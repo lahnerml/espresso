@@ -1,37 +1,41 @@
-# Copyright (C) 2014 Olaf Lenz
 #
+# Copyright (C) 2013,2014 The ESPResSo project
+#  
 # This file is part of ESPResSo.
-#
+#  
 # ESPResSo is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
-#
+#  
 # ESPResSo is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
-#
+#  
 # You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <http://www.gnu.org/licenses/>.
-#
-#
-# Define the espressomd package
-import sys, ctypes
+# along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+#  
+import sys
 
-# OpenMPI magic
-sys.setdlopenflags((sys.getdlopenflags() | ctypes.RTLD_GLOBAL ))
+cdef extern from "communication.hpp":
+  void mpi_init(int* argc = NULL, char ***argv = NULL)
+  int this_node
 
-# Initialize MPI, start the main loop on the slaves
-import espressomd._init
+cdef extern from "initialize.hpp":
+  void on_program_start()
+  void mpi_loop()
 
-# Initialize the Tcl Interpreter if available
-try:
-    import espressomd._tcl
-    tcl = espressomd._tcl.TclInterpreter()
-except ImportError:
-    pass
+### Here we make a minimalistic Tcl_Interp available
+# Main code
+mpi_init()
 
-espressomd._init.setup()
+# Main slave loop
+if this_node != 0:
+    on_program_start()
+    mpi_loop()
+    sys.exit()
 
-from espressomd.system import System
+def setup():
+    on_program_start()
+    

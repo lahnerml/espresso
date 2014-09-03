@@ -307,7 +307,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
     return;
   }
 
-  double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
+  double avg_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
 
   *rho =   avg_rho
          + lbfluid[0][0][index]
@@ -315,13 +315,13 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
          + lbfluid[0][3][index]  + lbfluid[0][4][index]
          + lbfluid[0][5][index]  + lbfluid[0][6][index] 
          + lbfluid[0][7][index]  + lbfluid[0][8][index]  
-	       + lbfluid[0][9][index]  + lbfluid[0][10][index]
+         + lbfluid[0][9][index]  + lbfluid[0][10][index]
          + lbfluid[0][11][index] + lbfluid[0][12][index] 
-	       + lbfluid[0][13][index] + lbfluid[0][14][index] 
+	     + lbfluid[0][13][index] + lbfluid[0][14][index] 
          + lbfluid[0][15][index] + lbfluid[0][16][index] 
-	       + lbfluid[0][17][index] + lbfluid[0][18][index];
-
+	     + lbfluid[0][17][index] + lbfluid[0][18][index];
 }
+
 
 /** Calculate the local fluid momentum.
  * The calculation is implemented explicitly for the special case of D3Q19.

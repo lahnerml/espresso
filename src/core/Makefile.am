@@ -80,6 +80,7 @@ libEspresso_la_SOURCES = \
 	random.cpp random.hpp \
 	rattle.cpp rattle.hpp \
 	reaction.cpp reaction.hpp \
+	readpdb.cpp readpdb.hpp \
 	Ringbuffer.hpp \
 	rotation.cpp rotation.hpp \
 	RuntimeErrorCollector.cpp RuntimeErrorCollector.hpp \
@@ -105,7 +106,8 @@ libEspresso_la_SOURCES = \
 	ghmc.cpp ghmc.hpp \
 	Vector.hpp \
 	SystemInterface.hpp \
-	EspressoSystemInterface.hpp EspressoSystemInterface.cpp
+	EspressoSystemInterface.hpp EspressoSystemInterface.cpp \
+	PdbParser.cpp PdbParser.hpp
 
 # nonbonded potentials and forces
 libEspresso_la_SOURCES += \

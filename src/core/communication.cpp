@@ -157,6 +157,7 @@ static int terminated = 0;
   CB(mpi_observable_lb_radial_velocity_profile_slave) \
   CB(mpiRuntimeErrorCollectorGatherSlave)        \
   CB(mpi_minimize_energy_slave) \
+  CB(mpi_gather_cuda_devices_slave) \
   CB(mpi_thermalize_cpu_slave) \
 
 // create the forward declarations
@@ -3008,3 +3009,17 @@ void mpi_external_potential_sum_energies_slave(int dummy1, int dummy2) {
   MPI_Reduce(energies, 0, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart); 
   free(energies);
 }
+
+#ifdef CUDA
+std::vector<EspressoGpuDevice> mpi_gather_cuda_devices() {
+  mpi_call(mpi_gather_cuda_devices_slave, 0, 0);
+  return cuda_gather_gpus();
+}
+#endif
+
+void mpi_gather_cuda_devices_slave(int dummy1, int dummy2) {
+#ifdef CUDA
+  cuda_gather_gpus();
+#endif
+}
+

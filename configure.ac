@@ -498,7 +498,72 @@ AS_IF([test x$arpack_found = xyes],[
   AC_DEFINE(ARPACK,[],[Whether ARPACK is available])])
 # end of check for ARPACK
 
+cat <<EOF
+****************************************************************
+*                  Checking for p4est                          *
+****************************************************************
+EOF
+# check whether the p4est library is available
+# This is needed for using adaptive grids in LBM
 
+## Checking for libsc
+################################
+AS_IF([test x$with_p4est = xguess || test x$with_p4est = xyes || test x$with_p4est = x],[
+   p4est_path=/usr/local/p4est
+],[test x$with_p4est != xno],[
+   p4est_path=$with_p4est
+   with_p4est=yes
+])
+
+AC_MSG_CHECKING([whether to use p4est])
+
+AC_ARG_WITH([p4est],
+	AS_HELP_STRING([--with-p4est],
+                       [specify whether or not to use p4est [guess]]),
+	, with_p4est=guess)
+AC_MSG_RESULT($with_p4est)
+
+cat <<EOF
+1/2: find libsc in $p4est_path
+EOF
+
+ES_ADDPATH_CHECK_LIB(sc, sc_init, [p4est_found=yes], [
+	p4est_found=no
+        
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find sc library in $p4est_path which is needed for p4est, specify location using LDFLAGS])
+        ],[
+            AC_MSG_WARN([could not find p4est library. Some features will not be available!])
+        ])
+    ], [$p4est_path/])
+
+## Checking for libp4est
+################################
+cat <<EOF
+2/2: find p4est
+EOF
+
+ES_ADDPATH_CHECK_LIB(p4est, p4est_init, [p4est_found=yes], [
+	p4est_found=no
+        
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find p4est library in [p4est_path], specify location using LDFLAGS])
+        ],[
+            AC_MSG_WARN([could not find p4est library. Some features will not be available!])
+        ])
+    ], [$p4est_path/lib/])
+
+AS_IF([test x$p4est_found = xno],[
+  AS_IF([test x$with_p4est = xyes],[
+    AC_MSG_FAILURE([p4est requested, but p4est was not found!])
+    ],[ AS_IF([test x$with_p4est = xguess], [
+          AC_MSG_WARN([p4est not found. Some features will not be available!])
+         ])
+    ])
+  ])
+AS_IF([test x$p4est_found = xyes],[
+  AC_DEFINE(p4est,[],[Whether p4est is available])])
+# end of check for p4est
 
 cat <<EOF
 ****************************************************************

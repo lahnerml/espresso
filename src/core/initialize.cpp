@@ -67,6 +67,11 @@
 #include "cuda_init.hpp"
 #include "cuda_interface.hpp"
 
+#ifdef LB_ADAPTIVE
+#include <sc.h>
+#include <p4est.h>
+#endif //LB_ADAPTIVE
+
 /** whether the thermostat has to be reinitialized before integration */
 static int reinit_thermo = 1;
 static int reinit_electrostatics = 0;
@@ -135,12 +140,15 @@ void on_program_start()
 #ifdef LB
   lb_pre_init();
 #endif
+#ifdef LB_ADAPTIVE
+  sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+  p4est_init(NULL, SC_LP_PRODUCTION);
+#endif //LB_ADAPTIVE
 
 #ifdef CATALYTIC_REACTIONS
   reaction.eq_rate=0.0;
   reaction.sing_mult=0;
 #endif
-
   /*
     call all initializations to do only on the master node here.
   */

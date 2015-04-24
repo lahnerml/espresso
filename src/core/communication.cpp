@@ -70,6 +70,12 @@
 #include "statistics_observable.hpp"
 #include "minimize_energy.hpp"
 
+#ifdef LB_ADAPTIVE
+#include "lb-adaptive.hpp"
+#include <p4est_to_p8est.h>
+#include <sc.h>
+#endif // LB_ADAPTIVE
+
 using namespace std;
 
 int this_node = -1;
@@ -273,6 +279,13 @@ void mpi_stop()
 
   mpi_call(mpi_stop_slave, -1, 0);
 
+  // shutdown p4est if it was used
+#ifdef LB_ADAPTIVE
+  p8est_destroy(p8est);
+  p8est_connectivity_destroy(conn);
+
+  sc_finalize();
+#endif
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -282,6 +295,13 @@ void mpi_stop()
 void mpi_stop_slave(int node, int param)
 {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
+
+#ifdef LB_ADAPTIVE
+  p8est_destroy(p8est);
+  p8est_connectivity_destroy(conn);
+
+  sc_finalize();
+#endif
 
   MPI_Barrier(comm_cart);
   MPI_Finalize();

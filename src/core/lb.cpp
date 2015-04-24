@@ -43,6 +43,12 @@
 
 #include "cuda_interface.hpp"
 
+#ifdef LB_ADAPTIVE
+#include <sc.h>
+#include <p8est.h>
+#include "lb-adaptive.hpp"
+#endif //LB_ADAPTIVE
+
 // global variable holding the number of fluid components (see global.cpp)
 int lb_components = LB_COMPONENTS;
 
@@ -1738,8 +1744,14 @@ int lb_sanity_checks() {
 
 /** (Pre-)allocate memory for data structures */
 void lb_pre_init() {
-    lbfluid[0]    = (double**) malloc(2*lbmodel.n_veloc*sizeof(double *));
-    lbfluid[0][0] = (double*) malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
+#ifdef LB_ADAPTIVE
+	sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+
+	rand_refinement();
+	// p4est_init(NULL, SC_LP_PRODUCTION);
+#endif // LB_ADAPTIVE
+	lbfluid[0]    = (double**) malloc(2*lbmodel.n_veloc*sizeof(double *));
+	lbfluid[0][0] = (double*) malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
 }
 
 

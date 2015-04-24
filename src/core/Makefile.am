@@ -60,6 +60,7 @@ libEspresso_la_SOURCES = \
 	lattice.cpp lattice_inline.hpp lattice.hpp \
 	layered.cpp layered.hpp \
 	lb.cpp lb.hpp \
+	lb-adaptive.cpp lb-adaptive.hpp \
 	lb-boundaries.cpp lb-boundaries.hpp \
 	lb-d3q18.hpp lb-d3q19.hpp \
 	lbgpu.cpp lbgpu.hpp\

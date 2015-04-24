@@ -524,7 +524,7 @@ AC_ARG_WITH([p4est],
 AC_MSG_RESULT($with_p4est)
 
 cat <<EOF
-1/2: find libsc in $p4est_path
+1/2: find libsc
 EOF
 
 ES_ADDPATH_CHECK_LIB(sc, sc_init, [p4est_found=yes], [
@@ -535,7 +535,17 @@ ES_ADDPATH_CHECK_LIB(sc, sc_init, [p4est_found=yes], [
         ],[
             AC_MSG_WARN([could not find p4est library. Some features will not be available!])
         ])
-    ], [$p4est_path/])
+    ], [$p4est_path/lib])
+    
+ES_ADDPATH_CHECK_HEADER([sc.h],, [
+   	p4est_found=no
+        
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find sc library header files specify location using CPPFLAGS])
+        ],[
+            AC_MSG_WARN([did not look for sc library header files as it is not used.])
+        ])
+    ], [$p4est_path/include])
 
 ## Checking for libp4est
 ################################
@@ -547,11 +557,21 @@ ES_ADDPATH_CHECK_LIB(p4est, p4est_init, [p4est_found=yes], [
 	p4est_found=no
         
         AS_IF([test x$with_p4est = xyes],[
-            AC_MSG_FAILURE([could not find p4est library in [p4est_path], specify location using LDFLAGS])
+            AC_MSG_FAILURE([could not find p4est library in $p4est_path, specify location using LDFLAGS])
         ],[
             AC_MSG_WARN([could not find p4est library. Some features will not be available!])
         ])
-    ], [$p4est_path/lib/])
+    ], [$p4est_path/lib])
+    
+ES_ADDPATH_CHECK_HEADER([p4est.h],, [
+   	p4est_found=no
+        
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find p4est library header files specify location using CPPFLAGS])
+        ],[
+            AC_MSG_WARN([did not look for p4est library header files as it is not used.])
+        ])
+    ], [$p4est_path/include])
 
 AS_IF([test x$p4est_found = xno],[
   AS_IF([test x$with_p4est = xyes],[

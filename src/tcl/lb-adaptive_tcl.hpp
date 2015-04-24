@@ -18,31 +18,17 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/** \file lb-adaptive.hpp
- *
- * Adaptive Lattice Boltzmann Scheme using CPU.
- * Header file for \ref lb-adaptive.cpp.
- *
- */
 
-#ifndef LB_ADAPTIVE_H
-#define LB_ADAPTIVE_H
+#include "parser.hpp"
+#include "lb-adaptive.hpp"
 
-#include "utils.hpp"
-#include <p8est.h>
-#include <p8est_connectivity.h>
+#ifndef LB_ADAPTIVE_TCL
+#define LB_ADAPTIVE_TCL
 
-extern p8est_t             *p8est;
-extern p8est_connectivity_t *conn;
+int tclcommand_setup_grid(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
-void setup_grid();
+int tclcommand_set_unif_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
-int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
-int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
-
-void rand_refinement(int level);
-
-void unif_refinement(int maxLevel);
-
-#endif //LB_ADAPTIVE_H
+#endif // LB_ADAPTIVE_TCL

@@ -37,6 +37,7 @@
 #include "integrate_sd_tcl.hpp"
 #include "interaction_data_tcl.hpp"
 #include "lb_tcl.hpp"
+#include "lb-adaptive_tcl.hpp"
 #include "lees_edwards_tcl.hpp"
 #include "lj_tcl.hpp"
 #include "maggs_tcl.hpp"
@@ -182,10 +183,13 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("save_state", tclcommand_save_state);
   REGISTER_COMMAND("load_state", tclcommand_load_state);
   /* in lb.cpp */
-
   REGISTER_COMMAND("lbfluid", tclcommand_lbfluid);
   REGISTER_COMMAND("lbnode", tclcommand_lbnode);
   REGISTER_COMMAND("lbboundary", tclcommand_lbboundary);
+  /* in lb-adaptive.cpp */
+  REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);
+  REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
+  REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
   /* here */
   REGISTER_COMMAND("replacestdchannel", tclcommand_replacestdchannel);
   /* in iccp3m.hpp */

@@ -51,6 +51,7 @@ libEspressoTcl_la_SOURCES = \
 	initialize_interpreter.cpp initialize_interpreter.hpp \
 	integrate_tcl.cpp integrate_tcl.hpp \
 	interaction_data_tcl.cpp interaction_data_tcl.hpp \
+	lb-adaptive_tcl.cpp lb-adaptive_tcl.hpp \
 	lb-boundaries_tcl.cpp lb-boundaries_tcl.hpp \
 	lb_tcl.cpp lb_tcl.hpp \
 	lees_edwards_tcl.cpp lees_edwards_tcl.hpp \

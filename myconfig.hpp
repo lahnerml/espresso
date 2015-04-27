@@ -77,6 +77,7 @@
 //#define LB_GPU
 //#define LB_BOUNDARIES
 //#define LB_BOUNDARIES_GPU
+#define LB_ADAPTIVE
 //#define LB_ELECTROHYDRODYNAMICS
 //#define ELECTROKINETICS
 //#define EK_BOUNDARIES

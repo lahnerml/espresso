@@ -2694,6 +2694,7 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 #endif
 }
 
+#ifdef LB_ADAPTIVE
 void mpi_lbadapt_grid_init (int node, int param) {
 		conn = p8est_connectivity_new_unitcube ();
 		p8est = p8est_new (comm_cart, conn, 0, NULL, NULL);
@@ -2721,6 +2722,7 @@ void mpi_rand_refinement (int node, int maxLevel) {
 	}
 	p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
 }
+#endif // LB_ADAPTIVE
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES

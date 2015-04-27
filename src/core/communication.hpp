@@ -468,6 +468,15 @@ void mpi_set_particle_gamma(int pnode, int part, double gamma);
 /** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
 void mpi_bcast_constraint(int del_num);
 
+#if defined(LB_ADAPTIVE)
+void mpi_lbadapt_grid_init (int node, int param);
+
+void mpi_unif_refinement (int node, int level);
+
+void mpi_rand_refinement (int node, int maxLevel);
+#endif // LB_ADAPTIVE
+
+
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
 void mpi_bcast_lbboundary(int del_num);

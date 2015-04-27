@@ -35,14 +35,8 @@
 extern p8est_t             *p8est;
 extern p8est_connectivity_t *conn;
 
-void setup_grid();
-
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
-
-void rand_refinement(int level);
-
-void unif_refinement(int maxLevel);
 
 #endif //LB_ADAPTIVE_H

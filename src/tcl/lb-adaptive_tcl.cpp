@@ -33,7 +33,8 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **
 	}
 
 	/* perform operation */
-	setup_grid();
+	mpi_call(mpi_lbadapt_grid_init, -1, 0);
+	mpi_lbadapt_grid_init(0, 0);
 
 	return TCL_OK;
 }
@@ -66,7 +67,7 @@ int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char 
   }
 
   mpi_call(mpi_unif_refinement, 1, level);
-  unif_refinement(level);
+  mpi_unif_refinement(0, level);
 
   return TCL_OK;
 }
@@ -97,7 +98,7 @@ int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char *
   }
 
   mpi_call(mpi_rand_refinement, -1, level);
-  rand_refinement(level);
+  mpi_rand_refinement(0, level);
 
   return TCL_OK;
 }

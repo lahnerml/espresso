@@ -72,8 +72,10 @@
 
 #ifdef LB_ADAPTIVE
 #include "lb-adaptive.hpp"
-#include <p4est_to_p8est.h>
 #include <sc.h>
+#include <p8est.h>
+#include <p8est_balance.h>
+#include <p8est_vtk.h>
 #endif // LB_ADAPTIVE
 
 using namespace std;
@@ -169,6 +171,9 @@ static int terminated = 0;
   CB(mpi_minimize_energy_slave) \
   CB(mpi_gather_cuda_devices_slave) \
   CB(mpi_thermalize_cpu_slave) \
+  CB(mpi_lbadapt_grid_init) \
+  CB(mpi_unif_refinement) \
+  CB(mpi_rand_refinement) \
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -281,8 +286,12 @@ void mpi_stop()
 
   // shutdown p4est if it was used
 #ifdef LB_ADAPTIVE
-  p8est_destroy(p8est);
-  p8est_connectivity_destroy(conn);
+  if (p8est) {
+  	p8est_destroy(p8est);
+  }
+  if (conn) {
+  	p8est_connectivity_destroy(conn);
+  }
 
   sc_finalize();
 #endif
@@ -296,13 +305,17 @@ void mpi_stop_slave(int node, int param)
 {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
+
 #ifdef LB_ADAPTIVE
-  p8est_destroy(p8est);
-  p8est_connectivity_destroy(conn);
+  if (p8est) {
+  	p8est_destroy(p8est);
+  }
+  if (conn) {
+  	p8est_connectivity_destroy(conn);
+  }
 
   sc_finalize();
 #endif
-
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -2679,6 +2692,34 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
     *boundary = data;
   }
 #endif
+}
+
+void mpi_lbadapt_grid_init (int node, int param) {
+		conn = p8est_connectivity_new_unitcube ();
+		p8est = p8est_new (comm_cart, conn, 0, NULL, NULL);
+}
+
+void mpi_unif_refinement (int node, int level) {
+	fprintf(stderr, "%i", this_node);
+
+	for (int i = 0; i < level; i++) {
+		p8est_refine(p8est, 0, refine_uniform, NULL);
+		p8est_partition (p8est, 0, NULL);
+	}
+	p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
+}
+
+void mpi_rand_refinement (int node, int maxLevel) {
+	fprintf(stderr, "%i", this_node);
+	// assert level 0 is refined
+	p8est_refine (p8est, 0, refine_uniform, NULL);
+
+	// for remaining levels 50% chance they will be refined
+	for (int i = 0; i < maxLevel; i++) {
+		p8est_refine(p8est, 0, refine_random, NULL);
+		p8est_partition (p8est, 0, NULL);
+	}
+	p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
 }
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {

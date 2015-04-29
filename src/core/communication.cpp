@@ -2698,21 +2698,24 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 
 #ifdef LB_ADAPTIVE
 void mpi_lbadapt_grid_init (int node, int param) {
-	  lbadapt_ctx_t ctx;
-	  ctx.bla = 0.5;
+	/* define context */
+	lbadapt_ctx_t ctx;
+	ctx.bla = 0.5;
 
-		conn = p8est_connectivity_new_unitcube ();
-		p8est = p8est_new_ext (comm_cart,        /* mpi communicator */
-													 conn,             /* connectivity */
-													 0,                /* min octants per process */
-													 0,				      	 /* min level */
-													 0,                /* fill uniform */
-													 sizeof (double),	 /* data size */
-													 lbadapt_init,     /* init function */
-													 (void *) (&ctx)   /* user pointer */
-													 );
-		p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_postInitTree");
+	/* create connectivity and octree */
+	conn = p8est_connectivity_new_unitcube ();
+	p8est = p8est_new_ext (comm_cart,        /* mpi communicator */
+			               conn,             /* connectivity */
+						   0,                /* min octants per process */
+						   0,				      	 /* min level */
+						   0,                /* fill uniform */
+						   sizeof (double),	 /* data size */
+						   lbadapt_init,     /* init function */
+						   (void *) (&ctx)   /* user pointer */
+	);
 
+	// create debug output
+	p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_postInitTree");
 }
 
 void mpi_unif_refinement (int node, int level) {

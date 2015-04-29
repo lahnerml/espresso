@@ -50,7 +50,7 @@ doc/dg/background_errors.unsorted
 *.swp
 
 # Eclipse project files
-.cproject
+src/__pycache__/
+.texlipse
 .autotools
 .pydevproject
-src/__pycache__/

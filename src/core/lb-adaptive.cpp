@@ -25,10 +25,6 @@
  *
  */
 
-#include <p8est_algorithms.h>
-#include <p8est_balance.h>
-#include <p8est_vtk.h>
-
 #include <stdlib.h>
 
 #include "utils.hpp"
@@ -49,5 +45,13 @@ int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t 
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
 	return rand() % 2;
 }
+
+void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
+	lbadapt_ctx_t *ctx = (lbadapt_ctx_t *) p8est->user_pointer;
+	lbadapt_payload_t *data = (lbadapt_payload_t *) quadrant->p.user_data;
+
+	data->test = 1.0;
+}
+
 
 #endif // LB_ADAPTIVE

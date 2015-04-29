@@ -72,10 +72,12 @@
 
 #ifdef LB_ADAPTIVE
 #include "lb-adaptive.hpp"
-#include <sc.h>
+#include <p8est_connectivity.h>
 #include <p8est.h>
-#include <p8est_balance.h>
+#include <p8est_bits.h>
+#include <p8est_extended.h>
 #include <p8est_vtk.h>
+#include <sc.h>
 #endif // LB_ADAPTIVE
 
 using namespace std;
@@ -2696,13 +2698,24 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 
 #ifdef LB_ADAPTIVE
 void mpi_lbadapt_grid_init (int node, int param) {
+	  lbadapt_ctx_t ctx;
+	  ctx.bla = 0.5;
+
 		conn = p8est_connectivity_new_unitcube ();
-		p8est = p8est_new (comm_cart, conn, 0, NULL, NULL);
+		p8est = p8est_new_ext (comm_cart,        /* mpi communicator */
+													 conn,             /* connectivity */
+													 0,                /* min octants per process */
+													 0,				      	 /* min level */
+													 0,                /* fill uniform */
+													 sizeof (double),	 /* data size */
+													 lbadapt_init,     /* init function */
+													 (void *) (&ctx)   /* user pointer */
+													 );
+		p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_postInitTree");
+
 }
 
 void mpi_unif_refinement (int node, int level) {
-	fprintf(stderr, "%i", this_node);
-
 	for (int i = 0; i < level; i++) {
 		p8est_refine(p8est, 0, refine_uniform, NULL);
 		p8est_partition (p8est, 0, NULL);
@@ -2711,11 +2724,11 @@ void mpi_unif_refinement (int node, int level) {
 }
 
 void mpi_rand_refinement (int node, int maxLevel) {
-	fprintf(stderr, "%i", this_node);
 	// assert level 0 is refined
 	p8est_refine (p8est, 0, refine_uniform, NULL);
 
 	// for remaining levels 50% chance they will be refined
+	// refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
 	for (int i = 0; i < maxLevel; i++) {
 		p8est_refine(p8est, 0, refine_random, NULL);
 		p8est_partition (p8est, 0, NULL);

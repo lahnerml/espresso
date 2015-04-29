@@ -143,6 +143,28 @@ if test "${CXXFLAGS+set}" != set; then
   ],[
     AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
   ])
+
+  ##################################
+  # test for -Wextra
+  AC_MSG_CHECKING([whether the compiler accepts -Wextra])
+  saved_CXXFLAGS=$CXXFLAGS
+  CXXFLAGS="-Wextra $CXXFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[
+    AC_MSG_RESULT(yes);try_add_flag_res=yes
+  ],[
+    AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
+  ])
+
+  ##################################
+  # test for -pedantic
+  AC_MSG_CHECKING([whether the compiler accepts -pedantic])
+  saved_CXXFLAGS=$CXXFLAGS
+  CXXFLAGS="-pedantic $CXXFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[
+    AC_MSG_RESULT(yes);try_add_flag_res=yes
+  ],[
+    AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
+  ])
 fi
 
 ##################################
@@ -517,7 +539,7 @@ AS_IF([test x$with_p4est = xguess || test x$with_p4est = xyes || test x$with_p4e
 
 AC_MSG_CHECKING([whether to use p4est])
 
-AC_ARG_WITH([p4est],
+AC_ARG_WITH([P4EST],
 	AS_HELP_STRING([--with-p4est],
                        [specify whether or not to use p4est [guess]]),
 	, with_p4est=guess)
@@ -582,7 +604,7 @@ AS_IF([test x$p4est_found = xno],[
     ])
   ])
 AS_IF([test x$p4est_found = xyes],[
-  AC_DEFINE(p4est,[],[Whether p4est is available])])
+  AC_DEFINE(P4EST,[],[Whether p4est is available])])
 # end of check for p4est
 
 cat <<EOF

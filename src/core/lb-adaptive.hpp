@@ -28,15 +28,28 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
-#include "utils.hpp"
 #include <p8est.h>
 #include <p8est_connectivity.h>
+
+#include "utils.hpp"
 
 extern p8est_t             *p8est;
 extern p8est_connectivity_t *conn;
 
+typedef struct lbadapt_payload {
+	double test;
+} lbadapt_payload_t;
+
+typedef struct lbadapt_ctx {
+	double bla;
+} lbadapt_ctx_t;
+
+void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
+
 
 #endif //LB_ADAPTIVE_H

@@ -376,10 +376,10 @@ inline double sinc(double d)
 {
 #define epsi 0.1
 
-#define c2 -0.1666666666667e-0
-#define c4  0.8333333333333e-2
-#define c6 -0.1984126984127e-3
-#define c8  0.2755731922399e-5
+#define C2 -0.1666666666667e-0
+#define C4  0.8333333333333e-2
+#define C6 -0.1984126984127e-3
+#define C8  0.2755731922399e-5
 
   double PId = PI*d, PId2;
 
@@ -387,7 +387,7 @@ inline double sinc(double d)
     return sin(PId)/PId;
   else {
     PId2 = SQR(PId);
-    return 1.0 + PId2*(c2+PId2*(c4+PId2*(c6+PId2*c8)));
+    return 1.0 + PId2*(C2+PId2*(C4+PId2*(C6+PId2*C8)));
   }
 }
 

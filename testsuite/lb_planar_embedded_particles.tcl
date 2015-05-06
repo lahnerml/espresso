@@ -37,6 +37,9 @@ set visc 7.
 set rho 2.
 set tau 0.04
 
+set steps 3000
+set writeIntervals 20
+
 setmd skin [ expr 0.4*$agrid ]
 
 lbfluid agrid $agrid visc $visc dens $rho tau $tau
@@ -175,7 +178,16 @@ lset f_body_vec $couette_flow_direction $f_body
 lbfluid agrid $agrid visc $visc dens $rho friction 1 tau $tau ext_force \
   [ lindex $f_body_vec 0 ] [ lindex $f_body_vec 1 ] [ lindex $f_body_vec 2 ]
 
-integrate 2000
+for {set i 0} {$i < $steps} {incr i} {
+  if {$i % $writeIntervals == 0} {
+    puts -nonewline "integrating $i"
+    puts "th step"
+
+    lbfluid print vtk velocity lb_planar_embedded_particles_poiseulle_velocity_$i.vtk
+    puts "wrote velocity file"
+  }
+  integrate 1
+}
 
 set accuracy_u 0.
 set meanabs_u 0.

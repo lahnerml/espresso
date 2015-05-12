@@ -77,7 +77,7 @@ extern int node_neighbors[6];
 #endif
 /** where to fold particles that leave local box in direction i. */
 extern int boundary[6];
-/** Flags for all three dimensions wether pbc are applied (default).
+/** Flags for all three dimensions whether pbc are applied (default).
     The first three bits give the periodicity */
 extern int periodic;
 

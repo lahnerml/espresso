@@ -70,9 +70,13 @@ void calculate_wall_dist(Particle *p1, double ppos[3], Particle *c_p, Constraint
   int i;
 
   *dist = -c->d;
-  for(i=0;i<3;i++) *dist += ppos[i]*c->n[i];
+  for (i = 0; i < 3; i++) {
+	*dist += ppos[i]*c->n[i];
+  }
   
-  for(i=0;i<3;i++) vec[i] = c->n[i] * *dist;
+  for(i = 0; i < 3; i++) {
+	vec[i] = c->n[i] * *dist;
+  }
   
 }
 

@@ -2702,12 +2702,14 @@ void mpi_lbadapt_grid_init (int node, int param) {
 	lbadapt_ctx_t ctx;
 	ctx.bla = 0.5;
 
+	fprintf (stderr, "%i", periodic);
 	/* create connectivity and octree */
-	conn = p8est_connectivity_new_unitcube ();
+	conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
+			                             periodic & 1, periodic & 2, periodic & 4);
 	p8est = p8est_new_ext (comm_cart,        /* mpi communicator */
 			               conn,             /* connectivity */
 						   0,                /* min octants per process */
-						   0,				      	 /* min level */
+						   0,				 /* min level */
 						   0,                /* fill uniform */
 						   sizeof (double),	 /* data size */
 						   lbadapt_init,     /* init function */

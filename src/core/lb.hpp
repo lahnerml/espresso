@@ -27,6 +27,7 @@
 #ifndef LB_H
 #define LB_H
 
+#include "lb-adaptive.hpp"
 #include "utils.hpp"
 #include "lattice_inline.hpp"
 

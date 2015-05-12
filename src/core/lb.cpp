@@ -582,16 +582,24 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
 	} else {
 		pos_file_ending = strpbrk (filename, "\0");
 	}
+
+	/* this is parallel io, i.e. we have to communicate the filename to all
+	 * other processes. */
     len = pos_file_ending - filename + 1;
 
+    /* call mpi printing routine on all slaves and communicate the filename */
     mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
     MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+    /* perform master IO routine here. */
+    /* TODO: move this to communication? */
 
     double *boundary;
     p4est_locidx_t num_cells;
     num_cells = p8est->local_num_quadrants;
     boundary = P4EST_ALLOC(double, num_cells);
 
+    /* grab boundary cells */
     p8est_iterate (p8est, NULL,
                    boundary,
                    lbadapt_get_boundary_values,
@@ -600,6 +608,7 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
                    NULL
     );
 
+    /* call output routine */
     p8est_vtk_writeAll (p8est,  /* p8est */
                         NULL,   /* geometry */
                         1.,     /* draw at full scale */
@@ -613,6 +622,7 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
                         "boundaries", boundary
     );
 
+    /* free memory */
     P4EST_FREE(boundary);
 
 #else // LB_ADAPTIVE

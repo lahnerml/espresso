@@ -574,38 +574,46 @@ int lb_lbfluid_get_ext_force(double* p_fx, double* p_fy, double* p_fz){
 
 int lb_lbfluid_print_vtk_boundary(char* filename) {
 #ifdef LB_ADAPTIVE
+	int len;
 	/* strip file ending from filename (if given) */
 	char *pos_file_ending = strpbrk (filename, ".");
 	if (pos_file_ending != 0) {
 		*pos_file_ending = '\0';
+	} else {
+		pos_file_ending = strpbrk (filename, "\0");
 	}
-	double *boundary;
-	p4est_locidx_t num_cells;
-	num_cells = p8est->local_num_quadrants;
-	boundary = P4EST_ALLOC(double, num_cells);
+    len = pos_file_ending - filename + 1;
 
-	p8est_iterate (p8est, NULL,
-				   boundary,
-				   lbadapt_get_boundary_values,
-				   NULL,
-				   NULL,
-				   NULL
-	);
+    mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
+    MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-	p8est_vtk_writeAll (p8est,  /* p8est */
-			            NULL,   /* geometry */
-						1.,     /* draw at full scale */
-						1,      /* write tree-id */
-						1,      /* write refinement level of each octant */
-						1,      /* write mpi process id */
-						0,      /* no rank wrapping */
-						1,      /* one scalar field of cell data */
-						0, 0, 0,/* no cell vectors, point scalars or point vectors */
-						filename,
-						"boundaries", boundary
-	);
+    double *boundary;
+    p4est_locidx_t num_cells;
+    num_cells = p8est->local_num_quadrants;
+    boundary = P4EST_ALLOC(double, num_cells);
 
-	P4EST_FREE(boundary);
+    p8est_iterate (p8est, NULL,
+                   boundary,
+                   lbadapt_get_boundary_values,
+                   NULL,
+                   NULL,
+                   NULL
+    );
+
+    p8est_vtk_writeAll (p8est,  /* p8est */
+                        NULL,   /* geometry */
+                        1.,     /* draw at full scale */
+                        1,      /* write tree-id */
+                        1,      /* write refinement level of each octant */
+                        1,      /* write mpi process id */
+                        0,      /* no rank wrapping */
+                        1,      /* one scalar field of cell data */
+                        0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                        filename,
+                        "boundaries", boundary
+    );
+
+    P4EST_FREE(boundary);
 
 #else // LB_ADAPTIVE
     FILE* fp = fopen(filename, "w");

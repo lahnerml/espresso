@@ -471,6 +471,8 @@ void mpi_bcast_constraint(int del_num);
 #if defined(LB_ADAPTIVE)
 void mpi_lbadapt_grid_init (int node, int param);
 
+void mpi_lbadapt_vtk_print_boundary(int node, int len);
+
 void mpi_unif_refinement (int node, int level);
 
 void mpi_rand_refinement (int node, int maxLevel);

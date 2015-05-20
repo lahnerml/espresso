@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
+  Copyright (C) 2010,2011,2012,2013,2014,2015 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group,
 
@@ -37,7 +37,7 @@
 #ifdef LB_ADAPTIVE
 
 p8est_connectivity_t *conn;
-p8est_t *p8est;
+p8est_t              *p8est;
 
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
 	return 1;
@@ -48,11 +48,12 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 }
 
 void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
-	lbadapt_ctx_t *ctx = (lbadapt_ctx_t *) p8est->user_pointer;
 	lbadapt_payload_t *data = (lbadapt_payload_t *) quadrant->p.user_data;
 
-	data->test = 1.0;
 	data->boundary = 0;
+	data->lbfields = malloc(sizeof(LB_FluidNode));
+	data->lbfluid[0] = malloc(lbmodel.n_veloc * sizeof(double));
+	data->lbfluid[1] = malloc(lbmodel.n_veloc * sizeof(double));
 }
 
 void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
@@ -98,13 +99,13 @@ void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_d
 	p4est_locidx_t  arrayoffset;
 	int i, j;
 
-    tree = p8est_tree_array_index (p8est->trees, which_tree);
-    local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
-    arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
+	tree = p8est_tree_array_index (p8est->trees, which_tree);
+	local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
+	arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
 
-    /* just grab the u value of each cell and pass it into solution vector */
-    bnd = data->boundary;
-    bnd_vals[arrayoffset] = bnd;
+	/* just grab the u value of each cell and pass it into solution vector */
+	bnd = data->boundary;
+	bnd_vals[arrayoffset] = bnd;
 }
 
 #endif // LB_ADAPTIVE

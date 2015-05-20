@@ -183,6 +183,7 @@ extern LB_Model lbmodel;
 extern LB_Parameters lbpar; 
 
 /** The underlying lattice */
+#ifndef LB_ADAPTIVE
 extern Lattice lblattice;
 
 /** Pointer to the velocity populations of the fluid.
@@ -192,6 +193,15 @@ extern double **lbfluid[2];
 
 /** Pointer to the hydrodynamic fields of the fluid */
 extern LB_FluidNode *lbfields;
+
+#else
+typedef struct lbadapt_payload {
+  int  boundary;
+  double *lbfluid[2];
+  LB_FluidNode lbfields;
+} lbadapt_payload_t;
+
+#endif // LB_ADAPTIVE
 
 /** Switch indicating momentum exchange between particles and fluid */
 extern int transfer_momentum;
@@ -325,10 +335,9 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
          + lbfluid[0][7][index]  + lbfluid[0][8][index]  
 	       + lbfluid[0][9][index]  + lbfluid[0][10][index]
          + lbfluid[0][11][index] + lbfluid[0][12][index] 
-	       + lbfluid[0][13][index] + lbfluid[0][14][index] 
+	       + lbfluid[0][13][index] + lbfluid[0][14][index]
          + lbfluid[0][15][index] + lbfluid[0][16][index] 
 	       + lbfluid[0][17][index] + lbfluid[0][18][index];
-
 }
 
 /** Calculate the local fluid momentum.

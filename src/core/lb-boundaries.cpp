@@ -291,7 +291,7 @@ if (ek_initialized)
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   }
   else {
-#if defined (LB) && defined (LB_BOUNDARIES) && defined(LB_ADAPTIVE)
+#if defined (LB) && defined (LB_BOUNDARIES) && !defined(LB_ADAPTIVE)
     int node_domain_position[3], offset[3];
     int the_boundary=-1;
     map_node_array(this_node, node_domain_position);
@@ -368,7 +368,7 @@ if (ek_initialized)
         }
       }
     } 
-// #elif defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
+#elif defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
     /* iterate over domain and put cell centers into cell function */
     /* set boundary information in cell centers */
     p8est_iterate (p8est,
@@ -512,6 +512,9 @@ void lb_bounce_back() {
 
   /* bottom-up sweep */
   //  for (k=lblattice.halo_offset;k<lblattice.halo_grid_volume;k++) {
+#ifdef LB_ADAPTIVE
+
+#else // LB_ADAPTIVE
   for (z=0; z<lblattice.grid[2]+2; z++) {
     for (y=0; y<lblattice.grid[1]+2; y++) {
       for (x=0; x<lblattice.grid[0]+2; x++) {
@@ -537,17 +540,18 @@ void lb_bounce_back() {
               else
                 lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k];
             }
-          }
+           }
         }
       }
     }
   }
-#else
+#endif // LB_ADAPTIVE
+#else // !PULL
 #error Bounce back boundary conditions are only implemented for PUSH scheme!
-#endif
-#else
+#endif // !PULL
+#else // D3Q19
 #error Bounce back boundary conditions are only implemented for D3Q19!
-#endif
+#endif // D3Q19
 }
 
 #endif

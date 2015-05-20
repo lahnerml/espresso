@@ -1,7 +1,7 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014,2015 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
-    Max-Planck-Institute for Polymer Research, Theory Group
+  Max-Planck-Institute for Polymer Research, Theory Group
 
   This file is part of ESPResSo.
 
@@ -28,25 +28,18 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
+/* p4est includes; opted to go for pure 3D */
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
+#include <p8est_ghost.h>
 #include <p8est_iterate.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
 #include "utils.hpp"
 
-extern p8est_t             *p8est;
+extern p8est_t              *p8est;
 extern p8est_connectivity_t *conn;
-
-typedef struct lbadapt_payload {
-	int    boundary;
-	double test;
-} lbadapt_payload_t;
-
-typedef struct lbadapt_ctx {
-	double bla;
-} lbadapt_ctx_t;
 
 void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
@@ -56,13 +49,13 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 
 /** Get the coordinates of the midpoint of a quadrant.
  *
- * \param [in]  p4est      the forest
+ * \param [in]  p4est    the forest
  * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q          the quadrant
- * \param [out] xyz        the coordinates of the midpoint of \a q
+ * \param [in]  q      the quadrant
+ * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
-                           p8est_quadrant_t * q, double xyz[3]);
+         p8est_quadrant_t * q, double xyz[3]);
 
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data);
 

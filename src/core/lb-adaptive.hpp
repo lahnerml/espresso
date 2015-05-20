@@ -47,11 +47,25 @@ extern p8est_connectivity_t *conn;
  */
 void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
+
 /*** REFINEMENT ***/
+/** Refinement function that refines all cells
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ */
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
 
+/** Refinement function that refines all cells with probability 0. with probability 0.55
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ */
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
 
 /*** HELPER FUNCTIONS ***/
 /* Geometry */
@@ -65,15 +79,17 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
          p8est_quadrant_t * q, double xyz[3]);
 
+
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *
  * \param [in][out] datafield  The fluid node that shall be written.
- * \param [in]      rho        The fluid density.
- * \param [in]      j          The fluid velocity.
- * \param [in]      pi         The fluid's stress tensor.
+ * \param [in]      rho        The fluids density.
+ * \param [in]      j          The fluids velocity.
+ * \param [in]      pi         The fluids stress tensor.
  */
 int lbadapt_calc_n_from_rho_j_pi (double * datafield, double rho, double* j, double* pi);
+
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data);
@@ -86,6 +102,4 @@ void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_data);
-
-
 #endif //LB_ADAPTIVE_H

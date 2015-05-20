@@ -1957,13 +1957,13 @@ void lb_reinit_parameters() {
  *  for boundaries to be set. */
 void lb_reinit_forces() {
 #ifdef LB_ADAPTIVE
-  p8est_iterate (p8est, NULL,
+  p8est_iterate (p8est,
+                 NULL,
                  NULL,
                  lbadapt_init_force_per_cell,
                  NULL,
                  NULL,
-                 NULL
-  );
+                 NULL);
 #else // LB_ADAPTIVE
   for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES
@@ -1994,14 +1994,13 @@ void lb_reinit_fluid() {
   LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
 
 #ifdef LB_ADAPTIVE
-
-  p8est_iterate (p8est, NULL,
+  p8est_iterate (p8est,
+                 NULL,
                  NULL,
                  lbadapt_init_fluid_per_cell,
                  NULL,
                  NULL,
-                 NULL
-  );
+                 NULL);
 #else // LB_ADAPTIVE
   /* default values for fields in lattice units */
   /* here the conversion to lb units is performed */

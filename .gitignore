@@ -48,6 +48,7 @@ doc/dg/background_errors.unsorted
 ## Editor stuff
 # vim
 *.swp
+tags/
 
 # Eclipse project files
 src/__pycache__/

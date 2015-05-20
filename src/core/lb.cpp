@@ -1953,7 +1953,8 @@ void lb_reinit_parameters() {
 }
 
 
-/** Resets the forces on the fluid nodes */
+/** Resets the forces on the fluid nodes; needs to be called after lb_reinit-fluid
+ *  for boundaries to be set. */
 void lb_reinit_forces() {
   for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES

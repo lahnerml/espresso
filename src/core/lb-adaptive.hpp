@@ -88,7 +88,10 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
  * \param [in]      j          The fluids velocity.
  * \param [in]      pi         The fluids stress tensor.
  */
-int lbadapt_calc_n_from_rho_j_pi (double * datafield, double rho, double* j, double* pi);
+int lbadapt_calc_n_from_rho_j_pi (double * datafield,
+                                  double rho,
+                                  double* j,
+                                  double* pi);
 
 
 /*** ITERATION CALLBACKS ***/

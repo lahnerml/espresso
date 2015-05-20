@@ -22,7 +22,6 @@
  *
  * Adaptive Lattice Boltzmann Scheme using CPU.
  * Implementation file for \ref lb-boundaries.hpp.
- *
  */
 
 #include <stdlib.h>
@@ -71,6 +70,108 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
                           q->x + half_length, q->y + half_length,
                           q->z + half_length,
                           xyz);
+}
+
+
+int lbadapt_calc_n_from_rho_j_pi (double * datafield,
+                                  double rho,
+                                  double * j,
+                                  double * pi) {
+  int i;
+  double local_rho, local_j[3], local_pi[6], trace;
+  const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
+
+  local_rho  = rho;
+
+  local_j[0] = j[0];
+  local_j[1] = j[1];
+  local_j[2] = j[2];
+
+  for (i = 0; i < 6; i++) local_pi[i] = pi[i];
+
+  trace = local_pi[0] + local_pi[2] + local_pi[5];
+
+#ifdef D3Q19
+  double rho_times_coeff;
+  double tmp1,tmp2;
+
+  /* update the q=0 sublattice */
+  datafield[0][0] = 1./3. * (local_rho-avg_rho) - 1./2. * trace;
+
+  /* update the q=1 sublattice */
+  rho_times_coeff = 1./18. * (local_rho-avg_rho);
+
+  datafield[0][1] = rho_times_coeff + 1./6.*local_j[0] + 1./4. * local_pi[0]
+                    - 1./12.*trace;
+  datafield[0][2] = rho_times_coeff - 1./6.*local_j[0] + 1./4. * local_pi[0]
+                    - 1./12.*trace;
+  datafield[0][3] = rho_times_coeff + 1./6.*local_j[1] + 1./4. * local_pi[2]
+                    - 1./12.*trace;
+  datafield[0][4] = rho_times_coeff - 1./6.*local_j[1] + 1./4. * local_pi[2]
+                    - 1./12.*trace;
+  datafield[0][5] = rho_times_coeff + 1./6.*local_j[2] + 1./4. * local_pi[5]
+                    - 1./12.*trace;
+  datafield[0][6] = rho_times_coeff - 1./6.*local_j[2] + 1./4. * local_pi[5]
+                    - 1./12.*trace;
+
+  /* update the q=2 sublattice */
+  rho_times_coeff = 1./36. * (local_rho-avg_rho);
+
+  tmp1 = local_pi[0] + local_pi[2];
+  tmp2 = 2.0 * local_pi[1];
+
+  datafield[0][7]  = rho_times_coeff + 1./12.*(local_j[0]+local_j[1])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][8]  = rho_times_coeff - 1./12.*(local_j[0]+local_j[1])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][9]  = rho_times_coeff + 1./12.*(local_j[0]-local_j[1])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+  datafield[0][10] = rho_times_coeff - 1./12.*(local_j[0]-local_j[1])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+
+  tmp1 = local_pi[0] + local_pi[5];
+  tmp2 = 2.0 * local_pi[3];
+
+  datafield[0][11] = rho_times_coeff + 1./12.*(local_j[0]+local_j[2])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][12] = rho_times_coeff - 1./12.*(local_j[0]+local_j[2])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][13] = rho_times_coeff + 1./12.*(local_j[0]-local_j[2])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+  datafield[0][14] = rho_times_coeff - 1./12.*(local_j[0]-local_j[2])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+
+  tmp1 = local_pi[2] + local_pi[5];
+  tmp2 = 2.0 * local_pi[4];
+
+  datafield[0][15] = rho_times_coeff + 1./12.*(local_j[1]+local_j[2])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][16] = rho_times_coeff - 1./12.*(local_j[1]+local_j[2])
+                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+  datafield[0][17] = rho_times_coeff + 1./12.*(local_j[1]-local_j[2])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+  datafield[0][18] = rho_times_coeff - 1./12.*(local_j[1]-local_j[2])
+                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+#else // D3Q19
+  int i;
+  double tmp=0.0;
+  double (*c)[3] = lbmodel.c;
+  double (*coeff)[4] = lbmodel.coeff;
+
+  for (i = 0; i < lbmodel.n_veloc; i++) {
+    tmp = local_pi[0] * SQR(c[i][0])
+      + (2.0 * local_pi[1] * c[i][0] + local_pi[2] * c[i][1])*c[i][1]
+      + (2.0 * (local_pi[3]*c[i][0] + local_pi[4] * c[i][1])
+         + local_pi[5] * c[i][2]) * c[i][2];
+
+    datafield[0][i] =  coeff[i][0] * (local_rho-avg_rho);
+    datafield[0][i] += coeff[i][1] * scalar(local_j,c[i]);
+    datafield[0][i] += coeff[i][2] * tmp;
+    datafield[0][i] += coeff[i][3] * trace;
+  }
+#endif // D3Q19
+
+  return 0;
 }
 
 

@@ -1956,6 +1956,15 @@ void lb_reinit_parameters() {
 /** Resets the forces on the fluid nodes; needs to be called after lb_reinit-fluid
  *  for boundaries to be set. */
 void lb_reinit_forces() {
+#ifdef LB_ADAPTIVE
+  p8est_iterate (p8est, NULL,
+                 NULL,
+                 lbadapt_init_force_per_cell,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+#else // LB_ADAPTIVE
   for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES
     // unit conversion: force density
@@ -1969,6 +1978,7 @@ void lb_reinit_forces() {
     lbfields[index].has_force = 0;
 #endif // EXTERNAL_FORCES
   }
+#endif // LB_ADAPTIVE
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
     lb_boundaries[i].force[0] = 0.;
@@ -1981,14 +1991,25 @@ void lb_reinit_forces() {
 
 /** (Re-)initializes the fluid according to the given value of rho. */
 void lb_reinit_fluid() {
+  LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
+
+#ifdef LB_ADAPTIVE
+
+  p8est_iterate (p8est, NULL,
+                 NULL,
+                 lbadapt_init_fluid_per_cell,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+#else // LB_ADAPTIVE
   /* default values for fields in lattice units */
   /* here the conversion to lb units is performed */
-  double rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
+  double rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
+  // start with fluid at rest and no stress
   double j[3] = { 0., 0., 0. };
-// double pi[6] = { rho*lbmodel.c_sound_sq, 0., rho*lbmodel.c_sound_sq, 0., 0., rho*lbmodel.c_sound_sq };
+  // double pi[6] = { rho*lbmodel.c_sound_sq, 0., rho*lbmodel.c_sound_sq, 0., 0., rho*lbmodel.c_sound_sq };
   double pi[6] = { 0., 0., 0., 0., 0., 0. };
-
-  LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
 
   for (index_t index = 0; index < lblattice.halo_grid_volume; index++) {
     // calculate equilibrium distribution
@@ -1999,6 +2020,7 @@ void lb_reinit_fluid() {
     lbfields[index].boundary = 0;
 #endif // LB_BOUNDARIES
   }
+#endif // LB_ADAPTIVE
 
   lbpar.resend_halo = 0;
 #ifdef LB_BOUNDARIES

@@ -38,15 +38,23 @@
 
 #include "utils.hpp"
 
+/* "global variables" */
 extern p8est_t              *p8est;
 extern p8est_connectivity_t *conn;
 
+
+/** setup function 
+ */
 void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
+/*** REFINEMENT ***/
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
 
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
+/*** HELPER FUNCTIONS ***/
+/* Geometry */
 /** Get the coordinates of the midpoint of a quadrant.
  *
  * \param [in]  p4est    the forest
@@ -57,8 +65,27 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
          p8est_quadrant_t * q, double xyz[3]);
 
+/* LBM */
+/** Calculate equilibrium distribution from given fluid parameters
+ *
+ * \param [in][out] datafield  The fluid node that shall be written.
+ * \param [in]      rho        The fluid density.
+ * \param [in]      j          The fluid velocity.
+ * \param [in]      pi         The fluid's stress tensor.
+ */
+int lbadapt_calc_n_from_rho_j_pi (double * datafield, double rho, double* j, double* pi);
+
+/*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data);
 
+
 void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_data);
+
 
 #endif //LB_ADAPTIVE_H

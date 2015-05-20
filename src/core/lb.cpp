@@ -76,7 +76,7 @@ LB_Parameters lbpar = {
   // friction
   {0.0},
   // ext_force
-  { 0.0, 0.0, 0.0},
+  {0.0, 0.0, 0.0},
   // rho_lb_units
   {0.},
   // gamma_odd
@@ -176,6 +176,7 @@ int lb_lbfluid_set_shanchen_coupling(double *p_coupling) {
   }
   on_lb_params_change_gpu(LBPAR_COUPLING);
 #endif // LB_GPU
+
 #ifdef LB
 #error not implemented
 #endif // LB
@@ -204,8 +205,7 @@ int lb_lbfluid_set_mobility(double *p_mobility) {
 }
 
 
-int affinity_set_params(int part_type_a, int part_type_b, double * affinity)
-{
+int affinity_set_params(int part_type_a, int part_type_b, double * affinity) {
   IA_parameters *data = get_ia_param_safe(part_type_a, part_type_b);
   data->affinity_on=0;
   if (!data) return ES_ERROR;
@@ -220,7 +220,6 @@ int affinity_set_params(int part_type_a, int part_type_b, double * affinity)
 
   return ES_OK;
 }
-
 #endif // SHANCHEN
 
 int lb_lbfluid_set_density(double *p_dens) {
@@ -242,6 +241,7 @@ int lb_lbfluid_set_density(double *p_dens) {
   return 0;
 }
 
+
 int lb_lbfluid_set_visc(double * p_visc) {
   for (int ii=0;ii<LB_COMPONENTS;ii++){
   if ( p_visc[ii] <= 0 )
@@ -260,6 +260,7 @@ int lb_lbfluid_set_visc(double * p_visc) {
   }
   return 0;
 }
+
 
 int lb_lbfluid_set_bulk_visc(double *p_bulk_visc) {
   for (int ii=0;ii<LB_COMPONENTS;ii++){
@@ -280,6 +281,7 @@ int lb_lbfluid_set_bulk_visc(double *p_bulk_visc) {
   return 0;
 }
 
+
 int lb_lbfluid_set_gamma_odd(double *p_gamma_odd) {
   for (int ii=0;ii<LB_COMPONENTS;ii++){
   if ( fabs(p_gamma_odd[ii]) > 1 )
@@ -299,8 +301,8 @@ int lb_lbfluid_set_gamma_odd(double *p_gamma_odd) {
   return 0;
 }
 
-int lb_lbfluid_set_gamma_even(double *p_gamma_even)
-{
+
+int lb_lbfluid_set_gamma_even(double *p_gamma_even) {
   for (int ii=0;ii<LB_COMPONENTS;ii++){
   if ( fabs(p_gamma_even[ii]) > 1 )
     return -1;
@@ -320,8 +322,7 @@ int lb_lbfluid_set_gamma_even(double *p_gamma_even)
 }
 
 
-int lb_lbfluid_set_friction(double * p_friction)
-{
+int lb_lbfluid_set_friction(double * p_friction) {
   for (int ii=0;ii<LB_COMPONENTS;ii++){
   if ( p_friction[ii] <= 0 )
       return -1;
@@ -704,7 +705,6 @@ int lb_lbfluid_print_vtk_density(char** filename) {
 
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
-
       int j;
       size_t size_of_values = lbpar_gpu.number_of_nodes * sizeof(LB_rho_v_pi_gpu);
       host_values = (LB_rho_v_pi_gpu*)malloc(size_of_values);
@@ -1920,10 +1920,16 @@ void lb_reinit_parameters() {
 #else // D3Q19
     double **e = lbmodel.e;
 #endif // D3Q19
-    for (i = 0; i < 3; i++) lb_phi[i] = 0.0;
+    for (i = 0; i < 3; i++) {
+      lb_phi[i] = 0.0;
+    }
     lb_phi[4] = sqrt(mu*e[19][4]*(1.-SQR(gamma_bulk))); // SQR(x) == x*x
-    for (i = 5; i < 10; i++) lb_phi[i] = sqrt(mu*e[19][i]*(1.-SQR(gamma_shear)));
-    for (i = 10; i < lbmodel.n_veloc; i++) lb_phi[i] = sqrt(mu*e[19][i]);
+    for (i = 5; i < 10; i++) {
+      lb_phi[i] = sqrt(mu*e[19][i]*(1.-SQR(gamma_shear)));
+    }
+    for (i = 10; i < lbmodel.n_veloc; i++) {
+      lb_phi[i] = sqrt(mu*e[19][i]);
+    }
 
     /* lb_coupl_pref is stored in MD units (force)
      * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
@@ -1952,9 +1958,9 @@ void lb_reinit_forces() {
   for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES
     // unit conversion: force density
-    lbfields[index].force[0] = lbpar.ext_force[0]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
-    lbfields[index].force[1] = lbpar.ext_force[1]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
-    lbfields[index].force[2] = lbpar.ext_force[2]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
+    lbfields[index].force[0] = lbpar.ext_force[0] * SQR(lbpar.agrid) * SQR(lbpar.tau);
+    lbfields[index].force[1] = lbpar.ext_force[1] * SQR(lbpar.agrid) * SQR(lbpar.tau);
+    lbfields[index].force[2] = lbpar.ext_force[2] * SQR(lbpar.agrid) * SQR(lbpar.tau);
 #else // EXTERNAL_FORCES
     lbfields[index].force[0] = 0.0;
     lbfields[index].force[1] = 0.0;
@@ -1964,9 +1970,9 @@ void lb_reinit_forces() {
   }
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
-    lb_boundaries[i].force[0]=0.;
-    lb_boundaries[i].force[1]=0.;
-    lb_boundaries[i].force[2]=0.;
+    lb_boundaries[i].force[0] = 0.;
+    lb_boundaries[i].force[1] = 0.;
+    lb_boundaries[i].force[2] = 0.;
   }
 #endif // LB_BOUNDARIES
 }

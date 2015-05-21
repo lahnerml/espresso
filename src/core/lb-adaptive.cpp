@@ -199,9 +199,8 @@ void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_d
   p8est_tree_t * tree;
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
-  double bnd;                                                     /* local meshwidth */
+  double bnd;
   p4est_locidx_t  arrayoffset;
-  int i, j;
 
   tree = p8est_tree_array_index (p8est->trees, which_tree);
   local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
@@ -218,7 +217,7 @@ void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_d
   p8est_quadrant_t  * q     = info->quad;                           /* get current global cell id */
   lbadapt_payload_t * data  = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
-  double h;                                                             /* local meshwidth */
+  double h;                                                         /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
 #ifdef EXTERNAL_FORCES
@@ -249,5 +248,114 @@ void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_d
   double j[3]  = {0., 0., 0.}
   double pi[6] = {0., 0., 0., 0., 0., 0.};
   lbadapt_calc_n_from_rho_j_pi (data->lbfields, rho, j, pi);
+}
+
+
+void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) {
+  double *rho = (double *) user_data;                           /* passed double to fill */
+  p8est_t * p8est = info->p4est;                                /* get p8est */
+  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
+  p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
+  p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
+
+  double h;                                                     /* local meshwidth */
+  h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
+
+#ifndef D3Q19
+#error Only D3Q19 is implemened!
+#endif // D3Q19
+
+  // unit conversion: mass density
+  if (!(lattice_switch & LATTICE_LB)) {
+      ostringstream msg;
+      msg <<"Error in lb_calc_local_rho in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+      runtimeError(msg);
+    *rho =0;
+    return;
+  }
+
+  double avg_rho = lbpar.rho[0] * h * h * h;
+
+  *rho +=   avg_rho
+          + data->lbfluid[0][0]
+          + data->lbfluid[0][1]  + data->lbfluid[0][2]
+          + data->lbfluid[0][3]  + data->lbfluid[0][4]
+          + data->lbfluid[0][5]  + data->lbfluid[0][6]
+          + data->lbfluid[0][7]  + data->lbfluid[0][8]
+          + data->lbfluid[0][9]  + data->lbfluid[0][10]
+          + data->lbfluid[0][11] + data->lbfluid[0][12]
+          + data->lbfluid[0][13] + data->lbfluid[0][14]
+          + data->lbfluid[0][15] + data->lbfluid[0][16]
+          + data->lbfluid[0][17] + data->lbfluid[0][18];
+}
+
+
+void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data) {
+  double *momentum = (double *) user_data;                      /* passed array to fill */
+  p8est_t * p8est = info->p4est;                                /* get p8est */
+  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
+  double h;                                                     /* local meshwidth */
+  h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
+
+  double j[3];
+
+#ifndef D3Q19
+#error Only D3Q19 is implemened!
+#endif // D3Q19
+  if (!(lattice_switch & LATTICE_LB)) {
+    ostringstream msg;
+    msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+    runtimeError(msg);
+    j[0]=j[1]=j[2]=0;
+    return;
+  }
+
+  j[0] =   data->lbfluid[0][1]  - data->lbfluid[0][2]
+         + data->lbfluid[0][7]  - data->lbfluid[0][8]
+         + data->lbfluid[0][9]  - data->lbfluid[0][10]
+         + data->lbfluid[0][11] - data->lbfluid[0][12]
+         + data->lbfluid[0][13] - data->lbfluid[0][14];
+  j[1] =   data->lbfluid[0][3]  - data->lbfluid[0][4]
+         + data->lbfluid[0][7]  - data->lbfluid[0][8]
+         - data->lbfluid[0][9]  + data->lbfluid[0][10]
+         + data->lbfluid[0][15] - data->lbfluid[0][16]
+         + data->lbfluid[0][17] - data->lbfluid[0][18];
+  j[2] =   data->lbfluid[0][5]  - data->lbfluid[0][6]
+         + data->lbfluid[0][11] - data->lbfluid[0][12]
+         - data->lbfluid[0][13] + data->lbfluid[0][14]
+         + data->lbfluid[0][15] - data->lbfluid[0][16]
+         - data->lbfluid[0][17] + data->lbfluid[0][18];
+  momentum[0] += j[0] + lbfields.force[0];
+  momentum[1] += j[1] + lbfields.force[1];
+  momentum[2] += j[2] + lbfields.force[2];
+
+  momentum[0] *= h/lbpar.tau;
+  momentum[1] *= h/lbpar.tau;
+  momentum[2] *= h/lbpar.tau;
+}
+
+
+void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
+  double *bnd_vals = (double *) user_data;                      /* passed array to fill */
+  p8est_t * p8est = info->p4est;                                /* get p8est */
+  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
+  p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
+  p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
+  p8est_tree_t * tree;
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
+
+  double bnd;                                                     /* local meshwidth */
+  p4est_locidx_t  arrayoffset;
+  int i, j;
+
+  tree = p8est_tree_array_index (p8est->trees, which_tree);
+  local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
+  arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
+
+  /* just grab the u value of each cell and pass it into solution vector */
+  bnd = data->boundary;
+  bnd_vals[arrayoffset] = bnd;
 }
 #endif // LB_ADAPTIVE

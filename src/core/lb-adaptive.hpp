@@ -105,4 +105,13 @@ void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data);
+
+
+void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data);
 #endif //LB_ADAPTIVE_H

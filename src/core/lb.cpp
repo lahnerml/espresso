@@ -3347,20 +3347,30 @@ void lb_calc_average_rho() {
   rho = 0.0;
   local_rho = 0.0;
   index = 0;
+#ifdef LB_ADAPTIVE
+  p4est_iterate (p8est,
+                 NULL,
+                 rho,
+                 lbadapt_calc_local_rho,
+                 NULL,
+                 NULL,
+                 NULL);
+#else // LB_ADAPTIVE
   for (z = 1; z <= lblattice.grid[2]; z++) {
     for (y = 1; y <= lblattice.grid[1]; y++) {
-    for (x = 1; x<=lblattice.grid[0]; x++) {
-      lb_calc_local_rho(index, &rho);
-      local_rho += rho;
+      for (x = 1; x<=lblattice.grid[0]; x++) {
+        lb_calc_local_rho(index, &rho);
+        local_rho += rho;
 
-      index++;
-    }
-    // skip halo region
-    index += 2;
+        index++;
+      }
+      // skip halo region
+      index += 2;
     }
     // skip halo region
     index += 2*lblattice.halo_grid[0];
   }
+#endif // LB_ADAPTIVE
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 
   /* calculate average density in MD units */

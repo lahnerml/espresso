@@ -309,7 +309,7 @@ void lb_calc_modes(index_t index, double *mode);
  * @param rho   local fluid density
  */
 inline void lb_calc_local_rho(index_t index, double *rho) {
-
+#ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
 #endif // D3Q19
@@ -336,6 +336,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
          + lbfluid[0][13][index] + lbfluid[0][14][index]
          + lbfluid[0][15][index] + lbfluid[0][16][index]
          + lbfluid[0][17][index] + lbfluid[0][18][index];
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate the local fluid momentum.
@@ -344,14 +345,14 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
  * @param j local fluid speed
  */
 inline void lb_calc_local_j(index_t index, double *j) {
-
+#ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
 #endif // D3Q19
   if (!(lattice_switch & LATTICE_LB)) {
-      ostringstream msg;
-      msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-      runtimeError(msg);
+    ostringstream msg;
+    msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+    runtimeError(msg);
     j[0]=j[1]=j[2]=0;
     return;
   }
@@ -371,7 +372,7 @@ inline void lb_calc_local_j(index_t index, double *j) {
          - lbfluid[0][13][index] + lbfluid[0][14][index]
          + lbfluid[0][15][index] - lbfluid[0][16][index]
          - lbfluid[0][17][index] + lbfluid[0][18][index];
-
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate the local fluid stress.
@@ -404,7 +405,7 @@ inline void lb_calc_local_pi(index_t index, double *pi) {
  * @param pi      local fluid pressure
  */
 inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *pi) {
-
+#ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
     ostringstream msg;
     msg <<"Error in lb_calc_local_fields in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
@@ -484,11 +485,12 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *
   pi[4] = mode[9];                                                  // yz
   pi[5] = ( mode[0] + mode[4] - mode[6] )/3.0;                      // zz
 
+#endif // LB_ADAPTIVE
 }
 
 #ifdef LB_BOUNDARIES
 inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
-
+#ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
     ostringstream msg;
     msg <<"Error in lb_local_fields_get_boundary_flag in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
@@ -498,6 +500,7 @@ inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
   }
 
   *boundary = lbfields[index].boundary;
+#endif // LB_ADAPTIVE
 }
 #endif // LB_BOUNDARIES
 

@@ -87,12 +87,21 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
  * \param [in]      rho        The fluids density.
  * \param [in]      j          The fluids velocity.
  * \param [in]      pi         The fluids stress tensor.
+ * \param [in]      h          The meshwidth of the current cell
  */
 int lbadapt_calc_n_from_rho_j_pi (double * datafield,
                                   double rho,
                                   double* j,
-                                  double* pi);
+                                  double* pi,
+                                  double h);
 
+
+/** Calculate modes for MRT scheme
+ *
+ * \param [in]      populations The population vector.
+ * \param     [out] mode        The resulting modes to be relaxed in a later step.
+ */
+int lbadapt_calc_modes (double * populations, double * mode);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data);

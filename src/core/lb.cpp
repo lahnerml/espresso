@@ -1236,6 +1236,9 @@ int lb_lbfluid_get_interpolated_velocity_global (double* p, double* v) {
 
 
 int lb_lbnode_get_pi(int* ind, double* p_pi) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   double p0 = 0;
 
   lb_lbnode_get_pi_neq(ind, p_pi);
@@ -1255,7 +1258,7 @@ int lb_lbnode_get_pi(int* ind, double* p_pi) {
   p_pi[0] += p0;
   p_pi[2] += p0;
   p_pi[5] += p0;
-
+#endif // LB_ADAPTIVE
   return 0;
 }
 
@@ -1296,11 +1299,15 @@ int lb_lbnode_get_pi_neq(int* ind, double* p_pi) {
     p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/lbpar.agrid/lbpar.agrid/lbpar.agrid;
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
 
 int lb_lbnode_get_boundary(int* ind, int* p_boundary) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     unsigned int host_flag;
@@ -1327,6 +1334,9 @@ int lb_lbnode_get_boundary(int* ind, int* p_boundary) {
 
 
 int lb_lbnode_get_pop(int* ind, double* p_pop) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
     fprintf(stderr, "Not implemented for GPU\n");
   } else {
@@ -1340,11 +1350,15 @@ int lb_lbnode_get_pop(int* ind, double* p_pop) {
     mpi_recv_fluid_populations(node, index, p_pop);
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
 
 int lb_lbnode_set_rho(int* ind, double *p_rho){
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     float host_rho[LB_COMPONENTS];
@@ -1373,11 +1387,15 @@ int lb_lbnode_set_rho(int* ind, double *p_rho){
 //  lb_reinit_parameters();
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
 
 int lb_lbnode_set_u(int* ind, double* u){
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     float host_velocity[3];
@@ -1406,6 +1424,7 @@ int lb_lbnode_set_u(int* ind, double* u){
     mpi_send_fluid(node,index,rho,j,pi) ;
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
@@ -1421,6 +1440,9 @@ int lb_lbnode_set_pi_neq(int* ind, double* pi_neq) {
 
 
 int lb_lbnode_set_pop(int* ind, double* p_pop) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   if (lattice_switch & LATTICE_LB_GPU) {
     printf("Not implemented in the LB GPU code!\n");
   } else {
@@ -1434,6 +1456,7 @@ int lb_lbnode_set_pop(int* ind, double* p_pop) {
     mpi_send_fluid_populations(node, index, p_pop);
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
@@ -1446,6 +1469,7 @@ int lb_lbnode_set_extforce(int* ind, double* f) {
 #ifdef LB
 /********************** The Main LB Part *************************************/
 /* Halo communication for push scheme */
+#ifndef LB_ADAPTIVE
 static void halo_push_communication() {
   index_t index;
   int x, y, z, count;
@@ -1748,6 +1772,7 @@ static void halo_push_communication() {
   free(rbuf);
   free(sbuf);
 }
+#endif // !LB_ADAPTIVE
 
 /***********************************************************************/
 
@@ -1847,6 +1872,7 @@ static void lb_realloc_fluid() {
 /** Sets up the structures for exchange of the halo regions.
  *  See also \ref halo.cpp */
 static void lb_prepare_communication() {
+#ifndef LB_ADAPTIVE
   int i;
   HaloCommunicator comm = { 0, NULL };
 
@@ -1892,6 +1918,7 @@ static void lb_prepare_communication() {
   }
 
   release_halo_communication(&comm);
+#endif // !LB_ADAPTIVE
 }
 
 
@@ -2088,16 +2115,20 @@ void lb_init() {
 
 /** Release the fluid. */
 void lb_release_fluid() {
+#ifndef LB_ADAPTIVE
   free(lbfluid[0][0]);
   free(lbfluid[0]);
   free(lbfields);
+#endif // LB_ADAPTIVE
 }
 
 
 /** Release fluid and communication. */
 void lb_release() {
+#ifndef LB_ADAPTIVE
   lb_release_fluid();
   release_halo_communication(&update_halo_comm);
+#endif // LB_ADAPTIVE
 }
 
 /***********************************************************************/
@@ -2109,6 +2140,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
                              const double *j,
                              double *pi)
 {
+#ifndef LB_ADAPTIVE
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
   const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
@@ -2185,14 +2217,14 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
     lbfluid[0][i][index] += coeff[i][3] * trace;
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 /*@}*/
 
 
 /** Calculation of hydrodynamic modes */
-void lb_calc_modes(index_t index, double *mode)
-{
+void lb_calc_modes(index_t index, double *mode) {
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p, n7m, n8p, n8m, n9p, n9m;
 
@@ -2709,59 +2741,54 @@ inline void lb_collide_stream() {
   }
 #endif // LB_BOUNDARIES
 
-
 #ifdef IMMERSED_BOUNDARY
-// Safeguard the node forces so that we can later use them for the IBM particle update
-// In the following loop the lbfields[XX].force are reset to zero
+  // Safeguard the node forces so that we can later use them for the IBM particle update
+  // In the following loop the lbfields[XX].force are reset to zero
   for (int i = 0; i<lblattice.halo_grid_volume; ++i)
   {
-  lbfields[i].force_buf[0] = lbfields[i].force[0];
-  lbfields[i].force_buf[1] = lbfields[i].force[1];
-  lbfields[i].force_buf[2] = lbfields[i].force[2];
+    lbfields[i].force_buf[0] = lbfields[i].force[0];
+    lbfields[i].force_buf[1] = lbfields[i].force[1];
+    lbfields[i].force_buf[2] = lbfields[i].force[2];
   }
 #endif
 
-
-
-
   index = lblattice.halo_offset;
   for (z = 1; z <= lblattice.grid[2]; z++) {
-    for (y = 1; y<=lblattice.grid[1]; y++) {
-    for (x = 1; x<=lblattice.grid[0]; x++) {
-      // as we only want to apply this to non-boundary nodes we can throw out the if-clause
-      // if we have a non-bounded domain
+    for (y = 1; y <= lblattice.grid[1]; y++) {
+      for (x = 1; x <= lblattice.grid[0]; x++) {
+        // as we only want to apply this to non-boundary nodes we can throw out the if-clause
+        // if we have a non-bounded domain
 #ifdef LB_BOUNDARIES
-      if (!lbfields[index].boundary)
+        if (!lbfields[index].boundary)
 #endif // LB_BOUNDARIES
-      {
+        {
 
-        /* calculate modes locally */
-        lb_calc_modes(index, modes);
+          /* calculate modes locally */
+          lb_calc_modes(index, modes);
 
-        /* deterministic collisions */
-        lb_relax_modes(index, modes);
+          /* deterministic collisions */
+          lb_relax_modes(index, modes);
 
-        /* fluctuating hydrodynamics */
-        if (fluct) lb_thermalize_modes(index, modes);
+          /* fluctuating hydrodynamics */
+          if (fluct) lb_thermalize_modes(index, modes);
 
-        /* apply forces */
+          /* apply forces */
 #ifdef EXTERNAL_FORCES
-        lb_apply_forces(index, modes);
+          lb_apply_forces(index, modes);
 #else // EXTERNAL_FORCES
-        if (lbfields[index].has_force) lb_apply_forces(index, modes);
+          if (lbfields[index].has_force) lb_apply_forces(index, modes);
 #endif // EXTERNAL_FORCES
 
-        /* transform back to populations and streaming */
-        lb_calc_n_from_modes_push(index, modes);
-
-      }
-//  #ifdef LB_BOUNDARIES
-//       else {
-//    // Here collision in the boundary nodes
-//    // can be included, if this is necessary
-//       //           lb_boundary_collisions(index, modes);
-//       }
-// #endif // LB_BOUNDARIES
+          /* transform back to populations and streaming */
+          lb_calc_n_from_modes_push(index, modes);
+        }
+        //  #ifdef LB_BOUNDARIES
+        //       else {
+        //    // Here collision in the boundary nodes
+        //    // can be included, if this is necessary
+        //       //           lb_boundary_collisions(index, modes);
+        //       }
+        // #endif // LB_BOUNDARIES
         ++index; /* next node */
       }
       index += 2; /* skip halo region */
@@ -2812,7 +2839,6 @@ inline void lb_stream_collide() {
         if (!lbfields[index].boundary)
 #endif // LB_BOUNDARIES
         {
-
           /* stream (pull) and calculate modes */
           lb_pull_calc_modes(index, modes);
 

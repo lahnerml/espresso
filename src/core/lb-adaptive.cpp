@@ -63,7 +63,7 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 
 /*** HELPER FUNCTIONS ***/
 void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
-    p8est_quadrant_t * q, double xyz[3]) {
+                           p8est_quadrant_t * q, double xyz[3]) {
   p4est_qcoord_t half_length = P8EST_QUADRANT_LEN (q->level) * 0.5;
 
   p8est_qcoord_to_vertex (p8est->connectivity, which_tree,
@@ -76,10 +76,11 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
 int lbadapt_calc_n_from_rho_j_pi (double * datafield,
                                   double rho,
                                   double * j,
-                                  double * pi) {
+                                  double * pi,
+                                  double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
-  const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
+  const double avg_rho = lbpar.rho[0] * h * h * h;
 
   local_rho  = rho;
 
@@ -96,22 +97,22 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
   double tmp1,tmp2;
 
   /* update the q=0 sublattice */
-  datafield[0][0] = 1./3. * (local_rho-avg_rho) - 1./2. * trace;
+  datafield[0][0] = 1./3. * (local_rho-avg_rho) - 0.5 * trace;
 
   /* update the q=1 sublattice */
   rho_times_coeff = 1./18. * (local_rho-avg_rho);
 
-  datafield[0][1] = rho_times_coeff + 1./6.*local_j[0] + 1./4. * local_pi[0]
+  datafield[0][1] = rho_times_coeff + 1./6.*local_j[0] + 0.25 * local_pi[0]
                     - 1./12.*trace;
-  datafield[0][2] = rho_times_coeff - 1./6.*local_j[0] + 1./4. * local_pi[0]
+  datafield[0][2] = rho_times_coeff - 1./6.*local_j[0] + 0.25 * local_pi[0]
                     - 1./12.*trace;
-  datafield[0][3] = rho_times_coeff + 1./6.*local_j[1] + 1./4. * local_pi[2]
+  datafield[0][3] = rho_times_coeff + 1./6.*local_j[1] + 0.25 * local_pi[2]
                     - 1./12.*trace;
-  datafield[0][4] = rho_times_coeff - 1./6.*local_j[1] + 1./4. * local_pi[2]
+  datafield[0][4] = rho_times_coeff - 1./6.*local_j[1] + 0.25 * local_pi[2]
                     - 1./12.*trace;
-  datafield[0][5] = rho_times_coeff + 1./6.*local_j[2] + 1./4. * local_pi[5]
+  datafield[0][5] = rho_times_coeff + 1./6.*local_j[2] + 0.25 * local_pi[5]
                     - 1./12.*trace;
-  datafield[0][6] = rho_times_coeff - 1./6.*local_j[2] + 1./4. * local_pi[5]
+  datafield[0][6] = rho_times_coeff - 1./6.*local_j[2] + 0.25 * local_pi[5]
                     - 1./12.*trace;
 
   /* update the q=2 sublattice */
@@ -168,6 +169,80 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
     datafield[0][i] += coeff[i][1] * scalar(local_j,c[i]);
     datafield[0][i] += coeff[i][2] * tmp;
     datafield[0][i] += coeff[i][3] * trace;
+  }
+#endif // D3Q19
+
+  return 0;
+}
+
+
+int lbadapt_calc_modes(double * population, double * modes) {
+#ifdef D3Q19
+  double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, \
+    n7p, n7m, n8p, n8m, n9p, n9m;
+
+  n0  = population[0][0];
+  n1p = population[0][1] + population[0][2];
+  n1m = population[0][1] - population[0][2];
+  n2p = population[0][3] + population[0][4];
+  n2m = population[0][3] - population[0][4];
+  n3p = population[0][5] + population[0][6];
+  n3m = population[0][5] - population[0][6];
+  n4p = population[0][7] + population[0][8];
+  n4m = population[0][7] - population[0][8];
+  n5p = population[0][9] + population[0][10];
+  n5m = population[0][9] - population[0][10];
+  n6p = population[0][11] + population[0][12];
+  n6m = population[0][11] - population[0][12];
+  n7p = population[0][13] + population[0][14];
+  n7m = population[0][13] - population[0][14];
+  n8p = population[0][15] + population[0][16];
+  n8m = population[0][15] - population[0][16];
+  n9p = population[0][17] + population[0][18];
+  n9m = population[0][17] - population[0][18];
+//  printf("n: ");
+//  for (i=0; i<19; i++)
+//  printf("%f ", lbfluid[1][i][index]);
+//  printf("\n");
+
+  /* mass mode */
+  mode[0] = n0 + n1p + n2p + n3p + n4p + n5p + n6p + n7p + n8p + n9p;
+
+  /* momentum modes */
+  mode[1] = n1m + n4m + n5m + n6m + n7m;
+  mode[2] = n2m + n4m - n5m + n8m + n9m;
+  mode[3] = n3m + n6m - n7m + n8m - n9m;
+
+  /* stress modes */
+  mode[4] = -n0 + n4p + n5p + n6p + n7p + n8p + n9p;
+  mode[5] = n1p - n2p + n6p + n7p - n8p - n9p;
+  mode[6] = n1p + n2p - n6p - n7p - n8p - n9p - 2.*(n3p - n4p - n5p);
+  mode[7] = n4p - n5p;
+  mode[8] = n6p - n7p;
+  mode[9] = n8p - n9p;
+
+#ifndef OLD_FLUCT
+  /* kinetic modes */
+  mode[10] = -2.*n1m + n4m + n5m + n6m + n7m;
+  mode[11] = -2.*n2m + n4m - n5m + n8m + n9m;
+  mode[12] = -2.*n3m + n6m - n7m + n8m - n9m;
+  mode[13] = n4m + n5m - n6m - n7m;
+  mode[14] = n4m - n5m - n8m - n9m;
+  mode[15] = n6m - n7m - n8m + n9m;
+  mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p
+    - 2.*(n1p + n2p + n3p);
+  mode[17] = - n1p + n2p + n6p + n7p - n8p - n9p;
+  mode[18] = - n1p - n2p -n6p - n7p - n8p - n9p
+    + 2.*(n3p + n4p + n5p);
+#endif // !OLD_FLUCT
+
+#else // D3Q19
+  int i, j;
+  for (i = 0; i < lbmodel.n_veloc; i++) {
+    mode[i] = 0.0;
+    for (j = 0; j < lbmodel.n_veloc; j++) {
+      mode[i] += lbmodel.e[i][j] * lbfluid[0][i][index];
+    }
   }
 #endif // D3Q19
 
@@ -247,7 +322,7 @@ void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_d
   // start with fluid at rest and no stress
   double j[3]  = {0., 0., 0.}
   double pi[6] = {0., 0., 0., 0., 0., 0.};
-  lbadapt_calc_n_from_rho_j_pi (data->lbfields, rho, j, pi);
+  lbadapt_calc_n_from_rho_j_pi (data->lbfields, rho, j, pi, h);
 }
 
 

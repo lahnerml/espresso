@@ -176,7 +176,7 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
 }
 
 
-int lbadapt_calc_modes(double * population, double * modes) {
+int lbadapt_calc_modes(double * population, double * mode) {
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, \
     n7p, n7m, n8p, n8m, n9p, n9m;
@@ -200,10 +200,6 @@ int lbadapt_calc_modes(double * population, double * modes) {
   n8m = population[0][15] - population[0][16];
   n9p = population[0][17] + population[0][18];
   n9m = population[0][17] - population[0][18];
-//  printf("n: ");
-//  for (i=0; i<19; i++)
-//  printf("%f ", lbfluid[1][i][index]);
-//  printf("\n");
 
   /* mass mode */
   mode[0] = n0 + n1p + n2p + n3p + n4p + n5p + n6p + n7p + n8p + n9p;
@@ -245,6 +241,64 @@ int lbadapt_calc_modes(double * population, double * modes) {
     }
   }
 #endif // D3Q19
+
+  return 0;
+}
+
+
+int lbadapt_relax_modes (double * mode, double * force, double h) {
+  double rho, j[3], pi_eq[6];
+
+  /* re-construct the real density
+   * remember that the populations are stored as differences to their
+   * equilibrium value */
+  rho = mode[0] + lbpar.rho[0] * h * h * h;
+
+  j[0] = mode[1];
+  j[1] = mode[2];
+  j[2] = mode[3];
+
+  /* if forces are present, the momentum density is redefined to
+   * include one half-step of the force action.  See the
+   * Chapman-Enskog expansion in [Ladd & Verberg]. */
+#ifndef EXTERNAL_FORCES
+  if (lbfields[index].has_force)
+#endif // !EXTERNAL_FORCES
+  {
+    j[0] += 0.5 * force[0];
+    j[1] += 0.5 * force[1];
+    j[2] += 0.5 * force[2];
+  }
+
+  /* equilibrium part of the stress modes */
+  pi_eq[0] = scalar(j,j) / rho;
+  pi_eq[1] = (SQR(j[0])-SQR(j[1])) / rho;
+  pi_eq[2] = (scalar(j,j) - 3.0 * SQR(j[2])) / rho;
+  pi_eq[3] = j[0] * j[1] / rho;
+  pi_eq[4] = j[0] * j[2] / rho;
+  pi_eq[5] = j[1] * j[2] / rho;
+
+  /* relax the stress modes */
+  mode[4] = pi_eq[0] + gamma_bulk * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + gamma_shear * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + gamma_shear * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + gamma_shear * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + gamma_shear * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + gamma_shear * (mode[9] - pi_eq[5]);
+
+#ifndef OLD_FLUCT
+  /* relax the ghost modes (project them out) */
+  /* ghost modes have no equilibrium part due to orthogonality */
+  mode[10] = gamma_odd*mode[10];
+  mode[11] = gamma_odd*mode[11];
+  mode[12] = gamma_odd*mode[12];
+  mode[13] = gamma_odd*mode[13];
+  mode[14] = gamma_odd*mode[14];
+  mode[15] = gamma_odd*mode[15];
+  mode[16] = gamma_even*mode[16];
+  mode[17] = gamma_even*mode[17];
+  mode[18] = gamma_even*mode[18];
+#endif // !OLD_FLUCT
 
   return 0;
 }

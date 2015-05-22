@@ -103,6 +103,10 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
  */
 int lbadapt_calc_modes (double * populations, double * mode);
 
+
+int lbadapt_relax_modes (double * mode, double h);
+
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data);
 

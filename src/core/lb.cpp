@@ -798,6 +798,7 @@ int lb_lbfluid_print_vtk_velocity(char* filename) {
 
 
 int lb_lbfluid_print_boundary(char* filename) {
+#ifndef LB_ADAPTIVE
   FILE* fp = fopen(filename, "w");
 
   if(fp == NULL)
@@ -806,7 +807,6 @@ int lb_lbfluid_print_boundary(char* filename) {
   }
 
   if (lattice_switch & LATTICE_LB_GPU) {
-#ifndef LB_ADAPTIVE
 #ifdef LB_GPU
     unsigned int* bound_array;
     bound_array = (unsigned int*) malloc(lbpar_gpu.number_of_nodes*sizeof(unsigned int));
@@ -860,6 +860,7 @@ int lb_lbfluid_print_boundary(char* filename) {
 
 
 int lb_lbfluid_print_velocity(char* filename) {
+#ifndef LB_ADAPTIVE
   FILE* fp = fopen(filename, "w");
 
   if(fp == NULL)
@@ -921,6 +922,7 @@ int lb_lbfluid_print_velocity(char* filename) {
   }
 
   fclose(fp);
+#endif // !LB_ADAPTIVE
   return 0;
 }
 
@@ -960,42 +962,42 @@ int lb_lbfluid_save_checkpoint(char* filename, int binary) {
   }
   else if(lattice_switch & LATTICE_LB) {
 #ifdef LB
-		FILE* cpfile;
-		cpfile=fopen(filename, "w");
-		if (!cpfile) {
-			return ES_ERROR;
-		}
-		double pop[19];
-		int ind[3];
+    FILE* cpfile;
+    cpfile=fopen(filename, "w");
+    if (!cpfile) {
+      return ES_ERROR;
+    }
+    double pop[19];
+    int ind[3];
 
-		int gridsize[3];
+    int gridsize[3];
 
-		gridsize[0] = box_l[0] / lbpar.agrid;
-		gridsize[1] = box_l[1] / lbpar.agrid;
-		gridsize[2] = box_l[2] / lbpar.agrid;
+    gridsize[0] = box_l[0] / lbpar.agrid;
+    gridsize[1] = box_l[1] / lbpar.agrid;
+    gridsize[2] = box_l[2] / lbpar.agrid;
 
-		for (int i=0; i < gridsize[0]; i++) {
-			for (int j=0; j < gridsize[1]; j++) {
-				for (int k=0; k < gridsize[2]; k++) {
-					ind[0]=i;
-					ind[1]=j;
-					ind[2]=k;
-					lb_lbnode_get_pop(ind, pop);
-					if (!binary) {
-						for (int n=0; n<19; n++) {
-							fprintf(cpfile, "%.16e ", pop[n]);
-						}
-						fprintf(cpfile, "\n");
-					}
-					else {
-						fwrite(pop, sizeof(double), 19, cpfile);
-					}
-				}
-			}
-		}
-		fclose(cpfile);
+    for (int i=0; i < gridsize[0]; i++) {
+      for (int j=0; j < gridsize[1]; j++) {
+        for (int k=0; k < gridsize[2]; k++) {
+          ind[0]=i;
+          ind[1]=j;
+          ind[2]=k;
+          lb_lbnode_get_pop(ind, pop);
+          if (!binary) {
+            for (int n=0; n<19; n++) {
+              fprintf(cpfile, "%.16e ", pop[n]);
+            }
+            fprintf(cpfile, "\n");
+          }
+          else {
+            fwrite(pop, sizeof(double), 19, cpfile);
+          }
+        }
+      }
+    }
+    fclose(cpfile);
 #endif // LB
-	}
+  }
   return ES_OK;
 }
 
@@ -1065,8 +1067,7 @@ int lb_lbfluid_load_checkpoint(char* filename, int binary) {
             if (fscanf(cpfile, "%lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf %lf \n", &pop[0],&pop[1],&pop[2],&pop[3],&pop[4],&pop[5],&pop[6],&pop[7],&pop[8],&pop[9],&pop[10],&pop[11],&pop[12],&pop[13],&pop[14],&pop[15],&pop[16],&pop[17],&pop[18]) != 19) {
               return ES_ERROR;
             }
-          }
-          else {
+          } else {
             if (fread(pop, sizeof(double), 19, cpfile) != 19)
               return ES_ERROR;
           }
@@ -1078,8 +1079,7 @@ int lb_lbfluid_load_checkpoint(char* filename, int binary) {
 //  lbpar.resend_halo=1;
 //  mpi_bcast_lb_params(0);
 #endif // LB
-  }
-  else {
+  } else {
     ostringstream msg;
     msg <<"To load an LB checkpoint one needs to have already initialized the LB fluid with the same grid size.";
     runtimeError(msg);
@@ -1090,6 +1090,9 @@ int lb_lbfluid_load_checkpoint(char* filename, int binary) {
 
 
 int lb_lbnode_get_rho(int* ind, double* p_rho){
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     int single_nodeindex = ind[0] + ind[1]*lbpar_gpu.dim_x + ind[2]*lbpar_gpu.dim_x*lbpar_gpu.dim_y;
@@ -1117,11 +1120,15 @@ int lb_lbnode_get_rho(int* ind, double* p_rho){
     *p_rho = rho;
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
 
 int lb_lbnode_get_u(int* ind, double* p_u) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     static LB_rho_v_pi_gpu *host_print_values=NULL;
@@ -1151,6 +1158,7 @@ int lb_lbnode_get_u(int* ind, double* p_u) {
     p_u[2] = j[2]/rho*lbpar.agrid/lbpar.tau;
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 
@@ -1253,6 +1261,9 @@ int lb_lbnode_get_pi(int* ind, double* p_pi) {
 
 
 int lb_lbnode_get_pi_neq(int* ind, double* p_pi) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     static LB_rho_v_pi_gpu *host_print_values=NULL;
@@ -1309,6 +1320,7 @@ int lb_lbnode_get_boundary(int* ind, int* p_boundary) {
     mpi_recv_fluid_boundary_flag(node,index,p_boundary);
 #endif // LB
   }
+#endif // LB_ADAPTIVE
   return 0;
 }
 #endif  //defined (LB) || defined (LB_GPU)
@@ -1797,21 +1809,22 @@ int lb_sanity_checks() {
 
 /***********************************************************************/
 
-/** (Pre-)allocate memory for data structures and setup p4est if needed. */
+/** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
   // one can define p4ests verbosity here.
   // p4est_init(NULL, SC_LP_PRODUCTION);
-#endif // LB_ADAPTIVE
-
+#else // LB_ADAPTIVE
   lbfluid[0]  = (double**) malloc(2*lbmodel.n_veloc*sizeof(double *));
   lbfluid[0][0] = (double*) malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
+#endif // LB_ADAPTIVE
 }
 
 
 /** (Re-)allocate memory for the fluid and initialize pointers. */
 static void lb_realloc_fluid() {
+#ifndef LB_ADAPTIVE
   int i;
 
   LB_TRACE(printf("reallocating fluid\n"));
@@ -1827,6 +1840,7 @@ static void lb_realloc_fluid() {
   }
 
   lbfields = (LB_FluidNode*) realloc(lbfields,lblattice.halo_grid_volume*sizeof(*lbfields));
+#endif // LB_ADAPTIVE
 }
 
 

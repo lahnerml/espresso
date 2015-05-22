@@ -2225,6 +2225,9 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
 
 /** Calculation of hydrodynamic modes */
 void lb_calc_modes(index_t index, double *mode) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p, n7m, n8p, n8m, n9p, n9m;
 
@@ -2292,12 +2295,15 @@ void lb_calc_modes(index_t index, double *mode) {
     }
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
 /** Streaming and calculation of modes (pull scheme) */
 inline void lb_pull_calc_modes(index_t index, double *mode) {
-
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   int yperiod = lblattice.halo_grid[0];
   int zperiod = lblattice.halo_grid[0]*lblattice.halo_grid[1];
 
@@ -2384,11 +2390,14 @@ inline void lb_pull_calc_modes(index_t index, double *mode) {
     }
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
-inline void lb_relax_modes(index_t index, double *mode)
-{
+inline void lb_relax_modes(index_t index, double *mode) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   double rho, j[3], pi_eq[6];
 
   /* re-construct the real density
@@ -2441,10 +2450,14 @@ inline void lb_relax_modes(index_t index, double *mode)
   mode[17] = gamma_even*mode[17];
   mode[18] = gamma_even*mode[18];
 #endif // !OLD_FLUCT
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_thermalize_modes(index_t index, double *mode) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   double fluct[6];
 #ifdef GAUSSRANDOM
   double rootrho_gauss = sqrt(fabs(mode[0]+lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid));
@@ -2524,11 +2537,14 @@ inline void lb_thermalize_modes(index_t index, double *mode) {
 #ifdef ADDITIONAL_CHECKS
   rancounter += 15;
 #endif // ADDITIONAL_CHECKS
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_apply_forces(index_t index, double* mode) {
-
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   double rho, *f, u[3], C[6];
 
   f = lbfields[index].force;
@@ -2572,13 +2588,15 @@ inline void lb_apply_forces(index_t index, double* mode) {
   lbfields[index].force[2] = 0.0;
   lbfields[index].has_force = 0;
 #endif // EXTERNAL_FORCES
-
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_calc_n_from_modes(index_t index, double *mode)
 {
-
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   double *w = lbmodel.w;
 
 #ifdef D3Q19
@@ -2635,10 +2653,14 @@ inline void lb_calc_n_from_modes(index_t index, double *mode)
   lbfluid[0][i][index] *= w[i];
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_calc_n_from_modes_push(index_t index, double *m) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
 #ifdef D3Q19
   int yperiod = lblattice.halo_grid[0];
   int zperiod = lblattice.halo_grid[0]*lblattice.halo_grid[1];
@@ -2723,11 +2745,27 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
     lbfluid[1][i][index] *= w[i];
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
+#ifdef LB_ADAPTIVE
+  lbadapt_payload_t *ghost_data;
+  p8est_ghost_t     *ghost;
+
+  // create ghost cells
+  ghost = p8est_ghost_new (p8est, P8EST_CONNECT_FULL);
+  // allocate space to store ghost data
+  ghost_data = P4EST_ALLOC (lbadapt_payload_t, ghost->ghost.elem_count);
+  // sync data
+  p8est_ghost_exchange_data (p8est, ghost, ghost_data);
+
+  // release space
+  P4EST_FREE (ghost_data);
+  p8est_ghost_destroy (ghost);
+#else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
   double modes[19];
@@ -2812,11 +2850,15 @@ inline void lb_collide_stream() {
 
   /* halo region is invalid after update */
   lbpar.resend_halo = 1;
+#endif // LB_ADAPTIVE
 }
 
 
 /** Streaming and collisions (pull scheme) */
 inline void lb_stream_collide() {
+#ifdef LB_ADAPTIVE
+
+#else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
   double modes[19];
@@ -2876,6 +2918,7 @@ inline void lb_stream_collide() {
 
   /* halo region is invalid after update */
   lbpar.resend_halo = 1;
+#endif // LB_ADAPTIVE
 
   // Re-reset the node forces to include also the halo nodes
 #ifdef IMMERSED_BOUNDARY

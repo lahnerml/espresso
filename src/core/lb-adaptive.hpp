@@ -104,7 +104,38 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
 int lbadapt_calc_modes (double * populations, double * mode);
 
 
+/** Perform MRT Relaxation step
+ *
+ * \param [in][out] mode  kinematic modes of the fluid.
+ * \param [in]      force Force that is applied on the fluid.
+ * \param [in]      h     Meshwidth of current cell
+ */
+int lbadapt_relax_modes (double * mode, double * force, double h);
+
+
+/** Thermalize modes
+ *
+ * \param [in][out] mode  The modes to be thermalized.
+ * \param [in]      h     The local mesh width
+ */
 int lbadapt_relax_modes (double * mode, double h);
+
+
+/** Apply force on fluid.
+ *
+ * \param [in][out] mode  The modes that the force is applied on.
+ * \param [in]      force The force that is applied.
+ * \param [in]      h     The local mesh width.
+ */
+int lbadapt_apply_force (double * mode, double * force, double h);
+
+
+/** Transfer modes back to populations
+ *
+ * \param     [out] populations  The resulting particle densities.
+ * \param [in]      mode         The modes.
+ */
+int lbadapt_calc_pop_from_modes (double * populations, double * mode);
 
 
 /*** ITERATION CALLBACKS ***/

@@ -304,6 +304,210 @@ int lbadapt_relax_modes (double * mode, double * force, double h) {
 }
 
 
+int lbadapt_thermalize_modes(double * mode, double h) {
+  double fluct[6];
+#ifdef GAUSSRANDOM
+  double rootrho_gauss = sqrt(fabs(mode[0]+lbpar.rho[0] * h * h * h));
+
+  /* stress modes */
+  mode[4] += (fluct[0] = rootrho_gauss*lb_phi[4]*gaussian_random());
+  mode[5] += (fluct[1] = rootrho_gauss*lb_phi[5]*gaussian_random());
+  mode[6] += (fluct[2] = rootrho_gauss*lb_phi[6]*gaussian_random());
+  mode[7] += (fluct[3] = rootrho_gauss*lb_phi[7]*gaussian_random());
+  mode[8] += (fluct[4] = rootrho_gauss*lb_phi[8]*gaussian_random());
+  mode[9] += (fluct[5] = rootrho_gauss*lb_phi[9]*gaussian_random());
+
+#ifndef OLD_FLUCT
+  /* ghost modes */
+  mode[10] += rootrho_gauss*lb_phi[10]*gaussian_random();
+  mode[11] += rootrho_gauss*lb_phi[11]*gaussian_random();
+  mode[12] += rootrho_gauss*lb_phi[12]*gaussian_random();
+  mode[13] += rootrho_gauss*lb_phi[13]*gaussian_random();
+  mode[14] += rootrho_gauss*lb_phi[14]*gaussian_random();
+  mode[15] += rootrho_gauss*lb_phi[15]*gaussian_random();
+  mode[16] += rootrho_gauss*lb_phi[16]*gaussian_random();
+  mode[17] += rootrho_gauss*lb_phi[17]*gaussian_random();
+  mode[18] += rootrho_gauss*lb_phi[18]*gaussian_random();
+#endif // !OLD_FLUCT
+
+#elif defined (GAUSSRANDOMCUT)
+  double rootrho_gauss = sqrt(fabs(mode[0]+lbpar.rho[0] * h * h * h));
+
+  /* stress modes */
+  mode[4] += (fluct[0] = rootrho_gauss*lb_phi[4]*gaussian_random_cut());
+  mode[5] += (fluct[1] = rootrho_gauss*lb_phi[5]*gaussian_random_cut());
+  mode[6] += (fluct[2] = rootrho_gauss*lb_phi[6]*gaussian_random_cut());
+  mode[7] += (fluct[3] = rootrho_gauss*lb_phi[7]*gaussian_random_cut());
+  mode[8] += (fluct[4] = rootrho_gauss*lb_phi[8]*gaussian_random_cut());
+  mode[9] += (fluct[5] = rootrho_gauss*lb_phi[9]*gaussian_random_cut());
+
+#ifndef OLD_FLUCT
+  /* ghost modes */
+  mode[10] += rootrho_gauss*lb_phi[10]*gaussian_random_cut();
+  mode[11] += rootrho_gauss*lb_phi[11]*gaussian_random_cut();
+  mode[12] += rootrho_gauss*lb_phi[12]*gaussian_random_cut();
+  mode[13] += rootrho_gauss*lb_phi[13]*gaussian_random_cut();
+  mode[14] += rootrho_gauss*lb_phi[14]*gaussian_random_cut();
+  mode[15] += rootrho_gauss*lb_phi[15]*gaussian_random_cut();
+  mode[16] += rootrho_gauss*lb_phi[16]*gaussian_random_cut();
+  mode[17] += rootrho_gauss*lb_phi[17]*gaussian_random_cut();
+  mode[18] += rootrho_gauss*lb_phi[18]*gaussian_random_cut();
+#endif // OLD_FLUCT
+
+#elif defined (FLATNOISE)
+  double rootrho = sqrt(fabs(12.0*(mode[0]+lbpar.rho[0] * h * h * h)));
+
+  /* stress modes */
+  mode[4] += (fluct[0] = rootrho*lb_phi[4]*(d_random()-0.5));
+  mode[5] += (fluct[1] = rootrho*lb_phi[5]*(d_random()-0.5));
+  mode[6] += (fluct[2] = rootrho*lb_phi[6]*(d_random()-0.5));
+  mode[7] += (fluct[3] = rootrho*lb_phi[7]*(d_random()-0.5));
+  mode[8] += (fluct[4] = rootrho*lb_phi[8]*(d_random()-0.5));
+  mode[9] += (fluct[5] = rootrho*lb_phi[9]*(d_random()-0.5));
+
+#ifndef OLD_FLUCT
+  /* ghost modes */
+  mode[10] += rootrho*lb_phi[10]*(d_random()-0.5);
+  mode[11] += rootrho*lb_phi[11]*(d_random()-0.5);
+  mode[12] += rootrho*lb_phi[12]*(d_random()-0.5);
+  mode[13] += rootrho*lb_phi[13]*(d_random()-0.5);
+  mode[14] += rootrho*lb_phi[14]*(d_random()-0.5);
+  mode[15] += rootrho*lb_phi[15]*(d_random()-0.5);
+  mode[16] += rootrho*lb_phi[16]*(d_random()-0.5);
+  mode[17] += rootrho*lb_phi[17]*(d_random()-0.5);
+  mode[18] += rootrho*lb_phi[18]*(d_random()-0.5);
+#endif // !OLD_FLUCT
+#else // GAUSSRANDOM
+#error No noise type defined for the CPU LB
+#endif //GAUSSRANDOM
+
+#ifdef ADDITIONAL_CHECKS
+  rancounter += 15;
+#endif // ADDITIONAL_CHECKS
+}
+
+
+int lbadapt_apply_force (double * mode, double * force, double h) {
+  double rho, u[3], C[6];
+
+  rho = mode[0] + lbpar.rho[0] * h * h * h;
+
+  /* hydrodynamic momentum density is redefined when external forces present */
+  u[0] = (mode[1] + 0.5 * force[0])/rho;
+  u[1] = (mode[2] + 0.5 * force[1])/rho;
+  u[2] = (mode[3] + 0.5 * force[2])/rho;
+
+  C[0] = (1.+gamma_bulk)*u[0]*force[0] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
+  C[2] = (1.+gamma_bulk)*u[1]*force[1] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
+  C[5] = (1.+gamma_bulk)*u[2]*force[2] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
+  C[1] = 1./2. * (1.+gamma_shear)*(u[0]*force[1]+u[1]*force[0]);
+  C[3] = 1./2. * (1.+gamma_shear)*(u[0]*force[2]+u[2]*force[0]);
+  C[4] = 1./2. * (1.+gamma_shear)*(u[1]*force[2]+u[2]*force[1]);
+
+  /* update momentum modes */
+  mode[1] += force[0];
+  mode[2] += force[1];
+  mode[3] += force[2];
+
+  /* update stress modes */
+  mode[4] += C[0] + C[2] + C[5];
+  mode[5] += C[0] - C[2];
+  mode[6] += C[0] + C[2] - 2. * C[5];
+  mode[7] += C[1];
+  mode[8] += C[3];
+  mode[9] += C[4];
+
+  /* reset force */
+#ifdef EXTERNAL_FORCES
+  // unit conversion: force density
+  lbfields[index].force[0] = lbpar.ext_force[0]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
+  lbfields[index].force[1] = lbpar.ext_force[1]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
+  lbfields[index].force[2] = lbpar.ext_force[2]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
+#else // EXTERNAL_FORCES
+  lbfields[index].force[0] = 0.0;
+  lbfields[index].force[1] = 0.0;
+  lbfields[index].force[2] = 0.0;
+  lbfields[index].has_force = 0;
+#endif // EXTERNAL_FORCES
+}
+
+
+int lbadapt_calc_pop_from_modes (double * populations, double * mode) {
+  double *w = lbmodel.w;
+
+#ifdef D3Q19
+  double (*e)[19] = d3q19_modebase;
+  double m[19];
+
+  /* normalization factors enter in the back transformation */
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    m[i] = (1./e[19][i])*mode[i];
+  }
+
+  populations[0][ 0][index] = m[0] - m[4] + m[16];
+  populations[0][ 1][index] = m[0] + m[1] + m[5] + m[6] - m[17] - m[18]
+                              - 2.*(m[10] + m[16]);
+  populations[0][ 2][index] = m[0] - m[1] + m[5] + m[6] - m[17] - m[18]
+                              + 2.*(m[10] - m[16]);
+  populations[0][ 3][index] = m[0] + m[2] - m[5] + m[6] + m[17] - m[18]
+                              - 2.*(m[11] + m[16]);
+  populations[0][ 4][index] = m[0] - m[2] - m[5] + m[6] + m[17] - m[18]
+                              + 2.*(m[11] - m[16]);
+  populations[0][ 5][index] = m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18]);
+  populations[0][ 6][index] = m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]);
+  populations[0][ 7][index] = m[0] + m[ 1] + m[ 2] + m[ 4] + 2.*m[6] + m[7]
+                              + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18];
+  populations[0][ 8][index] = m[0] - m[ 1] - m[ 2] + m[ 4] + 2.*m[6] + m[7]
+                              - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18];
+  populations[0][ 9][index] = m[0] + m[ 1] - m[ 2] + m[ 4] + 2.*m[6] - m[7]
+                              + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18];
+  populations[0][10][index] = m[0] - m[ 1] + m[ 2] + m[ 4] + 2.*m[6] - m[7]
+                              - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18];
+  populations[0][11][index] = m[0] + m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                              + m[8] + m[10] + m[12] - m[13] + m[15] + m[16]
+                              + m[17] - m[18];
+  populations[0][12][index] = m[0] - m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                              + m[8] - m[10] - m[12] + m[13] - m[15] + m[16]
+                              + m[17] - m[18];
+  populations[0][13][index] = m[0] + m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                              - m[8] + m[10] - m[12] - m[13] - m[15] + m[16]
+                              + m[17] - m[18];
+  populations[0][14][index] = m[0] - m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                              - m[8] - m[10] + m[12] + m[13] + m[15] + m[16]
+                              + m[17] - m[18];
+  populations[0][15][index] = m[0] + m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                              + m[9] + m[11] + m[12] - m[14] - m[15] + m[16]
+                              - m[17] - m[18];
+  populations[0][16][index] = m[0] - m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                              + m[9] - m[11] - m[12] + m[14] + m[15] + m[16]
+                              - m[17] - m[18];
+  populations[0][17][index] = m[0] + m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                              - m[9] + m[11] - m[12] - m[14] + m[15] + m[16]
+                              - m[17] - m[18];
+  populations[0][18][index] = m[0] - m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                              - m[9] - m[11] + m[12] + m[14] - m[15] + m[16]
+                              - m[17] - m[18];
+
+  /* weights enter in the back transformation */
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    populations[0][i][index] *= w[i];
+  }
+
+#else // D3Q19
+  double **e = lbmodel.e;
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    populations[0][i][index] = 0.0;
+
+    for (int j = 0; j < lbmodel.n_veloc; j++) {
+      populations[0][i][index] += mode[j] * e[j][i] / e[19][j];
+    }
+
+    populations[0][i][index] *= w[i];
+  }
+#endif // D3Q19
+}
+
+
 /*** ITERATOR CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data) {
   p8est_t * p8est = info->p4est;                                /* get p8est */

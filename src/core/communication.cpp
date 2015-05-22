@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <mpi.h>
 #include <cstdio>
@@ -203,7 +203,7 @@ const char *names[] = {
 #define SOME_TAG 42
 
 /** The requests are compiled statically here, so that after a crash
-    you can get the last issued request from the debugger. */ 
+    you can get the last issued request from the debugger. */
 static int request[3];
 
 /**********************************************
@@ -448,7 +448,7 @@ void mpi_bcast_event_slave(int node, int event)
 #endif
   case MAGGS_COUNT_CHARGES:
     maggs_count_charged_particles();
-    break; 
+    break;
 #endif
   case SORT_PARTICLES:
     local_sort_particles();
@@ -484,7 +484,7 @@ void mpi_place_particle(int pnode, int part, double p[3])
 void mpi_place_particle_slave(int pnode, int part)
 {
   double p[3];
-  
+
   if (pnode == this_node) {
     MPI_Recv(p, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     local_place_particle(part, p, 0);
@@ -510,7 +510,7 @@ void mpi_place_new_particle(int pnode, int part, double p[3])
 void mpi_place_new_particle_slave(int pnode, int part)
 {
   double p[3];
-  
+
   added_particle(part);
 
   if (pnode == this_node) {
@@ -1124,7 +1124,7 @@ void mpi_send_rotation_slave(int pnode, int part)
 #endif
 }
 
-void mpi_observable_lb_radial_velocity_profile() 
+void mpi_observable_lb_radial_velocity_profile()
 {
 #ifdef LB
   mpi_call(mpi_observable_lb_radial_velocity_profile_slave, 0, 0);
@@ -1133,7 +1133,7 @@ void mpi_observable_lb_radial_velocity_profile()
 void mpi_observable_lb_radial_velocity_profile_slave(int pnode, int part)
 {
 #ifdef LB
-  mpi_observable_lb_radial_velocity_profile_slave_implementation(); 
+  mpi_observable_lb_radial_velocity_profile_slave_implementation();
 #endif
 }
 
@@ -1144,7 +1144,7 @@ void mpi_observable_lb_radial_velocity_profile_slave(int pnode, int part)
 int mpi_send_bond(int pnode, int part, int *bond, int _delete)
 {
   int bond_size, stat=0;
-  
+
   mpi_call(mpi_send_bond_slave, pnode, part);
 
   bond_size = (bond) ? bonded_ia_params[bond[0]].num + 1 : 0;
@@ -1167,7 +1167,7 @@ int mpi_send_bond(int pnode, int part, int *bond, int _delete)
 void mpi_send_bond_slave(int pnode, int part)
 {
   int bond_size=0, *bond, _delete=0, stat;
-  
+
   if (pnode == this_node) {
     MPI_Recv(&bond_size, 1, MPI_INT, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     if (bond_size) {
@@ -1193,7 +1193,7 @@ void mpi_recv_part(int pnode, int part, Particle *pdata)
 #ifdef EXCLUSIONS
   IntList *el = &(pdata->el);
 #endif
-  
+
   /* fetch fixed data */
   if (pnode == this_node)
     memcpy(pdata, local_particles[part], sizeof(Particle));
@@ -1267,7 +1267,7 @@ void mpi_remove_particle_slave(int pnode, int part)
 
     if (pnode == this_node)
       local_remove_particle(part);
-    
+
     remove_all_bonds_to(part);
   }
   else
@@ -1344,7 +1344,7 @@ void mpi_bcast_ia_params(int i, int j)
       /* Communicate the data */
       MPI_Bcast(tabulated_forces.e,tablesize, MPI_DOUBLE, 0 , comm_cart);
       MPI_Bcast(tabulated_energies.e,tablesize, MPI_DOUBLE, 0 , comm_cart);
-    }    
+    }
 #endif
   }
   else {
@@ -1370,7 +1370,7 @@ void mpi_bcast_ia_params(int i, int j)
     }
 #endif
   }
-  
+
   on_short_range_ia_change();
 }
 
@@ -1463,7 +1463,7 @@ void mpi_gather_stats(int job, void *result, void *result_t, void *result_nb, vo
     break;
   case 3:
     mpi_call(mpi_gather_stats_slave, -1, 3);
-    pressure_calc((double*)result, (double*)result_t, 
+    pressure_calc((double*)result, (double*)result_t,
       (double*)result_nb, (double*)result_t_nb,1);
     break;
   case 4:
@@ -1475,7 +1475,7 @@ void mpi_gather_stats(int job, void *result, void *result_t, void *result_nb, vo
     mpi_call(mpi_gather_stats_slave, -1, 5);
     lb_calc_fluid_mass((double*)result);
     break;
-  case 6: 
+  case 6:
     mpi_call(mpi_gather_stats_slave, -1, 6);
     lb_calc_fluid_momentum((double*)result);
     break;
@@ -1538,7 +1538,7 @@ void mpi_gather_stats_slave(int ana_num, int job)
 
 /*************** REQ_GET_LOCAL_STRESS_TENSOR ************/
 void mpi_local_stress_tensor(DoubleList *TensorInBin, int bins[3], int periodic[3], double range_start[3], double range[3]) {
-  
+
   int i,j;
   DoubleList *TensorInBin_;
   PTENSOR_TRACE(fprintf(stderr,"%d: mpi_local_stress_tensor: Broadcasting local_stress_tensor parameters\n",this_node));
@@ -1555,20 +1555,20 @@ void mpi_local_stress_tensor(DoubleList *TensorInBin, int bins[3], int periodic[
       TensorInBin[i].e[j] = 0;
     }
   }
-  
+
   MPI_Bcast(bins, 3, MPI_INT, 0, comm_cart);
   MPI_Bcast(periodic, 3, MPI_INT, 0, comm_cart);
   MPI_Bcast(range_start, 3, MPI_DOUBLE, 0, comm_cart);
   MPI_Bcast(range, 3, MPI_DOUBLE, 0, comm_cart);
-  
+
   PTENSOR_TRACE(fprintf(stderr,"%d: mpi_local_stress_tensor: Call local_stress_tensor_calc\n",this_node));
   local_stress_tensor_calc(TensorInBin_, bins, periodic, range_start, range);
-  
+
   PTENSOR_TRACE(fprintf(stderr,"%d: mpi_local_stress_tensor: Reduce local stress tensors with MPI_Reduce\n",this_node));
   for (i=0;i<bins[0]*bins[1]*bins[2];i++) {
-    MPI_Reduce(TensorInBin_[i].e, TensorInBin[i].e, 9, MPI_DOUBLE, MPI_SUM, 0, comm_cart); 
+    MPI_Reduce(TensorInBin_[i].e, TensorInBin[i].e, 9, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
   }
-  
+
 }
 
 void mpi_local_stress_tensor_slave(int ana_num, int job) {
@@ -1583,7 +1583,7 @@ void mpi_local_stress_tensor_slave(int ana_num, int job) {
   MPI_Bcast(periodic, 3, MPI_INT, 0, comm_cart);
   MPI_Bcast(range_start, 3, MPI_DOUBLE, 0, comm_cart);
   MPI_Bcast(range, 3, MPI_DOUBLE, 0, comm_cart);
-  
+
   TensorInBin = (DoubleList*)malloc(bins[0]*bins[1]*bins[2]*sizeof(DoubleList));
   for ( i = 0 ; i < bins[0]*bins[1]*bins[2]; i++ ) {
     init_doublelist(&TensorInBin[i]);
@@ -1592,7 +1592,7 @@ void mpi_local_stress_tensor_slave(int ana_num, int job) {
       TensorInBin[i].e[j] = 0.0;
     }
   }
-  
+
   local_stress_tensor_calc(TensorInBin, bins, periodic, range_start, range);
 
   for (i=0;i<bins[0]*bins[1]*bins[2];i++) {
@@ -1619,7 +1619,7 @@ void mpi_get_particles(Particle *result, IntList *bi)
   int *sizes;
   Cell *cell;
   int c;
-  
+
   mpi_call(mpi_get_particles_slave, -1, bi != NULL);
 
   sizes = (int*)malloc(sizeof(int)*n_nodes);
@@ -1749,7 +1749,7 @@ void mpi_get_particles_slave(int pnode, int bi)
     result = (Particle*)malloc(n_part*sizeof(Particle));
 
     init_intlist(&local_bi);
-    
+
     g = 0;
     for (c = 0; c < local_cells.n; c++) {
       Particle *part;
@@ -1776,7 +1776,7 @@ void mpi_get_particles_slave(int pnode, int bi)
     if (bi) {
       COMM_TRACE(fprintf(stderr, "%d: sending bonds\n", this_node));
 
-      MPI_Gather(&local_bi.n, 1, MPI_INT, NULL, 1, MPI_INT, 0, comm_cart);      
+      MPI_Gather(&local_bi.n, 1, MPI_INT, NULL, 1, MPI_INT, 0, comm_cart);
       if (local_bi.n > 0)
   MPI_Send(local_bi.e, local_bi.n, MPI_INT, 0, SOME_TAG, comm_cart);
       realloc_intlist(&local_bi, 0);
@@ -1786,7 +1786,7 @@ void mpi_get_particles_slave(int pnode, int bi)
     if (bi) {
       /* inform master node that we do not have bonds (as we don't have particles) */
       g = 0;
-      MPI_Gather(&g, 1, MPI_INT, NULL, 1, MPI_INT, 0, comm_cart);      
+      MPI_Gather(&g, 1, MPI_INT, NULL, 1, MPI_INT, 0, comm_cart);
     }
   }
 }
@@ -1915,7 +1915,7 @@ void mpi_bcast_coulomb_params()
 }
 
 void mpi_bcast_coulomb_params_slave(int node, int parm)
-{   
+{
 #if defined(ELECTROSTATICS) || defined(DIPOLES)
   MPI_Bcast(&coulomb, sizeof(Coulomb_parameters), MPI_BYTE, 0, comm_cart);
 
@@ -1941,9 +1941,9 @@ void mpi_bcast_coulomb_params_slave(int node, int parm)
     break;
   case COULOMB_MMM2D:
     MPI_Bcast(&mmm2d_params, sizeof(MMM2D_struct), MPI_BYTE, 0, comm_cart);
-    break;  
+    break;
   case COULOMB_MAGGS:
-    MPI_Bcast(&maggs, sizeof(MAGGS_struct), MPI_BYTE, 0, comm_cart); 
+    MPI_Bcast(&maggs, sizeof(MAGGS_struct), MPI_BYTE, 0, comm_cart);
     break;
 #ifdef EWALD_GPU
   case COULOMB_EWALD_GPU:
@@ -1977,14 +1977,14 @@ void mpi_bcast_coulomb_params_slave(int node, int parm)
  case  DIPOLAR_MDLC_DS:
      //fall trough
  case  DIPOLAR_DS:
-    break;   
+    break;
   default:
     fprintf(stderr, "%d: INTERNAL ERROR: cannot bcast dipolar params for unknown method %d\n", this_node, coulomb.Dmethod);
     errexit();
   }
 
-#endif  
-  
+#endif
+
   on_coulomb_change();
 #endif
 }
@@ -1999,7 +1999,7 @@ void mpi_bcast_collision_params()
 }
 
 void mpi_bcast_collision_params_slave(int node, int parm)
-{   
+{
 #ifdef COLLISION_DETECTION
   MPI_Bcast(&collision_params, sizeof(Collision_parameters), MPI_BYTE, 0, comm_cart);
 
@@ -2023,7 +2023,7 @@ void mpi_send_ext_torque(int pnode, int part, int flag, int mask, double torque[
       /* set new values */
       p->p.ext_flag |= flag;
 
-      if (mask & PARTICLE_EXT_TORQUE) 
+      if (mask & PARTICLE_EXT_TORQUE)
   memcpy(p->p.ext_torque, torque, 3*sizeof(double));
     }
     else {
@@ -2050,7 +2050,7 @@ void mpi_send_ext_torque_slave(int pnode, int part)
       p->p.ext_flag &= ~s_buf[1];
       /* set new values */
       p->p.ext_flag |= s_buf[0];
-      
+
       if (s_buf[1] & PARTICLE_EXT_TORQUE)
   MPI_Recv(p->p.ext_torque, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     }
@@ -2097,7 +2097,7 @@ void mpi_send_ext_force_slave(int pnode, int part)
     p->p.ext_flag &= ~s_buf[1];
     /* set new values */
     p->p.ext_flag |= s_buf[0];
-    
+
     if (s_buf[1] & PARTICLE_EXT_FORCE)
       MPI_Recv(p->p.ext_force, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   }
@@ -2132,7 +2132,7 @@ void mpi_bcast_constraint(int del_num)
 }
 
 void mpi_bcast_constraint_slave(int node, int parm)
-{   
+{
 #ifdef CONSTRAINTS
   if(parm == -1) {
     n_constraints++;
@@ -2147,7 +2147,7 @@ void mpi_bcast_constraint_slave(int node, int parm)
   else {
     memcpy(&constraints[parm],&constraints[n_constraints-1],sizeof(Constraint));
     n_constraints--;
-    constraints = (Constraint*)realloc(constraints,n_constraints*sizeof(Constraint));    
+    constraints = (Constraint*)realloc(constraints,n_constraints*sizeof(Constraint));
   }
 
   on_constraint_change();
@@ -2159,7 +2159,7 @@ void mpi_bcast_lbboundary(int del_num)
 {
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
   mpi_call(mpi_bcast_lbboundary_slave, 0, del_num);
-  
+
   if (del_num == -1) {
     /* bcast new boundaries */
     MPI_Bcast(&lb_boundaries[n_lb_boundaries-1], sizeof(LB_Boundary), MPI_BYTE, 0, comm_cart);
@@ -2185,7 +2185,7 @@ void mpi_bcast_lbboundary(int del_num)
 }
 
 void mpi_bcast_lbboundary_slave(int node, int parm)
-{   
+{
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 
 #if defined(LB_BOUNDARIES)
@@ -2207,7 +2207,7 @@ void mpi_bcast_lbboundary_slave(int node, int parm)
   else {
     memcpy(&lb_boundaries[parm],&lb_boundaries[n_lb_boundaries-1],sizeof(LB_Boundary));
     n_lb_boundaries--;
-    lb_boundaries = (LB_Boundary*) realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));    
+    lb_boundaries = (LB_Boundary*) realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));
   }
 #endif
 
@@ -2317,7 +2317,7 @@ void mpi_cap_forces_slave(int node, int parm)
 #ifdef TABULATED
   MPI_Bcast(&force_cap, 1, MPI_DOUBLE, 0, comm_cart);
 /* to do: check if "check_tab_forcecap" is still useful since force capping
-   is defined globally now -- the cap for other forces would be removed too! 
+   is defined globally now -- the cap for other forces would be removed too!
   check_tab_forcecap(force_cap);
 */
   on_short_range_ia_change();
@@ -2353,7 +2353,7 @@ void mpi_get_configtemp(double cfgtmp[2])
 void mpi_get_configtemp_slave(int node, int cnt)
 {
 #ifdef CONFIGTEMP
-  extern double configtemp[2];  
+  extern double configtemp[2];
   MPI_Reduce(configtemp, NULL, 2, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 #endif
 }
@@ -2432,7 +2432,7 @@ void mpi_rescale_particles(int dir, double scale) {
 }
 
 void mpi_rescale_particles_slave(int pnode, int dir) {
-  double scale=0.0; 
+  double scale=0.0;
   MPI_Recv(&scale, 1, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   local_rescale_particles(dir, scale);
   on_particle_change();
@@ -2488,7 +2488,7 @@ int mpi_sync_topo_part_info() {
   int molsize=0;
   int moltype=0;
   int n_mols=0;
-  
+
   mpi_call(mpi_sync_topo_part_info_slave,-1,0);
   n_mols = n_molecules;
   MPI_Bcast(&n_mols,1,MPI_INT,0,comm_cart);
@@ -2517,9 +2517,9 @@ int mpi_sync_topo_part_info() {
     MPI_Bcast(&moltype,1,MPI_INT,0,comm_cart);
     MPI_Bcast(topology[i].part.e,topology[i].part.n,MPI_INT,0,comm_cart);
     MPI_Bcast(&topology[i].type,1,MPI_INT,0,comm_cart);
-    
+
   }
-  
+
   sync_topo_part_info();
 
   return 1;
@@ -2560,7 +2560,7 @@ void mpi_sync_topo_part_info_slave(int node,int parm ) {
     MPI_Bcast(&topology[i].type,1,MPI_INT,0,comm_cart);
 
   }
-  
+
 
   sync_topo_part_info();
 
@@ -2619,7 +2619,7 @@ void mpi_send_exclusion_slave(int part1, int part2)
 {
 #ifdef EXCLUSIONS
   int _delete=0;
-  MPI_Bcast(&_delete, 1, MPI_INT, 0, comm_cart);  
+  MPI_Bcast(&_delete, 1, MPI_INT, 0, comm_cart);
   local_change_exclusion(part1, part2, _delete);
   on_particle_change();
 #endif
@@ -2699,23 +2699,17 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 
 #ifdef LB_ADAPTIVE
 void mpi_lbadapt_grid_init (int node, int param) {
-  /* define context */
-  lbadapt_ctx_t ctx;
-  ctx.bla = 0.5;
-
   /* create connectivity and octree */
   conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
                  periodic & 1, periodic & 2, periodic & 4);
   p8est = p8est_new_ext (comm_cart,  /* mpi communicator */
-       conn,       /* connectivity */
-       0,    /* min octants per process */
-       0,    /* min level */
-       0,    /* fill uniform */
-       sizeof (double),  /* data size */
-       lbadapt_init,     /* init function */
-       (void *) (&ctx)   /* user pointer */
-  );
-
+                         conn,       /* connectivity */
+                         0,          /* min octants per process */
+                         0,          /* min level */
+                         0,                /* fill uniform */
+                         sizeof (double),  /* data size */
+                         lbadapt_init,     /* init function */
+                         NULL              /* user pointer */);
   // create debug output
   // p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_postInitTree");
 }
@@ -2815,12 +2809,12 @@ void mpi_iccp3m_iteration_slave(int dummy, int dummy2)
 int mpi_iccp3m_init(int n_induced_charges)
 {
 #ifdef ELECTROSTATICS
-  /* nothing has to be done on the master node, this 
+  /* nothing has to be done on the master node, this
    * passes only the number of induced charges, in order for
    * slaves to allocate memory */
-  
+
   mpi_call(mpi_iccp3m_init_slave, -1, n_induced_charges);
-   
+
   bcast_iccp3m_cfg();
 
   COMM_TRACE(fprintf(stderr, "%d: iccp3m init task %d done.\n", this_node, n_induced_charges));
@@ -2843,12 +2837,14 @@ void mpi_iccp3m_init_slave(int node, int dummy)
  }
 
   bcast_iccp3m_cfg();
-  
+
   check_runtime_errors();
 #endif
 }
 
+
 void mpi_recv_fluid_populations(int node, int index, double *pop) {
+#ifndef LB_ADAPTIVE
 #ifdef LB
   if (node==this_node) {
     lb_get_populations(index, pop);
@@ -2857,10 +2853,12 @@ void mpi_recv_fluid_populations(int node, int index, double *pop) {
     MPI_Recv(pop, 19, MPI_DOUBLE, node, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   }
   lbpar.resend_halo=1;
-#endif
+#endif // LB
+#endif // LB_ADAPTIVE
 }
 
 void mpi_recv_fluid_populations_slave(int node, int index) {
+#ifndef LB_ADAPTIVE
 #ifdef LB
   if (node==this_node) {
     double data[19];
@@ -2868,7 +2866,8 @@ void mpi_recv_fluid_populations_slave(int node, int index) {
     MPI_Send(data, 19, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
   lbpar.resend_halo=1;
-#endif
+#endif // LB
+#endif // LB_ADAPTIVE
 }
 
 void mpi_send_fluid_populations(int node, int index, double *pop) {
@@ -2879,7 +2878,7 @@ void mpi_send_fluid_populations(int node, int index, double *pop) {
     mpi_call(mpi_send_fluid_populations_slave, node, index);
     MPI_Send(pop, 19, MPI_DOUBLE, node, SOME_TAG, comm_cart);
   }
-#endif
+#endif // LB
 }
 
 void mpi_send_fluid_populations_slave(int node, int index) {
@@ -2889,7 +2888,7 @@ void mpi_send_fluid_populations_slave(int node, int index) {
     MPI_Recv(data, 19, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     lb_set_populations(index, data);
   }
-#endif
+#endif // LB
 }
 
 /****************************************************/
@@ -2897,17 +2896,17 @@ void mpi_send_fluid_populations_slave(int node, int index) {
 void mpi_bcast_max_mu() {
 #ifdef DIPOLES
   mpi_call(mpi_bcast_max_mu_slave, -1, 0);
-  
+
   calc_mu_max();
-  
+
 #endif
 }
 
 void mpi_bcast_max_mu_slave(int node, int dummy) {
 #ifdef DIPOLES
-  
+
   calc_mu_max();
- 
+
 #endif
 }
 
@@ -3015,7 +3014,7 @@ void mpi_system_CMS() {
   double rdata[4];
   double *pdata = rdata;
 
-  data[0] = 0.0; 
+  data[0] = 0.0;
   data[1] = 0.0;
   data[2] = 0.0;
   data[3] = 0.0;
@@ -3056,7 +3055,7 @@ void mpi_system_CMS_velocity() {
   double rdata[4];
   double *pdata = rdata;
 
-  data[0] = 0.0; 
+  data[0] = 0.0;
   data[1] = 0.0;
   data[2] = 0.0;
   data[3] = 0.0;
@@ -3162,7 +3161,7 @@ void mpi_loop()
     slave_callbacks[request[0]](request[1], request[2]);
     COMM_TRACE(fprintf(stderr, "%d: finished %s %d %d\n", this_node,
            names[request[0]], request[1], request[2]));
-  
+
   }
 }
 
@@ -3209,8 +3208,8 @@ void mpi_external_potential_sum_energies() {
   for (int i=0; i<n_external_potentials; i++) {
     energies[i]=external_potentials[i].energy;
   }
-  double* energies_sum = (double*) malloc(n_external_potentials*sizeof(double)); 
-  MPI_Reduce(energies, energies_sum, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart); 
+  double* energies_sum = (double*) malloc(n_external_potentials*sizeof(double));
+  MPI_Reduce(energies, energies_sum, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
   for (int i=0; i<n_external_potentials; i++) {
     external_potentials[i].energy=energies_sum[i];
   }
@@ -3224,7 +3223,7 @@ void mpi_external_potential_sum_energies_slave(int dummy1, int dummy2) {
   for (int i=0; i<n_external_potentials; i++) {
     energies[i]=external_potentials[i].energy;
   }
-  MPI_Reduce(energies, 0, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart); 
+  MPI_Reduce(energies, 0, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
   free(energies);
 }
 

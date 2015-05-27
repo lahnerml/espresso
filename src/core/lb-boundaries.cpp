@@ -97,9 +97,11 @@ void lbboundary_mindist_position(double pos[3], double* mindist, double distvec[
 /** Initialize boundary conditions for all constraints in the system. */
 void lb_init_boundaries() {
 
+#ifndef LB_ADAPTIVE
   int n, x, y, z;
   //char *errtxt;
   double pos[3], dist, dist_tmp=0.0, dist_vec[3];
+#endif // LB_ADAPTIVE
 
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined (LB_GPU) && defined (LB_BOUNDARIES_GPU)
@@ -479,7 +481,9 @@ int lbboundary_get_force(int no, double* f) {
 #ifdef LB_BOUNDARIES
 
 void lb_bounce_back() {
+#ifdef LB_ADAPTIVE
 
+#else // LB_ADAPTIVE
 #ifdef D3Q19
 #ifndef PULL
   int k,i,l;
@@ -512,9 +516,6 @@ void lb_bounce_back() {
 
   /* bottom-up sweep */
   //  for (k=lblattice.halo_offset;k<lblattice.halo_grid_volume;k++) {
-#ifdef LB_ADAPTIVE
-
-#else // LB_ADAPTIVE
   for (z=0; z<lblattice.grid[2]+2; z++) {
     for (y=0; y<lblattice.grid[1]+2; y++) {
       for (x=0; x<lblattice.grid[0]+2; x++) {
@@ -545,13 +546,13 @@ void lb_bounce_back() {
       }
     }
   }
-#endif // LB_ADAPTIVE
 #else // !PULL
 #error Bounce back boundary conditions are only implemented for PUSH scheme!
 #endif // !PULL
 #else // D3Q19
 #error Bounce back boundary conditions are only implemented for D3Q19!
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
-#endif
+#endif // LB_BOUNDARIES

@@ -29,12 +29,28 @@
 #include "utils.hpp"
 #include "constraint.hpp"
 #include "communication.hpp"
+#include "lb.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
-
+#include "lb-d3q19.hpp"
 
 #ifdef LB_ADAPTIVE
 
+/* Code duplication from lb.cpp */
+/* For the D3Q19 model most functions have a separate implementation
+ * where the coefficients and the velocity vectors are hardcoded
+ * explicitly. This saves a lot of multiplications with 1's and 0's
+ * thus making the code more efficient. */
+#ifndef D3Q19
+#define D3Q19
+#endif // D3Q19
+
+#if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
+#define FLATNOISE
+#endif // (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
+
+
+/* "external variables" */
 p8est_connectivity_t *conn;
 p8est_t              *p8est;
 
@@ -44,9 +60,9 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
   lbadapt_payload_t *data = (lbadapt_payload_t *) quadrant->p.user_data;
 
   data->boundary = 0;
-  data->lbfields = malloc(sizeof(LB_FluidNode));
-  data->lbfluid[0] = malloc(lbmodel.n_veloc * sizeof(double));
-  data->lbfluid[1] = malloc(lbmodel.n_veloc * sizeof(double));
+  // data->lbfields = (LB_FluidNode) malloc(sizeof(LB_FluidNode));
+  data->lbfluid[0] = (double*) malloc(lbmodel.n_veloc * sizeof(double));
+  data->lbfluid[1] = (double*) malloc(lbmodel.n_veloc * sizeof(double));
 }
 
 
@@ -73,7 +89,7 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
 }
 
 
-int lbadapt_calc_n_from_rho_j_pi (double * datafield,
+int lbadapt_calc_n_from_rho_j_pi (double ** datafield,
                                   double rho,
                                   double * j,
                                   double * pi,
@@ -176,7 +192,7 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
 }
 
 
-int lbadapt_calc_modes(double * population, double * mode) {
+int lbadapt_calc_modes(double ** population, double * mode) {
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, \
     n7p, n7m, n8p, n8m, n9p, n9m;
@@ -384,30 +400,34 @@ int lbadapt_thermalize_modes(double * mode, double h) {
 #ifdef ADDITIONAL_CHECKS
   rancounter += 15;
 #endif // ADDITIONAL_CHECKS
+
+  return 0;
 }
 
 
-int lbadapt_apply_force (double * mode, double * force, double h) {
-  double rho, u[3], C[6];
+int lbadapt_apply_force (double * mode, LB_FluidNode * lbfields, double h) {
+  double rho, u[3], C[6], *f;
+
+  f = lbfields->force;
 
   rho = mode[0] + lbpar.rho[0] * h * h * h;
 
   /* hydrodynamic momentum density is redefined when external forces present */
-  u[0] = (mode[1] + 0.5 * force[0])/rho;
-  u[1] = (mode[2] + 0.5 * force[1])/rho;
-  u[2] = (mode[3] + 0.5 * force[2])/rho;
+  u[0] = (mode[1] + 0.5 * f[0])/rho;
+  u[1] = (mode[2] + 0.5 * f[1])/rho;
+  u[2] = (mode[3] + 0.5 * f[2])/rho;
 
-  C[0] = (1.+gamma_bulk)*u[0]*force[0] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
-  C[2] = (1.+gamma_bulk)*u[1]*force[1] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
-  C[5] = (1.+gamma_bulk)*u[2]*force[2] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,force);
-  C[1] = 1./2. * (1.+gamma_shear)*(u[0]*force[1]+u[1]*force[0]);
-  C[3] = 1./2. * (1.+gamma_shear)*(u[0]*force[2]+u[2]*force[0]);
-  C[4] = 1./2. * (1.+gamma_shear)*(u[1]*force[2]+u[2]*force[1]);
+  C[0] = (1.+gamma_bulk)*u[0]*f[0] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
+  C[2] = (1.+gamma_bulk)*u[1]*f[1] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
+  C[5] = (1.+gamma_bulk)*u[2]*f[2] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
+  C[1] = 1./2. * (1.+gamma_shear)*(u[0]*f[1]+u[1]*f[0]);
+  C[3] = 1./2. * (1.+gamma_shear)*(u[0]*f[2]+u[2]*f[0]);
+  C[4] = 1./2. * (1.+gamma_shear)*(u[1]*f[2]+u[2]*f[1]);
 
   /* update momentum modes */
-  mode[1] += force[0];
-  mode[2] += force[1];
-  mode[3] += force[2];
+  mode[1] += f[0];
+  mode[2] += f[1];
+  mode[3] += f[2];
 
   /* update stress modes */
   mode[4] += C[0] + C[2] + C[5];
@@ -420,19 +440,21 @@ int lbadapt_apply_force (double * mode, double * force, double h) {
   /* reset force */
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  lbfields[index].force[0] = lbpar.ext_force[0]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
-  lbfields[index].force[1] = lbpar.ext_force[1]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
-  lbfields[index].force[2] = lbpar.ext_force[2]*pow(lbpar.agrid,2)*lbpar.tau*lbpar.tau;
+  lbfields->force[0] = lbpar.ext_force[0] * SQR(h) * SQR(lbpar.tau);
+  lbfields->force[1] = lbpar.ext_force[1] * SQR(h) * SQR(lbpar.tau);
+  lbfields->force[2] = lbpar.ext_force[2] * SQR(h) * SQR(lbpar.tau);
 #else // EXTERNAL_FORCES
-  lbfields[index].force[0] = 0.0;
-  lbfields[index].force[1] = 0.0;
-  lbfields[index].force[2] = 0.0;
-  lbfields[index].has_force = 0;
+  lbfields->force[0] = 0.0;
+  lbfields->force[1] = 0.0;
+  lbfields->force[2] = 0.0;
+  lbfields->has_force = 0;
 #endif // EXTERNAL_FORCES
+
+  return 0;
 }
 
 
-int lbadapt_calc_pop_from_modes (double * populations, double * mode) {
+int lbadapt_calc_pop_from_modes (double ** populations, double * mode) {
   double *w = lbmodel.w;
 
 #ifdef D3Q19
@@ -444,67 +466,68 @@ int lbadapt_calc_pop_from_modes (double * populations, double * mode) {
     m[i] = (1./e[19][i])*mode[i];
   }
 
-  populations[0][ 0][index] = m[0] - m[4] + m[16];
-  populations[0][ 1][index] = m[0] + m[1] + m[5] + m[6] - m[17] - m[18]
-                              - 2.*(m[10] + m[16]);
-  populations[0][ 2][index] = m[0] - m[1] + m[5] + m[6] - m[17] - m[18]
-                              + 2.*(m[10] - m[16]);
-  populations[0][ 3][index] = m[0] + m[2] - m[5] + m[6] + m[17] - m[18]
-                              - 2.*(m[11] + m[16]);
-  populations[0][ 4][index] = m[0] - m[2] - m[5] + m[6] + m[17] - m[18]
-                              + 2.*(m[11] - m[16]);
-  populations[0][ 5][index] = m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18]);
-  populations[0][ 6][index] = m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]);
-  populations[0][ 7][index] = m[0] + m[ 1] + m[ 2] + m[ 4] + 2.*m[6] + m[7]
-                              + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18];
-  populations[0][ 8][index] = m[0] - m[ 1] - m[ 2] + m[ 4] + 2.*m[6] + m[7]
-                              - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18];
-  populations[0][ 9][index] = m[0] + m[ 1] - m[ 2] + m[ 4] + 2.*m[6] - m[7]
-                              + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18];
-  populations[0][10][index] = m[0] - m[ 1] + m[ 2] + m[ 4] + 2.*m[6] - m[7]
-                              - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18];
-  populations[0][11][index] = m[0] + m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
-                              + m[8] + m[10] + m[12] - m[13] + m[15] + m[16]
-                              + m[17] - m[18];
-  populations[0][12][index] = m[0] - m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
-                              + m[8] - m[10] - m[12] + m[13] - m[15] + m[16]
-                              + m[17] - m[18];
-  populations[0][13][index] = m[0] + m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
-                              - m[8] + m[10] - m[12] - m[13] - m[15] + m[16]
-                              + m[17] - m[18];
-  populations[0][14][index] = m[0] - m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
-                              - m[8] - m[10] + m[12] + m[13] + m[15] + m[16]
-                              + m[17] - m[18];
-  populations[0][15][index] = m[0] + m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
-                              + m[9] + m[11] + m[12] - m[14] - m[15] + m[16]
-                              - m[17] - m[18];
-  populations[0][16][index] = m[0] - m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
-                              + m[9] - m[11] - m[12] + m[14] + m[15] + m[16]
-                              - m[17] - m[18];
-  populations[0][17][index] = m[0] + m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
-                              - m[9] + m[11] - m[12] - m[14] + m[15] + m[16]
-                              - m[17] - m[18];
-  populations[0][18][index] = m[0] - m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
-                              - m[9] - m[11] + m[12] + m[14] - m[15] + m[16]
-                              - m[17] - m[18];
+  populations[0][ 0] = m[0] - m[4] + m[16];
+  populations[0][ 1] = m[0] + m[1] + m[5] + m[6] - m[17] - m[18]
+                       - 2.*(m[10] + m[16]);
+  populations[0][ 2] = m[0] - m[1] + m[5] + m[6] - m[17] - m[18]
+                       + 2.*(m[10] - m[16]);
+  populations[0][ 3] = m[0] + m[2] - m[5] + m[6] + m[17] - m[18]
+                       - 2.*(m[11] + m[16]);
+  populations[0][ 4] = m[0] - m[2] - m[5] + m[6] + m[17] - m[18]
+                       + 2.*(m[11] - m[16]);
+  populations[0][ 5] = m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18]);
+  populations[0][ 6] = m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]);
+  populations[0][ 7] = m[0] + m[ 1] + m[ 2] + m[ 4] + 2.*m[6] + m[7]
+                       + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18];
+  populations[0][ 8] = m[0] - m[ 1] - m[ 2] + m[ 4] + 2.*m[6] + m[7]
+                       - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18];
+  populations[0][ 9] = m[0] + m[ 1] - m[ 2] + m[ 4] + 2.*m[6] - m[7]
+                       + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18];
+  populations[0][10] = m[0] - m[ 1] + m[ 2] + m[ 4] + 2.*m[6] - m[7]
+                       - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18];
+  populations[0][11] = m[0] + m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                       + m[8] + m[10] + m[12] - m[13] + m[15] + m[16]
+                       + m[17] - m[18];
+  populations[0][12] = m[0] - m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                       + m[8] - m[10] - m[12] + m[13] - m[15] + m[16]
+                       + m[17] - m[18];
+  populations[0][13] = m[0] + m[ 1] - m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                       - m[8] + m[10] - m[12] - m[13] - m[15] + m[16]
+                       + m[17] - m[18];
+  populations[0][14] = m[0] - m[ 1] + m[ 3] + m[ 4] + m[ 5] - m[ 6]
+                       - m[8] - m[10] + m[12] + m[13] + m[15] + m[16]
+                       + m[17] - m[18];
+  populations[0][15] = m[0] + m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                       + m[9] + m[11] + m[12] - m[14] - m[15] + m[16]
+                       - m[17] - m[18];
+  populations[0][16] = m[0] - m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                       + m[9] - m[11] - m[12] + m[14] + m[15] + m[16]
+                       - m[17] - m[18];
+  populations[0][17] = m[0] + m[ 2] - m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                       - m[9] + m[11] - m[12] - m[14] + m[15] + m[16]
+                       - m[17] - m[18];
+  populations[0][18] = m[0] - m[ 2] + m[ 3] + m[ 4] - m[ 5] - m[ 6]
+                       - m[9] - m[11] + m[12] + m[14] - m[15] + m[16]
+                       - m[17] - m[18];
 
   /* weights enter in the back transformation */
   for (int i = 0; i < lbmodel.n_veloc; i++) {
-    populations[0][i][index] *= w[i];
+    populations[0][i] *= w[i];
   }
 
 #else // D3Q19
   double **e = lbmodel.e;
   for (int i = 0; i < lbmodel.n_veloc; i++) {
-    populations[0][i][index] = 0.0;
+    populations[0][i] = 0.0;
 
     for (int j = 0; j < lbmodel.n_veloc; j++) {
-      populations[0][i][index] += mode[j] * e[j][i] / e[19][j];
+      populations[0][i] += mode[j] * e[j][i] / e[19][j];
     }
 
-    populations[0][i][index] *= w[i];
+    populations[0][i] *= w[i];
   }
 #endif // D3Q19
+  return 0;
 }
 
 
@@ -513,7 +536,6 @@ void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_d
   p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
-  p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
   double midpoint[3];
@@ -546,7 +568,6 @@ void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data) {
-  p8est_t           * p8est = info->p4est;                          /* get p8est */
   p8est_quadrant_t  * q     = info->quad;                           /* get current global cell id */
   lbadapt_payload_t * data  = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
@@ -568,7 +589,6 @@ void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_data) {
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
@@ -578,18 +598,15 @@ void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_d
   // convert rho to lattice units
   double rho   = lbpar.rho[0] * h * h * h;
   // start with fluid at rest and no stress
-  double j[3]  = {0., 0., 0.}
+  double j[3]  = {0., 0., 0.};
   double pi[6] = {0., 0., 0., 0., 0., 0.};
-  lbadapt_calc_n_from_rho_j_pi (data->lbfields, rho, j, pi, h);
+  lbadapt_calc_n_from_rho_j_pi (data->lbfluid, rho, j, pi, h);
 }
 
 
 void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) {
   double *rho = (double *) user_data;                           /* passed double to fill */
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
-  p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
-  p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
   double h;                                                     /* local meshwidth */
@@ -626,7 +643,6 @@ void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) 
 
 void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data) {
   double *momentum = (double *) user_data;                      /* passed array to fill */
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
   double h;                                                     /* local meshwidth */
@@ -660,9 +676,9 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data) {
          - data->lbfluid[0][13] + data->lbfluid[0][14]
          + data->lbfluid[0][15] - data->lbfluid[0][16]
          - data->lbfluid[0][17] + data->lbfluid[0][18];
-  momentum[0] += j[0] + lbfields.force[0];
-  momentum[1] += j[1] + lbfields.force[1];
-  momentum[2] += j[2] + lbfields.force[2];
+  momentum[0] += j[0] + data->lbfields.force[0];
+  momentum[1] += j[1] + data->lbfields.force[1];
+  momentum[2] += j[2] + data->lbfields.force[2];
 
   momentum[0] *= h/lbpar.tau;
   momentum[1] *= h/lbpar.tau;
@@ -681,7 +697,6 @@ void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
 
   double bnd;                                                     /* local meshwidth */
   p4est_locidx_t  arrayoffset;
-  int i, j;
 
   tree = p8est_tree_array_index (p8est->trees, which_tree);
   local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */

@@ -37,13 +37,13 @@
 #include <p8est_vtk.h>
 
 #include "utils.hpp"
+#include "lb.hpp"
 
 /* "global variables" */
 extern p8est_t              *p8est;
 extern p8est_connectivity_t *conn;
 
-
-/** setup function 
+/** setup function
  */
 void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
@@ -89,10 +89,10 @@ void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
  * \param [in]      pi         The fluids stress tensor.
  * \param [in]      h          The meshwidth of the current cell
  */
-int lbadapt_calc_n_from_rho_j_pi (double * datafield,
+int lbadapt_calc_n_from_rho_j_pi (double ** datafield,
                                   double rho,
-                                  double* j,
-                                  double* pi,
+                                  double * j,
+                                  double * pi,
                                   double h);
 
 
@@ -101,7 +101,7 @@ int lbadapt_calc_n_from_rho_j_pi (double * datafield,
  * \param [in]      populations The population vector.
  * \param     [out] mode        The resulting modes to be relaxed in a later step.
  */
-int lbadapt_calc_modes (double * populations, double * mode);
+int lbadapt_calc_modes (double ** populations, double * mode);
 
 
 /** Perform MRT Relaxation step
@@ -127,7 +127,7 @@ int lbadapt_relax_modes (double * mode, double h);
  * \param [in]      force The force that is applied.
  * \param [in]      h     The local mesh width.
  */
-int lbadapt_apply_force (double * mode, double * force, double h);
+int lbadapt_apply_force (double * mode, LB_FluidNode * lbfields, double h);
 
 
 /** Transfer modes back to populations
@@ -154,8 +154,14 @@ void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_d
 void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data);
+void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data);
+void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_stream_edges (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_stream_faces (p8est_iter_volume_info_t * info, void * user_data);
 #endif //LB_ADAPTIVE_H

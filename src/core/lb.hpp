@@ -27,7 +27,6 @@
 #ifndef LB_H
 #define LB_H
 
-#include "lb-adaptive.hpp"
 #include "utils.hpp"
 #include "lattice_inline.hpp"
 
@@ -193,7 +192,7 @@ extern double **lbfluid[2];
 
 /** Pointer to the hydrodynamic fields of the fluid */
 extern LB_FluidNode *lbfields;
-#else // LB_ADAPTIVE 
+#else // LB_ADAPTIVE
 typedef struct lbadapt_payload {
   int  boundary;
   double *lbfluid[2];
@@ -214,6 +213,12 @@ extern int resend_halo;
 
 extern double gamma_shear;
 extern double gamma_bulk;
+
+extern double gamma_odd;
+extern double gamma_even;
+extern double lb_phi[19];
+extern double lb_coupl_pref;
+extern double lb_coupl_pref2;
 
 /************************************************************/
 /** \name Exported Functions */

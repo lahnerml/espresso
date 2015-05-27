@@ -38,11 +38,16 @@
  * \param result Fluid mass
  */
 void lb_calc_fluid_mass(double *result) {
+#ifndef LB_ADAPTIVE
   int x, y, z, index;
   double sum_rho=0.0, rho=0.0;
+#else
+  double sum_rho = 0.0;
+#endif // LB_ADAPTIVE
+
 
 #ifdef LB_ADAPTIVE
-  p4est_iterate (p8est,
+  p8est_iterate (p8est,
                  NULL,
                  &sum_rho,
                  lbadapt_calc_local_rho,
@@ -70,11 +75,15 @@ void lb_calc_fluid_mass(double *result) {
  * \param result Fluid momentum
  */
 void lb_calc_fluid_momentum(double *result) {
+#ifndef LB_ADAPTIVE
   int x, y, z, index;
   double j[3], momentum[3] = { 0.0, 0.0, 0.0 };
+#else // LB_ADAPTIVE
+  double momentum[3] = {0., 0., 0.};
+#endif // LB_ADAPTIVE
 
 #ifdef LB_ADAPTIVE
-  p4est_iterate (p8est,
+  p8est_iterate (p8est,
                  NULL,
                  momentum,
                  lbadapt_calc_local_j,
@@ -107,6 +116,7 @@ void lb_calc_fluid_momentum(double *result) {
  * \param result Fluid temperature
  */
 void lb_calc_fluid_temp(double *result) {
+#ifndef LB_ADAPTIVE
   int x, y, z, index;
   double rho, j[3];
   double temp = 0.0;
@@ -120,12 +130,12 @@ void lb_calc_fluid_temp(double *result) {
 
 #ifdef LB_BOUNDARIES
 	if ( !lbfields[index].boundary )
-#endif
-	  {
-	    lb_calc_local_fields(index, &rho, j, NULL);
-	    temp += scalar(j,j);
-	    number_of_non_boundary_nodes++;
-	  }
+#endif // LB_BOUNDARIES
+        {
+          lb_calc_local_fields(index, &rho, j, NULL);
+          temp += scalar(j,j);
+          number_of_non_boundary_nodes++;
+        }
       }
     }
   }
@@ -135,6 +145,7 @@ void lb_calc_fluid_temp(double *result) {
               lbpar.tau*lbpar.tau*lbpar.agrid)/n_nodes;
 
   MPI_Reduce(&temp, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 void lb_collect_boundary_forces(double *result) {
@@ -154,7 +165,9 @@ void lb_collect_boundary_forces(double *result) {
 
 /** Calculate a density profile of the fluid. */
 void lb_calc_densprof(double *result, int *params) {
-
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
   double *profile;
@@ -212,7 +225,6 @@ void lb_calc_densprof(double *result, int *params) {
     MPI_Gather(profile, lblattice.grid[pdir], MPI_DOUBLE, result, lblattice.grid[pdir], MPI_DOUBLE, 0, slice_comm);
 
     free(profile);
-
   }
 
   MPI_Comm_free(&slice_comm);
@@ -228,14 +240,16 @@ void lb_calc_densprof(double *result, int *params) {
   }
 
   if (this_node != 0) free(params);
-
+#endif // LB_ADAPTIVE
 }
 
 #define REQ_VELPROF 701
 
 /** Calculate a velocity profile for the LB fluid. */
 void lb_calc_velprof(double *result, int *params) {
-
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
   double rho, j[3], *velprof;
@@ -329,6 +343,7 @@ void lb_calc_velprof(double *result, int *params) {
 
   if (this_node !=0) free(params);
 
+#endif // LB_ADAPTIVE
 }
 
 #endif /* LB */

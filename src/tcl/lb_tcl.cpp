@@ -894,12 +894,16 @@ int tclcommand_lbnode(ClientData data, Tcl_Interp *interp, int argc, char **argv
   else
   {
 #ifdef LB
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
     if (lbfluid[0][0]==0)
     {
       Tcl_AppendResult(interp, "lbnode: lbfluid not correctly initialized", (char *)NULL);
       return TCL_ERROR;
     }
-#endif
+#endif // LB_ADAPTIVE
+#endif // LB
   }
 
   if (argc < 3)

@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** \file statistics_fluid.cpp
  *
@@ -37,28 +37,26 @@
 #ifdef LB
 
 static void lb_master_calc_densprof(double *profile, int pdir, int x1, int x2) {
-    
     /* this is a quick and dirty hack to issue slave calls with parameters */
-    
+
     int params[3] = { pdir, x1, x2 };
-    
+
     mpi_gather_stats(9, profile, params, NULL, NULL);
-    
 }
 
 static void lb_master_calc_velprof(double *result, int vcomp, int pdir, int x1, int x2) {
-    
+
     /* this is a quick and dirty hack to issue slave calls with parameters */
-    
+
     int params[4];
-    
+
     params[0] = vcomp;
     params[1] = pdir;
     params[2] = x1;
     params[3] = x2;
-    
+
     mpi_gather_stats(8, result, params, NULL, NULL);
-    
+
 }
 
 
@@ -79,7 +77,7 @@ static int tclcommand_analyze_fluid_parse_momentum(Tcl_Interp* interp, int argc,
   double mom[3];
 
   mpi_gather_stats(6, mom, NULL, NULL, NULL);
-  
+
   Tcl_PrintDouble(interp, mom[0], buffer);
   Tcl_AppendResult(interp, buffer, " ", (char *)NULL);
   Tcl_PrintDouble(interp, mom[1], buffer);
@@ -98,12 +96,14 @@ static int tclcommand_analyze_fluid_parse_temp(Tcl_Interp *interp, int argc, cha
 
   Tcl_PrintDouble(interp, temp, buffer);
   Tcl_AppendResult(interp, buffer, (char *)NULL);
-  
+
   return TCL_OK;
 }
 
 static int tclcommand_analyze_fluid_parse_densprof(Tcl_Interp *interp, int argc, char **argv) {
-  
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
   int i, pdir, x1, x2;
   char buffer[TCL_DOUBLE_SPACE];
   double *profile;
@@ -133,12 +133,15 @@ static int tclcommand_analyze_fluid_parse_densprof(Tcl_Interp *interp, int argc,
     Tcl_AppendResult(interp, buffer, "\n", (char *)NULL);
   }
   free(profile);
-  
-  return TCL_OK;
+#endif // LB_ADAPTIVE
 
+  return TCL_OK;
 }
 
 static int tclcommand_analyze_fluid_parse_velprof(Tcl_Interp *interp, int argc, char **argv) {
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else // LB_ADAPTIVE
     int i, pdir, vcomp, x1, x2;
     char buffer[TCL_DOUBLE_SPACE];
     double *velprof;
@@ -180,12 +183,12 @@ static int tclcommand_analyze_fluid_parse_velprof(Tcl_Interp *interp, int argc, 
 	Tcl_AppendResult(interp, buffer, " ", (char *)NULL);
 	Tcl_PrintDouble(interp, velprof[i], buffer);
 	Tcl_AppendResult(interp, buffer, "\n", (char *)NULL);
-    }	
+    }
 
     free(velprof);
+#endif // LB_ADAPTIVE
 
     return TCL_OK;
-
 }
 #endif /* LB */
 
@@ -197,7 +200,7 @@ int tclcommand_analyze_parse_fluid_cpu(Tcl_Interp *interp, int argc, char **argv
     if (argc==0) {
 	Tcl_AppendResult(interp, "usage: analyze fluid <what>", (char *)NULL);
 	return TCL_ERROR;
-    } 
+    }
 
     if (ARG0_IS_S("mass"))
       err = tclcommand_analyze_fluid_parse_mass(interp, argc - 1, argv + 1);
@@ -225,7 +228,7 @@ int tclcommand_analyze_parse_fluid_cpu(Tcl_Interp *interp, int argc, char **argv
 static int tclcommand_analyze_fluid_mass_gpu(Tcl_Interp* interp, int argc, char *argv[]){
   char buffer[TCL_DOUBLE_SPACE];
   double host_mass[1];
-  
+
   lb_calc_fluid_mass_GPU(host_mass);
 
   Tcl_PrintDouble(interp, host_mass[0], buffer);
@@ -240,7 +243,7 @@ static int tclcommand_analyze_fluid_parse_momentum_gpu(Tcl_Interp* interp, int a
   double host_mom[3];
 
   lb_calc_fluid_momentum_GPU(host_mom);
-  
+
   Tcl_PrintDouble(interp, host_mom[0], buffer);
   Tcl_AppendResult(interp, buffer, " ", (char *)NULL);
   Tcl_PrintDouble(interp, host_mom[1], buffer);
@@ -256,7 +259,7 @@ static int tclcommand_analyze_fluid_parse_temperature_gpu(Tcl_Interp* interp, in
   double host_temp[1];
 
   lb_calc_fluid_temperature_GPU(host_temp);
-  
+
   Tcl_PrintDouble(interp, host_temp[0], buffer);
   Tcl_AppendResult(interp, buffer, " ", (char *)NULL);
 
@@ -271,7 +274,7 @@ int tclcommand_analyze_parse_fluid_gpu(Tcl_Interp *interp, int argc, char **argv
     if (argc==0) {
 	Tcl_AppendResult(interp, "usage: analyze fluid <what>", (char *)NULL);
 	return TCL_ERROR;
-    } 
+    }
 
     if (ARG0_IS_S("mass"))
 		//fprintf(stderr, "sry not implemented yet");
@@ -300,7 +303,7 @@ int tclcommand_analyze_parse_fluid(Tcl_Interp *interp, int argc, char **argv) {
 
   if (lattice_switch & LATTICE_LB_GPU){
       return tclcommand_analyze_parse_fluid_gpu(interp, argc, argv);
-  } else 
+  } else
       return tclcommand_analyze_parse_fluid_cpu(interp, argc, argv);
 
 }

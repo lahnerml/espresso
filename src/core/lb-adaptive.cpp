@@ -706,4 +706,43 @@ void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
   bnd = data->boundary;
   bnd_vals[arrayoffset] = bnd;
 }
+
+
+void lbadapt_stream_edges (p8est_iter_volume_info_t * info, void * user_data) {
+  /** p4est edge numbering:
+   *    z   --------e3-------
+   *    |  /|               /|
+   *    |e6 |             e7 |
+   *    |/ e10            /  |
+   *     -------e2-------   e11
+   *    |   | y          |   |
+   *    |   |/          e9   |
+   *   e8   -------e1----|---
+   *    |  /             |  /
+   *    | e4             | e5
+   *    |/               |/
+   *     --------e0------ ------- x
+   */
+}
+
+
+void lbadapt_stream_faces (p8est_iter_volume_info_t * info, void * user_data) {
+  /** p4est face numbering
+   *
+   *                   f5 (+z)
+   *         z   -----------------
+   *         |  /|               /|
+   *         | / |              / |
+   *         |/  |   f3 (+y)   /  |
+   *          ----------------    |
+   *         |   | y          |   | f1 (+x)
+   *         |   |/           |   |
+   * f0 (-x) |   -------------|---
+   *         |  /   f2 (-y)   |  /
+   *         | /              | /
+   *         |/               |/
+   *          ---------------- ------- x
+   *                f4 (-z)
+   */
+}
 #endif // LB_ADAPTIVE

@@ -708,7 +708,7 @@ void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
 }
 
 
-void lbadapt_stream_edges (p8est_iter_volume_info_t * info, void * user_data) {
+void lbadapt_stream_edges (p8est_iter_edge_info_t * info, void * user_data) {
   /** p4est edge numbering:
    *    z   --------e3-------
    *    |  /|               /|
@@ -723,10 +723,103 @@ void lbadapt_stream_edges (p8est_iter_volume_info_t * info, void * user_data) {
    *    |/               |/
    *     --------e0------ ------- x
    */
+  // extract information
+  lbadapt_payload_t      * ghost_data = (lbadapt_payload_t *) user_data;
+  lbadapt_payload_t      * src, * dest;
+  p8est_quadrant_t       * quad;
+  p8est_iter_edge_side_t * side[2];
+  sc_array_t             * sides      = &(info->sides);
+  int                      which_edge;
+  int                      indexSrc, indexDest;
+
+  // side[0] is the cell that is currently considered, side[1] the respective
+  // neighbor
+  side[0] = p8est_iter_eside_array_index_int (sides, 0);
+  side[1] = p8est_iter_eside_array_index_int (sides, 1);
+
+  // determine which edge is considered
+  which_edge = side[0]->edge;
+  switch (which_edge) {
+    case 0:
+      indexSrc = 16;
+      indexDest = 15;
+      break;
+    case 1:
+      indexSrc = 17;
+      indexDest = 18;
+      break;
+    case 2:
+      indexSrc = 18;
+      indexDest = 17;
+      break;
+    case 3:
+      indexSrc = 15;
+      indexDest = 16;
+      break;
+    case 4:
+      indexSrc = 12;
+      indexDest = 11;
+      break;
+    case 5:
+      indexSrc = 13;
+      indexDest = 14;
+      break;
+    case 6:
+      indexSrc = 14;
+      indexDest = 13;
+      break;
+    case 7:
+      indexSrc = 11;
+      indexDest = 12;
+      break;
+    case 8:
+      indexSrc = 8;
+      indexDest = 7;
+      break;
+    case 9:
+      indexSrc = 9;
+      indexDest = 10;
+      break;
+    case 10:
+      indexSrc = 10;
+      indexDest = 9;
+      break;
+    case 11:
+      indexSrc = 7;
+      indexDest = 8;
+      break;
+    default:
+      P4EST_ASSERT (false);
+  }
+
+  // fetch data and stream population from source to dest; distinguish hanging
+  // nodes and ghost nodes from inner nodes
+  if (side[0]->is_hanging) {
+    // regular grid only for the moment
+    P4EST_ASSERT (false);
+  } else {
+    if (side[0]->is.full.is_ghost) {
+      src = (lbadapt_payload_t *) &ghost_data[side[0]->is.full.quadid];
+    } else {
+      src = (lbadapt_payload_t *) side[0]->is.full.quad->p.user_data;
+    }
+  }
+  if (side[1]->is_hanging) {
+    // regular grid only for the moment
+    P4EST_ASSERT (false);
+  } else {
+    if (side[1]->is.full.is_ghost) {
+      dest = (lbadapt_payload_t *) &ghost_data[side[1]->is.full.quadid];
+    } else {
+      dest = (lbadapt_payload_t *) side[1]->is.full.quad->p.user_data;
+    }
+  }
+
+  dest->lbfluid[1][indexDest] = src->lbfluid[0][indexSrc];
 }
 
 
-void lbadapt_stream_faces (p8est_iter_volume_info_t * info, void * user_data) {
+void lbadapt_stream_faces (p8est_iter_face_info_t * info, void * user_data) {
   /** p4est face numbering
    *
    *                   f5 (+z)
@@ -744,5 +837,75 @@ void lbadapt_stream_faces (p8est_iter_volume_info_t * info, void * user_data) {
    *          ---------------- ------- x
    *                f4 (-z)
    */
+  p8est_t                * p8est      = info->p4est;
+  lbadapt_payload_t      * ghost_data = (lbadapt_payload_t *) user_data;
+  lbadapt_payload_t      * src, * dest;
+  p8est_quadrant_t       * quad;
+  p8est_iter_face_side_t * side[2];
+  sc_array_t             * sides      = &(info->sides);
+  int                      which_face;
+  int                      indexSrc, indexDest;
+
+  // side[0] is the cell that is currently considered, side[1] the respective
+  // neighbor
+  side[0] = p8est_iter_fside_array_index_int (sides, 0);
+  side[1] = p8est_iter_fside_array_index_int (sides, 1);
+
+  // determine which edge is considered
+  which_face = side[0]->face;
+  switch (which_face) {
+    case 0:
+      indexSrc = 2;
+      indexDest = 1;
+      break;
+    case 1:
+      indexSrc = 1;
+      indexDest = 2;
+      break;
+    case 2:
+      indexSrc = 4;
+      indexDest = 3;
+      break;
+    case 3:
+      indexSrc = 3;
+      indexDest = 4;
+      break;
+    case 4:
+      indexSrc = 5;
+      indexDest = 6;
+      break;
+    case 5:
+      indexSrc = 6;
+      indexDest = 5;
+      break;
+    default:
+      // must not happen
+      P4EST_ASSERT (false);
+  }
+
+  // fetch data and stream population from source to dest; distinguish hanging
+  // nodes and ghost nodes from inner nodes
+  if (side[0]->is_hanging) {
+    // regular grid only for the moment
+    P4EST_ASSERT (false);
+  } else {
+    if (side[0]->is.full.is_ghost) {
+      src = (lbadapt_payload_t *) &ghost_data[side[0]->is.full.quadid];
+    } else {
+      src = (lbadapt_payload_t *) side[0]->is.full.quad->p.user_data;
+    }
+  }
+  if (side[1]->is_hanging) {
+    // regular grid only for the moment
+    P4EST_ASSERT (false);
+  } else {
+    if (side[1]->is.full.is_ghost) {
+      dest = (lbadapt_payload_t *) &ghost_data[side[1]->is.full.quadid];
+    } else {
+      dest = (lbadapt_payload_t *) side[1]->is.full.quad->p.user_data;
+    }
+  }
+
+  dest->lbfluid[1][indexDest] = src->lbfluid[0][indexSrc];
 }
 #endif // LB_ADAPTIVE

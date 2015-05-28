@@ -871,12 +871,12 @@ void lbadapt_stream_faces (p8est_iter_face_info_t * info, void * user_data) {
       indexDest = 4;
       break;
     case 4:
-      indexSrc = 5;
-      indexDest = 6;
-      break;
-    case 5:
       indexSrc = 6;
       indexDest = 5;
+      break;
+    case 5:
+      indexSrc = 5;
+      indexDest = 6;
       break;
     default:
       // must not happen

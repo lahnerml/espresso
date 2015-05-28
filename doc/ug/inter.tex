@@ -803,6 +803,20 @@ A minimalistic example how to set up bonded harmonic interactions between two pa
 \index{FENE bond|mainindex}
 \index{interactions!FENE|mainindex}
 
+\PythonSyntaxOn
+\begin{pysyntax}
+  \object{
+    espressomd.interaction
+  }{
+    FeneBond
+  }{
+    k=\arg{double},
+    d_r_max=\arg{double}
+  }[
+  ]
+\end{pysyntax}
+\PythonSyntaxOff
+
 \begin{essyntax}
   inter \var{bondid}
   fene
@@ -838,6 +852,21 @@ $r=\var{r_0}+\var{\Delta r_\mathrm{max}}$. It is given by
 \subsection{Harmonic bond}
 \index{harmonic bond|mainindex}
 \index{interactions!harmonic|mainindex}
+
+\PythonSyntaxOn
+\begin{pysyntax}
+  \object{
+    espressomd.interactions
+  }{
+    HarmonicBond
+  }{
+    k=\arg{double},
+    r_0=\arg{double},
+  }[
+    r_cut=\arg{double}
+  ]
+\end{pysyntax}
+\PythonSyntaxOff
 
 \begin{essyntax}
   inter \var{bondid}
@@ -998,6 +1027,17 @@ The potential is calculated as follows:
 \end{itemize}
 
 \subsection{Virtual bonds}
+\PythonSyntaxOn
+\begin{pysyntax}
+  \object{
+    espressomd.interactions
+  }{
+    Virtual
+  }{
+  }[
+  ]
+\end{pysyntax}
+\PythonSyntaxOff
 \begin{essyntax}
   inter \var{bondid} virtual_bond
 \end{essyntax}

@@ -515,7 +515,36 @@ class HarmonicBond(BondedInteraction):
 
   def _setParamsInEsCore(self):
     harmonic_set_params(self._bondId,self._params["k"],self._params["r_0"],self._params["r_cut"])
-   
+    
+IF BOND_CONSTRAINT==1:
+    class RigidBond(BondedInteraction):
+      def typeNumber(self):
+        return 3
+
+      def typeName(self): 
+        return "RIGID"
+
+      def validKeys(self):
+        return "r", "ptol", "vtol"
+
+      def requiredKeys(self): 
+        return "r"
+
+      def setDefaultParams(self):
+        #TODO rationality of Default Parameters has to be checked
+        self._params = {"r":0.,\
+        		    "ptol":0.001,\
+        		    "vtol":0.001} 
+
+      def _getParamsFromEsCore(self):
+        return {"r":bonded_ia_params[self._bondId].p.rigid_bond.r, "ptol":bonded_ia_params[self._bondId].p.rigid_bond.ptol, "vtol":bonded_ia_params[self._bondId].p.rigid_bond.vtol}
+
+      def _setParamsInEsCore(self):
+        rigid_bond_set_params(self._bondId,self._params["r"],self._params["ptol"],self._params["vtol"])
+ELSE:
+    class RigidBond(BondedInteractionNotDefined):
+      name="RIGID"
+
 
 class Dihedral(BondedInteraction):
   def typeNumber(self):
@@ -739,33 +768,35 @@ ELSE:
   class Angle_Harmonic(BondedInteractionNotDefined):
     name="BOND_ANGLE"
  
+
 IF BOND_ANGLE == 1:   
   class Angle_Cosine(BondedInteraction):
     def typeNumber(self):
       return 14
 
-  def typeName(self): 
-    return "ANGLE_COSINE"
-
-  def validKeys(self):
-    return "bend", "phi0"
-
-  def requiredKeys(self): 
-    return "bend", "phi0"
-
-  def setDefaultParams(self):
-    self._params = {"bend":0, "phi0":0} 
-
-  def _getParamsFromEsCore(self):
-    return \
-      {"bend":bonded_ia_params[self._bondId].p.angle_cosine.bend,\
-       "phi0":bonded_ia_params[self._bondId].p.angle_cosine.phi0}
-
-  def _setParamsInEsCore(self):
-    angle_cosine_set_params(self._bondId,self._params["bend"],self._params["phi0"])
+    def typeName(self): 
+      return "ANGLE_COSINE"
+  
+    def validKeys(self):
+      return "K", "phi_0"
+  
+    def requiredKeys(self): 
+      return "K", "phi_0"
+  
+    def setDefaultParams(self):
+      self._params = {"K":0, "phi_0":0} 
+  
+    def _getParamsFromEsCore(self):
+      return \
+        {"K":bonded_ia_params[self._bondId].p.angle_cosine.bend,\
+         "phi_0":bonded_ia_params[self._bondId].p.angle_cosine.phi0}
+  
+    def _setParamsInEsCore(self):
+      angle_cosine_set_params(self._bondId,self._params["K"],self._params["phi_0"])
 ELSE:
   class Angle_Cosine(BondedInteractionNotDefined):
-    name="BOND_ANGLE"
+    name="BOND_ANGLE_COSINE"
+
    
 IF BOND_ANGLE == 1:      
   class Angle_Cossquare(BondedInteraction):
@@ -946,15 +977,10 @@ class Stretchlin_Force(BondedInteraction):
 
 
 
-
-    
-bondedInteractionClasses = {0:FeneBond, 1:HarmonicBond, 5:Dihedral, 6:Tabulated, 7:Subt_Lj,\
+bondedInteractionClasses = {0:FeneBond, 1:HarmonicBond, 3:RigidBond, 5:Dihedral, 6:Tabulated, 7:Subt_Lj, \
     9:Virtual, 11:Endangledist, 12:Overlapped,\
     13:Angle_Harmonic, 14:Angle_Cosine, 15:Angle_Cossquare, 16:Stretching_Force, 17:Area_Force_Local,\
     18:Bending_Force, 19:Volume_Force, 20:Area_Force_Global, 21:Stretchlin_Force}
-
-
-
 
 
 

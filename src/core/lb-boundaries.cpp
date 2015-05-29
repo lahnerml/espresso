@@ -1,6 +1,6 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group,
 
   This file is part of ESPResSo.
@@ -16,7 +16,7 @@
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 /** \file lb-boundaries.cpp
  *
@@ -89,7 +89,7 @@ void lbboundary_mindist_position(double pos[3], double* mindist, double distvec[
       distvec[0] = vec[0];
       distvec[1] = vec[1];
       distvec[2] = vec[2];
-    } 
+    }
   }
 }
 
@@ -221,7 +221,7 @@ if (ek_initialized)
 #endif
 }
 
-#ifdef EK_BOUNDARIES 
+#ifdef EK_BOUNDARIES
 if(pdb_boundary_lattice &&
     pdb_boundary_lattice[ek_parameters.dim_y*ek_parameters.dim_x*z + ek_parameters.dim_x*y + x]) {
   dist = -1;
@@ -358,7 +358,7 @@ if (ek_initialized)
               dist = dist_tmp;
               the_boundary = n;
             }
-          }       
+          }
 
           if (dist <= 0 && the_boundary >= 0 && n_lb_boundaries > 0) {
             lbfields[get_linear_index(x,y,z,lblattice.halo_grid)].boundary = the_boundary+1;
@@ -369,7 +369,7 @@ if (ek_initialized)
           }
         }
       }
-    } 
+    }
 #elif defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
     /* iterate over domain and put cell centers into cell function */
     /* set boundary information in cell centers */
@@ -455,17 +455,17 @@ int lbboundary_get_force(int no, double* f) {
     f[0]=-forces[3*no+0];
     f[1]=-forces[3*no+1];
     f[2]=-forces[3*no+2];
-#else 
+#else
     return ES_ERROR;
 #endif
-  } else { 
+  } else {
 #if defined (LB_BOUNDARIES) && defined (LB)
     mpi_gather_stats(8, forces, NULL, NULL, NULL);
 
     f[0]=forces[3*no+0]*lbpar.agrid/lbpar.tau/lbpar.tau;
     f[1]=forces[3*no+1]*lbpar.agrid/lbpar.tau/lbpar.tau;
     f[2]=forces[3*no+2]*lbpar.agrid/lbpar.tau/lbpar.tau;
-#else 
+#else
     return ES_ERROR;
 #endif
   }
@@ -519,29 +519,29 @@ void lb_bounce_back() {
   for (z=0; z<lblattice.grid[2]+2; z++) {
     for (y=0; y<lblattice.grid[1]+2; y++) {
       for (x=0; x<lblattice.grid[0]+2; x++) {
-        k= get_linear_index(x,y,z,lblattice.halo_grid);
+        k = get_linear_index(x,y,z,lblattice.halo_grid);
 
         if (lbfields[k].boundary) {
           lb_calc_modes(k, modes);
 
           for (i=0; i<19; i++) {
-            population_shift=0;
-            for (l=0; l<3; l++) {
+            population_shift = 0;
+            for (l = 0; l < 3; l++) {
               population_shift-=lbpar.agrid*lbpar.agrid*lbpar.agrid*lbpar.agrid*lbpar.agrid*lbpar.rho[0]*2*lbmodel.c[i][l]*lbmodel.w[i]*lb_boundaries[lbfields[k].boundary-1].velocity[l]/lbmodel.c_sound_sq;
             }
-            if ( x-lbmodel.c[i][0] > 0 && x -lbmodel.c[i][0] < lblattice.grid[0]+1 && 
-                y-lbmodel.c[i][1] > 0 && y -lbmodel.c[i][1] < lblattice.grid[1]+1 &&
-                z-lbmodel.c[i][2] > 0 && z -lbmodel.c[i][2] < lblattice.grid[2]+1) {
-              if ( !lbfields[k-next[i]].boundary ) {
+            if (x - lbmodel.c[i][0] > 0 && x -lbmodel.c[i][0] < lblattice.grid[0]+1 &&
+                y - lbmodel.c[i][1] > 0 && y -lbmodel.c[i][1] < lblattice.grid[1]+1 &&
+                z - lbmodel.c[i][2] > 0 && z -lbmodel.c[i][2] < lblattice.grid[2]+1) {
+              if (!lbfields[k-next[i]].boundary) {
                 for (l=0; l<3; l++) {
                   lb_boundaries[lbfields[k].boundary-1].force[l]+=(2*lbfluid[1][i][k]+population_shift)*lbmodel.c[i][l];
                 }
                 lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k] + population_shift;
-              }
-              else
+              } else {
                 lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k];
+              }
             }
-           }
+          }
         }
       }
     }

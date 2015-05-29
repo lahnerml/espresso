@@ -37,7 +37,6 @@
 #include "thermostat.hpp"
 #include "halo.hpp"
 #include "lb-d3q19.hpp"
-#include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "immersed_boundary/ibm_main.hpp"

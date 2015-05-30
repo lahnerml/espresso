@@ -160,8 +160,14 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_stream_edges (p8est_iter_volume_info_t * info, void * user_data);
+void lbadapt_stream_edges (p8est_iter_edge_info_t * info, void * user_data);
 
 
-void lbadapt_stream_faces (p8est_iter_volume_info_t * info, void * user_data);
+void lbadapt_stream_faces (p8est_iter_face_info_t * info, void * user_data);
+
+
+void lbadapt_bounceback_edges (p8est_iter_edge_info_t * info, void * user_data);
+
+
+void lbadapt_bounceback_faces (p8est_iter_face_info_t * info, void * user_data);
 #endif //LB_ADAPTIVE_H

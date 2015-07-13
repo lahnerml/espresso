@@ -355,9 +355,9 @@ inline void lb_calc_local_j(index_t index, double *j) {
 #error Only D3Q19 is implemened!
 #endif // D3Q19
   if (!(lattice_switch & LATTICE_LB)) {
-    ostringstream msg;
-    msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-    runtimeError(msg);
+      ostringstream msg;
+      msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+      runtimeError(msg);
     j[0]=j[1]=j[2]=0;
     return;
   }
@@ -391,9 +391,9 @@ inline void lb_calc_local_pi(index_t index, double *pi) {
   double j[3];
 
   if (!(lattice_switch & LATTICE_LB)) {
-    ostringstream msg;
-    msg <<"Error in lb_calc_local_pi in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-    runtimeError(msg);
+      ostringstream msg;
+      msg <<"Error in lb_calc_local_pi in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+      runtimeError(msg);
     j[0] = j[1] = j[2] = 0;
     return;
   }
@@ -412,9 +412,9 @@ inline void lb_calc_local_pi(index_t index, double *pi) {
 inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *pi) {
 #ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
-    ostringstream msg;
-    msg <<"Error in lb_calc_local_fields in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-    runtimeError(msg);
+      ostringstream msg;
+      msg <<"Error in lb_calc_local_fields in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+      runtimeError(msg);
     *rho=0; j[0]=j[1]=j[2]=0; pi[0]=pi[1]=pi[2]=pi[3]=pi[4]=pi[5]=0;
     return;
   }
@@ -424,9 +424,9 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *
 #endif // D3Q19
 
   if (!(lattice_switch & LATTICE_LB)) {
-    ostringstream msg;
-    msg <<"Error in lb_calc_local_pi in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-    runtimeError(msg);
+      ostringstream msg;
+      msg <<"Error in lb_calc_local_pi in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
+      runtimeError(msg);
     j[0] = j[1] = j[2] = 0;
     return;
   }
@@ -538,6 +538,7 @@ inline void lb_set_populations(index_t index, double* pop) {
 #if defined (LB) || defined (LB_GPU)
 /* A C level interface to the LB fluid */
 int lb_lbfluid_set_density(double * p_dens);
+int lb_lbfluid_get_density(double *p_dens);
 int lb_lbfluid_set_visc(double * p_visc);
 int lb_lbfluid_set_bulk_visc(double * p_bulk_visc);
 int lb_lbfluid_set_gamma_odd(double * p_gamma_odd);
@@ -548,10 +549,18 @@ int lb_lbfluid_set_agrid(double p_agrid);
 int lb_lbfluid_set_ext_force(int component, double p_fx, double p_fy, double p_fz);
 int lb_lbfluid_set_tau(double p_tau);
 int lb_lbfluid_set_remove_momentum(void);
+int lb_lbfluid_get_agrid(double* p_agrid);
+int lb_lbfluid_get_tau(double* p_tau);
+int lb_lbfluid_get_visc(double* p_visc);
+int lb_lbfluid_get_bulk_visc(double* p_bulk_visc);
+int lb_lbfluid_get_friction(double * p_friction);
+int lb_lbfluid_get_ext_force(double* p_f);
 #ifdef SHANCHEN
 int lb_lbfluid_set_shanchen_coupling(double * p_coupling);
 int lb_lbfluid_set_mobility(double * p_mobility);
 #endif // SHANCHEN
+int lb_set_lattice_switch(int py_switch);
+int lb_get_lattice_switch(int* py_switch);
 
 /* IO routines */
 int lb_lbfluid_print_vtk_boundary(char* filename);

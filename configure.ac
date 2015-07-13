@@ -642,6 +642,7 @@ AS_IF([test .$with_python_interface != .no], [
 	AX_PYTHON_DEVEL([>= '2.5'])
 
         AC_ARG_VAR(CYTHON,[Specify the cython tool to use])
+        AC_ARG_VAR(CYFLAGS,[Specify cython flags])
    	AC_PATH_PROG(CYTHON,cython,no)
    	AS_IF([test .$CYTHON = .no],
                     [build_python_interface=no],
@@ -936,6 +937,10 @@ linker flags            = $LDFLAGS
 libraries               = $LIBS
 using debug flags       = $enable_debug
 using profiling flags   = $enable_profiling
+
+cython complier         = $CYTHON
+cython preproc flags    = $CYFLAGS
+
 
 Libraries
 ---------

@@ -1,28 +1,28 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #ifndef _COMMUNICATION_HPP
 #define _COMMUNICATION_HPP
 /** \file communication.hpp
     This file contains the asynchronous MPI communication.
- 
+
     It is the header file for \ref communication.cpp "communication.c".
 
     The asynchronous MPI communication is used during the script
@@ -163,7 +163,7 @@ void mpi_send_swimming(int node, int part, ParticleParametersSwimming swim);
 */
 void mpi_send_f(int node, int part, double F[3]);
 
-/** issue req_set_solv: send particle solvation free energy 
+/** issue req_set_solv: send particle solvation free energy
     also calls \ref on_particle_change.
     \param part the particle.
     \param node the node it is attached to.
@@ -243,7 +243,7 @@ void mpi_send_torque(int node, int part, double torque[3]);
 #endif
 
 
-#ifdef DIPOLES 
+#ifdef DIPOLES
 /** Issue REQ_SET_DIP: send particle dipole orientation.
     Also calls \ref on_particle_change.
     \param part the particle.
@@ -354,7 +354,7 @@ void mpi_recv_part(int node, int part, Particle *part_data);
 */
 int mpi_integrate(int n_steps, int reuse_forces);
 
-/** Issue REQ_MIN_ENERGY: start energy minimization.    
+/** Issue REQ_MIN_ENERGY: start energy minimization.
     @return nonzero on error
  */
 int mpi_minimize_energy(void);
@@ -366,7 +366,7 @@ int mpi_minimize_energy(void);
     interaction parameters. Therefor i and j are used depending on
     their value:
 
-    \param i   particle type for non bonded interaction parameters / 
+    \param i   particle type for non bonded interaction parameters /
                bonded interaction type number.
     \param j   if not negative: particle type for non bonded interaction parameters /
                if negative: flag for bonded interaction */
@@ -385,32 +385,32 @@ void mpi_bcast_n_particle_types(int s);
 	<li> 3 calculate and reduce (sum up) instantaneous pressure, using \ref pressure_calc.
     </ul>
     \param result where to store the gathered value(s):
-    <ul><li> job=1 unused (the results are stored in a global 
+    <ul><li> job=1 unused (the results are stored in a global
 	     energy array of type \ref Observable_stat)
-	<li> job=2 unused (the results are stored in a global 
+	<li> job=2 unused (the results are stored in a global
 	     virials array of type \ref Observable_stat)
-	<li> job=3 unused (the results are stored in a global 
+	<li> job=3 unused (the results are stored in a global
 	     virials array of type \ref Observable_stat)
     \param result_t where to store the gathered value(s):
-    <ul><li> job=1 unused (the results are stored in a global 
+    <ul><li> job=1 unused (the results are stored in a global
 	     energy array of type \ref Observable_stat)
-	<li> job=2 unused (the results are stored in a global 
+	<li> job=2 unused (the results are stored in a global
 	     p_tensor tensor of type \ref Observable_stat)
-	<li> job=3 unused (the results are stored in a global 
+	<li> job=3 unused (the results are stored in a global
 	     p_tensor tensor of type \ref Observable_stat)
     \param result_nb where to store the gathered value(s):
-    <ul><li> job=1 unused (the results are stored in a global 
+    <ul><li> job=1 unused (the results are stored in a global
 	     energy array of type \ref Observable_stat_non_bonded)
-	<li> job=2 unused (the results are stored in a global 
+	<li> job=2 unused (the results are stored in a global
 	     virials_non_bonded array of type \ref Observable_stat_non_bonded)
-	<li> job=3 unused (the results are stored in a global 
+	<li> job=3 unused (the results are stored in a global
 	     virials_non_bonded array of type \ref Observable_stat_non_bonded)
     \param result_t_nb where to store the gathered value(s):
-    <ul><li> job=1 unused (the results are stored in a global 
+    <ul><li> job=1 unused (the results are stored in a global
 	     energy array of type \ref Observable_stat_non_bonded)
-	<li> job=2 unused (the results are stored in a global 
+	<li> job=2 unused (the results are stored in a global
 	     p_tensor_non_bonded tensor of type \ref Observable_stat_non_bonded)
-	<li> job=3 unused (the results are stored in a global 
+	<li> job=3 unused (the results are stored in a global
 	     p_tensor_non_bonded tensor of type \ref Observable_stat_non_bonded)
     </ul>
 */
@@ -428,19 +428,19 @@ void mpi_local_stress_tensor(DoubleList *TensorInBin, int bins[3], int periodic[
     pointed to by il. The particles bonding information references this array,
     which is the only data you have to free later (besides the result array
     you allocated). YOU MUST NOT CALL \ref free_particle on any of these particles!
-    
+
   \param result where to store the gathered particles
   \param il if non-NULL, the integerlist where to store the bonding info
 */
 void mpi_get_particles(Particle *result, IntList *il);
 
 /** Issue REQ_SET_TIME_STEP: send new \ref time_step and rescale the
-    velocities accordingly. 
+    velocities accordingly.
 */
 void mpi_set_time_step(double time_step);
 
 #ifdef MULTI_TIMESTEP
-/** Issue REQ_SET_SMALLER_TIME_STEP: send new \ref smaller_time_step. 
+/** Issue REQ_SET_SMALLER_TIME_STEP: send new \ref smaller_time_step.
     Requires MULTI_TIMESTEP feature. */
 void mpi_set_smaller_time_step(double smaller_time_step);
 #endif
@@ -469,7 +469,9 @@ void mpi_set_particle_gamma(int pnode, int part, double gamma);
 void mpi_bcast_constraint(int del_num);
 
 #if defined(LB_ADAPTIVE)
-void mpi_lbadapt_grid_init (int node, int param);
+void mpi_lbadapt_grid_init (int node, int level);
+
+void mpi_lbadapt_create_mesh (int node, int param);
 
 void mpi_lbadapt_vtk_print_boundary(int node, int len);
 
@@ -533,7 +535,7 @@ void mpi_bcast_nptiso_geom(void);
     in sync with the topology.  Note that this only makes sense if you
     have a simple topology such that each particle can only belong to
     a single molecule */
-void mpi_update_mol_ids(void); 
+void mpi_update_mol_ids(void);
 
 /** Issue REQ_SYNC_TOPO: Update the molecules ids to that they correspond to the topology */
 int mpi_sync_topo_part_info(void);
@@ -600,9 +602,9 @@ void mpi_send_fluid_populations(int node, int index, double *pop);
  */
 void mpi_bcast_max_mu();
 
-/** Galilei and other: set all particle velocities and rotational inertias to zero. 
-                       set all forces and torques on the particles to zero 
-                       calculate the centre of mass (CMS) 
+/** Galilei and other: set all particle velocities and rotational inertias to zero.
+                       set all forces and torques on the particles to zero
+                       calculate the centre of mass (CMS)
                        calculate the velocity of the CMS
                        remove the CMS velocity from the system
  */
@@ -620,8 +622,8 @@ void mpi_setup_reaction();
 void mpi_external_potential_broadcast(int number);
 void mpi_external_potential_broadcast_slave(int node, int number);
 void mpi_external_potential_tabulated_read_potential_file(int number);
-void mpi_external_potential_sum_energies(); 
-void mpi_external_potential_sum_energies_slave(); 
+void mpi_external_potential_sum_energies();
+void mpi_external_potential_sum_energies_slave();
 
 #ifdef CUDA
 /** Gather CUDA devices from all nodes */

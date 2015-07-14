@@ -336,7 +336,6 @@ void release_halo_communication(HaloCommunicator *hc) {
   }
 
   free(hc->halo_info);
-
 }
 
 /** Perform communication according to the parallelization scheme

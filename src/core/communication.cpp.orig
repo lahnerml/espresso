@@ -308,6 +308,7 @@ void mpi_stop_slave(int node, int param)
 {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
+
 #ifdef LB_ADAPTIVE
   if (p8est) {
     p8est_destroy(p8est);
@@ -1211,7 +1212,7 @@ void mpi_recv_part(int pnode, int part, Particle *pdata)
       memmove(bl->e, local_particles[part]->bl.e, sizeof(int)*bl->n);
     else
       MPI_Recv(bl->e, bl->n, MPI_INT, pnode,
-               SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+         SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   }
   else
     bl->e = NULL;
@@ -1225,7 +1226,7 @@ void mpi_recv_part(int pnode, int part, Particle *pdata)
       memmove(el->e, local_particles[part]->el.e, sizeof(int)*el->n);
     else
       MPI_Recv(el->e, el->n, MPI_INT, pnode,
-               SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+         SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   }
   else
     el->e = NULL;
@@ -1642,24 +1643,45 @@ void mpi_get_particles(Particle *result, IntList *bi)
   for (pnode = 0; pnode < n_nodes; pnode++) {
     if (sizes[pnode] > 0) {
       if (pnode == this_node) {
+<<<<<<< HEAD
   for (c = 0; c < local_cells.n; c++) {
     Particle *part;
     int npart;
     cell = local_cells.cell[c];
     part = cell->part;
     npart = cell->n;
-	  memmove(&result[g], part, npart*sizeof(Particle));
+    memcpy(&result[g], part, npart*sizeof(Particle));
     g += npart;
     if (bi) {
       int pc;
       for (pc = 0; pc < npart; pc++) {
         Particle *p = &part[pc];
         realloc_intlist(&local_bi, local_bi.n + p->bl.n);
-	      memmove(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
+        memcpy(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
         local_bi.n += p->bl.n;
       }
     }
   }
+=======
+	for (c = 0; c < local_cells.n; c++) {
+	  Particle *part;
+	  int npart;
+	  cell = local_cells.cell[c];
+	  part = cell->part;
+	  npart = cell->n;
+	  memmove(&result[g], part, npart*sizeof(Particle));
+	  g += npart;
+	  if (bi) {
+	    int pc;
+	    for (pc = 0; pc < npart; pc++) {
+	      Particle *p = &part[pc];
+	      realloc_intlist(&local_bi, local_bi.n + p->bl.n);
+	      memmove(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
+	      local_bi.n += p->bl.n;
+	    }
+	  }
+	}
+>>>>>>> espresso
       }
       else {
   MPI_Recv(&result[g], sizes[pnode]*sizeof(Particle), MPI_BYTE, pnode, SOME_TAG,
@@ -1695,11 +1717,19 @@ void mpi_get_particles(Particle *result, IntList *bi)
       if (sizes[pnode] > 0) {
   realloc_intlist(bi, bi->n + sizes[pnode]);
 
+<<<<<<< HEAD
   if (pnode == this_node)
-	  memmove(&bi->e[bi->n], local_bi.e, sizes[pnode]*sizeof(int));
+    memcpy(&bi->e[bi->n], local_bi.e, sizes[pnode]*sizeof(int));
   else
     MPI_Recv(&bi->e[bi->n], sizes[pnode], MPI_INT, pnode, SOME_TAG,
        comm_cart, MPI_STATUS_IGNORE);
+=======
+	if (pnode == this_node)
+	  memmove(&bi->e[bi->n], local_bi.e, sizes[pnode]*sizeof(int));
+	else
+	  MPI_Recv(&bi->e[bi->n], sizes[pnode], MPI_INT, pnode, SOME_TAG,
+		   comm_cart, MPI_STATUS_IGNORE);
+>>>>>>> espresso
 
   bi->n += sizes[pnode];
       }
@@ -1759,13 +1789,23 @@ void mpi_get_particles_slave(int pnode, int bi)
       memmove(&result[g],part,npart*sizeof(Particle));
       g+=cell->n;
       if (bi) {
+<<<<<<< HEAD
   int pc;
   for (pc = 0; pc < npart; pc++) {
     Particle *p = &part[pc];
     realloc_intlist(&local_bi, local_bi.n + p->bl.n);
-	  memmove(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
+    memcpy(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
     local_bi.n += p->bl.n;
   }
+=======
+	int pc;
+	for (pc = 0; pc < npart; pc++) {
+	  Particle *p = &part[pc];
+	  realloc_intlist(&local_bi, local_bi.n + p->bl.n);
+	  memmove(&local_bi.e[local_bi.n], p->bl.e, p->bl.n*sizeof(int));
+	  local_bi.n += p->bl.n;
+	}
+>>>>>>> espresso
       }
     }
     /* and send it back to the master node */
@@ -2022,14 +2062,19 @@ void mpi_send_ext_torque(int pnode, int part, int flag, int mask, double torque[
       /* set new values */
       p->p.ext_flag |= flag;
 
+<<<<<<< HEAD
       if (mask & PARTICLE_EXT_TORQUE)
+  memcpy(p->p.ext_torque, torque, 3*sizeof(double));
+=======
+      if (mask & PARTICLE_EXT_TORQUE) 
         memmove(p->p.ext_torque, torque, 3*sizeof(double));
+>>>>>>> espresso
     }
     else {
       s_buf[0] = flag; s_buf[1] = mask;
       MPI_Send(s_buf, 2, MPI_INT, pnode, SOME_TAG, comm_cart);
       if (mask & PARTICLE_EXT_TORQUE)
-        MPI_Send(torque, 3, MPI_DOUBLE, pnode, SOME_TAG, comm_cart);
+  MPI_Send(torque, 3, MPI_DOUBLE, pnode, SOME_TAG, comm_cart);
     }
 
     on_particle_change();
@@ -2051,7 +2096,7 @@ void mpi_send_ext_torque_slave(int pnode, int part)
       p->p.ext_flag |= s_buf[0];
 
       if (s_buf[1] & PARTICLE_EXT_TORQUE)
-        MPI_Recv(p->p.ext_torque, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+  MPI_Recv(p->p.ext_torque, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     }
 
     on_particle_change();
@@ -2091,7 +2136,7 @@ void mpi_send_ext_force_slave(int pnode, int part)
   int s_buf[2]={0,0};
   if (pnode == this_node) {
     Particle *p = local_particles[part];
-        MPI_Recv(s_buf, 2, MPI_INT, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+  MPI_Recv(s_buf, 2, MPI_INT, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     /* mask out old flags */
     p->p.ext_flag &= ~s_buf[1];
     /* set new values */
@@ -2697,18 +2742,20 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 }
 
 #ifdef LB_ADAPTIVE
-void mpi_lbadapt_grid_init (int node, int level) {
+void mpi_lbadapt_grid_init (int node, int param) {
   /* create connectivity and octree */
   conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
-                                       periodic & 1, periodic & 2, periodic & 4);
+                 periodic & 1, periodic & 2, periodic & 4);
   p8est = p8est_new_ext (comm_cart,  /* mpi communicator */
                          conn,       /* connectivity */
                          0,          /* min octants per process */
-                         level,          /* min level */
-                         1,                /* fill uniform */
-                         sizeof (lbadapt_payload_t),  /* data size */
+                         0,          /* min level */
+                         0,                /* fill uniform */
+                         sizeof (double),  /* data size */
                          lbadapt_init,     /* init function */
                          NULL              /* user pointer */);
+  // create debug output
+  // p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_postInitTree");
 }
 
 void mpi_lbadapt_vtk_print_boundary (int node, int len) {

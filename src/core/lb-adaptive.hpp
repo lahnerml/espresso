@@ -33,6 +33,7 @@
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
 #include <p8est_iterate.h>
+#include <p8est_mesh.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
@@ -160,14 +161,8 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_stream_edges (p8est_iter_edge_info_t * info, void * user_data);
+void lbadapt_stream (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_stream_faces (p8est_iter_face_info_t * info, void * user_data);
-
-
-void lbadapt_bounceback_edges (p8est_iter_edge_info_t * info, void * user_data);
-
-
-void lbadapt_bounceback_faces (p8est_iter_face_info_t * info, void * user_data);
+void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);
 #endif //LB_ADAPTIVE_H

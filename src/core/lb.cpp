@@ -1929,7 +1929,7 @@ void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
   // one can define p4ests verbosity here.
-  // p4est_init(NULL, SC_LP_PRODUCTION);
+  p4est_init(NULL, SC_LP_PRODUCTION);
 #else // LB_ADAPTIVE
   lbfluid[0]  = (double**) malloc(2*lbmodel.n_veloc*sizeof(double *));
   lbfluid[0][0] = (double*) malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
@@ -1962,7 +1962,8 @@ static void lb_realloc_fluid() {
 /** Sets up the structures for exchange of the halo regions.
  *  See also \ref halo.cpp */
 static void lb_prepare_communication() {
-#ifndef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE
+#else // LB_ADAPTIVE
   int i;
   HaloCommunicator comm = { 0, NULL };
 
@@ -2207,7 +2208,8 @@ void lb_init() {
 
 /** Release the fluid. */
 void lb_release_fluid() {
-#ifndef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE
+#else // LB_ADAPTIVE
   free(lbfluid[0][0]);
   free(lbfluid[0]);
   free(lbfields);
@@ -2217,8 +2219,8 @@ void lb_release_fluid() {
 
 /** Release fluid and communication. */
 void lb_release() {
-#ifndef LB_ADAPTIVE
   lb_release_fluid();
+#ifndef LB_ADAPTIVE
   release_halo_communication(&update_halo_comm);
 #endif // LB_ADAPTIVE
 }
@@ -2232,7 +2234,9 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
                              const double *j,
                              double *pi)
 {
-#ifndef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE
+  // not implemented
+#else
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
   const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
@@ -2844,19 +2848,23 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
+  p8est_ghost_t *ghost;
+  p8est_mesh_t  *mesh;
   lbadapt_payload_t *ghost_data;
-  p8est_ghost_t     *ghost;
 
-  // create ghost cells
-  ghost = p8est_ghost_new (p8est, P8EST_CONNECT_FULL);
-  // allocate space to store ghost data
+  ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
   ghost_data = P4EST_ALLOC (lbadapt_payload_t, ghost->ghosts.elem_count);
-  // sync data
   p8est_ghost_exchange_data (p8est, ghost, ghost_data);
 
-  // release space
+  mesh = p8est_mesh_new_ext (p8est,
+                             ghost,
+                             0,
+                             1,
+                             P8EST_CONNECT_FULL);
+
   P4EST_FREE (ghost_data);
-  p8est_ghost_destroy (ghost);
+  p8est_mesh_destroy(mesh);
+  p8est_ghost_destroy(ghost);
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;

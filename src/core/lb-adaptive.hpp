@@ -43,6 +43,9 @@
 /* "global variables" */
 extern p8est_t              *p8est;
 extern p8est_connectivity_t *conn;
+extern p8est_ghost_t        *lbadapt_ghost;
+extern p8est_mesh_t         *lbadapt_mesh;
+extern lbadapt_payload_t    *lbadapt_ghost_data;
 
 /** setup function
  */

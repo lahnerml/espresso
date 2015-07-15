@@ -2853,11 +2853,11 @@ inline void lb_collide_stream() {
   lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
-  lbadapt_mesh = p8est_mesh_new_ext (p8est,
-                                     lbadapt_ghost,
-                                     0,
-                                     1,
-                                     P8EST_CONNECT_FULL);
+  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
+                                     lbadapt_ghost,        /* ghost layer */
+                                     1,                    /* compute quad_to_tree */
+                                     1,                    /* compute quad_to_level */
+                                     P8EST_CONNECT_FULL);  /* fully connected */
   }
 
   /* loop over all lattice cells (halo excluded) */

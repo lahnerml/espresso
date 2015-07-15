@@ -164,7 +164,7 @@ int lbadapt_apply_forces (double * mode, LB_FluidNode * lbfields, double h);
  * \param     [out] populations  The resulting particle densities.
  * \param [in]      mode         The modes.
  */
-int lbadapt_calc_pop_from_modes (double * populations, double * mode);
+int lbadapt_calc_pop_from_modes (double * populations, double * m);
 
 
 /*** ITERATION CALLBACKS ***/

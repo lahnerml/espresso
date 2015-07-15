@@ -559,80 +559,324 @@ int lbadapt_calc_pop_from_modes (double ** populations, double * mode) {
 }
 
 
-int lbadapt_calc_n_from_modes_push (int qid, double * mode) {
+int lbadapt_calc_n_from_modes_push (int qid, double * m) {
 #ifdef D3Q19
   /* indexes of streaming targets */
+  /* currently:
+   * no tree boundaries, i.e. no need to consider orientation.
+   * direct transfer from mapping given at beginning of file */
   index_t next[19];
+  /* 0 vel */
   next[0]  = qid;
-  /* no tree boundaries, i.e. no need to consider orientation */
-  next[1]  = index + 1;
-  next[2]  = index - 1;
-  next[3]  = index + yperiod;
-  next[4]  = index - yperiod;
-  next[5]  = index + zperiod;
-  next[6]  = index - zperiod;
-  next[7]  = index + (1 + yperiod);
-  next[8]  = index - (1 + yperiod);
-  next[9]  = index + (1 - yperiod);
-  next[10] = index - (1 - yperiod);
-  next[11] = index + (1 + zperiod);
-  next[12] = index - (1 + zperiod);
-  next[13] = index + (1 - zperiod);
-  next[14] = index - (1 - zperiod);
-  next[15] = index + (yperiod + zperiod);
-  next[16] = index - (yperiod + zperiod);
-  next[17] = index + (yperiod - zperiod);
-  next[18] = index - (yperiod - zperiod);
+  /* face-velocities */
+  next[1]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 1];
+  next[2]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 0];
+  next[3]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 3];
+  next[4]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 2];
+  next[5]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 5];
+  next[6]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 4];
+  /* edge velocities */
+  next[7]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid + 11];
+  next[8]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  8];
+  next[9]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  9];
+  next[10] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid + 10];
+  next[11] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  7];
+  next[12] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  4];
+  next[13] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  5];
+  next[14] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  6];
+  next[15] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  3];
+  next[16] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  0];
+  next[17] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  1];
+  next[18] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  2];
 
   /* normalization factors enter in the back transformation */
-  for (int i = 0; i < lbmodel.n_veloc; i++)
-    m[i] = (1./d3q19_modebase[19][i])*m[i];
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    m[i] = (1. / d3q19_modebase[19][i]) * m[i];
+  }
 
+  p8est_tree_t      * tree;
+  p8est_quadrant_t  * cell;
+  lbadapt_payload_t * data;
 #ifndef OLD_FLUCT
-  lbfluid[1][ 0][next[0]] = m[0] - m[4] + m[16];
-  lbfluid[1][ 1][next[1]] = m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2.*(m[10] + m[16]);
-  lbfluid[1][ 2][next[2]] = m[0] - m[1] + m[5] + m[6] - m[17] - m[18] + 2.*(m[10] - m[16]);
-  lbfluid[1][ 3][next[3]] = m[0] + m[2] - m[5] + m[6] + m[17] - m[18] - 2.*(m[11] + m[16]);
-  lbfluid[1][ 4][next[4]] = m[0] - m[2] - m[5] + m[6] + m[17] - m[18] + 2.*(m[11] - m[16]);
-  lbfluid[1][ 5][next[5]] = m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18]);
-  lbfluid[1][ 6][next[6]] = m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]);
-  lbfluid[1][ 7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7] + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18];
-  lbfluid[1][ 8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7] - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18];
-  lbfluid[1][ 9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7] + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18];
-  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7] - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18];
-  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] + m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18];
-  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] - m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18];
-  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] + m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18];
-  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] - m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18];
-  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] + m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18];
-  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] - m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18];
-  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] + m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18];
-  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] - m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18];
+  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+  cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0]);
+  data = (lbadapt_payload_t *) cell->p.user_data;
+  data->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
+
+  if (next[1] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 1] = (m[0] + m[1] + m[5] + m[6] - m[17] - m[18]
+        - 2.*(m[10] + m[16])) * lbmodel.w[1];
+  }
+
+  if (next[2] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[2]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 2] = (m[0] - m[1] + m[5] + m[6] - m[17] - m[18]
+        + 2.*(m[10] - m[16])) * lbmodel.w[2];
+  }
+
+  if (next[3] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[3]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 3] = (m[0] + m[2] - m[5] + m[6] + m[17] - m[18]
+        - 2.*(m[11] + m[16])) * lbmodel.w[3];
+  }
+
+  if (next[4] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[4]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 4] = (m[0] - m[2] - m[5] + m[6] + m[17] - m[18]
+        + 2.*(m[11] - m[16])) * lbmodel.w[4];
+  }
+
+  if (next[5] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[5]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 5] = (m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18])) * lbmodel.w[5];
+  }
+
+  if (next[6] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[6]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 6] = (m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18])) * lbmodel.w[6];
+  }
+
+  if (next[7] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[7]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 7] = (m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7]
+        + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18]) * lbmodel.w[7];
+  }
+
+  if (next[8] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[8]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 8] = (m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7]
+        - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18]) * lbmodel.w[8];
+  }
+
+  if (next[9] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[9]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 9] = (m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7]
+        + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18]) * lbmodel.w[9];
+  }
+
+  if (next[10] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[10]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][10] = (m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7]
+        - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18]) * lbmodel.w[10];
+  }
+
+  if (next[11] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[11]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][11] = (m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8]
+        + m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18]) * lbmodel.w[11];
+  }
+
+  if (next[12] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[12]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][12] = (m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8]
+        - m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18]) * lbmodel.w[12];
+  }
+
+  if (next[13] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[13]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][13] = (m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8]
+        + m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18]) * lbmodel.w[13];
+  }
+
+  if (next[14] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[14]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][14] = (m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8]
+        - m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18]) * lbmodel.w[14];
+  }
+
+  if (next[15] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[15]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][15] = (m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9]
+        + m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18]) * lbmodel.w[15];
+  }
+
+  if (next[16] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[16]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][16] = (m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9]
+        - m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18]) * lbmodel.w[16];
+  }
+
+  if (next[17] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[17]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][17] = (m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9]
+        + m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18]) * lbmodel.w[17];
+  }
+
+  if (next[18] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[18]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][18] = (m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9]
+        - m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18]) * lbmodel.w[18];
+  }
 #else // !OLD_FLUCT
-  lbfluid[1][ 0][next[0]] = m[0] - m[4];
-  lbfluid[1][ 1][next[1]] = m[0] + m[1] + m[5] + m[6];
-  lbfluid[1][ 2][next[2]] = m[0] - m[1] + m[5] + m[6];
-  lbfluid[1][ 3][next[3]] = m[0] + m[2] - m[5] + m[6];
-  lbfluid[1][ 4][next[4]] = m[0] - m[2] - m[5] + m[6];
-  lbfluid[1][ 5][next[5]] = m[0] + m[3] - 2.*m[6];
-  lbfluid[1][ 6][next[6]] = m[0] - m[3] - 2.*m[6];
-  lbfluid[1][ 7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7];
-  lbfluid[1][ 8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7];
-  lbfluid[1][ 9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7];
-  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7];
-  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8];
-  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8];
-  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8];
-  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8];
-  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9];
-  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9];
-  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9];
-  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9];
+  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+  cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+  data = (lbadapt_payload_t *) cell->p.user_data;
+  data->lbfluid[1][ 0] = (m[0] - m[4]) * lbmodel.w[0];
+
+  if (next[1] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 1] = (m[0] + m[1] + m[5] + m[6]) * lbmodel.w[1];
+  }
+
+  if (next[2] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 2] = (m[0] - m[1] + m[5] + m[6]) * lbmodel.w[2];
+  }
+
+  if (next[3] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 3] = (m[0] + m[2] - m[5] + m[6]) * lbmodel.w[3];
+  }
+
+  if (next[4] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 4] = (m[0] - m[2] - m[5] + m[6]) * lbmodel.w[4];
+  }
+
+  if (next[5] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 5] = (m[0] + m[3] - 2.*m[6]) * lbmodel.w[5];
+  }
+
+  if (next[6] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 6] = (m[0] - m[3] - 2.*m[6]) * lbmodel.w[6];
+  }
+
+  if (next[7] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 7] = (m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7]) * lbmodel.w[7];
+  }
+
+  if (next[8] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 8] = (m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7]) * lbmodel.w[8];
+  }
+
+  if (next[9] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][ 9] = (m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7]) * lbmodel.w[9];
+  }
+
+  if (next[10] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][10] = (m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7]) * lbmodel.w[10];
+  }
+
+  if (next[11] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][11] = (m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8]) * lbmodel.w[11];
+  }
+
+  if (next[12] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][12] = (m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8]) * lbmodel.w[12];
+  }
+
+  if (next[13] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][13] = (m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8]) * lbmodel.w[13];
+  }
+
+  if (next[14] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][14] = (m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8]) * lbmodel.w[14];
+  }
+
+  if (next[15] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][15] = (m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9]) * lbmodel.w[15];
+  }
+
+  if (next[16] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][16] = (m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9]) * lbmodel.w[16];
+  }
+
+  if (next[17] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][17] = (m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9]) * lbmodel.w[17];
+  }
+
+  if (next[18] != -1) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
+    data = (lbadapt_payload_t *) cell->p.user_data;
+    data->lbfluid[1][18] = (m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9]) * lbmodel.w[18];
+  }
 #endif // !OLD_FLUCT
 
-  /* weights enter in the back transformation */
-  for (int i = 0; i < lbmodel.n_veloc; i++)
-    lbfluid[1][i][next[i]] *= lbmodel.w[i];
 #else // D3Q19
   double **e = lbmodel.e;
   index_t next[lbmodel.n_veloc];

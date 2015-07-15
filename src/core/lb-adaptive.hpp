@@ -47,6 +47,31 @@ extern p8est_ghost_t        *lbadapt_ghost;
 extern p8est_mesh_t         *lbadapt_mesh;
 extern lbadapt_payload_t    *lbadapt_ghost_data;
 
+/*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
+/**
+ * | ESPResSo c_i | p4est face | p4est edge | vec          |
+ * |--------------+------------+------------+--------------|
+ * |            0 |          - |          - | { 0,  0,  0} |
+ * |            1 |          1 |          - | { 1,  0,  0} |
+ * |            2 |          0 |          - | {-1,  0,  0} |
+ * |            3 |          3 |          - | { 0,  1,  0} |
+ * |            4 |          2 |          - | { 0, -1,  0} |
+ * |            5 |          5 |          - | { 0,  0,  1} |
+ * |            6 |          4 |          - | { 0,  0, -1} |
+ * |            7 |          - |         11 | { 1,  1,  0} |
+ * |            8 |          - |          8 | {-1, -1,  0} |
+ * |            9 |          - |          9 | { 1, -1,  0} |
+ * |           10 |          - |         10 | {-1,  1,  0} |
+ * |           11 |          - |          7 | { 1,  0,  1} |
+ * |           12 |          - |          4 | {-1,  0, -1} |
+ * |           13 |          - |          5 | { 1,  0, -1} |
+ * |           14 |          - |          6 | {-1,  0,  1} |
+ * |           15 |          - |          3 | { 0,  1,  1} |
+ * |           16 |          - |          0 | { 0, -1, -1} |
+ * |           17 |          - |          1 | { 0,  1, -1} |
+ * |           18 |          - |          2 | { 0, -1,  1} |
+ */
+
 /** setup function
  */
 void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
@@ -131,7 +156,7 @@ int lbadapt_relax_modes (double * mode, double h);
  * \param [in]      force The force that is applied.
  * \param [in]      h     The local mesh width.
  */
-int lbadapt_apply_force (double * mode, LB_FluidNode * lbfields, double h);
+int lbadapt_apply_forces (double * mode, LB_FluidNode * lbfields, double h);
 
 
 /** Transfer modes back to populations
@@ -164,8 +189,11 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_stream (p8est_iter_volume_info_t * info, void * user_data);
+void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data);
 #endif //LB_ADAPTIVE_H

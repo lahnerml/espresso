@@ -25,6 +25,7 @@
  */
 
 #include <stdlib.h>
+#include <iostream>
 
 #include "utils.hpp"
 #include "constraint.hpp"
@@ -57,6 +58,30 @@ p8est_ghost_t        *lbadapt_ghost;
 p8est_mesh_t         *lbadapt_mesh;
 lbadapt_payload_t    *lbadapt_ghost_data;
 
+/*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
+/**
+ * | ESPResSo c_i | p4est face | p4est edge | vec          |
+ * |--------------+------------+------------+--------------|
+ * |            0 |          - |          - | { 0,  0,  0} |
+ * |            1 |          1 |          - | { 1,  0,  0} |
+ * |            2 |          0 |          - | {-1,  0,  0} |
+ * |            3 |          3 |          - | { 0,  1,  0} |
+ * |            4 |          2 |          - | { 0, -1,  0} |
+ * |            5 |          5 |          - | { 0,  0,  1} |
+ * |            6 |          4 |          - | { 0,  0, -1} |
+ * |            7 |          - |         11 | { 1,  1,  0} |
+ * |            8 |          - |          8 | {-1, -1,  0} |
+ * |            9 |          - |          9 | { 1, -1,  0} |
+ * |           10 |          - |         10 | {-1,  1,  0} |
+ * |           11 |          - |          7 | { 1,  0,  1} |
+ * |           12 |          - |          4 | {-1,  0, -1} |
+ * |           13 |          - |          5 | { 1,  0, -1} |
+ * |           14 |          - |          6 | {-1,  0,  1} |
+ * |           15 |          - |          3 | { 0,  1,  1} |
+ * |           16 |          - |          0 | { 0, -1, -1} |
+ * |           17 |          - |          1 | { 0,  1, -1} |
+ * |           18 |          - |          2 | { 0, -1,  1} |
+ */
 
 /*** SETUP ***/
 void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
@@ -408,7 +433,7 @@ int lbadapt_thermalize_modes(double * mode, double h) {
 }
 
 
-int lbadapt_apply_force (double * mode, LB_FluidNode * lbfields, double h) {
+int lbadapt_apply_forces (double * mode, LB_FluidNode * lbfields, double h) {
   double rho, u[3], C[6], *f;
 
   f = lbfields->force;
@@ -533,6 +558,95 @@ int lbadapt_calc_pop_from_modes (double ** populations, double * mode) {
   return 0;
 }
 
+
+int lbadapt_calc_n_from_modes_push (int qid, double * mode) {
+#ifdef D3Q19
+  /* indexes of streaming targets */
+  index_t next[19];
+  next[0]  = qid;
+  /* no tree boundaries, i.e. no need to consider orientation */
+  next[1]  = index + 1;
+  next[2]  = index - 1;
+  next[3]  = index + yperiod;
+  next[4]  = index - yperiod;
+  next[5]  = index + zperiod;
+  next[6]  = index - zperiod;
+  next[7]  = index + (1 + yperiod);
+  next[8]  = index - (1 + yperiod);
+  next[9]  = index + (1 - yperiod);
+  next[10] = index - (1 - yperiod);
+  next[11] = index + (1 + zperiod);
+  next[12] = index - (1 + zperiod);
+  next[13] = index + (1 - zperiod);
+  next[14] = index - (1 - zperiod);
+  next[15] = index + (yperiod + zperiod);
+  next[16] = index - (yperiod + zperiod);
+  next[17] = index + (yperiod - zperiod);
+  next[18] = index - (yperiod - zperiod);
+
+  /* normalization factors enter in the back transformation */
+  for (int i = 0; i < lbmodel.n_veloc; i++)
+    m[i] = (1./d3q19_modebase[19][i])*m[i];
+
+#ifndef OLD_FLUCT
+  lbfluid[1][ 0][next[0]] = m[0] - m[4] + m[16];
+  lbfluid[1][ 1][next[1]] = m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2.*(m[10] + m[16]);
+  lbfluid[1][ 2][next[2]] = m[0] - m[1] + m[5] + m[6] - m[17] - m[18] + 2.*(m[10] - m[16]);
+  lbfluid[1][ 3][next[3]] = m[0] + m[2] - m[5] + m[6] + m[17] - m[18] - 2.*(m[11] + m[16]);
+  lbfluid[1][ 4][next[4]] = m[0] - m[2] - m[5] + m[6] + m[17] - m[18] + 2.*(m[11] - m[16]);
+  lbfluid[1][ 5][next[5]] = m[0] + m[3] - 2.*(m[6] + m[12] + m[16] - m[18]);
+  lbfluid[1][ 6][next[6]] = m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]);
+  lbfluid[1][ 7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7] + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18];
+  lbfluid[1][ 8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7] - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18];
+  lbfluid[1][ 9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7] + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18];
+  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7] - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18];
+  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] + m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18];
+  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] - m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18];
+  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] + m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18];
+  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] - m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18];
+  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] + m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18];
+  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] - m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18];
+  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] + m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18];
+  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] - m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18];
+#else // !OLD_FLUCT
+  lbfluid[1][ 0][next[0]] = m[0] - m[4];
+  lbfluid[1][ 1][next[1]] = m[0] + m[1] + m[5] + m[6];
+  lbfluid[1][ 2][next[2]] = m[0] - m[1] + m[5] + m[6];
+  lbfluid[1][ 3][next[3]] = m[0] + m[2] - m[5] + m[6];
+  lbfluid[1][ 4][next[4]] = m[0] - m[2] - m[5] + m[6];
+  lbfluid[1][ 5][next[5]] = m[0] + m[3] - 2.*m[6];
+  lbfluid[1][ 6][next[6]] = m[0] - m[3] - 2.*m[6];
+  lbfluid[1][ 7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7];
+  lbfluid[1][ 8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7];
+  lbfluid[1][ 9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7];
+  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7];
+  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8];
+  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8];
+  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8];
+  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8];
+  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9];
+  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9];
+  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9];
+  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9];
+#endif // !OLD_FLUCT
+
+  /* weights enter in the back transformation */
+  for (int i = 0; i < lbmodel.n_veloc; i++)
+    lbfluid[1][i][next[i]] *= lbmodel.w[i];
+#else // D3Q19
+  double **e = lbmodel.e;
+  index_t next[lbmodel.n_veloc];
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    next[i] = get_linear_index(c[i][0],c[i][1],c[i][2],lblattic.halo_grid);
+    lbfluid[1][i][next[i]] = 0.0;
+    for (int j = 0; j < lbmodel.n_veloc; j++)
+      lbfluid[1][i][next[i]] += mode[j]*e[j][i]/e[19][j];
+    lbfluid[1][i][index] *= w[i];
+  }
+#endif // D3Q19
+
+  return 0;
+}
 
 /*** ITERATOR CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data) {
@@ -691,7 +805,6 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data) {
 
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
   double *bnd_vals = (double *) user_data;                      /* passed array to fill */
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
   p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
@@ -708,5 +821,45 @@ void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
   /* just grab the u value of each cell and pass it into solution vector */
   bnd = data->boundary;
   bnd_vals[arrayoffset] = bnd;
+}
+
+
+void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) {
+  /* collect some dates from iteration info */
+  p8est_quadrant_t * q = info->quad;
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data;
+  double h;                                                     /* local meshwidth */
+  h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
+
+  /* place for storing modes */
+  double modes[19];
+
+  /* calculate modes locally */
+  lbadapt_calc_modes(data->lbfluid, modes);
+
+  /* deterministic collisions */
+  lbadapt_relax_modes(modes, data->lbfields.force, h);
+
+  /* fluctuating hydrodynamics */
+
+  if (fluct) lbadapt_thermalize_modes(modes, h);
+
+  /* apply forces */
+#ifdef EXTERNAL_FORCES
+  lbadapt_apply_forces(modes, &data->lbfields, h);
+#else // EXTERNAL_FORCES
+  if (has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
+#endif // EXTERNAL_FORCES
+
+  /* transform back to populations and streaming */
+  lbadapt_calc_n_from_modes_push(info->quadid, modes);
+}
+
+
+void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
+}
+
+
+void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
 }
 #endif // LB_ADAPTIVE

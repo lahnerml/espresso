@@ -200,6 +200,9 @@ typedef struct lbadapt_payload {
 } lbadapt_payload_t;
 #endif // LB_ADAPTIVE
 
+/* int to indicate fluctuations */
+extern int fluct;
+
 /** Switch indicating momentum exchange between particles and fluid */
 extern int transfer_momentum;
 

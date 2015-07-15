@@ -2219,8 +2219,8 @@ void lb_release_fluid() {
 
 /** Release fluid and communication. */
 void lb_release() {
-  lb_release_fluid();
 #ifndef LB_ADAPTIVE
+  lb_release_fluid();
   release_halo_communication(&update_halo_comm);
 #endif // LB_ADAPTIVE
 }
@@ -2859,6 +2859,50 @@ inline void lb_collide_stream() {
                                      1,
                                      P8EST_CONNECT_FULL);
   }
+
+  /* loop over all lattice cells (halo excluded) */
+#ifdef LB_BOUNDARIES
+  for (int i = 0; i < n_lb_boundaries; i++) {
+    lb_boundaries[i].force[0]=0.;
+    lb_boundaries[i].force[1]=0.;
+    lb_boundaries[i].force[2]=0.;
+  }
+#endif // LB_BOUNDARIES
+  p8est_iterate (p8est,                  /* forest */
+                 NULL,                   /* no geom */
+                 NULL,                   /* no user_data */
+                 lbadapt_collide_stream, /* volume callback */
+                 NULL,                   /* face callback */
+                 NULL,                   /* edge callback */
+                 NULL                    /* corner callback */
+  );
+
+  // exchange ghost
+  if (lbadapt_ghost == NULL) {
+    lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
+    lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+  }
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
+  // bounce back on boundaries
+  p8est_iterate (p8est,                  /* forest */
+                 NULL,                   /* no geom */
+                 NULL,                   /* no user_data */
+                 lbadapt_bounce_back,    /* volume callback */
+                 NULL,                   /* face callback */
+                 NULL,                   /* edge callback */
+                 NULL                    /* corner callback */
+  );
+
+  // swap pre-/postcollision pointers
+  p8est_iterate (p8est,                  /* forest */
+                 NULL,                   /* no geom */
+                 NULL,                   /* no user_data */
+                 lbadapt_swap_pointers,  /* volume callback */
+                 NULL,                   /* face callback */
+                 NULL,                   /* edge callback */
+                 NULL                    /* corner callback */
+  );
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;

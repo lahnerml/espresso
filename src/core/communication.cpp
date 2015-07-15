@@ -295,6 +295,15 @@ void mpi_stop()
   if (conn) {
     p8est_connectivity_destroy(conn);
   }
+  if (lbadapt_ghost_data) {
+    P4EST_FREE (lbadapt_ghost_data);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
+  }
 
   sc_finalize();
 #endif
@@ -314,6 +323,15 @@ void mpi_stop_slave(int node, int param)
   }
   if (conn) {
     p8est_connectivity_destroy(conn);
+  }
+  if (lbadapt_ghost_data) {
+    P4EST_FREE (lbadapt_ghost_data);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
   }
 
   sc_finalize();

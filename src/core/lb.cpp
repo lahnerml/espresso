@@ -2848,6 +2848,7 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
+  if (lbadapt_mesh == NULL) {
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
   lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
@@ -2857,10 +2858,7 @@ inline void lb_collide_stream() {
                                      0,
                                      1,
                                      P8EST_CONNECT_FULL);
-
-  P4EST_FREE (lbadapt_ghost_data);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
+  }
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;

@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #ifndef _GLOBAL_HPP
 #define _GLOBAL_HPP
@@ -75,7 +75,7 @@ extern const Datafield fields[];
 */
 /*@{*/
 /** index of \ref box_l in \ref #fields */
-#define FIELD_BOXL                0  
+#define FIELD_BOXL                0
 /** index of \ref DomainDecomposition::cell_grid in  \ref #fields */
 #define FIELD_CELLGRID            1
 /** index of \ref DomainDecomposition::cell_size in  \ref #fields */
@@ -121,7 +121,7 @@ extern const Datafield fields[];
 /** index of \ref nptiso_gammav in \ref #fields */
 #define FIELD_NPTISO_GV           22
 /** index of \ref nptiso_struct::p_ext in \ref #fields */
-#define FIELD_NPTISO_PEXT         23      
+#define FIELD_NPTISO_PEXT         23
 /** index of \ref nptiso_struct::p_inst in \ref #fields */
 #define FIELD_NPTISO_PINST        24
 /** index of \ref nptiso_struct::p_inst_av in \ref #fields */
@@ -171,13 +171,13 @@ extern const Datafield fields[];
 /** index of \ref ghmc_phi in \ref #fields */
 #define FIELD_GHMC_PHI            47
 /** index of \ref ghmc_phi in \ref #fields */
-#define FIELD_GHMC_RES            48 
+#define FIELD_GHMC_RES            48
 /** index of \ref ghmc_phi in \ref #fields */
 #define FIELD_GHMC_FLIP           49
 /** index of \ref ghmc_phi in \ref #fields */
-#define FIELD_GHMC_SCALE          50 
+#define FIELD_GHMC_SCALE          50
 /** index of \ref lb_components in \ref #fields */
-#define FIELD_LB_COMPONENTS       51 
+#define FIELD_LB_COMPONENTS       51
 /** index of \ref warnings in \ref #fields */
 #define FIELD_WARNINGS            52
 /** DPD_IGNORE_FIXED_PARTICLES */

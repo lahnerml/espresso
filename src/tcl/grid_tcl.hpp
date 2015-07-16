@@ -33,7 +33,7 @@ int tclcallback_periodicity(Tcl_Interp *interp, void *_data);
 int tclcallback_node_grid(Tcl_Interp *interp, void *data);
 
 /** datafield callback for \ref #periodic. Determines wether a coordinate is pbc (default). */
-int tclcallback_periodicity(Tcl_Interp *interp, void *_data);
+// int tclcallback_periodicity(Tcl_Interp *interp, void *_data);
 
 /** datafield callback for \ref box_l. Sets the box dimensions. */
 int tclcallback_box_l(Tcl_Interp *interp, void *_data);

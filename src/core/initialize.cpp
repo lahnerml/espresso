@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** \file initialize.cpp
     Implementation of \ref initialize.hpp "initialize.hpp"
@@ -230,7 +230,7 @@ void on_observable_calc()
   if (resort_particles)
     cells_resort_particles(CELL_GLOBAL_EXCHANGE);
 
-#ifdef ELECTROSTATICS  
+#ifdef ELECTROSTATICS
   if (reinit_electrostatics) {
     EVENT_TRACE(fprintf(stderr, "%d: reinit_electrostatics\n", this_node));
     switch (coulomb.method) {
@@ -241,8 +241,8 @@ void on_observable_calc()
       p3m_count_charged_particles();
       break;
 #endif
-    case COULOMB_MAGGS: 
-      maggs_init(); 
+    case COULOMB_MAGGS:
+      maggs_init();
       break;
     default: break;
     }
@@ -297,7 +297,7 @@ void on_coulomb_change()
 #ifdef ELECTROSTATICS
   switch (coulomb.method) {
   case COULOMB_DH:
-    break;    
+    break;
 #ifdef P3M
 #ifdef CUDA
   case COULOMB_P3M_GPU:
@@ -306,7 +306,7 @@ void on_coulomb_change()
       errexit();
     }
     p3m_gpu_init(p3m.params.cao, p3m.params.mesh[0], p3m.params.alpha, box_l[0]);
-    MPI_Bcast(gpu_get_global_particle_vars_pointer_host(), 
+    MPI_Bcast(gpu_get_global_particle_vars_pointer_host(),
               sizeof(CUDA_global_part_vars), MPI_BYTE, 0, comm_cart);
     break;
 #endif
@@ -323,7 +323,7 @@ void on_coulomb_change()
   case COULOMB_MMM2D:
     MMM2D_init();
     break;
-  case COULOMB_MAGGS: 
+  case COULOMB_MAGGS:
     maggs_init();
     /* Maggs electrostatics needs ghost velocities */
     on_ghost_flags_change();
@@ -409,11 +409,11 @@ void on_resort_particles()
   case COULOMB_MMM2D:
     MMM2D_on_resort_particles();
     break;
-  default: 
+  default:
     break;
   }
 #endif /* ifdef ELECTROSTATICS */
-  
+
   /* DIPOLAR interactions so far don't need this */
 
   recalc_forces = 1;
@@ -440,7 +440,7 @@ void on_boxl_change() {
   case COULOMB_MMM2D:
 	  MMM2D_init();
 	  break;
-  case COULOMB_MAGGS: 
+  case COULOMB_MAGGS:
 	  maggs_init();
 	  break;
   default:
@@ -484,7 +484,7 @@ void on_cell_structure_change()
 #ifdef ELECTROSTATICS
   switch (coulomb.method) {
   case COULOMB_DH:
-    break;    
+    break;
 #ifdef P3M
   case COULOMB_ELC_P3M:
     ELC_init();
@@ -501,7 +501,7 @@ void on_cell_structure_change()
   case COULOMB_MMM2D:
     MMM2D_init();
     break;
-  case COULOMB_MAGGS: 
+  case COULOMB_MAGGS:
     maggs_init();
     /* Maggs electrostatics needs ghost velocities */
     on_ghost_flags_change();
@@ -591,8 +591,8 @@ void on_parameter_change(int field)
       if (lattice_switch & LATTICE_LB_GPU) {
         lb_reinit_parameters_gpu();
       }
-    }  
-#endif    
+    }
+#endif
 #ifdef LB
     if (lattice_switch & LATTICE_LB) {
       lb_reinit_parameters();
@@ -679,7 +679,7 @@ void on_ghost_flags_change()
   int old_have_v = ghosts_have_v;
 
   ghosts_have_v = 0;
-  
+
   /* DPD and LB need also ghost velocities */
   if (thermo_switch & THERMO_DPD)
     ghosts_have_v = 1;
@@ -700,12 +700,12 @@ void on_ghost_flags_change()
   //maybe we have to add a new global to differ between compile in and acctual use.
   ghosts_have_v = 1;
 #endif
-#ifdef VIRTUAL_SITES 
+#ifdef VIRTUAL_SITES
   //VIRUTAL_SITES need v to update v of virtual sites
   ghosts_have_v = 1;
 #endif
 
   if (old_have_v != ghosts_have_v)
-    cells_re_init(CELL_STRUCTURE_CURRENT);    
+    cells_re_init(CELL_STRUCTURE_CURRENT);
 }
 

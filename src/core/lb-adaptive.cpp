@@ -1310,5 +1310,10 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 
 
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
+  lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
+  double temp[19];
+  memcpy(temp, data->lbfluid[0], sizeof(19*sizeof(double)));
+  memcpy(data->lbfluid[0], data->lbfluid[1], sizeof(19*sizeof(double)));
+  memcpy(data->lbfluid[1], temp, sizeof(19*sizeof(double)));
 }
 #endif // LB_ADAPTIVE

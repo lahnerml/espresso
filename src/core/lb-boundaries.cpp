@@ -482,7 +482,7 @@ int lbboundary_get_force(int no, double* f) {
 
 void lb_bounce_back() {
 #ifdef LB_ADAPTIVE
-
+  // not implemented here
 #else // LB_ADAPTIVE
 #ifdef D3Q19
 #ifndef PULL
@@ -534,9 +534,9 @@ void lb_bounce_back() {
             }
             // no idea what this is actually good for, seems like it checks whether we
             // stay inside the domain, i. e. do not bounce back out of the halo layer.
-            if (x - lbmodel.c[i][0] > 0 && x -lbmodel.c[i][0] < lblattice.grid[0]+1 &&
-                y - lbmodel.c[i][1] > 0 && y -lbmodel.c[i][1] < lblattice.grid[1]+1 &&
-                z - lbmodel.c[i][2] > 0 && z -lbmodel.c[i][2] < lblattice.grid[2]+1) {
+            if (x - lbmodel.c[i][0] > 0 && x - lbmodel.c[i][0] < lblattice.grid[0]+1 &&
+                y - lbmodel.c[i][1] > 0 && y - lbmodel.c[i][1] < lblattice.grid[1]+1 &&
+                z - lbmodel.c[i][2] > 0 && z - lbmodel.c[i][2] < lblattice.grid[2]+1) {
               // if neighboring node is fluid node: adapt force before bounce back
               if (!lbfields[k-next[i]].boundary) {
                 for (l = 0; l < 3; l++) {

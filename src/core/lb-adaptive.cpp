@@ -1353,21 +1353,22 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
   // for proper bounceback from ghostcells we have to check each cell, if it's
   // neighbor is a ghost and if it is a boundary cell. Otherwise we cannot cope
   // with boundary cells ending in the ghost layer.
-  if (currCellData->boundary) {
-    lbadapt_calc_modes(data->lbfluid, modes);
+  lbadapt_calc_modes(data->lbfluid, modes);
 
-    for (int i = 0; i < 19; i++) {
-      tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
+  for (int i = 0; i < 19; i++) {
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
                                                  lbadapt_mesh->quad_to_tree[next[i]]);
-      if (next[i] < lq) {
-        cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[i]);
-        data = (lbadapt_payload_t *) cell->p.user_data;
-        is_ghost = 0;
-      }
-      else {
-        data = &lbadapt_ghost_data[next[i] - lq];
-        is_ghost = 1;
-      }
+    if (next[i] < lq) {
+      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[i]);
+      data = (lbadapt_payload_t *) cell->p.user_data;
+      is_ghost = 0;
+    }
+    else {
+      data = &lbadapt_ghost_data[next[i] - lq];
+      is_ghost = 1;
+    }
+
+    if (currCellData->boundary) {
       // calculate population shift (moving boundary)
       population_shift = 0;
       for (int l = 0; l < 3; l++) {
@@ -1388,6 +1389,36 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
       } else {
         // else bounce back
         data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i];
+      }
+    }
+
+    // do the inverse of the above algorithm if the neighboring cell is a ghost
+    // cell and a boundary cell to properly bounce back for obstacles on process
+    // boundaries. However, it is only necessary to do this if the neighboring
+    // cell is a ghost cell as well as a boundary cell because p4est_iterate
+    // does not visit ghost cells in the volume callback
+    if (is_ghost && data->boundary) {
+      // calculate population shift (moving boundary)
+      population_shift = 0;
+      for (int l = 0; l < 3; l++) {
+        population_shift -= h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[reverse[i]][l]
+                            * lbmodel.w[reverse[i]]
+                            * lb_boundaries[data->boundary - 1].velocity[l] / lbmodel.c_sound_sq;
+      }
+
+      // in adaptive formulation we dont need to check that we only do bounce back
+      // within computational domain, because within this scope we dont consider
+      // the ghost layer.
+      // if neighboring node is fluid node: adapt force before bounce back
+      if (!currCellData->boundary) {
+        for (int l = 0; l < 3; l++) {
+          lb_boundaries[data->boundary-1].force[l] +=
+            (2 * data->lbfluid[1][reverse[i]] + population_shift) * lbmodel.c[reverse[i]][l];
+        }
+        currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] + population_shift;
+      } else {
+        // else bounce back
+        currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]];
       }
     }
   }

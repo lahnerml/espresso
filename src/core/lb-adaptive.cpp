@@ -623,13 +623,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   lbadapt_payload_t * data;
 #ifndef OLD_FLUCT
   int lq = p8est->local_num_quadrants;
-  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
   cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0]);
   data = (lbadapt_payload_t *) cell->p.user_data;
   data->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
 
   if (next[1] != -1 && next[1] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[1]]);
     if (next[1] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -642,7 +642,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[2] != -1 && next[2] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[2]]);
     if (next[2] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[2]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -655,7 +655,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[3] != -1 && next[3] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[3]]);
     if (next[3] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[3]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -668,7 +668,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[4] != -1 && next[4] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[4]]);
     if (next[4] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[4]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -681,7 +681,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[5] != -1 && next[5] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[5]]);
     if (next[5] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[5]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -693,7 +693,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[6] != -1 && next[6] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[6]]);
     if (next[6] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[6]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -705,7 +705,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[7] != -1 && next[7] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[7]]);
     if (next[7] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[7]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -718,7 +718,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[8] != -1 && next[8] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[8]]);
     if (next[8] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[8]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -731,7 +731,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[9] != -1 && next[9] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[9]]);
     if (next[9] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[9]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -744,7 +744,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[10] != -1 && next[10] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[10]]);
     if (next[10] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[10]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -757,7 +757,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[11] != -1 && next[11] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[11]]);
     if (next[11] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[11]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -770,7 +770,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[12] != -1 && next[12] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[12]]);
     if (next[12] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[12]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -783,7 +783,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[13] != -1 && next[13] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[13]]);
     if (next[13] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[13]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -796,7 +796,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[14] != -1 && next[14] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[14]]);
     if (next[14] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[14]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -809,7 +809,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[15] != -1 && next[15] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[15]]);
     if (next[15] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[15]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -822,7 +822,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[16] != -1 && next[16] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[16]]);
     if (next[16] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[16]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -835,7 +835,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[17] != -1 && next[17] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[17]]);
     if (next[17] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[17]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -848,7 +848,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[18] != -1 && next[18] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[18]]);
     if (next[18] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[18]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -860,13 +860,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
         - m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18]) * lbmodel.w[18];
   }
 #else // !OLD_FLUCT
-  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
   cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0]);
   data = (lbadapt_payload_t *) cell->p.user_data;
   data->lbfluid[1][ 0] = (m[0] - m[4]) * lbmodel.w[0];
 
   if (next[1] != -1 && next[1] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[1]]);
     if (next[1] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -878,7 +878,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[2] != -1 && next[2] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[2]]);
     if (next[2] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[2]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -890,7 +890,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[3] != -1 && next[3] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[3]]);
     if (next[3] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[3]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -902,7 +902,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[4] != -1 && next[4] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[4]]);
     if (next[4] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[4]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -914,7 +914,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[5] != -1 && next[5] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[5]]);
     if (next[5] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[5]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -926,7 +926,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[6] != -1 && next[6] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[6]]);
     if (next[6] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[6]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -938,7 +938,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[7] != -1 && next[7] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[7]]);
     if (next[7] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[7]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -950,7 +950,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[8] != -1 && next[8] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[8]]);
     if (next[8] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[8]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -962,7 +962,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[9] != -1 && next[9] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[9]]);
     if (next[9] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[9]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -974,7 +974,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[10] != -1 && next[10] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[10]]);
     if (next[10] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[10]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -986,7 +986,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[11] != -1 && next[11] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[11]]);
     if (next[11] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[11]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -998,7 +998,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[12] != -1 && next[12] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[12]]);
     if (next[12] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[12]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1010,7 +1010,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[13] != -1 && next[13] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[13]]);
     if (next[13] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[13]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1022,7 +1022,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[14] != -1 && next[14] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[14]]);
     if (next[14] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[14]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1034,7 +1034,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[15] != -1 && next[15] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[15]]);
     if (next[15] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[15]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1046,7 +1046,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[16] != -1 && next[16] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[16]]);
     if (next[16] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[16]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1058,7 +1058,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[17] != -1 && next[17] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[17]]);
     if (next[17] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[17]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1070,7 +1070,7 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   }
 
   if (next[18] != -1 && next[18] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[qid]);
+    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[18]]);
     if (next[18] < lq) {
       cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[18]);
       data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1099,7 +1099,6 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
 
 /*** ITERATOR CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data) {
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
@@ -1113,7 +1112,6 @@ void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_d
 
 void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_data) {
   double *bnd_vals = (double *) user_data;                      /* passed array to fill */
-  p8est_t * p8est = info->p4est;                                /* get p8est */
   p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
   p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
   p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
@@ -1187,7 +1185,7 @@ void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) 
       ostringstream msg;
       msg <<"Error in lb_calc_local_rho in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
       runtimeError(msg);
-    *rho =0;
+    *rho = 0;
     return;
   }
 
@@ -1306,6 +1304,99 @@ void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) 
 
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
+#ifdef D3Q19
+#ifndef PULL
+  p8est_quadrant_t  *currCell     = info->quad;     // current cell
+  lbadapt_payload_t *currCellData =
+    (lbadapt_payload_t *) currCell->p.user_data;    // payload of current cell
+  int qid = info->quadid;                       // quadid of current cell
+  int lq = p8est->local_num_quadrants;              // local number of quadrants
+  double h;                                         // local meshwidth
+  h = (double) P8EST_QUADRANT_LEN(currCell->level) / (double) P8EST_ROOT_LEN;
+
+  int next[19];
+  double population_shift;
+  double modes[19];
+
+  /* 0 vel */
+  next[0]  = qid;
+  /* face-velocities */
+  next[1]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 1];
+  next[2]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 0];
+  next[3]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 3];
+  next[4]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 2];
+  next[5]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 5];
+  next[6]  = lbadapt_mesh->quad_to_quad[P8EST_FACES * qid + 4];
+  /* edge velocities */
+  next[7]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid + 11];
+  next[8]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  8];
+  next[9]  = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  9];
+  next[10] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid + 10];
+  next[11] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  7];
+  next[12] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  4];
+  next[13] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  5];
+  next[14] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  6];
+  next[15] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  3];
+  next[16] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  0];
+  next[17] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  1];
+  next[18] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  2];
+
+  /* index of inverse vector, 0 is inverse to itself. */
+  int reverse[] = { 0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15, 18, 17 };
+
+  /* corresponding destination cells and their data */
+  p8est_tree_t      * tree;
+  p8est_quadrant_t  * cell;
+  lbadapt_payload_t * data;
+  int                 is_ghost;
+
+  // for proper bounceback from ghostcells we have to check each cell, if it's
+  // neighbor is a ghost and if it is a boundary cell. Otherwise we cannot cope
+  // with boundary cells ending in the ghost layer.
+  if (currCellData->boundary) {
+    lbadapt_calc_modes(data->lbfluid, modes);
+
+    for (int i = 0; i < 19; i++) {
+      tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
+                                                 lbadapt_mesh->quad_to_tree[next[i]]);
+      if (next[i] < lq) {
+        cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[i]);
+        data = (lbadapt_payload_t *) cell->p.user_data;
+        is_ghost = 0;
+      }
+      else {
+        data = &lbadapt_ghost_data[next[i] - lq];
+        is_ghost = 1;
+      }
+      // calculate population shift (moving boundary)
+      population_shift = 0;
+      for (int l = 0; l < 3; l++) {
+        population_shift -= h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] * lbmodel.w[i]
+                            * lb_boundaries[currCellData->boundary - 1].velocity[l] / lbmodel.c_sound_sq;
+      }
+
+      // in adaptive formulation we dont need to check that we only do bounce back
+      // within computational domain, because within this scope we dont consider
+      // the ghost layer.
+      // if neighboring node is fluid node: adapt force before bounce back
+      if (!data->boundary) {
+        for (int l = 0; l < 3; l++) {
+          lb_boundaries[currCellData->boundary-1].force[l] +=
+            (2 * currCellData->lbfluid[1][i] + population_shift) * lbmodel.c[i][l];
+        }
+        data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] + population_shift;
+      } else {
+        // else bounce back
+        data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i];
+      }
+    }
+  }
+#else // !PULL
+#error Bounce back boundary conditions are only implemented for PUSH scheme!
+#endif // !PULL
+#else // D3Q19
+#error Bounce back boundary conditions are only implemented for D3Q19!
+#endif // D3Q19
 }
 
 

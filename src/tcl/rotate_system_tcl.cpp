@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2012,2013,2014,2015 The ESPResSo project
+  Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
     Max-Planck-Institute for Polymer Research, Theory Group
   
@@ -19,22 +19,35 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>. 
 */
 
-#ifndef __RUNING_AVERAGE_HPP
-#define __RUNING_AVERAGE_HPP
+#include "rotate_system.hpp"
+#include "parser.hpp"
 
-template<typename Scalar>
-class RunningAverage {
-public:
-  RunningAverage() : m_n(0), m_new_var(0.0) {};
-  void add_sample(Scalar s);
-  void clear() { m_n = 0; }
-  const int &n() const { return &m_n; }
-  Scalar avg() const;
-  Scalar var() const;
-private:
-  int m_n;
-  Scalar m_old_avg, m_new_avg;
-  Scalar m_old_var, m_new_var;
-};
+/* ############### */
+int tclcommand_rotate_system(ClientData data, Tcl_Interp * interp, int argc, char ** argv){
+  double alpha,theta,phi;
+  if (argc != 4) { 
+    fprintf(stderr,"needs 3 angles\n");
+    return ES_ERROR;
+  }
+  if (! (ARG_IS_D(1,phi)))
+  {
+      fprintf(stderr,"Expects 3 floats\n");
+      return ES_ERROR;
+  }
 
-#endif
+  if (!(ARG_IS_D(2,theta)))
+  {
+      fprintf(stderr,"Expects 3 floats\n");
+      return ES_ERROR;
+  }
+  if (! (ARG_IS_D(3,alpha)))
+  {
+      fprintf(stderr,"Expects 3 floats\n");
+      return ES_ERROR;
+  }
+  
+
+  rotate_system(phi,theta,alpha);
+
+  return ES_OK;
+}

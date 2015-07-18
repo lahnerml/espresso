@@ -289,12 +289,6 @@ void mpi_stop()
 
   // shutdown p4est if it was used
 #ifdef LB_ADAPTIVE
-  if (p8est) {
-    p8est_destroy(p8est);
-  }
-  if (conn) {
-    p8est_connectivity_destroy(conn);
-  }
   if (lbadapt_ghost_data) {
     P4EST_FREE (lbadapt_ghost_data);
   }
@@ -304,7 +298,12 @@ void mpi_stop()
   if (lbadapt_ghost) {
     p8est_ghost_destroy(lbadapt_ghost);
   }
-
+  if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
   sc_finalize();
 #endif
   MPI_Barrier(comm_cart);
@@ -318,12 +317,6 @@ void mpi_stop_slave(int node, int param)
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
 #ifdef LB_ADAPTIVE
-  if (p8est) {
-    p8est_destroy(p8est);
-  }
-  if (conn) {
-    p8est_connectivity_destroy(conn);
-  }
   if (lbadapt_ghost_data) {
     P4EST_FREE (lbadapt_ghost_data);
   }
@@ -334,6 +327,12 @@ void mpi_stop_slave(int node, int param)
     p8est_ghost_destroy(lbadapt_ghost);
   }
 
+    if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
   sc_finalize();
 #endif
   MPI_Barrier(comm_cart);
@@ -1072,7 +1071,7 @@ void mpi_send_virtual_slave(int pnode, int part)
 
 /********************* REQ_SET_BOND ********/
 
-void mpi_send_vs_relative(int pnode, int part, int vs_relative_to, double vs_distance)
+void mpi_send_vs_relative(int pnode, int part, int vs_relative_to, double vs_distance, double* rel_ori)
 {
 #ifdef VIRTUAL_SITES_RELATIVE
   mpi_call(mpi_send_vs_relative_slave, pnode, part);
@@ -1083,10 +1082,13 @@ void mpi_send_vs_relative(int pnode, int part, int vs_relative_to, double vs_dis
     Particle *p = local_particles[part];
     p->p.vs_relative_to_particle_id = vs_relative_to;
     p->p.vs_relative_distance = vs_distance;
+    for (int i=0;i<4;i++)
+     p->p.vs_relative_rel_orientation[i] = rel_ori[i];
   }
   else {
     MPI_Send(&vs_relative_to, 1, MPI_INT, pnode, SOME_TAG, comm_cart);
     MPI_Send(&vs_distance, 1, MPI_DOUBLE, pnode, SOME_TAG, comm_cart);
+    MPI_Send(rel_ori, 4, MPI_DOUBLE, pnode, SOME_TAG, comm_cart);
   }
 
   on_particle_change();
@@ -1101,6 +1103,8 @@ void mpi_send_vs_relative_slave(int pnode, int part)
   MPI_Recv(&p->p.vs_relative_to_particle_id, 1, MPI_INT, 0, SOME_TAG,
        comm_cart, MPI_STATUS_IGNORE);
     MPI_Recv(&p->p.vs_relative_distance, 1, MPI_DOUBLE, 0, SOME_TAG,
+	     comm_cart, MPI_STATUS_IGNORE);
+    MPI_Recv(p->p.vs_relative_rel_orientation, 4, MPI_DOUBLE, 0, SOME_TAG,
        comm_cart, MPI_STATUS_IGNORE);
   }
 

@@ -56,3 +56,7 @@ src/__pycache__/
 .texlipse
 .autotools
 .pydevproject
+.cproject
+
+# Merge Clutter
+*.orig

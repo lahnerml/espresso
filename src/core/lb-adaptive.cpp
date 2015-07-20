@@ -1353,7 +1353,6 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
   // for proper bounceback from ghostcells we have to check each cell, if it's
   // neighbor is a ghost and if it is a boundary cell. Otherwise we cannot cope
   // with boundary cells ending in the ghost layer.
-  lbadapt_calc_modes(data->lbfluid, modes);
 
   for (int i = 0; i < 19; i++) {
     tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
@@ -1369,6 +1368,7 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
     }
 
     if (currCellData->boundary) {
+      lbadapt_calc_modes(currCellData->lbfluid, modes);
       // calculate population shift (moving boundary)
       population_shift = 0;
       for (int l = 0; l < 3; l++) {
@@ -1398,6 +1398,7 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
     // cell is a ghost cell as well as a boundary cell because p4est_iterate
     // does not visit ghost cells in the volume callback
     if (is_ghost && data->boundary) {
+      lbadapt_calc_modes(data->lbfluid, modes);
       // calculate population shift (moving boundary)
       population_shift = 0;
       for (int l = 0; l < 3; l++) {

@@ -469,11 +469,33 @@ void mpi_set_particle_gamma(int pnode, int part, double gamma);
 void mpi_bcast_constraint(int del_num);
 
 #if defined(LB_ADAPTIVE)
+/** initialize adaptive grid
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] level refine grid uniformly up to this level
+ */
 void mpi_lbadapt_grid_init (int node, int level);
 
-void mpi_lbadapt_create_mesh (int node, int param);
-
+/** Call for parallel IO of boundary
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
 void mpi_lbadapt_vtk_print_boundary(int node, int len);
+
+/** Call for parallel IO of density
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_lbadapt_vtk_print_density (int node, int len);
+
+/** Call for parallel IO of velocity
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_lbadapt_vtk_print_velocity(int node, int len);
 
 void mpi_unif_refinement (int node, int level);
 

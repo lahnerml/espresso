@@ -175,6 +175,8 @@ static int terminated = 0;
   CB(mpi_thermalize_cpu_slave) \
   CB(mpi_lbadapt_grid_init) \
   CB(mpi_lbadapt_vtk_print_boundary) \
+  CB(mpi_lbadapt_vtk_print_density) \
+  CB(mpi_lbadapt_vtk_print_velocity) \
   CB(mpi_unif_refinement) \
   CB(mpi_rand_refinement) \
 
@@ -2756,6 +2758,71 @@ void mpi_lbadapt_vtk_print_boundary (int node, int len) {
                       0, 0, 0,/* no cell vectors, point scalars or point vectors */
                       filename,
                       "boundaries", boundary
+  );
+
+  P4EST_FREE(boundary);
+}
+
+void mpi_lbadapt_vtk_print_density (int node, int len) {
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  double *density;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  density = P4EST_ALLOC(double, num_cells);
+
+  p8est_iterate (p8est, NULL,
+                 density,
+                 lbadapt_get_boundary_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      filename,
+                      "density", density
+  );
+
+  P4EST_FREE(density);
+}
+
+void mpi_lbadapt_vtk_print_velocity (int node, int len) {
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  double *velocity;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  velocity = P4EST_ALLOC(double, P8EST_DIM * num_cells);
+
+  p8est_iterate (p8est, NULL,
+                 velocity,
+                 lbadapt_get_velocity_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      0,      /* no cell scalar field */
+                      1,      /* one vector field of cell data */
+                      0, 0,   /* no point scalars or point vectors */
+                      filename,
+                      "velocity", velocity
   );
 
   P4EST_FREE(boundary);

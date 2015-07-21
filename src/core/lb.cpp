@@ -758,6 +758,59 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
 
 
 int lb_lbfluid_print_vtk_density(char** filename) {
+#ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (*filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (*filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - *filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_density, -1, len);
+  MPI_Bcast(*filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *density;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  density = P4EST_ALLOC(double, num_cells);
+
+  /* grab density values of cells */
+  p8est_iterate (p8est, NULL,
+                 density,
+                 lbadapt_get_density_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      *filename,
+                      "density", density
+  );
+
+  /* free memory */
+  P4EST_FREE(density);
+
+#else // LB_ADAPTIVE
   int ii;
 
   for(ii=0;ii<LB_COMPONENTS;++ii) {
@@ -795,12 +848,65 @@ int lb_lbfluid_print_vtk_density(char** filename) {
     }
     fclose(fp);
   }
+#endif // LB_ADAPTIVE
+
   return 0;
 }
 
 
 int lb_lbfluid_print_vtk_velocity(char* filename) {
 #ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_velocity, -1, len);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *velocity;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  velocity = P4EST_ALLOC(double, P8EST_DIM * num_cells);
+
+  /* grab density values of cells */
+  p8est_iterate (p8est, NULL,
+                 velocity,
+                 lbadapt_get_velocity_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      0,      /* no cell scalar field */
+                      1,      /* one vector field of cell data */
+                      0, 0,   /* no point scalars or point vectors */
+                      filename,
+                      "velocity", velocity
+  );
+
+  /* free memory */
+  P4EST_FREE(velocity);
 #else // LB_ADAPTIVE
   FILE* fp = fopen(filename, "w");
 

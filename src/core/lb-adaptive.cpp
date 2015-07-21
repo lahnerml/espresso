@@ -27,6 +27,7 @@
 
 #include <stdlib.h>
 #include <iostream>
+#include <algorithm>
 
 #include "utils.hpp"
 #include "constraint.hpp"
@@ -104,10 +105,10 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
 
   // 3D array
   for (int i = 0; i < 3; i++) {
-  data->lbfields.j[i] = 0;
-  data->lbfields.force[i] = 0;
+    data->lbfields.j[i] = 0;
+    data->lbfields.force[i] = 0;
 #ifdef IMMERSED_BOUNDARY
-  data->lbfields.force_buf[i] = 0;
+    data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
   }
 
@@ -585,7 +586,7 @@ int lbadapt_calc_pop_from_modes (double ** populations, double * mode) {
 
 int lbadapt_calc_n_from_modes_push (int qid, double * m) {
 #ifdef D3Q19
-  /* indexes of streaming targets */
+  /* lookup cell indexes of streaming targets */
   /* currently:
    * no tree boundaries, i.e. no need to consider orientation.
    * direct transfer from mapping given at beginning of file */
@@ -621,8 +622,8 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   p8est_tree_t      * tree;
   p8est_quadrant_t  * cell;
   lbadapt_payload_t * data;
-#ifndef OLD_FLUCT
   int lq = p8est->local_num_quadrants;
+#ifndef OLD_FLUCT
   tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
   cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0]);
   data = (lbadapt_payload_t *) cell->p.user_data;
@@ -1111,10 +1112,10 @@ void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_data) {
-  double *bnd_vals = (double *) user_data;                      /* passed array to fill */
-  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
-  p4est_topidx_t which_tree = info->treeid;                     /* get current tree id */
-  p4est_locidx_t local_id = info->quadid;                       /* get cell id w.r.t. tree-id */
+  double *bnd_vals = (double *) user_data;       /* passed array to fill */
+  p8est_quadrant_t * q = info->quad;             /* get current global cell id */
+  p4est_topidx_t which_tree = info->treeid;      /* get current tree id */
+  p4est_locidx_t local_id = info->quadid;        /* get cell id w.r.t. tree-id */
   p8est_tree_t * tree;
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
 
@@ -1125,9 +1126,98 @@ void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_d
   local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
   arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
 
-  /* just grab the u value of each cell and pass it into solution vector */
+  /* just grab the value of each cell and pass it into solution vector */
   bnd = data->boundary;
   bnd_vals[arrayoffset] = bnd;
+}
+
+
+void lbadapt_get_density_values (p8est_iter_volume_info_t * info, void * user_data) {
+  double *dens_vals = (double *) user_data;      /* passed array to fill */
+  p8est_quadrant_t * q = info->quad;             /* get current global cell id */
+  p4est_topidx_t which_tree = info->treeid;      /* get current tree id */
+  p4est_locidx_t local_id = info->quadid;        /* get cell id w.r.t. tree-id */
+  p8est_tree_t * tree;
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
+  double h;                                      /* local meshwidth */
+  h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
+
+  double dens;
+  p4est_locidx_t  arrayoffset;
+
+  tree = p8est_tree_array_index (p8est->trees, which_tree);
+  local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
+  arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
+
+  /* just grab the value of each cell and pass it into solution vector */
+  double avg_rho = 0;//lbpar.rho[0] * h * h * h;
+
+  if (data->boundary) {
+    dens = 0;
+  }
+  else {
+    dens =   avg_rho
+            + data->lbfluid[0][0]
+            + data->lbfluid[0][1]  + data->lbfluid[0][2]
+            + data->lbfluid[0][3]  + data->lbfluid[0][4]
+            + data->lbfluid[0][5]  + data->lbfluid[0][6]
+            + data->lbfluid[0][7]  + data->lbfluid[0][8]
+            + data->lbfluid[0][9]  + data->lbfluid[0][10]
+            + data->lbfluid[0][11] + data->lbfluid[0][12]
+            + data->lbfluid[0][13] + data->lbfluid[0][14]
+            + data->lbfluid[0][15] + data->lbfluid[0][16]
+            + data->lbfluid[0][17] + data->lbfluid[0][18];
+  }
+  dens_vals[arrayoffset] = dens;
+}
+
+
+void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_data) {
+  double *veloc_vals = (double *) user_data;     /* passed array to fill */
+  p8est_quadrant_t * q = info->quad;             /* get current global cell id */
+  p4est_topidx_t which_tree = info->treeid;      /* get current tree id */
+  p4est_locidx_t local_id = info->quadid;        /* get cell id w.r.t. tree-id */
+  p8est_tree_t * tree;
+  lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
+  double h;                                      /* local meshwidth */
+  h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
+
+  double j[3];
+  p4est_locidx_t  arrayoffset;
+
+  tree = p8est_tree_array_index (p8est->trees, which_tree);
+  local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
+  arrayoffset = 3 * local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
+
+  /* just grab the value of each cell and pass it into solution vector */
+  if (data->boundary) {
+    j[0] = j[1] = j[2] = 0.;
+  }
+  else {
+    j[0] =   data->lbfluid[0][1]  - data->lbfluid[0][2]
+           + data->lbfluid[0][7]  - data->lbfluid[0][8]
+           + data->lbfluid[0][9]  - data->lbfluid[0][10]
+           + data->lbfluid[0][11] - data->lbfluid[0][12]
+           + data->lbfluid[0][13] - data->lbfluid[0][14];
+    j[1] =   data->lbfluid[0][3]  - data->lbfluid[0][4]
+           + data->lbfluid[0][7]  - data->lbfluid[0][8]
+           - data->lbfluid[0][9]  + data->lbfluid[0][10]
+           + data->lbfluid[0][15] - data->lbfluid[0][16]
+           + data->lbfluid[0][17] - data->lbfluid[0][18];
+    j[2] =   data->lbfluid[0][5]  - data->lbfluid[0][6]
+           + data->lbfluid[0][11] - data->lbfluid[0][12]
+           - data->lbfluid[0][13] + data->lbfluid[0][14]
+           + data->lbfluid[0][15] - data->lbfluid[0][16]
+           - data->lbfluid[0][17] + data->lbfluid[0][18];
+  }
+
+  veloc_vals[arrayoffset]     = j[0] + data->lbfields.force[0];
+  veloc_vals[arrayoffset + 1] = j[1] + data->lbfields.force[1];
+  veloc_vals[arrayoffset + 2] = j[2] + data->lbfields.force[2];
+
+  veloc_vals[arrayoffset]     *= h/lbpar.tau;
+  veloc_vals[arrayoffset + 1] *= h/lbpar.tau;
+  veloc_vals[arrayoffset + 2] *= h/lbpar.tau;
 }
 
 
@@ -1435,8 +1525,9 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
   lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
   double temp[19];
-  memcpy(temp, data->lbfluid[0], sizeof(19*sizeof(double)));
-  memcpy(data->lbfluid[0], data->lbfluid[1], sizeof(19*sizeof(double)));
-  memcpy(data->lbfluid[1], temp, sizeof(19*sizeof(double)));
+  std::swap(data->lbfluid[0], data->lbfluid[1]);
+  // memcpy(temp, data->lbfluid[0], sizeof(19*sizeof(double)));
+  // memcpy(data->lbfluid[0], data->lbfluid[1], sizeof(19*sizeof(double)));
+  // memcpy(data->lbfluid[1], temp, sizeof(19*sizeof(double)));
 }
 #endif // LB_ADAPTIVE

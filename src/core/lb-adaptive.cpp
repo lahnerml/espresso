@@ -1368,28 +1368,30 @@ void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) 
   double h;                                                     /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
-  /* place for storing modes */
-  double modes[19];
+  if (!data->boundary) {
+    /* place for storing modes */
+    double modes[19];
 
-  /* calculate modes locally */
-  lbadapt_calc_modes(data->lbfluid, modes);
+    /* calculate modes locally */
+    lbadapt_calc_modes(data->lbfluid, modes);
 
-  /* deterministic collisions */
-  lbadapt_relax_modes(modes, data->lbfields.force, h);
+    /* deterministic collisions */
+    lbadapt_relax_modes(modes, data->lbfields.force, h);
 
-  /* fluctuating hydrodynamics */
+    /* fluctuating hydrodynamics */
 
-  if (fluct) lbadapt_thermalize_modes(modes, h);
+    if (fluct) lbadapt_thermalize_modes(modes, h);
 
-  /* apply forces */
+    /* apply forces */
 #ifdef EXTERNAL_FORCES
-  lbadapt_apply_forces(modes, &data->lbfields, h);
+    lbadapt_apply_forces(modes, &data->lbfields, h);
 #else // EXTERNAL_FORCES
-  if (has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
+    if (has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
 
-  /* transform back to populations and streaming */
-  lbadapt_calc_n_from_modes_push(info->quadid, modes);
+    /* transform back to populations and streaming */
+    lbadapt_calc_n_from_modes_push(info->quadid, modes);
+  }
 }
 
 

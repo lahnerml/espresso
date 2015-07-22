@@ -2798,6 +2798,7 @@ void mpi_lbadapt_vtk_print_density (int node, int len) {
 void mpi_lbadapt_vtk_print_velocity (int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
   double *velocity;
   p4est_locidx_t num_cells;
   num_cells = p8est->local_num_quadrants;
@@ -2825,7 +2826,7 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
                       "velocity", velocity
   );
 
-  P4EST_FREE(boundary);
+  P4EST_FREE(velocity);
 }
 
 void mpi_unif_refinement (int node, int level) {

@@ -2716,8 +2716,8 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 #endif
 }
 
-#ifdef LB_ADAPTIVE
 void mpi_lbadapt_grid_init (int node, int level) {
+#ifdef LB_ADAPTIVE
   /* create connectivity and octree */
   conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
                                        periodic & 1, periodic & 2, periodic & 4);
@@ -2729,9 +2729,11 @@ void mpi_lbadapt_grid_init (int node, int level) {
                          sizeof (lbadapt_payload_t),  /* data size */
                          lbadapt_init,     /* init function */
                          NULL              /* user pointer */);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_vtk_print_boundary (int node, int len) {
+#ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   double *boundary;
@@ -2761,9 +2763,11 @@ void mpi_lbadapt_vtk_print_boundary (int node, int len) {
   );
 
   P4EST_FREE(boundary);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_vtk_print_density (int node, int len) {
+#ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   double *density;
@@ -2793,9 +2797,11 @@ void mpi_lbadapt_vtk_print_density (int node, int len) {
   );
 
   P4EST_FREE(density);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_vtk_print_velocity (int node, int len) {
+#ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
@@ -2827,17 +2833,21 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
   );
 
   P4EST_FREE(velocity);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_unif_refinement (int node, int level) {
+#ifdef LB_ADAPTIVE
   for (int i = 0; i < level; i++) {
     p8est_refine(p8est, 0, refine_uniform, NULL);
     p8est_partition (p8est, 0, NULL);
   }
   p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
+#endif //LB_ADAPTIVE
 }
 
 void mpi_rand_refinement (int node, int maxLevel) {
+#ifdef LB_ADAPTIVE
   // assert level 0 is refined
   p8est_refine (p8est, 0, refine_uniform, NULL);
 
@@ -2848,8 +2858,8 @@ void mpi_rand_refinement (int node, int maxLevel) {
     p8est_partition (p8est, 0, NULL);
   }
   p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
-}
 #endif // LB_ADAPTIVE
+}
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES

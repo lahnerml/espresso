@@ -2985,7 +2985,7 @@ inline void lb_collide_stream() {
 
   // bounce back on boundaries
   p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,          /* ghost */
+                 NULL,                   /* ghost */
                  NULL,                   /* no user_data */
                  lbadapt_bounce_back,    /* volume callback */
                  NULL,                   /* face callback */
@@ -3683,12 +3683,12 @@ void calc_particle_lattice_ia() {
  * This function has to be called after changing the density of
  * a local lattice site in order to set lbpar.rho consistently. */
 void lb_calc_average_rho() {
-  double * rho;
   double local_rho, sum_rho;
 
-  *rho = 0.0;
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
+  double * rho;
+  *rho = 0.0;
   p8est_iterate (p8est,
                  NULL,
                  (void *) rho,
@@ -3697,13 +3697,14 @@ void lb_calc_average_rho() {
                  NULL,
                  NULL);
 #else // LB_ADAPTIVE
-  index_t *index;
+  index_t index;
   int x, y, z;
+  double rho = 0.;
 
   index = 0;
   for (z = 1; z <= lblattice.grid[2]; z++) {
     for (y = 1; y <= lblattice.grid[1]; y++) {
-      for (x = 1; x<=lblattice.grid[0]; x++) {
+      for (x = 1; x <= lblattice.grid[0]; x++) {
         lb_calc_local_rho(index, &rho);
         local_rho += rho;
 

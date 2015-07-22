@@ -383,6 +383,7 @@ void lb_init_boundaries() {
   }
 }
 
+#ifdef LB_ADAPTIVE
 int lbadapt_is_boundary(double pos[3]) {
   int n;
   //char *errtxt;
@@ -440,6 +441,7 @@ int lbadapt_is_boundary(double pos[3]) {
     return 0;
   }
 }
+#endif //LB_ADAPTIVE
 
 
 int lbboundary_get_force(int no, double* f) {

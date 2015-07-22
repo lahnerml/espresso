@@ -28,6 +28,7 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
+#ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
@@ -202,4 +203,5 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data);
+#endif // LB_ADAPTIVE
 #endif //LB_ADAPTIVE_H

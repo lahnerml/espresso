@@ -2973,9 +2973,20 @@ inline void lb_collide_stream() {
   }
 #endif // LB_BOUNDARIES
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* no ghost */
+                 lbadapt_ghost,                   /* no ghost */
                  NULL,                   /* no user_data */
-                 lbadapt_collide_stream, /* volume callback */
+                 lbadapt_collide_streamI, /* volume callback */
+                 NULL,                   /* face callback */
+                 NULL,                   /* edge callback */
+                 NULL                    /* corner callback */
+  );
+
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
+  p8est_iterate (p8est,                  /* forest */
+                 lbadapt_ghost,                   /* no ghost */
+                 NULL,                   /* no user_data */
+                 lbadapt_collide_streamII, /* volume callback */
                  NULL,                   /* face callback */
                  NULL,                   /* edge callback */
                  NULL                    /* corner callback */
@@ -2985,7 +2996,7 @@ inline void lb_collide_stream() {
 
   // bounce back on boundaries
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* ghost */
+                 lbadapt_ghost,                   /* ghost */
                  NULL,                   /* no user_data */
                  lbadapt_bounce_back,    /* volume callback */
                  NULL,                   /* face callback */
@@ -2993,9 +3004,11 @@ inline void lb_collide_stream() {
                  NULL                    /* corner callback */
   );
 
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
   // swap pre-/postcollision pointers
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* no ghost */
+                 lbadapt_ghost,                   /* no ghost */
                  NULL,                   /* no user_data */
                  lbadapt_swap_pointers,  /* volume callback */
                  NULL,                   /* face callback */

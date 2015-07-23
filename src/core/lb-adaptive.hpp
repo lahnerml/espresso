@@ -196,7 +196,10 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data);
+void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_collide_streamII (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);

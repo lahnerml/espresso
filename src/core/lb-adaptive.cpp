@@ -92,8 +92,9 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
   data->boundary = 0;
   // data->lbfields = (LB_FluidNode) malloc(sizeof(LB_FluidNode));
   for (int i = 0; i < lbmodel.n_veloc; i++) {
-    data->lbfluid[0][i] = 0.0;
+    data->lbfluid[0][i] = 0.;
     data->lbfluid[1][i] = 0.;
+    data->modes[i] = 0.;
   }
 
   // ints
@@ -584,7 +585,7 @@ int lbadapt_calc_pop_from_modes (double ** populations, double * mode) {
 }
 
 
-int lbadapt_calc_n_from_modes_push (int qid, double * m) {
+int lbadapt_calc_n_from_modes_push (int qid) {
 #ifdef D3Q19
   /* lookup cell indexes of streaming targets */
   /* currently:
@@ -614,26 +615,31 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
   next[17] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  1];
   next[18] = lbadapt_mesh->quad_to_quad_edge[P8EST_EDGES * qid +  2];
 
-  /* normalization factors enter in the back transformation */
-  for (int i = 0; i < lbmodel.n_veloc; i++) {
-    m[i] = (1. / d3q19_modebase[19][i]) * m[i];
-  }
-
   /* this is _a lot_ uglier than a regular grid */
   /* containers for accessing data through p4est_mesh */
   p8est_tree_t      * tree;
   p8est_quadrant_t  * cell;
-  lbadapt_payload_t * data;
+  lbadapt_payload_t * data, *currCellData;
+
+  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
+  cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0] - tree->quadrants_offset);
+  currCellData = (lbadapt_payload_t *) cell->p.user_data;
+  double *m = currCellData->modes;
+  double *ghost_m;
+
+  /* normalization factors enter in the back transformation */
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    m[i] = (1. / d3q19_modebase[19][i]) * m[i];
+  }
 
   /* number of cells on local process */
   int lq = p8est->local_num_quadrants;
 
 #ifndef OLD_FLUCT
   /* cell itself cannot be ghost cell */
-  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
-  cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0] - tree->quadrants_offset);
   data = (lbadapt_payload_t *) cell->p.user_data;
   data->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
+  bool ghost = true;
 
   if (next[1] != -1 && next[1] != next[0]) {
     tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[1]]);
@@ -643,6 +649,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[1] - lq];
+      if(ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][2] = (ghost_m[0] - ghost_m[1] + ghost_m[5]
+                                     + ghost_m[6] - ghost_m[17] - ghost_m[18]
+                                     + 2. * (ghost_m[10] - ghost_m[16]))
+                                    * lbmodel.w[2];
+      }
     }
     data->lbfluid[1][ 1] = (m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2. * (m[10] + m[16]))
                            * lbmodel.w[1];
@@ -656,6 +669,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[2] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][1] = (ghost_m[0] + ghost_m[1] + ghost_m[5]
+                                     + ghost_m[6] - ghost_m[17] - ghost_m[18]
+                                     - 2. * (ghost_m[10] + ghost_m[16]))
+                                    * lbmodel.w[1];
+      }
     }
     data->lbfluid[1][ 2] = (m[0] - m[1] + m[5] + m[6] - m[17] - m[18] + 2. * (m[10] - m[16]))
                            * lbmodel.w[2];
@@ -669,6 +689,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[3] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][4] = (ghost_m[0] - ghost_m[2] - ghost_m[5]
+                                     + ghost_m[6] + ghost_m[17] - ghost_m[18]
+                                     + 2. * (m[11] - m[16]))
+                                    * lbmodel.w[4];
+      }
     }
     data->lbfluid[1][ 3] = (m[0] + m[2] - m[5] + m[6] + m[17] - m[18] - 2. * (m[11] + m[16]))
                            * lbmodel.w[3];
@@ -682,6 +709,13 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[4] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][3] = (ghost_m[0] + ghost_m[2] - ghost_m[5]
+                                     + ghost_m[6] + ghost_m[17] - ghost_m[18]
+                                     - 2. * (ghost_m[11] + ghost_m[16]))
+                                    * lbmodel.w[3];
+      }
     }
     data->lbfluid[1][ 4] = (m[0] - m[2] - m[5] + m[6] + m[17] - m[18] + 2. * (m[11] - m[16]))
                            * lbmodel.w[4];
@@ -695,6 +729,12 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[5] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][6] = (ghost_m[0] - ghost_m[3]
+                                     - 2.*(ghost_m[6] - ghost_m[12] + ghost_m[16] - ghost_m[18]))
+                                    * lbmodel.w[6];
+      }
     }
     data->lbfluid[1][ 5] = (m[0] + m[3] - 2. * (m[6] + m[12] + m[16] - m[18]))
                            * lbmodel.w[5];
@@ -708,6 +748,12 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[6] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][5] = (ghost_m[0] + ghost_m[3]
+                                     - 2. * (ghost_m[6] + ghost_m[12] + ghost_m[16] - ghost_m[18]))
+                                    * lbmodel.w[5];
+      }
     }
     data->lbfluid[1][ 6] = (m[0] - m[3] - 2.*(m[6] - m[12] + m[16] - m[18]))
                            * lbmodel.w[6];
@@ -721,6 +767,14 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[7] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][8] = (ghost_m[0] - ghost_m[1] - ghost_m[2]
+                                     + ghost_m[4] + 2.*ghost_m[6] + ghost_m[7]
+                                     - ghost_m[10] - ghost_m[11] - ghost_m[13]
+                                     - ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
+                                    * lbmodel.w[8];
+      }
     }
     data->lbfluid[1][ 7] = (m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7] + m[10] + m[11] + m[13] + m[14] + m[16] + 2.*m[18])
                            * lbmodel.w[7];
@@ -734,6 +788,14 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[8] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][7] = (ghost_m[0] + ghost_m[1] + ghost_m[2]
+                                     + ghost_m[4] + 2.*ghost_m[6] + ghost_m[7]
+                                     + ghost_m[10] + ghost_m[11] + ghost_m[13]
+                                     + ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
+                                    * lbmodel.w[7];
+      }
     }
     data->lbfluid[1][ 8] = (m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7] - m[10] - m[11] - m[13] - m[14] + m[16] + 2.*m[18])
                            * lbmodel.w[8];
@@ -747,6 +809,14 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[9] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][10] = (ghost_m[0] - ghost_m[1] + ghost_m[2]
+                                      + ghost_m[4] + 2.*ghost_m[6] - ghost_m[7]
+                                      - ghost_m[10] + ghost_m[11] - ghost_m[13]
+                                      + ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
+                                     * lbmodel.w[10];
+      }
     }
     data->lbfluid[1][ 9] = (m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7] + m[10] - m[11] + m[13] - m[14] + m[16] + 2.*m[18])
                            * lbmodel.w[9];
@@ -760,6 +830,14 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[10] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][9] = (ghost_m[0] + ghost_m[1] - ghost_m[2]
+                                     + ghost_m[4] + 2.*ghost_m[6] - ghost_m[7]
+                                     + ghost_m[10] - ghost_m[11] + ghost_m[13]
+                                     - ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
+                                    * lbmodel.w[9];
+      }
     }
     data->lbfluid[1][10] = (m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7] - m[10] + m[11] - m[13] + m[14] + m[16] + 2.*m[18])
                            * lbmodel.w[10];
@@ -773,6 +851,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[11] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][12] = (ghost_m[0] - ghost_m[1] - ghost_m[3]
+                                      + ghost_m[4] + ghost_m[5] - ghost_m[6]
+                                      + ghost_m[8] - ghost_m[10] - ghost_m[12]
+                                      + ghost_m[13] - ghost_m[15] + ghost_m[16]
+                                      + ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[12];
+      }
     }
     data->lbfluid[1][11] = (m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] + m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18])
                            * lbmodel.w[11];
@@ -786,6 +873,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[12] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][11] = (ghost_m[0] + ghost_m[1] + ghost_m[3]
+                                      + ghost_m[4] + ghost_m[5] - ghost_m[6]
+                                      + ghost_m[8] + ghost_m[10] + ghost_m[12]
+                                      - ghost_m[13] + ghost_m[15] + ghost_m[16]
+                                      + ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[11];
+      }
     }
     data->lbfluid[1][12] = (m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] - m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18])
                            * lbmodel.w[12];
@@ -799,6 +895,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[13] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][14] = (ghost_m[0] - ghost_m[1] + ghost_m[3]
+                                      + ghost_m[4] + ghost_m[5] - ghost_m[6]
+                                      - ghost_m[8] - ghost_m[10] + ghost_m[12]
+                                      + ghost_m[13] + ghost_m[15] + ghost_m[16]
+                                      + ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[14];
+      }
     }
     data->lbfluid[1][13] = (m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] + m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18])
                            * lbmodel.w[13];
@@ -812,6 +917,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[14] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][13] = (ghost_m[0] + ghost_m[1] - ghost_m[3]
+                                      + ghost_m[4] + ghost_m[5] - ghost_m[6]
+                                      - ghost_m[8] + ghost_m[10] - ghost_m[12]
+                                      - ghost_m[13] - ghost_m[15] + ghost_m[16]
+                                      + ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[13];
+      }
     }
     data->lbfluid[1][14] = (m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] - m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18])
                            * lbmodel.w[14];
@@ -825,6 +939,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[15] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][16] = (ghost_m[0] - ghost_m[2] - ghost_m[3]
+                                      + ghost_m[4] - ghost_m[5] - ghost_m[6]
+                                      + ghost_m[9] - ghost_m[11] - ghost_m[12]
+                                      + ghost_m[14] + ghost_m[15] + ghost_m[16]
+                                      - ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[16];
+      }
     }
     data->lbfluid[1][15] = (m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] + m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18])
                            * lbmodel.w[15];
@@ -838,6 +961,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[16] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][15] = (ghost_m[0] + ghost_m[2] + ghost_m[3]
+                                      + ghost_m[4] - ghost_m[5] - ghost_m[6]
+                                      + ghost_m[9] + ghost_m[11] + ghost_m[12]
+                                      - ghost_m[14] - ghost_m[15] + ghost_m[16]
+                                      - ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[15];
+      }
     }
     data->lbfluid[1][16] = (m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] - m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18])
                            * lbmodel.w[16];
@@ -851,6 +983,15 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[17] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][18] = (ghost_m[0] - ghost_m[2] + ghost_m[3]
+                                      + ghost_m[4] - ghost_m[5] - ghost_m[6]
+                                      - ghost_m[9] - ghost_m[11] + ghost_m[12]
+                                      + ghost_m[14] - ghost_m[15] + ghost_m[16]
+                                      - ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[18];
+      }
     }
     data->lbfluid[1][17] = (m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] + m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18])
                            * lbmodel.w[17];
@@ -864,250 +1005,21 @@ int lbadapt_calc_n_from_modes_push (int qid, double * m) {
     }
     else {
       data = &lbadapt_ghost_data[next[18] - lq];
+      if (ghost) {
+      ghost_m = data->modes;
+      currCellData->lbfluid[1][17] = (ghost_m[0] + ghost_m[2] - ghost_m[3]
+                                      + ghost_m[4] - ghost_m[5] - ghost_m[6]
+                                      - ghost_m[9] + ghost_m[11] - ghost_m[12]
+                                      - ghost_m[14] + ghost_m[15] + ghost_m[16]
+                                      - ghost_m[17] - ghost_m[18])
+                                     * lbmodel.w[17];
+      }
     }
     data->lbfluid[1][18] = (m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] - m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18])
                            * lbmodel.w[18];
   }
 #else // !OLD_FLUCT
-  tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[0]]);
-  cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0] - tree->quadrants_offset);
-  data = (lbadapt_payload_t *) cell->p.user_data;
-  data->lbfluid[1][ 0] = (m[0] - m[4])
-                         * lbmodel.w[0];
-
-  if (next[1] != -1 && next[1] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[1]]);
-    if (next[1] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[1] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[1] - lq];
-    }
-    data->lbfluid[1][ 1] = (m[0] + m[1] + m[5] + m[6])
-                           * lbmodel.w[1];
-  }
-
-  if (next[2] != -1 && next[2] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[2]]);
-    if (next[2] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[2] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[2] - lq];
-    }
-    data->lbfluid[1][ 2] = (m[0] - m[1] + m[5] + m[6])
-                           * lbmodel.w[2];
-  }
-
-  if (next[3] != -1 && next[3] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[3]]);
-    if (next[3] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[3] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[3] - lq];
-    }
-    data->lbfluid[1][ 3] = (m[0] + m[2] - m[5] + m[6])
-                           * lbmodel.w[3];
-  }
-
-  if (next[4] != -1 && next[4] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[4]]);
-    if (next[4] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[4] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[4] - lq];
-    }
-    data->lbfluid[1][ 4] = (m[0] - m[2] - m[5] + m[6])
-                           * lbmodel.w[4];
-  }
-
-  if (next[5] != -1 && next[5] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[5]]);
-    if (next[5] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[5] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[5] - lq];
-    }
-    data->lbfluid[1][ 5] = (m[0] + m[3] - 2.*m[6])
-                           * lbmodel.w[5];
-  }
-
-  if (next[6] != -1 && next[6] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[6]]);
-    if (next[6] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[6] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[6] - lq];
-    }
-    data->lbfluid[1][ 6] = (m[0] - m[3] - 2.*m[6])
-                           * lbmodel.w[6];
-  }
-
-  if (next[7] != -1 && next[7] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[7]]);
-    if (next[7] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[7] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[7] - lq];
-    }
-    data->lbfluid[1][ 7] = (m[0] + m[1] + m[2] + m[4] + 2.*m[6] + m[7])
-                           * lbmodel.w[7];
-  }
-
-  if (next[8] != -1 && next[8] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[8]]);
-    if (next[8] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[8] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[8] - lq];
-    }
-    data->lbfluid[1][ 8] = (m[0] - m[1] - m[2] + m[4] + 2.*m[6] + m[7])
-                           * lbmodel.w[8];
-  }
-
-  if (next[9] != -1 && next[9] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[9]]);
-    if (next[9] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[9] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[9] - lq];
-    }
-    data->lbfluid[1][ 9] = (m[0] + m[1] - m[2] + m[4] + 2.*m[6] - m[7])
-                           * lbmodel.w[9];
-  }
-
-  if (next[10] != -1 && next[10] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[10]]);
-    if (next[10] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[10] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[10] - lq];
-    }
-    data->lbfluid[1][10] = (m[0] - m[1] + m[2] + m[4] + 2.*m[6] - m[7])
-                           * lbmodel.w[10];
-  }
-
-  if (next[11] != -1 && next[11] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[11]]);
-    if (next[11] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[11] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[11] - lq];
-    }
-    data->lbfluid[1][11] = (m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8])
-                           * lbmodel.w[11];
-  }
-
-  if (next[12] != -1 && next[12] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[12]]);
-    if (next[12] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[12] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[12] - lq];
-    }
-    data->lbfluid[1][12] = (m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8])
-                           * lbmodel.w[12];
-  }
-
-  if (next[13] != -1 && next[13] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[13]]);
-    if (next[13] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[13] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[13] - lq];
-    }
-    data->lbfluid[1][13] = (m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8])
-                           * lbmodel.w[13];
-  }
-
-  if (next[14] != -1 && next[14] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[14]]);
-    if (next[14] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[14] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[14] - lq];
-    }
-    data->lbfluid[1][14] = (m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8])
-                           * lbmodel.w[14];
-  }
-
-  if (next[15] != -1 && next[15] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[15]]);
-    if (next[15] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[15] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[15] - lq];
-    }
-    data->lbfluid[1][15] = (m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9])
-                           * lbmodel.w[15];
-  }
-
-  if (next[16] != -1 && next[16] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[16]]);
-    if (next[16] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[16] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[16] - lq];
-    }
-    data->lbfluid[1][16] = (m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9])
-                           * lbmodel.w[16];
-  }
-
-  if (next[17] != -1 && next[17] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[17]]);
-    if (next[17] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[17] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[17] - lq];
-    }
-    data->lbfluid[1][17] = (m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9])
-                           * lbmodel.w[17];
-  }
-
-  if (next[18] != -1 && next[18] != next[0]) {
-    tree = (p8est_tree_t *) sc_array_index_int(p8est->trees, lbadapt_mesh->quad_to_tree[next[18]]);
-    if (next[18] < lq) {
-      cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[18] - tree->quadrants_offset);
-      data = (lbadapt_payload_t *) cell->p.user_data;
-    }
-    else {
-      data = &lbadapt_ghost_data[next[18] - lq];
-    }
-    data->lbfluid[1][18] = (m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9])
-                           * lbmodel.w[18];
-  }
+#error not implemented
 #endif // !OLD_FLUCT
 #endif // D3Q19
 
@@ -1377,7 +1289,7 @@ void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void *user_data) {
 }
 
 
-void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) {
+void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data) {
   /* collect some dates from iteration info */
   p8est_quadrant_t * q = info->quad;
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data;
@@ -1386,7 +1298,7 @@ void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) 
 
   if (!data->boundary) {
     /* place for storing modes */
-    double modes[19];
+    double *modes = data->modes;
 
     /* calculate modes locally */
     lbadapt_calc_modes(data->lbfluid, modes);
@@ -1404,12 +1316,13 @@ void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data) 
 #else // EXTERNAL_FORCES
     if (has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
-
-    /* transform back to populations and streaming */
-    lbadapt_calc_n_from_modes_push(info->quadid, modes);
   }
 }
 
+
+void lbadapt_collide_streamII (p8est_iter_volume_info_t *info, void *user_data) {
+  lbadapt_calc_n_from_modes_push(info->quadid);
+}
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 #ifdef D3Q19

@@ -2229,7 +2229,7 @@ void lb_reinit_fluid() {
 
 #ifdef LB_ADAPTIVE
   p8est_iterate (p8est,
-                 NULL,
+                 lbadapt_ghost,
                  NULL,
                  lbadapt_init_fluid_per_cell,
                  NULL,
@@ -2291,7 +2291,7 @@ void lb_init() {
   lblattice.init(temp_agrid, temp_offset, 1, 0);
 
   if (check_runtime_errors()) return;
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 
   /* allocate memory for data structures */
   lb_realloc_fluid();
@@ -2954,16 +2954,6 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
-  lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
-  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
-
-  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
-                                     lbadapt_ghost,        /* ghost layer */
-                                     1,                    /* compute quad_to_tree */
-                                     1,                    /* compute quad_to_level */
-                                     P8EST_CONNECT_FULL);  /* fully connected */
-
   /* loop over all lattice cells (halo excluded) */
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
@@ -2981,10 +2971,18 @@ inline void lb_collide_stream() {
                  NULL                    /* corner callback */
   );
 
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
+  lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
+  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
+                                     lbadapt_ghost,        /* ghost layer */
+                                     1,                    /* compute quad_to_tree */
+                                     1,                    /* compute quad_to_level */
+                                     P8EST_CONNECT_FULL);  /* fully connected */
+
   p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,                   /* no ghost */
+                 lbadapt_ghost,          /* no ghost */
                  NULL,                   /* no user_data */
                  lbadapt_collide_streamII, /* volume callback */
                  NULL,                   /* face callback */
@@ -2996,15 +2994,13 @@ inline void lb_collide_stream() {
 
   // bounce back on boundaries
   p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,                   /* ghost */
+                 lbadapt_ghost,          /* ghost */
                  NULL,                   /* no user_data */
                  lbadapt_bounce_back,    /* volume callback */
                  NULL,                   /* face callback */
                  NULL,                   /* edge callback */
                  NULL                    /* corner callback */
   );
-
-  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
   // swap pre-/postcollision pointers
   p8est_iterate (p8est,                  /* forest */

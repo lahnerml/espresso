@@ -246,6 +246,79 @@ int lbadapt_calc_n_from_rho_j_pi (double datafield[2][19],
 }
 
 
+int lbadapt_calc_local_fields (double mode[19],
+                               double force[3],
+                               int boundary,
+															 int has_force,
+                               double h,
+                               double *rho,
+                               double *j,
+                               double *pi) {
+#ifdef LB_BOUNDARIES
+  if ( boundary ) {
+    *rho = lbpar.rho[0] * h * h * h;
+    j[0] = 0.; j[1] = 0.;  j[2] = 0.;
+    if (pi) {pi[0] = 0.; pi[1] = 0.; pi[2] = 0.; pi[3] = 0.; pi[4] = 0.; pi[5] = 0.;}
+    return 0;
+  }
+#endif // LB_BOUNDARIES
+  double cpmode[19];
+  for (int i = 0; i < 19; ++i) {
+    cpmode[i] = mode[i];
+  }
+  double modes_from_pi_eq[6];
+
+  *rho = cpmode[0] + lbpar.rho[0] * h * h * h;
+
+  j[0] = cpmode[1];
+  j[1] = cpmode[2];
+  j[2] = cpmode[3];
+
+#ifndef EXTERNAL_FORCES
+  if (has_force)
+#endif // EXTERNAL_FORCES
+  {
+    j[0] += 0.5 * force[0];
+    j[1] += 0.5 * force[1];
+    j[2] += 0.5 * force[2];
+  }
+  if (!pi)
+    return 0;
+
+  /* equilibrium part of the stress modes */
+  modes_from_pi_eq[0] = scalar(j,j)/ *rho;
+  modes_from_pi_eq[1] = (SQR(j[0])-SQR(j[1]))/ *rho;
+  modes_from_pi_eq[2] = (scalar(j,j) - 3.0 * SQR(j[2]))/ *rho;
+  modes_from_pi_eq[3] = j[0] * j[1]/ *rho;
+  modes_from_pi_eq[4] = j[0] * j[2]/ *rho;
+  modes_from_pi_eq[5] = j[1] * j[2]/ *rho;
+
+  /* Now we must predict the outcome of the next collision */
+  /* We immediately average pre- and post-collision. */
+  cpmode[4] = modes_from_pi_eq[0] + (0.5+0.5*gamma_bulk )*(cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] = modes_from_pi_eq[1] + (0.5+0.5*gamma_shear)*(cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] = modes_from_pi_eq[2] + (0.5+0.5*gamma_shear)*(cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] = modes_from_pi_eq[3] + (0.5+0.5*gamma_shear)*(cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] = modes_from_pi_eq[4] + (0.5+0.5*gamma_shear)*(cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] = modes_from_pi_eq[5] + (0.5+0.5*gamma_shear)*(cpmode[9] - modes_from_pi_eq[5]);
+
+  // Transform the stress tensor components according to the modes that
+  // correspond to those used by U. Schiller. In terms of populations this
+  // expression then corresponds exactly to those in Eqs. 116 - 121 in the
+  // Duenweg and Ladd paper, when these are written out in populations.
+  // But to ensure this, the expression in Schiller's modes has to be different!
+
+  pi[0] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] + 3.0*cpmode[5] )/6.0;  // xx
+  pi[1] = cpmode[7];                                                  // xy
+  pi[2] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] - 3.0*cpmode[5] )/6.0;  // yy
+  pi[3] = cpmode[8];                                                  // xz
+  pi[4] = cpmode[9];                                                  // yz
+  pi[5] = ( cpmode[0] + cpmode[4] - cpmode[6] )/3.0;                      // zz
+
+  return 0;
+}
+
+
 int lbadapt_calc_modes(double population[2][19], double * mode) {
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, \
@@ -1110,42 +1183,28 @@ void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_d
   double h;                                      /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
-  double j[3];
+  /* calculate position to write to */
   p4est_locidx_t  arrayoffset;
-
   tree = p8est_tree_array_index (p8est->trees, which_tree);
   local_id += tree->quadrants_offset;   /* now the id is relative to the MPI process */
   arrayoffset = 3 * local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
 
-  /* just grab the value of each cell and pass it into solution vector */
-  if (data->boundary) {
-    j[0] = j[1] = j[2] = 0.;
-  }
-  else {
-    j[0] =   data->lbfluid[0][1]  - data->lbfluid[0][2]
-           + data->lbfluid[0][7]  - data->lbfluid[0][8]
-           + data->lbfluid[0][9]  - data->lbfluid[0][10]
-           + data->lbfluid[0][11] - data->lbfluid[0][12]
-           + data->lbfluid[0][13] - data->lbfluid[0][14];
-    j[1] =   data->lbfluid[0][3]  - data->lbfluid[0][4]
-           + data->lbfluid[0][7]  - data->lbfluid[0][8]
-           - data->lbfluid[0][9]  + data->lbfluid[0][10]
-           + data->lbfluid[0][15] - data->lbfluid[0][16]
-           + data->lbfluid[0][17] - data->lbfluid[0][18];
-    j[2] =   data->lbfluid[0][5]  - data->lbfluid[0][6]
-           + data->lbfluid[0][11] - data->lbfluid[0][12]
-           - data->lbfluid[0][13] + data->lbfluid[0][14]
-           + data->lbfluid[0][15] - data->lbfluid[0][16]
-           - data->lbfluid[0][17] + data->lbfluid[0][18];
-  }
+  /* calculate values to write */
+  double rho;
+  double j[3];
+  lbadapt_calc_local_fields (data->modes,
+                             data->lbfields.force,
+                             data->boundary,
+                             data->lbfields.has_force,
+                             h,
+                             &rho,
+                             j,
+                             NULL);
 
-  veloc_vals[arrayoffset]     = j[0] + data->lbfields.force[0];
-  veloc_vals[arrayoffset + 1] = j[1] + data->lbfields.force[1];
-  veloc_vals[arrayoffset + 2] = j[2] + data->lbfields.force[2];
-
-  veloc_vals[arrayoffset]     *= h/lbpar.tau;
-  veloc_vals[arrayoffset + 1] *= h/lbpar.tau;
-  veloc_vals[arrayoffset + 2] *= h/lbpar.tau;
+  /* pass it into solution vector */
+  veloc_vals[arrayoffset]     = j[0];
+  veloc_vals[arrayoffset + 1] = j[1];
+  veloc_vals[arrayoffset + 2] = j[2];
 }
 
 
@@ -1321,7 +1380,10 @@ void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data)
 
 
 void lbadapt_collide_streamII (p8est_iter_volume_info_t *info, void *user_data) {
-  lbadapt_calc_n_from_modes_push(info->quadid);
+  lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
+	if (!data->boundary) {
+		lbadapt_calc_n_from_modes_push(info->quadid);
+	}
 }
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {

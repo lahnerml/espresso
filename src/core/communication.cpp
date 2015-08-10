@@ -208,6 +208,14 @@ const char *names[] = {
     you can get the last issued request from the debugger. */
 static int request[3];
 
+/** Map callback function pointers to request codes */
+#ifndef HAVE_CXX11
+std::map<SlaveCallback *, int> request_map;
+#else
+#include <unordered_map>
+std::unordered_map<SlaveCallback *, int> request_map;
+#endif
+
 /**********************************************
  * procedures
  **********************************************/
@@ -246,22 +254,17 @@ void mpi_init(int *argc, char ***argv)
   MPI_Comm_set_errhandler(comm_cart, mpi_errh);
 #endif
 
+  for(int i = 0; i < N_CALLBACKS; ++i)  {
+    request_map.insert(std::pair<SlaveCallback *, int>(slave_callbacks[i], i));
+  }
+    
   initRuntimeErrorCollector();
 }
 
 #ifdef HAVE_MPI
 void mpi_call(SlaveCallback cb, int node, int param) {
-  // find req number in callback array
-  int reqcode;
-  for (reqcode = 0; reqcode < N_CALLBACKS; reqcode++) {
-    if (cb == slave_callbacks[reqcode]) break;
-  }
-
-  if (reqcode >= N_CALLBACKS) {
-    fprintf(stderr, "%d: INTERNAL ERROR: unknown callback %d called\n", this_node, reqcode);
-    errexit();
-  }
-
+  const int reqcode = request_map[cb];
+  
   request[0] = reqcode;
   request[1] = node;
   request[2] = param;
@@ -386,7 +389,7 @@ void mpi_bcast_parameter_slave(int node, int i)
 void mpi_who_has()
 {
   Cell *cell;
-  int *sizes = (int*)malloc(sizeof(int)*n_nodes);
+  static int *sizes = new int[n_nodes];
   int *pdata = NULL;
   int pdata_s = 0;
 
@@ -420,17 +423,15 @@ void mpi_who_has()
       for (int i = 0; i < sizes[pnode]; i++)
   particle_node[pdata[i]] = pnode;
     }
-  }
-
+  }  
   free(pdata);
-  free(sizes);
 }
 
 void mpi_who_has_slave(int node, int param)
 {
   Cell *cell;
   int npart, i, c;
-  int *sendbuf;
+  static int *sendbuf;
   int n_part;
 
   n_part = cells_get_n_particles();
@@ -438,7 +439,7 @@ void mpi_who_has_slave(int node, int param)
   if (n_part == 0)
     return;
 
-  sendbuf = (int*)malloc(sizeof(int)*n_part);
+  sendbuf = (int*)realloc(sendbuf, sizeof(int)*n_part);
   npart = 0;
   for (c = 0; c < local_cells.n; c++) {
     cell = local_cells.cell[c];
@@ -446,7 +447,6 @@ void mpi_who_has_slave(int node, int param)
       sendbuf[npart++] = cell->part[i].p.identity;
   }
   MPI_Send(sendbuf, npart, MPI_INT, 0, SOME_TAG, comm_cart);
-  free(sendbuf);
 }
 
 /**************** REQ_CHTOPL ***********/
@@ -1432,8 +1432,8 @@ void mpi_bcast_ia_params_slave(int i, int j)
     if(bonded_ia_params[i].type == BONDED_IA_TABULATED) {
       int size = bonded_ia_params[i].p.tab.npoints;
       /* alloc force and energy tables on slave nodes! */
-      bonded_ia_params[i].p.tab.f = (double*)malloc(size*sizeof(double));
-      bonded_ia_params[i].p.tab.e = (double*)malloc(size*sizeof(double));
+      bonded_ia_params[i].p.tab.f = (double*)Utils::malloc(size*sizeof(double));
+      bonded_ia_params[i].p.tab.e = (double*)Utils::malloc(size*sizeof(double));
       MPI_Bcast(bonded_ia_params[i].p.tab.f, size, MPI_DOUBLE, 0 , comm_cart);
       MPI_Bcast(bonded_ia_params[i].p.tab.e, size, MPI_DOUBLE, 0 , comm_cart);
     }
@@ -1443,9 +1443,9 @@ void mpi_bcast_ia_params_slave(int i, int j)
     if(bonded_ia_params[i].type == BONDED_IA_OVERLAPPED) {
       int size = bonded_ia_params[i].p.overlap.noverlaps;
       /* alloc overlapped parameter arrays on slave nodes! */
-      bonded_ia_params[i].p.overlap.para_a = (double*)malloc(size*sizeof(double));
-      bonded_ia_params[i].p.overlap.para_b = (double*)malloc(size*sizeof(double));
-      bonded_ia_params[i].p.overlap.para_c = (double*)malloc(size*sizeof(double));
+      bonded_ia_params[i].p.overlap.para_a = (double*)Utils::malloc(size*sizeof(double));
+      bonded_ia_params[i].p.overlap.para_b = (double*)Utils::malloc(size*sizeof(double));
+      bonded_ia_params[i].p.overlap.para_c = (double*)Utils::malloc(size*sizeof(double));
       MPI_Bcast(bonded_ia_params[i].p.overlap.para_a, size, MPI_DOUBLE, 0 , comm_cart);
       MPI_Bcast(bonded_ia_params[i].p.overlap.para_b, size, MPI_DOUBLE, 0 , comm_cart);
       MPI_Bcast(bonded_ia_params[i].p.overlap.para_c, size, MPI_DOUBLE, 0 , comm_cart);

@@ -521,8 +521,8 @@ inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
 inline void lb_get_populations(index_t index, double* pop) {
 #ifndef LB_ADAPTIVE
   int i=0;
-  for (i=0; i<19; i++) {
-    pop[i]=lbfluid[0][i][index]+lbmodel.coeff[i][0]*lbpar.rho[0];
+  for (i=0; i<19*LB_COMPONENTS; i++) {
+    pop[i]=lbfluid[0][i][index]+lbmodel.coeff[i%19][0]*lbpar.rho[i/19];
   }
 #endif // LB_ADAPTIVE
 }
@@ -530,8 +530,8 @@ inline void lb_get_populations(index_t index, double* pop) {
 inline void lb_set_populations(index_t index, double* pop) {
 #ifndef LB_ADAPTIVE
   int i=0;
-  for (i=0; i<19; i++) {
-    lbfluid[0][i][index]=pop[i]-lbmodel.coeff[i][0]*lbpar.rho[0];
+  for (i=0; i<19*LB_COMPONENTS; i++) {
+    lbfluid[0][i][index]=pop[i]-lbmodel.coeff[i%19][0]*lbpar.rho[i/19];
   }
 #endif // LB_ADAPTIVE
 }

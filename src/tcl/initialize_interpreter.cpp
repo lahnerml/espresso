@@ -123,6 +123,9 @@ char *get_default_scriptsdir();
 /** Returns runtime of the integration loop in seconds. From tuning_tcl.cpp **/
 int tclcommand_time_integration(ClientData data, Tcl_Interp *interp, int argc, char *argv[]);
 
+/** Tunes the skin */
+int tclcommand_tune_skin(ClientData data, Tcl_Interp *interp, int argc, char *argv[]);
+
 /** Reads particles from pdb file, see \ref readpdb.cpp */
 int tclcommand_readpdb(ClientData data, Tcl_Interp *interp, int argc, char *argv[]);
 
@@ -198,9 +201,11 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbnode", tclcommand_lbnode);
   REGISTER_COMMAND("lbboundary", tclcommand_lbboundary);
   /* in lb-adaptive.cpp */
+#ifdef LB_ADAPTIVE
   REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);
   REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
   REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
+#endif // LB_ADAPTIVE
   /* here */
   REGISTER_COMMAND("replacestdchannel", tclcommand_replacestdchannel);
   /* in iccp3m.hpp */
@@ -240,6 +245,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("system_CMS_velocity", tclcommand_system_CMS_velocity);
   REGISTER_COMMAND("galilei_transform", tclcommand_galilei_transform);
   REGISTER_COMMAND("time_integration", tclcommand_time_integration);
+  REGISTER_COMMAND("tune_skin", tclcommand_tune_skin);
   REGISTER_COMMAND("electrokinetics", tclcommand_electrokinetics);
 #if defined(SD) || defined(BD)
   /* from integrate_sd_tcl.cpp */

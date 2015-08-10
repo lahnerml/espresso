@@ -28,6 +28,7 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
+#ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
@@ -162,7 +163,7 @@ int lbadapt_apply_forces (double * mode, LB_FluidNode * lbfields, double h);
 /** Transfer modes back to populations
  *
  * \param     [out] populations  The resulting particle densities.
- * \param [in]      mode         The modes.
+ * \param [in]      m            The modes.
  */
 int lbadapt_calc_pop_from_modes (double * populations, double * m);
 
@@ -172,6 +173,12 @@ void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_get_boundary_values (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_get_density_values (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data);
@@ -189,11 +196,15 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void * user_data);
 void lbadapt_calc_local_pi (p8est_iter_volume_info_t * info, void * user_data);
 
 
-void lbadapt_collide_stream (p8est_iter_volume_info_t * info, void * user_data);
+void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_collide_streamII (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data);
+#endif // LB_ADAPTIVE
 #endif //LB_ADAPTIVE_H

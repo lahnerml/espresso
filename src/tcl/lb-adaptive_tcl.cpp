@@ -23,7 +23,7 @@
 
 #include <stdio.h>
 
-
+#ifdef LB_ADAPTIVE
 int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **argv) {
   /* container for parameters */
   int level = 0;
@@ -116,3 +116,4 @@ int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char *
 
   return TCL_OK;
 }
+#endif //LB_ADAPTIVE

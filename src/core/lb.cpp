@@ -118,22 +118,22 @@ HaloCommunicator update_halo_comm = { 0, NULL };
 /** \name Derived parameters */
 /*@{*/
 /** Flag indicating whether fluctuations are present. */
-int fluct;
+static int fluct;
 
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
 /** relaxation of the odd kinetic modes */
-double gamma_odd  = 0.0;
+static double gamma_odd  = 0.0;
 /** relaxation of the even kinetic modes */
-double gamma_even = 0.0;
+static double gamma_even = 0.0;
 /** amplitudes of the fluctuations of the modes */
-double lb_phi[19];
+static double lb_phi[19];
 /** amplitude of the fluctuations in the viscous coupling */
-double lb_coupl_pref = 0.0;
+static double lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random numbers */
-double lb_coupl_pref2 = 0.0;
+static double lb_coupl_pref2 = 0.0;
 /*@}*/
 
 /** measures the MD time since the last fluid update */
@@ -332,19 +332,19 @@ int lb_lbfluid_set_gamma_odd(double *p_gamma_odd) {
 
 
 int lb_lbfluid_set_gamma_even (double *p_gamma_even) {
-  for (int ii=0;ii<LB_COMPONENTS;ii++){
-  if ( fabs(p_gamma_even[ii]) > 1 ) return -1;
-  if (lattice_switch & LATTICE_LB_GPU) {
+  for (int ii=0;ii<LB_COMPONENTS;ii++) {
+    if ( fabs(p_gamma_even[ii]) > 1 ) return -1;
+    if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
-    lbpar_gpu.gamma_even[ii] = (float)p_gamma_even[ii];
-    on_lb_params_change_gpu(0);
+      lbpar_gpu.gamma_even[ii] = (float)p_gamma_even[ii];
+      on_lb_params_change_gpu(0);
 #endif // LB_GPU
-  } else {
+    } else {
 #ifdef LB
-    lbpar.gamma_even[ii] = gamma_even = p_gamma_even[ii];
-    mpi_bcast_lb_params(0);
+      lbpar.gamma_even[ii] = gamma_even = p_gamma_even[ii];
+      mpi_bcast_lb_params(0);
 #endif // LB
-  }
+    }
   }
   return 0;
 }
@@ -703,7 +703,7 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     unsigned int* bound_array;
-    bound_array = (unsigned int*) malloc(lbpar_gpu.number_of_nodes*sizeof(unsigned int));
+    bound_array = (unsigned int*) Utils::malloc(lbpar_gpu.number_of_nodes*sizeof(unsigned int));
     lb_get_boundary_flags_GPU(bound_array);
 
     int j;
@@ -753,11 +753,64 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
   }
   fclose(fp);
 #endif // LB_ADAPTIVE
-	return 0;
+  return 0;
 }
 
 
 int lb_lbfluid_print_vtk_density(char** filename) {
+#ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (*filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (*filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - *filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_density, -1, len);
+  MPI_Bcast(*filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *density;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  density = P4EST_ALLOC(double, num_cells);
+
+  /* grab density values of cells */
+  p8est_iterate (p8est, NULL,
+                 density,
+                 lbadapt_get_density_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      *filename,
+                      "density", density
+  );
+
+  /* free memory */
+  P4EST_FREE(density);
+
+#else // LB_ADAPTIVE
   int ii;
 
   for(ii=0;ii<LB_COMPONENTS;++ii) {
@@ -772,7 +825,7 @@ int lb_lbfluid_print_vtk_density(char** filename) {
 #ifdef LB_GPU
       int j;
       size_t size_of_values = lbpar_gpu.number_of_nodes * sizeof(LB_rho_v_pi_gpu);
-      host_values = (LB_rho_v_pi_gpu*)malloc(size_of_values);
+      host_values = (LB_rho_v_pi_gpu*)Utils::malloc(size_of_values);
       lb_get_values_GPU(host_values);
 
       fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_gpu\nASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\nORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %u\nSCALARS density float 1\nLOOKUP_TABLE default\n",
@@ -795,12 +848,65 @@ int lb_lbfluid_print_vtk_density(char** filename) {
     }
     fclose(fp);
   }
+#endif // LB_ADAPTIVE
+
   return 0;
 }
 
 
 int lb_lbfluid_print_vtk_velocity(char* filename) {
 #ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_velocity, -1, len);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *velocity;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  velocity = P4EST_ALLOC(double, P8EST_DIM * num_cells);
+
+  /* grab density values of cells */
+  p8est_iterate (p8est, NULL,
+                 velocity,
+                 lbadapt_get_velocity_values,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      0,      /* no cell scalar field */
+                      1,      /* one vector field of cell data */
+                      0, 0,   /* no point scalars or point vectors */
+                      filename,
+                      "velocity", velocity
+  );
+
+  /* free memory */
+  P4EST_FREE(velocity);
 #else // LB_ADAPTIVE
   FILE* fp = fopen(filename, "w");
 
@@ -812,7 +918,7 @@ int lb_lbfluid_print_vtk_velocity(char* filename) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     size_t size_of_values = lbpar_gpu.number_of_nodes * sizeof(LB_rho_v_pi_gpu);
-    host_values = (LB_rho_v_pi_gpu*)malloc(size_of_values);
+    host_values = (LB_rho_v_pi_gpu*)Utils::malloc(size_of_values);
     lb_get_values_GPU(host_values);
     fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_gpu\n"
         "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\n"
@@ -878,7 +984,7 @@ int lb_lbfluid_print_boundary(char* filename) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     unsigned int* bound_array;
-    bound_array = (unsigned int*) malloc(lbpar_gpu.number_of_nodes*sizeof(unsigned int));
+    bound_array = (unsigned int*) Utils::malloc(lbpar_gpu.number_of_nodes*sizeof(unsigned int));
     lb_get_boundary_flags_GPU(bound_array);
 
     int xyz[3];
@@ -944,7 +1050,7 @@ int lb_lbfluid_print_velocity(char* filename) {
     errexit();
 #endif // SHANCHEN
     size_t size_of_values = lbpar_gpu.number_of_nodes * sizeof(LB_rho_v_pi_gpu);
-    host_values = (LB_rho_v_pi_gpu*)malloc(size_of_values);
+    host_values = (LB_rho_v_pi_gpu*)Utils::malloc(size_of_values);
     lb_get_values_GPU(host_values);
     int xyz[3];
     int j;
@@ -1004,10 +1110,10 @@ int lb_lbfluid_save_checkpoint(char* filename, int binary) {
     if (!cpfile) {
       return ES_ERROR;
     }
-    float* host_checkpoint_vd = (float *) malloc(lbpar_gpu.number_of_nodes * 19 * sizeof(float));
-    unsigned int* host_checkpoint_seed = (unsigned int *) malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
-    unsigned int* host_checkpoint_boundary = (unsigned int *) malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
-    lbForceFloat* host_checkpoint_force = (lbForceFloat *) malloc(lbpar_gpu.number_of_nodes * 3 * sizeof(lbForceFloat));
+    float* host_checkpoint_vd = (float *) Utils::malloc(lbpar_gpu.number_of_nodes * 19 * sizeof(float));
+    unsigned int* host_checkpoint_seed = (unsigned int *) Utils::malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
+    unsigned int* host_checkpoint_boundary = (unsigned int *) Utils::malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
+    lbForceFloat* host_checkpoint_force = (lbForceFloat *) Utils::malloc(lbpar_gpu.number_of_nodes * 3 * sizeof(lbForceFloat));
     lb_save_checkpoint_GPU(host_checkpoint_vd, host_checkpoint_seed, host_checkpoint_boundary, host_checkpoint_force);
         if(!binary)
         {
@@ -1088,29 +1194,28 @@ int lb_lbfluid_load_checkpoint(char* filename, int binary) {
     if (!cpfile) {
       return ES_ERROR;
     }
-    float* host_checkpoint_vd = (float *) malloc(lbpar_gpu.number_of_nodes * 19 * sizeof(float));
-    unsigned int* host_checkpoint_seed = (unsigned int *) malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
-    unsigned int* host_checkpoint_boundary = (unsigned int *) malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
-    lbForceFloat* host_checkpoint_force = (lbForceFloat *) malloc(lbpar_gpu.number_of_nodes * 3 * sizeof(lbForceFloat));
+    float* host_checkpoint_vd = (float *) Utils::malloc(lbpar_gpu.number_of_nodes * 19 * sizeof(float));
+    unsigned int* host_checkpoint_seed = (unsigned int *) Utils::malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
+    unsigned int* host_checkpoint_boundary = (unsigned int *) Utils::malloc(lbpar_gpu.number_of_nodes * sizeof(unsigned int));
+    lbForceFloat* host_checkpoint_force = (lbForceFloat *) Utils::malloc(lbpar_gpu.number_of_nodes * 3 * sizeof(lbForceFloat));
 
-    if (!binary) {
-      for (int n=0; n<(19*int(lbpar_gpu.number_of_nodes)); n++) {
-        fscanf(cpfile, "%f", &host_checkpoint_vd[n]);
-      }
-      for (int n=0; n<int(lbpar_gpu.number_of_nodes); n++) {
-        fscanf(cpfile, "%u", &host_checkpoint_seed[n]);
-      }
-      for (int n=0; n<int(lbpar_gpu.number_of_nodes); n++) {
-        fscanf(cpfile, "%u", &host_checkpoint_boundary[n]);
-      }
-      for (int n=0; n<(3*int(lbpar_gpu.number_of_nodes)); n++) {
-        if (sizeof(lbForceFloat) == sizeof(float))
-        fscanf(cpfile, "%f", &host_checkpoint_force[n]);
-        else
-        fscanf(cpfile, "%lf", &host_checkpoint_force[n]);
-      }
-      lb_load_checkpoint_GPU(host_checkpoint_vd, host_checkpoint_seed, host_checkpoint_boundary, host_checkpoint_force);
-    }
+        if (!binary) {
+            for (int n=0; n<(19*int(lbpar_gpu.number_of_nodes)); n++) {
+                fscanf(cpfile, "%f", &host_checkpoint_vd[n]);
+            }
+            for (int n=0; n<int(lbpar_gpu.number_of_nodes); n++) {
+                fscanf(cpfile, "%u", &host_checkpoint_seed[n]);
+            }
+            for (int n=0; n<int(lbpar_gpu.number_of_nodes); n++) {
+                fscanf(cpfile, "%u", &host_checkpoint_boundary[n]);
+            }
+            for (int n=0; n<(3*int(lbpar_gpu.number_of_nodes)); n++) {
+              if (sizeof(lbForceFloat) == sizeof(float))
+                fscanf(cpfile, "%f", &host_checkpoint_force[n]);
+              else
+                fscanf(cpfile, "%f", &host_checkpoint_force[n]);
+            }
+        }
         else
         {
           if(fread(host_checkpoint_vd, sizeof(float), 19*int(lbpar_gpu.number_of_nodes), cpfile) != (unsigned int) (19*lbpar_gpu.number_of_nodes))
@@ -1188,7 +1293,7 @@ int lb_lbnode_get_rho(int* ind, double* p_rho){
     int single_nodeindex = ind[0] + ind[1]*lbpar_gpu.dim_x + ind[2]*lbpar_gpu.dim_x*lbpar_gpu.dim_y;
     static LB_rho_v_pi_gpu *host_print_values=NULL;
 
-    if(host_print_values==NULL) host_print_values = (LB_rho_v_pi_gpu *) malloc(sizeof(LB_rho_v_pi_gpu));
+    if(host_print_values==NULL) host_print_values = (LB_rho_v_pi_gpu *) Utils::malloc(sizeof(LB_rho_v_pi_gpu));
     lb_print_node_GPU(single_nodeindex, host_print_values);
     for(int ii=0;ii<LB_COMPONENTS;ii++) {
       p_rho[ii] = (double)(host_print_values->rho[ii]);
@@ -1222,7 +1327,7 @@ int lb_lbnode_get_u(int* ind, double* p_u) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     static LB_rho_v_pi_gpu *host_print_values=NULL;
-    if(host_print_values==NULL) host_print_values= (LB_rho_v_pi_gpu *) malloc(sizeof(LB_rho_v_pi_gpu));
+    if(host_print_values==NULL) host_print_values= (LB_rho_v_pi_gpu *) Utils::malloc(sizeof(LB_rho_v_pi_gpu));
 
     int single_nodeindex = ind[0] + ind[1]*lbpar_gpu.dim_x + ind[2]*lbpar_gpu.dim_x*lbpar_gpu.dim_y;
     lb_print_node_GPU(single_nodeindex, host_print_values);
@@ -1360,7 +1465,7 @@ int lb_lbnode_get_pi_neq(int* ind, double* p_pi) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     static LB_rho_v_pi_gpu *host_print_values=NULL;
-    if(host_print_values==NULL) host_print_values= (LB_rho_v_pi_gpu *) malloc(sizeof(LB_rho_v_pi_gpu));
+    if(host_print_values==NULL) host_print_values= (LB_rho_v_pi_gpu *) Utils::malloc(sizeof(LB_rho_v_pi_gpu));
 
     int single_nodeindex = ind[0] + ind[1]*lbpar_gpu.dim_x + ind[2]*lbpar_gpu.dim_x*lbpar_gpu.dim_y;
     lb_print_node_GPU(single_nodeindex, host_print_values);
@@ -1744,7 +1849,7 @@ static void halo_push_communication() {
                      rbuf, count, MPI_DOUBLE, rnode, REQ_HALO_SPREAD,
                      comm_cart, &status);
     } else {
-        memcpy(rbuf,sbuf,count*sizeof(double));
+      memmove(rbuf,sbuf,count*sizeof(double));
     }
 
   buffer = rbuf;
@@ -2048,15 +2153,18 @@ void lb_reinit_parameters() {
 #else // D3Q19
     double **e = lbmodel.e;
 #endif // D3Q19
-    for (i = 0; i < 3; i++) {
+    for (i = 0; i < 4; i++) {
       lb_phi[i] = 0.0;
     }
     lb_phi[4] = sqrt(mu*e[19][4]*(1.-SQR(gamma_bulk))); // SQR(x) == x*x
     for (i = 5; i < 10; i++) {
       lb_phi[i] = sqrt(mu*e[19][i]*(1.-SQR(gamma_shear)));
     }
-    for (i = 10; i < lbmodel.n_veloc; i++) {
-      lb_phi[i] = sqrt(mu*e[19][i]);
+    for (i = 10; i < 16; i++) {
+      lb_phi[i] = sqrt(mu*e[19][i] * (1 - SQR(gamma_odd)));
+    }
+    for (i = 16; i < 19; i++) {
+      lb_phi[i] = sqrt(mu*e[19][i] * (1 - SQR(gamma_even)));
     }
 
     /* lb_coupl_pref is stored in MD units (force)
@@ -2123,7 +2231,7 @@ void lb_reinit_fluid() {
 
 #ifdef LB_ADAPTIVE
   p8est_iterate (p8est,
-                 NULL,
+                 lbadapt_ghost,
                  NULL,
                  lbadapt_init_fluid_per_cell,
                  NULL,
@@ -2185,7 +2293,7 @@ void lb_init() {
   lblattice.init(temp_agrid, temp_offset, 1, 0);
 
   if (check_runtime_errors()) return;
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 
   /* allocate memory for data structures */
   lb_realloc_fluid();
@@ -2848,18 +2956,6 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
-//  if (lbadapt_mesh == NULL) {
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
-  lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
-  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
-
-  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
-                                     lbadapt_ghost,        /* ghost layer */
-                                     1,                    /* compute quad_to_tree */
-                                     1,                    /* compute quad_to_level */
-                                     P8EST_CONNECT_FULL);  /* fully connected */
- // }
-
   /* loop over all lattice cells (halo excluded) */
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
@@ -2869,24 +2965,38 @@ inline void lb_collide_stream() {
   }
 #endif // LB_BOUNDARIES
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* no geom */
+                 lbadapt_ghost,                   /* no ghost */
                  NULL,                   /* no user_data */
-                 lbadapt_collide_stream, /* volume callback */
+                 lbadapt_collide_streamI, /* volume callback */
                  NULL,                   /* face callback */
                  NULL,                   /* edge callback */
                  NULL                    /* corner callback */
   );
 
-  // exchange ghost
-  if (lbadapt_ghost == NULL) {
-    lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
-    lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
-  }
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
+  lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
+  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
+                                     lbadapt_ghost,        /* ghost layer */
+                                     1,                    /* compute quad_to_tree */
+                                     1,                    /* compute quad_to_level */
+                                     P8EST_CONNECT_FULL);  /* fully connected */
+
+  p8est_iterate (p8est,                  /* forest */
+                 lbadapt_ghost,          /* no ghost */
+                 NULL,                   /* no user_data */
+                 lbadapt_collide_streamII, /* volume callback */
+                 NULL,                   /* face callback */
+                 NULL,                   /* edge callback */
+                 NULL                    /* corner callback */
+  );
+
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
   // bounce back on boundaries
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* no geom */
+                 lbadapt_ghost,          /* ghost */
                  NULL,                   /* no user_data */
                  lbadapt_bounce_back,    /* volume callback */
                  NULL,                   /* face callback */
@@ -2896,13 +3006,21 @@ inline void lb_collide_stream() {
 
   // swap pre-/postcollision pointers
   p8est_iterate (p8est,                  /* forest */
-                 NULL,                   /* no geom */
+                 lbadapt_ghost,                   /* no ghost */
                  NULL,                   /* no user_data */
                  lbadapt_swap_pointers,  /* volume callback */
                  NULL,                   /* face callback */
                  NULL,                   /* edge callback */
                  NULL                    /* corner callback */
   );
+
+  p8est_mesh_destroy (lbadapt_mesh);
+  P4EST_FREE (lbadapt_ghost_data);
+  p8est_ghost_destroy (lbadapt_ghost);
+
+  lbadapt_mesh       = NULL;
+  lbadapt_ghost_data = NULL;
+  lbadapt_ghost      = NULL;
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
@@ -3576,12 +3694,12 @@ void calc_particle_lattice_ia() {
  * This function has to be called after changing the density of
  * a local lattice site in order to set lbpar.rho consistently. */
 void lb_calc_average_rho() {
-  double * rho;
   double local_rho, sum_rho;
 
-  *rho = 0.0;
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
+  double * rho;
+  *rho = 0.0;
   p8est_iterate (p8est,
                  NULL,
                  (void *) rho,
@@ -3590,13 +3708,14 @@ void lb_calc_average_rho() {
                  NULL,
                  NULL);
 #else // LB_ADAPTIVE
-  index_t *index;
+  index_t index;
   int x, y, z;
+  double rho = 0.;
 
   index = 0;
   for (z = 1; z <= lblattice.grid[2]; z++) {
     for (y = 1; y <= lblattice.grid[1]; y++) {
-      for (x = 1; x<=lblattice.grid[0]; x++) {
+      for (x = 1; x <= lblattice.grid[0]; x++) {
         lb_calc_local_rho(index, &rho);
         local_rho += rho;
 
@@ -3643,8 +3762,8 @@ static void lb_check_halo_regions() {
   double *s_buffer, *r_buffer;
   MPI_Status status[2];
 
-  r_buffer = (double*) malloc(count*sizeof(double));
-  s_buffer = (double*) malloc(count*sizeof(double));
+  r_buffer = (double*) Utils::malloc(count*sizeof(double));
+  s_buffer = (double*) Utils::malloc(count*sizeof(double));
 
   if (PERIODIC(0)) {
     for (z = 0; z < lblattice.halo_grid[2]; ++z) {

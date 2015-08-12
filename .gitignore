@@ -58,5 +58,8 @@ src/__pycache__/
 .pydevproject
 .cproject
 
+#emacs
+\#*
+
 # Merge Clutter
 *.orig

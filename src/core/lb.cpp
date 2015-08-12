@@ -118,22 +118,22 @@ HaloCommunicator update_halo_comm = { 0, NULL };
 /** \name Derived parameters */
 /*@{*/
 /** Flag indicating whether fluctuations are present. */
-static int fluct;
+int fluct;
 
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
 /** relaxation of the odd kinetic modes */
-static double gamma_odd  = 0.0;
+double gamma_odd  = 0.0;
 /** relaxation of the even kinetic modes */
-static double gamma_even = 0.0;
+double gamma_even = 0.0;
 /** amplitudes of the fluctuations of the modes */
-static double lb_phi[19];
+double lb_phi[19];
 /** amplitude of the fluctuations in the viscous coupling */
-static double lb_coupl_pref = 0.0;
+double lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random numbers */
-static double lb_coupl_pref2 = 0.0;
+double lb_coupl_pref2 = 0.0;
 /*@}*/
 
 /** measures the MD time since the last fluid update */
@@ -161,7 +161,7 @@ int lb_set_lattice_switch(int py_switch){
 
   if(py_switch == 1){
 #ifdef LB
-    if( !(lattice_switch & LATTICE_LB_GPU) ) 
+    if( !(lattice_switch & LATTICE_LB_GPU) )
       lattice_switch = lattice_switch | LATTICE_LB;
       return 0;
 #endif
@@ -2964,54 +2964,54 @@ inline void lb_collide_stream() {
     lb_boundaries[i].force[2]=0.;
   }
 #endif // LB_BOUNDARIES
-  p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,                   /* no ghost */
-                 NULL,                   /* no user_data */
+  p8est_iterate (p8est,                   /* forest */
+                 lbadapt_ghost,           /* no ghost */
+                 NULL,                    /* no user_data */
                  lbadapt_collide_streamI, /* volume callback */
-                 NULL,                   /* face callback */
-                 NULL,                   /* edge callback */
-                 NULL                    /* corner callback */
+                 NULL,                    /* face callback */
+                 NULL,                    /* edge callback */
+                 NULL                     /* corner callback */
   );
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
   lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
-  lbadapt_mesh = p8est_mesh_new_ext (p8est,                /* forest */
-                                     lbadapt_ghost,        /* ghost layer */
-                                     1,                    /* compute quad_to_tree */
-                                     1,                    /* compute quad_to_level */
-                                     P8EST_CONNECT_FULL);  /* fully connected */
+  lbadapt_mesh = p8est_mesh_new_ext (p8est,               /* forest */
+                                     lbadapt_ghost,       /* ghost layer */
+                                     1,                   /* compute quad_to_tree */
+                                     1,                   /* compute quad_to_level */
+                                     P8EST_CONNECT_FULL); /* fully connected */
 
-  p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,          /* no ghost */
-                 NULL,                   /* no user_data */
+  p8est_iterate (p8est,                    /* forest */
+                 lbadapt_ghost,            /* no ghost */
+                 NULL,                     /* no user_data */
                  lbadapt_collide_streamII, /* volume callback */
-                 NULL,                   /* face callback */
-                 NULL,                   /* edge callback */
-                 NULL                    /* corner callback */
+                 NULL,                     /* face callback */
+                 NULL,                     /* edge callback */
+                 NULL                      /* corner callback */
   );
 
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
   // bounce back on boundaries
-  p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,          /* ghost */
-                 NULL,                   /* no user_data */
-                 lbadapt_bounce_back,    /* volume callback */
-                 NULL,                   /* face callback */
-                 NULL,                   /* edge callback */
-                 NULL                    /* corner callback */
+  p8est_iterate (p8est,               /* forest */
+                 lbadapt_ghost,       /* ghost */
+                 NULL,                /* no user_data */
+                 lbadapt_bounce_back, /* volume callback */
+                 NULL,                /* face callback */
+                 NULL,                /* edge callback */
+                 NULL                 /* corner callback */
   );
 
   // swap pre-/postcollision pointers
-  p8est_iterate (p8est,                  /* forest */
-                 lbadapt_ghost,                   /* no ghost */
-                 NULL,                   /* no user_data */
-                 lbadapt_swap_pointers,  /* volume callback */
-                 NULL,                   /* face callback */
-                 NULL,                   /* edge callback */
-                 NULL                    /* corner callback */
+  p8est_iterate (p8est,                 /* forest */
+                 lbadapt_ghost,         /* no ghost */
+                 NULL,                  /* no user_data */
+                 lbadapt_swap_pointers, /* volume callback */
+                 NULL,                  /* face callback */
+                 NULL,                  /* edge callback */
+                 NULL                   /* corner callback */
   );
 
   p8est_mesh_destroy (lbadapt_mesh);
@@ -3044,7 +3044,7 @@ inline void lb_collide_stream() {
     lbfields[i].force_buf[1] = lbfields[i].force[1];
     lbfields[i].force_buf[2] = lbfields[i].force[2];
   }
-#endif
+#endif // IMMERSED_BOUNDARY
 
   index = lblattice.halo_offset;
   for (z = 1; z <= lblattice.grid[2]; z++) {
@@ -3569,7 +3569,13 @@ void calc_particle_lattice_ia() {
 
       /* all fields have to be recalculated */
 #ifdef LB_ADAPTIVE
-      // TODO: iterate over lattice and set recalc_fields flag
+      p8est_iterate(p8est,
+                    NULL,
+                    NULL,
+                    lbadapt_set_recalc_fields,
+                    NULL,
+                    NULL,
+                    NULL);
 #else // LB_ADAPTIVE
       for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
           lbfields[i].recalc_fields = 1;

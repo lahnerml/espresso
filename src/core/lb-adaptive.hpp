@@ -181,6 +181,9 @@ void lbadapt_get_density_values (p8est_iter_volume_info_t * info, void * user_da
 void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_data);
 
 
+void lbadapt_set_recalc_fields (p8est_iter_volume_info_t * info, void * user_data);
+
+
 void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data);
 
 

@@ -101,10 +101,10 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
   data->lbfields.recalc_fields = 1;
   data->lbfields.has_force = 0;
 
-  // 1D array
+  // 1D "array"
   data->lbfields.rho[0] = 0.;
 
-  // 3D array
+  // 3D arrays
   for (int i = 0; i < 3; i++) {
     data->lbfields.j[i] = 0;
     data->lbfields.force[i] = 0;
@@ -132,8 +132,10 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 
 
 /*** HELPER FUNCTIONS ***/
-void lbadapt_get_midpoint (p8est_t * p8est, p4est_topidx_t which_tree,
-                           p8est_quadrant_t * q, double xyz[3]) {
+void lbadapt_get_midpoint (p8est_t * p8est,
+                           p4est_topidx_t which_tree,
+                           p8est_quadrant_t * q,
+                           double xyz[3]) {
   p4est_qcoord_t half_length = P8EST_QUADRANT_LEN (q->level) * 0.5;
 
   p8est_qcoord_to_vertex (p8est->connectivity, which_tree,
@@ -249,13 +251,14 @@ int lbadapt_calc_n_from_rho_j_pi (double datafield[2][19],
 int lbadapt_calc_local_fields (double mode[19],
                                double force[3],
                                int boundary,
-															 int has_force,
+                               int has_force,
                                double h,
                                double *rho,
                                double *j,
                                double *pi) {
 #ifdef LB_BOUNDARIES
-  if ( boundary ) {
+  if (boundary) {
+    // set all to 0 on boundary
     *rho = lbpar.rho[0] * h * h * h;
     j[0] = 0.; j[1] = 0.;  j[2] = 0.;
     if (pi) {pi[0] = 0.; pi[1] = 0.; pi[2] = 0.; pi[3] = 0.; pi[4] = 0.; pi[5] = 0.;}
@@ -1208,6 +1211,13 @@ void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_d
 }
 
 
+void lbadapt_set_recalc_fields (p8est_iter_volume_info_t * info, void * user_data) {
+  p8est_quadrant_t *q = info->quad;
+  lbadapt_payload_t * data = (lbadapt_payload_t *) q->p.user_data;
+
+  data->lbfields.recalc_fields = 1;
+}
+
 void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data) {
   p8est_quadrant_t  * q     = info->quad;                           /* get current global cell id */
   lbadapt_payload_t * data  = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
@@ -1355,7 +1365,10 @@ void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data)
   double h;                                                     /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
-  if (!data->boundary) {
+#ifdef LB_BOUNDARIES
+  if (!data->boundary)
+#endif // LB_BOUNDARIES
+  {
     /* place for storing modes */
     double *modes = data->modes;
 
@@ -1366,14 +1379,13 @@ void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data)
     lbadapt_relax_modes(modes, data->lbfields.force, h);
 
     /* fluctuating hydrodynamics */
-
     if (fluct) lbadapt_thermalize_modes(modes, h);
 
     /* apply forces */
 #ifdef EXTERNAL_FORCES
     lbadapt_apply_forces(modes, &data->lbfields, h);
 #else // EXTERNAL_FORCES
-    if (has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
+    if (data->lbfields.has_force) lbadapt_apply_forces(modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
   }
 }
@@ -1381,10 +1393,11 @@ void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data)
 
 void lbadapt_collide_streamII (p8est_iter_volume_info_t *info, void *user_data) {
   lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
-	if (!data->boundary) {
-		lbadapt_calc_n_from_modes_push(info->quadid);
-	}
+  if (!data->boundary) {
+    lbadapt_calc_n_from_modes_push(info->quadid);
+  }
 }
+
 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 #ifdef D3Q19

@@ -547,12 +547,12 @@ int lbadapt_apply_forces (double * mode, LB_FluidNode * lbfields, double h) {
   u[1] = (mode[2] + 0.5 * f[1])/rho;
   u[2] = (mode[3] + 0.5 * f[2])/rho;
 
-  C[0] = (1.+gamma_bulk)*u[0]*f[0] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
-  C[2] = (1.+gamma_bulk)*u[1]*f[1] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
-  C[5] = (1.+gamma_bulk)*u[2]*f[2] + 1./3.*(gamma_bulk-gamma_shear)*scalar(u,f);
-  C[1] = 1./2. * (1.+gamma_shear)*(u[0]*f[1]+u[1]*f[0]);
-  C[3] = 1./2. * (1.+gamma_shear)*(u[0]*f[2]+u[2]*f[0]);
-  C[4] = 1./2. * (1.+gamma_shear)*(u[1]*f[2]+u[2]*f[1]);
+  C[0] = (1. + gamma_bulk) * u[0] * f[0] + 1./3. * (gamma_bulk - gamma_shear) * scalar(u,f);
+  C[2] = (1. + gamma_bulk) * u[1] * f[1] + 1./3. * (gamma_bulk - gamma_shear) * scalar(u,f);
+  C[5] = (1. + gamma_bulk) * u[2] * f[2] + 1./3. * (gamma_bulk - gamma_shear) * scalar(u,f);
+  C[1] = 0.5 * (1. + gamma_shear) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear) * (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];

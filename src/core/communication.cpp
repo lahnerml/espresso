@@ -262,14 +262,14 @@ void mpi_init(int *argc, char ***argv)
   for(int i = 0; i < N_CALLBACKS; ++i)  {
     request_map.insert(std::pair<SlaveCallback *, int>(slave_callbacks[i], i));
   }
-    
+
   initRuntimeErrorCollector();
 }
 
 #ifdef HAVE_MPI
 void mpi_call(SlaveCallback cb, int node, int param) {
   const int reqcode = request_map[cb];
-  
+
   request[0] = reqcode;
   request[1] = node;
   request[2] = param;
@@ -430,7 +430,7 @@ void mpi_who_has()
         particle_node[pdata[i]] = pnode;
       }
     }
-  }  
+  }
   free(pdata);
 }
 
@@ -2706,9 +2706,8 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
     pi[3] = data[7];
     pi[4] = data[8];
     pi[5] = data[9];
-
   }
-#endif
+#endif // LB
 }
 
 void mpi_recv_fluid_slave(int node, int index) {
@@ -3351,4 +3350,3 @@ void mpi_gather_cuda_devices_slave(int dummy1, int dummy2) {
   cuda_gather_gpus();
 #endif
 }
-

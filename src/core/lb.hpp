@@ -494,7 +494,7 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *
   pi[4] = mode[9];                                                  // yz
   pi[5] = ( mode[0] + mode[4] - mode[6] )/3.0;                      // zz
 
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 }
 
 #ifdef LB_BOUNDARIES

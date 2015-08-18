@@ -1,27 +1,27 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 /** \file integrate.cpp   Molecular dynamics integrator.
  *
- *  For more information about the integrator 
+ *  For more information about the integrator
  *  see \ref integrate.hpp "integrate.hpp".
 */
 
@@ -129,15 +129,15 @@ void propagate_pos();
     \f[ p(t+\Delta t) = p(t) + \Delta t  v(t+0.5 \Delta t) \f] */
 void propagate_vel_pos();
 /** Rescale all particle forces with \f[ 0.5 \Delta t^2 \f] and propagate the velocities.
-    Integration step 4 of the Velocity Verletintegrator:<br> 
+    Integration step 4 of the Velocity Verletintegrator:<br>
     \f[ v(t+\Delta t) = v(t+0.5 \Delta t) + 0.5 \Delta t f(t+\Delta t) \f] */
 void rescale_forces_propagate_vel();
 
 /** Integrator stability check (see compile flag ADDITIONAL_CHECKS). */
-void force_and_velocity_check(Particle *p); 
+void force_and_velocity_check(Particle *p);
 /** Integrator stability check (see compile flag ADDITIONAL_CHECKS). */
 void force_and_velocity_display();
- 
+
 void finalize_p_inst_npt();
 
 /*@}*/
@@ -156,7 +156,7 @@ void integrator_sanity_checks()
 #ifdef NPT
 
 void integrator_npt_sanity_checks()
-{  
+{
   if (integ_switch == INTEG_METHOD_NPT_ISO) {
     if (nptiso.piston <= 0.0) {
         ostringstream msg;
@@ -214,16 +214,16 @@ void integrate_ensemble_init()
 
     nptiso.volume = pow(box_l[nptiso.non_const_dim],nptiso.dimension);
 
-    if (recalc_forces) { 
-      nptiso.p_inst = 0.0;  
+    if (recalc_forces) {
+      nptiso.p_inst = 0.0;
       nptiso.p_vir[0] = nptiso.p_vir[1] = nptiso.p_vir[2] = 0.0;
       nptiso.p_vel[0] = nptiso.p_vel[1] = nptiso.p_vel[2] = 0.0;
 #ifdef CONFIGTEMP
       configtemp[0] = configtemp[1] = 0.0;
-#endif
+#endif // CONFIGTEMP
     }
   }
-#endif
+#endif // NPT
 }
 
 /************************************************************/
@@ -232,12 +232,12 @@ void integrate_vv(int n_steps, int reuse_forces)
 {
   /* Prepare the Integrator */
   on_integration_start();
- 
+
   #ifdef IMMERSED_BOUNDARY
     // Here we initialize volume conservation
     // This function checks if the reference volumes have been set and if necessary calculates them
     IBM_InitVolumeConservation();
-  #endif
+#endif // IMMERSED BOUNDARY
 
   /* if any method vetoes (P3M not initialized), immediately bail out */
   if (check_runtime_errors())
@@ -265,16 +265,16 @@ void integrate_vv(int n_steps, int reuse_forces)
       ghost_communicator(&cell_structure.collect_ghost_force_comm);
       rescale_forces();
     }
-#endif
+#endif // NPT
   }
-#endif
+#endif // MULTI_TIMESTEP
 
   /* Verlet list criterion */
   skin2 = SQR(0.5 * skin);
 
   INTEG_TRACE(fprintf(stderr,"%d: integrate_vv: integrating %d steps (recalc_forces=%d)\n",
                       this_node, n_steps, recalc_forces));
-   
+
   /* Integration Step: Preparation for first integration step:
      Calculate forces f(t) as function of positions p(t) ( and velocities v(t) ) */
   /* reuse_forces logic:
@@ -289,12 +289,12 @@ void integrate_vv(int n_steps, int reuse_forces)
     transfer_momentum = 0;
     if (lattice_switch & LATTICE_LB && this_node == 0)
       if (warnings) fprintf (stderr, "Warning: Recalculating forces, so the LB coupling forces are not included in the particle force the first time step. This only matters if it happens frequently during sampling.\n");
-#endif
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 0;
     if (lattice_switch & LATTICE_LB_GPU && this_node == 0)
       if (warnings) fprintf (stderr, "Warning: Recalculating forces, so the LB coupling forces are not included in the particle force the first time step. This only matters if it happens frequently during sampling.\n");
-#endif
+#endif // LB_GPU
 
     force_calc();
 
@@ -309,7 +309,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 
 #ifdef MULTI_TIMESTEP
 #ifdef NPT
-    if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO) 
+    if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO)
       for(int j=0;j<3;++j)
         nptiso.p_vir[j] += virial_store[j];
 #endif
@@ -360,18 +360,18 @@ void integrate_vv(int n_steps, int reuse_forces)
     /* Integration Steps: Step 1 and 2 of Velocity Verlet scheme:
        v(t+0.5*dt) = v(t) + 0.5*dt * f(t)
        p(t + dt)   = p(t) + dt * v(t+0.5*dt)
-       NOTE 1: Prefactors do not occur in formulas since we use 
-       rescaled forces and velocities. 
-       NOTE 2: Depending on the integration method Step 1 and Step 2 
-       cannot be combined for the translation. 
+       NOTE 1: Prefactors do not occur in formulas since we use
+       rescaled forces and velocities.
+       NOTE 2: Depending on the integration method Step 1 and Step 2
+       cannot be combined for the translation.
     */
     if (integ_switch == INTEG_METHOD_NPT_ISO || nemd_method != NEMD_METHOD_OFF) {
       propagate_vel();
-      propagate_pos(); 
+      propagate_pos();
     } else if(integ_switch == INTEG_METHOD_STEEPEST_DESCENT) {
       if(steepest_descent_step())
 	break;
-    } else { 
+    } else {
       propagate_vel_pos();
     }
 
@@ -384,7 +384,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 
 #ifdef ELECTROSTATICS
     if(coulomb.method == COULOMB_MAGGS) {
-      maggs_propagate_B_field(0.5*time_step); 
+      maggs_propagate_B_field(0.5*time_step);
     }
 #endif
 
@@ -409,7 +409,7 @@ void integrate_vv(int n_steps, int reuse_forces)
         if(integ_switch == INTEG_METHOD_NPT_ISO || nemd_method != NEMD_METHOD_OFF) {
           propagate_vel();  propagate_pos(); }
         else
-          propagate_vel_pos();        
+          propagate_vel_pos();
         cells_update_ghosts();
         force_calc();
         ghost_communicator(&cell_structure.collect_ghost_force_comm);
@@ -420,7 +420,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 #endif
         rescale_forces_propagate_vel();
       }
-      current_time_step_is_small = 0;             
+      current_time_step_is_small = 0;
       thermo_heat_up();
       force_calc();
       thermo_cool_down();
@@ -436,13 +436,13 @@ void integrate_vv(int n_steps, int reuse_forces)
 
 #ifdef LB
     transfer_momentum = 1;
-#endif
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 1;
-#endif
+#endif // LB_GPU
 
     force_calc();
-    
+
 // IMMERSED_BOUNDARY
 #ifdef IMMERSED_BOUNDARY
     // Now the forces are computed and need to go into the LB fluid
@@ -461,7 +461,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 
 #ifdef MULTI_TIMESTEP
 #ifdef NPT
-    if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO) 
+    if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO)
       for(int j=0;j<3;++j)
         nptiso.p_vir[j] += virial_store[j];
 #endif
@@ -490,7 +490,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 #ifdef LB
     if (lattice_switch & LATTICE_LB)
       lattice_boltzmann_update();
-      
+
     if (check_runtime_errors())
       break;
 #endif
@@ -510,10 +510,10 @@ void integrate_vv(int n_steps, int reuse_forces)
 #endif
     }
 #endif //LB_GPU
-    
+
 // IMMERSED_BOUNDARY
 #ifdef IMMERSED_BOUNDARY
-    
+
     IBM_UpdateParticlePositions();
     // We reset all since otherwise the halo nodes may not be reset
     // NB: the normal Espresso reset is also done after applying the forces
@@ -521,19 +521,19 @@ void integrate_vv(int n_steps, int reuse_forces)
 #ifdef LB_GPU
     //if (lattice_switch & LATTICE_LB_GPU) IBM_ResetLBForces_GPU();
 #endif
-    
+
     if (check_runtime_errors()) break;
-    
+
     // Ghost positions are now out-of-date
     // We should update.
     // Actually we seem to get the same results whether we do this here or not, but it is safer to do it
     ghost_communicator(&cell_structure.update_ghost_pos_comm);
-    
+
 #endif // IMMERSED_BOUNDARY
 
 #ifdef ELECTROSTATICS
     if(coulomb.method == COULOMB_MAGGS) {
-      maggs_propagate_B_field(0.5*time_step); 
+      maggs_propagate_B_field(0.5*time_step);
     }
 #endif
 
@@ -579,7 +579,7 @@ void integrate_vv(int n_steps, int reuse_forces)
 
 /************************************************************/
 
-void rescale_velocities(double scale) 
+void rescale_velocities(double scale)
 {
   Particle *p;
   int i, np, c;
@@ -672,7 +672,7 @@ void rescale_forces_propagate_vel()
       ONEPART_TRACE(if(p[i].p.identity==check_id) fprintf(stderr,"%d: OPT: SCAL f = (%.3e,%.3e,%.3e) v_old = (%.3e,%.3e,%.3e)\n",this_node,p[i].f.f[0],p[i].f.f[1],p[i].f.f[2],p[i].m.v[0],p[i].m.v[1],p[i].m.v[2]));
 #ifdef VIRTUAL_SITES
        // Virtual sites are not propagated during integration
-       if (ifParticleIsVirtual(&p[i])) continue; 
+       if (ifParticleIsVirtual(&p[i])) continue;
 #endif
       for(j = 0; j < 3 ; j++) {
 #ifdef EXTERNAL_FORCES
@@ -691,7 +691,7 @@ void rescale_forces_propagate_vel()
           else
 #endif
             /* Propagate velocity: v(t+dt) = v(t+0.5*dt) + 0.5*dt * f(t+dt) */
-            p[i].m.v[j] += p[i].f.f[j]; 
+            p[i].m.v[j] += p[i].f.f[j];
 #ifdef EXTERNAL_FORCES
         }
 #endif
@@ -756,7 +756,7 @@ void propagate_press_box_pos_and_rescale_npt()
     if (this_node == 0) {
 #ifdef MULTI_TIMESTEP
       if (smaller_time_step < 0. || current_time_step_is_small == 0)
-#endif      
+#endif
         nptiso.volume += nptiso.inv_piston*nptiso.p_diff*0.5*time_step;
       scal[2] = SQR(box_l[nptiso.non_const_dim])/pow(nptiso.volume,2.0/nptiso.dimension);
 #ifdef MULTI_TIMESTEP
@@ -796,12 +796,12 @@ void propagate_press_box_pos_and_rescale_npt()
 #endif
     }
     MPI_Bcast(scal,  3, MPI_DOUBLE, 0, comm_cart);
-    
+
 
     /* propagate positions while rescaling positions and velocities */
     for (c = 0; c < local_cells.n; c++) {
       cell = local_cells.cell[c]; p  = cell->part; np = cell->n;
-      for(i = 0; i < np; i++) { 
+      for(i = 0; i < np; i++) {
 #ifdef VIRTUAL_SITES
         if (ifParticleIsVirtual(&p[i])) continue;
 #endif
@@ -811,7 +811,7 @@ void propagate_press_box_pos_and_rescale_npt()
 #endif
             if(nptiso.geometry & nptiso.nptgeom_dir[j]) {
 #ifdef MULTI_TIMESTEP
-              if (smaller_time_step > 0.) { 
+              if (smaller_time_step > 0.) {
                 if (current_time_step_is_small == 1) {
                   if (mts_index==mts_max-1) {
                     p[i].r.p[j]      = scal[1]*(p[i].r.p[j] + scal[2]*p[i].m.v[j]);
@@ -826,12 +826,12 @@ void propagate_press_box_pos_and_rescale_npt()
               {
                 p[i].r.p[j]      = scal[1]*(p[i].r.p[j] + scal[2]*p[i].m.v[j]);
                 p[i].l.p_old[j] *= scal[1];
-                p[i].m.v[j]     *= scal[0];          
+                p[i].m.v[j]     *= scal[0];
               }
             } else {
 #ifdef MULTI_TIMESTEP
-              if (smaller_time_step < 0. || current_time_step_is_small == 1) 
-#endif              
+              if (smaller_time_step < 0. || current_time_step_is_small == 1)
+#endif
                 p[i].r.p[j] += p[i].m.v[j];
             }
 
@@ -841,17 +841,17 @@ void propagate_press_box_pos_and_rescale_npt()
 #endif
         }
         ONEPART_TRACE(if(p[i].p.identity==check_id) fprintf(stderr,"%d: OPT:PV_1 v_new=(%.3e,%.3e,%.3e)\n",this_node,p[i].m.v[0],p[i].m.v[1],p[i].m.v[2]));
-        ONEPART_TRACE(if(p[i].p.identity==check_id) fprintf(stderr,"%d: OPT:PPOS p=(%.3f,%.3f,%.3f)\n",this_node,p[i].r.p[0],p[i].r.p[1],p[i].r.p[2])); 
+        ONEPART_TRACE(if(p[i].p.identity==check_id) fprintf(stderr,"%d: OPT:PPOS p=(%.3f,%.3f,%.3f)\n",this_node,p[i].r.p[0],p[i].r.p[1],p[i].r.p[2]));
 #ifdef ADDITIONAL_CHECKS
-        force_and_velocity_check(&p[i]); 
+        force_and_velocity_check(&p[i]);
 #endif
       }
     }
-    resort_particles = 1; 
+    resort_particles = 1;
 
     /* Apply new volume to the box-length, communicate it, and account for necessary adjustments to the cell geometry */
     if (this_node == 0) {
-      for ( i = 0 ; i < 3 ; i++ ){ 
+      for ( i = 0 ; i < 3 ; i++ ){
         if ( nptiso.geometry & nptiso.nptgeom_dir[i] ) {
           box_l[i] = L_new;
         } else if ( nptiso.cubic_box ) {
@@ -895,7 +895,7 @@ void propagate_vel()
 #endif
       for(j=0; j < 3; j++){
 #ifdef EXTERNAL_FORCES
-	if (!(p[i].p.ext_flag & COORD_FIXED(j)))	
+	if (!(p[i].p.ext_flag & COORD_FIXED(j)))
 #endif
           {
 #ifdef NPT
@@ -1006,7 +1006,7 @@ void propagate_vel_pos()
 #ifdef VIRTUAL_SITES
        if (ifParticleIsVirtual(&p[i])) continue;
 #endif
-     for(j=0; j < 3; j++){   
+     for(j=0; j < 3; j++){
 #ifdef EXTERNAL_FORCES
         if (!(p[i].p.ext_flag & COORD_FIXED(j)))
 #endif
@@ -1016,7 +1016,7 @@ void propagate_vel_pos()
 
 #ifdef MULTI_TIMESTEP
         if (smaller_time_step < 0. || current_time_step_is_small==1)
-#endif  
+#endif
             /* Propagate positions (only NVT): p(t + dt)   = p(t) + dt * v(t+0.5*dt) */
             p[i].r.p[j] += p[i].m.v[j];
         }
@@ -1040,16 +1040,16 @@ void propagate_vel_pos()
                          if( abs(delta_box) > 1 ){
                              fprintf(stderr, "Error! Particle moved more than one box length in 1 step\n");
                              errexit();
-                         } 
-                         p[i].m.v[0]     -= delta_box * lees_edwards_rate;   
-                         p[i].r.p[0]     -= delta_box * lees_edwards_offset; 
+                         }
+                         p[i].m.v[0]     -= delta_box * lees_edwards_rate;
+                         p[i].r.p[0]     -= delta_box * lees_edwards_offset;
                          p[i].r.p[1]     -= delta_box * box_l[1];
-                         p[i].l.i[1]     += delta_box; 
+                         p[i].l.i[1]     += delta_box;
                          while( p[i].r.p[1] >  box_l[1] ) {p[i].r.p[1] -= box_l[1]; p[i].l.i[1]++;}
                          while( p[i].r.p[1] <  0.0 )      {p[i].r.p[1] += box_l[1]; p[i].l.i[1]--;}
                          resort_particles = 1;
                     }
-                    /* Branch prediction on most systems should mean there is minimal cost here */ 
+                    /* Branch prediction on most systems should mean there is minimal cost here */
                     while( p[i].r.p[0] >  box_l[0] ) {p[i].r.p[0] -= box_l[0]; p[i].l.i[0]++;}
                     while( p[i].r.p[0] <  0.0 )      {p[i].r.p[0] += box_l[0]; p[i].l.i[0]--;}
                     while( p[i].r.p[2] >  box_l[2] ) {p[i].r.p[2] -= box_l[2]; p[i].l.i[2]++;}
@@ -1058,9 +1058,9 @@ void propagate_vel_pos()
 #endif
 
       /* Verlet criterion check*/
-      if(SQR(p[i].r.p[0]-p[i].l.p_old[0]) 
+      if(SQR(p[i].r.p[0]-p[i].l.p_old[0])
         +SQR(p[i].r.p[1]-p[i].l.p_old[1])
-        +SQR(p[i].r.p[2]-p[i].l.p_old[2]) > skin2) 
+        +SQR(p[i].r.p[2]-p[i].l.p_old[2]) > skin2)
             resort_particles=1;
 
 

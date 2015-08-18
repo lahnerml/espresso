@@ -921,13 +921,13 @@ int lb_lbfluid_print_vtk_velocity(char* filename) {
     host_values = (LB_rho_v_pi_gpu*)Utils::malloc(size_of_values);
     lb_get_values_GPU(host_values);
     fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_gpu\n"
-        "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\n"
-        "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %u\n"
-        "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
-        lbpar_gpu.dim_x, lbpar_gpu.dim_y, lbpar_gpu.dim_z,
-        lbpar_gpu.agrid*0.5, lbpar_gpu.agrid*0.5, lbpar_gpu.agrid*0.5,
-        lbpar_gpu.agrid, lbpar_gpu.agrid, lbpar_gpu.agrid,
-        lbpar_gpu.number_of_nodes);
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %u %u %u\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %u\n"
+            "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
+            lbpar_gpu.dim_x, lbpar_gpu.dim_y, lbpar_gpu.dim_z,
+            lbpar_gpu.agrid*0.5, lbpar_gpu.agrid*0.5, lbpar_gpu.agrid*0.5,
+            lbpar_gpu.agrid, lbpar_gpu.agrid, lbpar_gpu.agrid,
+            lbpar_gpu.number_of_nodes);
     for(int j=0; j<int(lbpar_gpu.number_of_nodes); ++j){
       /** print of the calculated phys values */
       fprintf(fp, "%f %f %f\n", host_values[j].v[0], host_values[j].v[1], host_values[j].v[2]);
@@ -945,13 +945,13 @@ int lb_lbfluid_print_vtk_velocity(char* filename) {
     gridsize[2] = box_l[2] / lbpar.agrid;
 
     fprintf(fp, "# vtk DataFile Version 2.0\nlbfluid_cpu\n"
-        "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
-        "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
-        "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
-        gridsize[0], gridsize[1], gridsize[2],
-        lblattice.agrid[0]*0.5, lblattice.agrid[1]*0.5, lblattice.agrid[2]*0.5,
-        lblattice.agrid[0], lblattice.agrid[1], lblattice.agrid[2],
-        gridsize[0]*gridsize[1]*gridsize[2]);
+            "ASCII\nDATASET STRUCTURED_POINTS\nDIMENSIONS %d %d %d\n"
+            "ORIGIN %f %f %f\nSPACING %f %f %f\nPOINT_DATA %d\n"
+            "SCALARS velocity float 3\nLOOKUP_TABLE default\n",
+            gridsize[0], gridsize[1], gridsize[2],
+            lblattice.agrid[0]*0.5, lblattice.agrid[1]*0.5, lblattice.agrid[2]*0.5,
+            lblattice.agrid[0], lblattice.agrid[1], lblattice.agrid[2],
+            gridsize[0]*gridsize[1]*gridsize[2]);
 
     for(pos[2] = 0; pos[2] < gridsize[2]; pos[2]++)
     {
@@ -3111,17 +3111,17 @@ inline void lb_collide_stream() {
   tmp = lbfluid[0];
   lbfluid[0] = lbfluid[1];
   lbfluid[1] = tmp;
+#endif // LB_ADAPTIVE
 
   /* halo region is invalid after update */
   lbpar.resend_halo = 1;
-#endif // LB_ADAPTIVE
 }
 
 
 /** Streaming and collisions (pull scheme) */
 inline void lb_stream_collide() {
 #ifdef LB_ADAPTIVE
-
+  // not implemented
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
@@ -3240,17 +3240,15 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 
 #ifdef EXTERNAL_FORCES
   if (!(p->p.ext_flag & COORD_FIXED(0))
-      && !(p->p.ext_flag & COORD_FIXED(1)) && !(p->p.ext_flag & COORD_FIXED(2)))
-    {
-      ONEPART_TRACE(
-                    if(p->p.identity == check_id)
-                      {
-                        fprintf(stderr,
-                                "%d: OPT: f = (%.3e,%.3e,%.3e)\n",
-                                this_node, p->f.f[0], p->f.f[1], p->f.f[2]);
-                      }
-                    );
-    }
+      && !(p->p.ext_flag & COORD_FIXED(1)) && !(p->p.ext_flag & COORD_FIXED(2))) {
+    ONEPART_TRACE(
+                  if(p->p.identity == check_id) {
+                    fprintf(stderr,
+                            "%d: OPT: f = (%.3e,%.3e,%.3e)\n",
+                            this_node, p->f.f[0], p->f.f[1], p->f.f[2]);
+                  }
+                 );
+  }
 #endif
 
   /* determine elementary lattice cell surrounding the particle
@@ -3258,14 +3256,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   lblattice.map_position_to_lattice(p->r.p,node_index,delta);
 
   ONEPART_TRACE(
-                if(p->p.identity == check_id)
-                  {
-                    fprintf(stderr,
-                            "%d: OPT: LB delta=(%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) pos=(%.3f,%.3f,%.3f)\n",
-                            this_node, delta[0], delta[1], delta[2], delta[3],
-                            delta[4], delta[5], p->r.p[0], p->r.p[1], p->r.p[2]);
-                  }
-                );
+                if(p->p.identity == check_id) {
+                  fprintf(stderr,
+                          "%d: OPT: LB delta=(%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) pos=(%.3f,%.3f,%.3f)\n",
+                          this_node, delta[0], delta[1], delta[2], delta[3],
+                          delta[4], delta[5], p->r.p[0], p->r.p[1], p->r.p[2]);
+                }
+               );
 
   /* calculate fluid velocity at particle's position
      this is done by linear interpolation
@@ -3273,14 +3270,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   lb_lbfluid_get_interpolated_velocity(p->r.p, interpolated_u);
 
   ONEPART_TRACE(
-                if (p->p.identity==check_id)
-                  {
-                    fprintf(stderr,
-                            "%d: OPT: LB u = (%.16e,%.3e,%.3e) v = (%.16e,%.3e,%.3e)\n",
-                            this_node, interpolated_u[0], interpolated_u[1], interpolated_u[2],
-                            p->m.v[0], p->m.v[1], p->m.v[2]);
-                  }
-                );
+                if (p->p.identity==check_id) {
+                  fprintf(stderr,
+                          "%d: OPT: LB u = (%.16e,%.3e,%.3e) v = (%.16e,%.3e,%.3e)\n",
+                          this_node, interpolated_u[0], interpolated_u[1], interpolated_u[2],
+                          p->m.v[0], p->m.v[1], p->m.v[2]);
+                }
+               );
 
   /* calculate viscous force
    * take care to rescale velocities with time_step and transform to MD units
@@ -3291,8 +3287,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   velocity[2] = p->m.v[2];
 
 #ifdef ENGINE
-  if ( p->swim.swimming )
-  {
+  if ( p->swim.swimming ) {
     velocity[0] -= (p->swim.v_swim*time_step)*p->r.quatu[0];
     velocity[1] -= (p->swim.v_swim*time_step)*p->r.quatu[1];
     velocity[2] -= (p->swim.v_swim*time_step)*p->r.quatu[2];
@@ -3300,48 +3295,45 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     p->swim.v_center[1] = interpolated_u[1];
     p->swim.v_center[2] = interpolated_u[2];
   }
-#endif
+#endif // ENGINE
 
 #ifdef LB_ELECTROHYDRODYNAMICS
   force[0] = - lbpar.friction[0] * (velocity[0]/time_step - interpolated_u[0] - p->p.mu_E[0]);
   force[1] = - lbpar.friction[0] * (velocity[1]/time_step - interpolated_u[1] - p->p.mu_E[1]);
   force[2] = - lbpar.friction[0] * (velocity[2]/time_step - interpolated_u[2] - p->p.mu_E[2]);
-#else
+#else // LB_ELECTROHYDRODYNAMICS
   force[0] = - lbpar.friction[0] * (velocity[0]/time_step - interpolated_u[0]);
   force[1] = - lbpar.friction[0] * (velocity[1]/time_step - interpolated_u[1]);
   force[2] = - lbpar.friction[0] * (velocity[2]/time_step - interpolated_u[2]);
-#endif
+#endif // LB_ELECTROHYDRODYNAMICS
 
   ONEPART_TRACE(
-                if (p->p.identity == check_id)
-                  {
-                    fprintf(stderr,
-                            "%d: OPT: LB f_drag = (%.6e,%.3e,%.3e)\n",
-                            this_node, force[0], force[1], force[2]);
-                  }
-                );
+                if (p->p.identity == check_id) {
+                  fprintf(stderr,
+                          "%d: OPT: LB f_drag = (%.6e,%.3e,%.3e)\n",
+                          this_node, force[0], force[1], force[2]);
+                }
+               );
 
   ONEPART_TRACE(
-                if (p->p.identity == check_id)
-                  {
-                    fprintf(stderr,
-                            "%d: OPT: LB f_random = (%.6e,%.3e,%.3e)\n",
-                            this_node, p->lc.f_random[0], p->lc.f_random[1], p->lc.f_random[2]);
-                  }
-                );
+                if (p->p.identity == check_id) {
+                  fprintf(stderr,
+                          "%d: OPT: LB f_random = (%.6e,%.3e,%.3e)\n",
+                          this_node, p->lc.f_random[0], p->lc.f_random[1], p->lc.f_random[2]);
+                }
+               );
 
   force[0] = force[0] + p->lc.f_random[0];
   force[1] = force[1] + p->lc.f_random[1];
   force[2] = force[2] + p->lc.f_random[2];
 
   ONEPART_TRACE(
-                if (p->p.identity == check_id)
-                  {
-                    fprintf(stderr,
-                            "%d: OPT: LB f_tot = (%.6e,%.3e,%.3e)\n",
-                            this_node, force[0], force[1], force[2]);
-                  }
-                );
+                if (p->p.identity == check_id) {
+                  fprintf(stderr,
+                          "%d: OPT: LB f_tot = (%.6e,%.3e,%.3e)\n",
+                          this_node, force[0], force[1], force[2]);
+                }
+               );
 
   /* transform momentum transfer to lattice units
      (Eq. (12) Ahlrichs and Duenweg, JCP 111(17):8225 (1999)) */
@@ -3558,12 +3550,12 @@ void calc_particle_lattice_ia() {
   double force[3];
 
   if (transfer_momentum) {
-
     if (lbpar.resend_halo) { /* first MD step after last LB update */
-
       /* exchange halo regions (for fluid-particle coupling) */
 #ifdef LB_ADAPTIVE
-      // TODO: Exchange Ghost data
+      lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
+      lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+      p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 #else // LB_ADAPTIVE
       halo_communication(&update_halo_comm, (char*)**lbfluid);
 #endif // LB ADAPTIVE
@@ -3586,58 +3578,55 @@ void calc_particle_lattice_ia() {
                     NULL);
 #else // LB_ADAPTIVE
       for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
-          lbfields[i].recalc_fields = 1;
+        lbfields[i].recalc_fields = 1;
       }
 #endif // LB_ADAPTIVE
     }
 
     /* draw random numbers for local particles */
-    for (int c = 0; c < local_cells.n; c++)
-      {
-        cell = local_cells.cell[c] ;
-        p = cell->part ;
-        np = cell->n ;
-        for (int i = 0; i < np; i++)
-          {
+    for (int c = 0; c < local_cells.n; c++) {
+      cell = local_cells.cell[c] ;
+      p = cell->part ;
+      np = cell->n ;
+      for (int i = 0; i < np; i++) {
 #ifdef GAUSSRANDOM
-            p[i].lc.f_random[0] = lb_coupl_pref2 * gaussian_random();
-            p[i].lc.f_random[1] = lb_coupl_pref2 * gaussian_random();
-            p[i].lc.f_random[2] = lb_coupl_pref2 * gaussian_random();
+        p[i].lc.f_random[0] = lb_coupl_pref2 * gaussian_random();
+        p[i].lc.f_random[1] = lb_coupl_pref2 * gaussian_random();
+        p[i].lc.f_random[2] = lb_coupl_pref2 * gaussian_random();
 #elif defined (GAUSSRANDOMCUT)
-            p[i].lc.f_random[0] = lb_coupl_pref2 * gaussian_random_cut();
-            p[i].lc.f_random[1] = lb_coupl_pref2 * gaussian_random_cut();
-            p[i].lc.f_random[2] = lb_coupl_pref2 * gaussian_random_cut();
+        p[i].lc.f_random[0] = lb_coupl_pref2 * gaussian_random_cut();
+        p[i].lc.f_random[1] = lb_coupl_pref2 * gaussian_random_cut();
+        p[i].lc.f_random[2] = lb_coupl_pref2 * gaussian_random_cut();
 #elif defined (FLATNOISE)
-            p[i].lc.f_random[0] = lb_coupl_pref * (d_random()-0.5);
-            p[i].lc.f_random[1] = lb_coupl_pref * (d_random()-0.5);
-            p[i].lc.f_random[2] = lb_coupl_pref * (d_random()-0.5);
+        p[i].lc.f_random[0] = lb_coupl_pref * (d_random()-0.5);
+        p[i].lc.f_random[1] = lb_coupl_pref * (d_random()-0.5);
+        p[i].lc.f_random[2] = lb_coupl_pref * (d_random()-0.5);
 #else // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM
 
 #ifdef ADDITIONAL_CHECKS
-            rancounter += 3;
+        rancounter += 3;
 #endif // ADDITIONAL_CHECKS
-          }
       }
+    }
 
     /* communicate the random numbers */
     ghost_communicator(&cell_structure.ghost_lbcoupling_comm);
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
-#endif
+#endif // ENGINE
 
-  /* local cells */
-  for (int c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c] ;
-    p = cell->part ;
-    np = cell->n ;
+    /* local cells */
+    for (int c = 0; c < local_cells.n; c++) {
+      cell = local_cells.cell[c] ;
+      p = cell->part ;
+      np = cell->n ;
 
-    for (int i = 0; i < np; i++) {
-
+      for (int i = 0; i < np; i++) {
 #ifdef IMMERSED_BOUNDARY
-    // Virtual particles for IBM must not be coupled
-    if(!ifParticleIsVirtual(&p[i]))
+        // Virtual particles for IBM must not be coupled
+        if(!ifParticleIsVirtual(&p[i]))
 #endif
         {
           lb_viscous_coupling(&p[i],force);
@@ -3654,7 +3643,7 @@ void calc_particle_lattice_ia() {
     }
 
 #ifdef LB_ADAPTIVE
-  // not implemented
+    // not implemented
 #else // LB_ADAPTIVE
     /* ghost cells */
     for (int c = 0; c < ghost_cells.n ;c++) {
@@ -3671,8 +3660,7 @@ void calc_particle_lattice_ia() {
             && p[i].r.p[1] < my_right[1]+0.5*lblattice.agrid[1]
             && p[i].r.p[2] >= my_left[2]-0.5*lblattice.agrid[2]
             && p[i].r.p[2] < my_right[2]+0.5*lblattice.agrid[2]) {
-          ONEPART_TRACE(
-                        if (p[i].p.identity == check_id) {
+          ONEPART_TRACE(if (p[i].p.identity == check_id) {
                           fprintf(stderr,
                                   "%d: OPT: LB coupling of ghost particle:\n",
                                   this_node);
@@ -3681,7 +3669,7 @@ void calc_particle_lattice_ia() {
 #ifdef IMMERSED_BOUNDARY
             // Virtual particles for IBM must not be coupled
             if(!ifParticleIsVirtual(&p[i]))
-#endif
+#endif // IMMERSED_BOUNDARY
             {
               lb_viscous_coupling(&p[i],force);
             }
@@ -3689,12 +3677,12 @@ void calc_particle_lattice_ia() {
             /* ghosts must not have the force added! */
             ONEPART_TRACE(
                           if (p->p.identity == check_id)
-                            {
+                          {
                               fprintf(stderr,
                                       "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n",
                                       this_node, p->f.f[0], p->f.f[1], p->f.f[2]);
-                            }
-                          );
+                          }
+                         );
           }
       }
     }

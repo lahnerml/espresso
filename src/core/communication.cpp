@@ -169,7 +169,7 @@ static int terminated = 0;
   CB(mpi_external_potential_tabulated_read_potential_file_slave) \
   CB(mpi_external_potential_sum_energies_slave) \
   CB(mpi_observable_lb_radial_velocity_profile_slave) \
-  CB(mpiRuntimeErrorCollectorGatherSlave)  \
+  CB(mpiRuntimeErrorCollectorGatherSlave) \
   CB(mpi_check_runtime_errors_slave) \
   CB(mpi_minimize_energy_slave) \
   CB(mpi_gather_cuda_devices_slave) \
@@ -206,7 +206,7 @@ const char *names[] = {
 #define SOME_TAG 42
 
 /** The requests are compiled statically here, so that after a crash
-    you can get the last issued request from the debugger. */
+    you can get the last issued request from the debugger.*/
 static int request[3];
 
 /** Map callback function pointers to request codes */
@@ -275,7 +275,7 @@ void mpi_call(SlaveCallback cb, int node, int param) {
   request[2] = param;
 
   COMM_TRACE(fprintf(stderr, "%d: issuing %s %d %d\n",
-         this_node, names[reqcode], node, param));
+                     this_node, names[reqcode], node, param));
 #ifdef ASYNC_BARRIER
   MPI_Barrier(comm_cart);
 #endif
@@ -566,8 +566,8 @@ void mpi_send_v_slave(int pnode, int part)
 {
   if (pnode == this_node) {
     Particle *p = local_particles[part];
-  MPI_Recv(p->m.v, 3, MPI_DOUBLE, 0, SOME_TAG,
-           comm_cart, MPI_STATUS_IGNORE);
+    MPI_Recv(p->m.v, 3, MPI_DOUBLE, 0, SOME_TAG,
+             comm_cart, MPI_STATUS_IGNORE);
   }
 
   on_particle_change();
@@ -596,8 +596,8 @@ void mpi_send_swimming_slave(int pnode, int part)
 #ifdef ENGINE
   if (pnode == this_node) {
     Particle *p = local_particles[part];
-  MPI_Recv(&p->swim, sizeof(ParticleParametersSwimming), MPI_BYTE, 0, SOME_TAG,
-           comm_cart, MPI_STATUS_IGNORE);
+    MPI_Recv(&p->swim, sizeof(ParticleParametersSwimming), MPI_BYTE, 0, SOME_TAG,
+             comm_cart, MPI_STATUS_IGNORE);
   }
 
   on_particle_change();
@@ -626,8 +626,8 @@ void mpi_send_f_slave(int pnode, int part)
 {
   if (pnode == this_node) {
     Particle *p = local_particles[part];
-  MPI_Recv(p->f.f, 3, MPI_DOUBLE, 0, SOME_TAG,
-           comm_cart, MPI_STATUS_IGNORE);
+    MPI_Recv(p->f.f, 3, MPI_DOUBLE, 0, SOME_TAG,
+             comm_cart, MPI_STATUS_IGNORE);
     p->f.f[0] /= PMASS(*p);
     p->f.f[1] /= PMASS(*p);
     p->f.f[2] /= PMASS(*p);
@@ -659,8 +659,8 @@ void mpi_send_q_slave(int pnode, int part)
 #ifdef ELECTROSTATICS
   if (pnode == this_node) {
     Particle *p = local_particles[part];
-  MPI_Recv(&p->p.q, 1, MPI_DOUBLE, 0, SOME_TAG,
-           comm_cart, MPI_STATUS_IGNORE);
+    MPI_Recv(&p->p.q, 1, MPI_DOUBLE, 0, SOME_TAG,
+             comm_cart, MPI_STATUS_IGNORE);
   }
 
   on_particle_change();
@@ -1325,14 +1325,14 @@ int mpi_integrate(int n_steps, int reuse_forces)
     mpi_call(mpi_integrate_slave, n_steps, reuse_forces);
     integrate_vv(n_steps, reuse_forces);
     COMM_TRACE(fprintf(stderr, "%d: integration task %d done.\n", \
-           this_node, n_steps));
+                       this_node, n_steps));
   } else {
     for (int i=0; i<n_steps; i++) {
       mpi_call(mpi_integrate_slave, 1, reuse_forces);
       integrate_vv(1, reuse_forces);
       reuse_forces = 0; // makes even less sense after the first time step
       COMM_TRACE(fprintf(stderr, "%d: integration task %d done.\n",     \
-       this_node, i));
+                         this_node, i));
       autoupdate_correlations();
     }
   }
@@ -1658,7 +1658,7 @@ void mpi_get_particles(Particle *result, IntList *bi)
 
   if (tot_size!=n_part) {
     fprintf(stderr,"%d: ERROR: mpi_get_particles: n_part %d, but I counted %d. Exiting...\n",
-      this_node, n_part, tot_size);
+            this_node, n_part, tot_size);
     errexit();
   }
 
@@ -1995,6 +1995,8 @@ void mpi_bcast_coulomb_params_slave(int node, int parm)
 #endif
 
 #ifdef DIPOLES
+  set_dipolar_method_local(coulomb.Dmethod);
+
   switch (coulomb.Dmethod) {
   case DIPOLAR_NONE:
     break;
@@ -2011,6 +2013,8 @@ void mpi_bcast_coulomb_params_slave(int node, int parm)
  case  DIPOLAR_MDLC_DS:
      //fall trough
  case  DIPOLAR_DS:
+    break;
+ case  DIPOLAR_DS_GPU:
     break;
   default:
     fprintf(stderr, "%d: INTERNAL ERROR: cannot bcast dipolar params for unknown method %d\n", this_node, coulomb.Dmethod);

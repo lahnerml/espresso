@@ -311,12 +311,12 @@ int lbadapt_calc_local_fields (double mode[19],
   // Duenweg and Ladd paper, when these are written out in populations.
   // But to ensure this, the expression in Schiller's modes has to be different!
 
-  pi[0] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] + 3.0*cpmode[5] )/6.0;  // xx
-  pi[1] = cpmode[7];                                                  // xy
-  pi[2] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] - 3.0*cpmode[5] )/6.0;  // yy
-  pi[3] = cpmode[8];                                                  // xz
-  pi[4] = cpmode[9];                                                  // yz
-  pi[5] = ( cpmode[0] + cpmode[4] - cpmode[6] )/3.0;                      // zz
+  pi[0] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] + 3.0*cpmode[5] )/6.0; // xx
+  pi[1] = cpmode[7];                                                       // xy
+  pi[2] = ( 2.0*(cpmode[0] + cpmode[4]) + cpmode[6] - 3.0*cpmode[5] )/6.0; // yy
+  pi[3] = cpmode[8];                                                       // xz
+  pi[4] = cpmode[9];                                                       // yz
+  pi[5] = ( cpmode[0] + cpmode[4] - cpmode[6] )/3.0;                       // zz
 
   return 0;
 }
@@ -1550,9 +1550,9 @@ void lbadapt_get_velocity_values (p8est_iter_volume_info_t * info, void * user_d
                              NULL);
 
   /* pass it into solution vector */
-  veloc_vals[arrayoffset]     = j[0];
-  veloc_vals[arrayoffset + 1] = j[1];
-  veloc_vals[arrayoffset + 2] = j[2];
+  veloc_vals[arrayoffset]     = j[0] / rho * h / lbpar.tau;
+  veloc_vals[arrayoffset + 1] = j[1] / rho * h / lbpar.tau;
+  veloc_vals[arrayoffset + 2] = j[2] / rho * h / lbpar.tau;
 }
 
 

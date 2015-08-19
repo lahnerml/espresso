@@ -705,7 +705,7 @@ int lbadapt_calc_n_from_modes_push (int qid) {
   cell = (p8est_quadrant_t *) sc_array_index_int(&tree->quadrants, next[0] - tree->quadrants_offset);
   currCellData = (lbadapt_payload_t *) cell->p.user_data;
   double *m = currCellData->modes;
-  double *ghost_m;
+  double ghost_m[19];
 
   /* normalization factors enter in the back transformation */
   for (int i = 0; i < lbmodel.n_veloc; i++) {
@@ -734,7 +734,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[1] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[1]] =
           (ghost_m[0] - ghost_m[1] + ghost_m[5] + ghost_m[6] - ghost_m[17] - ghost_m[18]
            + 2. * (ghost_m[10] - ghost_m[16])) * lbmodel.w[2];
@@ -753,7 +759,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[2] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[2]] =
           (ghost_m[0] + ghost_m[1] + ghost_m[5] + ghost_m[6] - ghost_m[17] - ghost_m[18]
            - 2. * (ghost_m[10] + ghost_m[16])) * lbmodel.w[1];
@@ -772,7 +784,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[3] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[3]] =
           (ghost_m[0] - ghost_m[2] - ghost_m[5] + ghost_m[6] + ghost_m[17] - ghost_m[18]
            + 2. * (m[11] - m[16])) * lbmodel.w[4];
@@ -791,7 +809,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[4] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[4]] =
           (ghost_m[0] + ghost_m[2] - ghost_m[5] + ghost_m[6] + ghost_m[17] - ghost_m[18]
            - 2. * (ghost_m[11] + ghost_m[16])) * lbmodel.w[3];
@@ -810,7 +834,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[5] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[5]] =
           (ghost_m[0] - ghost_m[3] - 2.*(ghost_m[6] - ghost_m[12] + ghost_m[16] - ghost_m[18]))
           * lbmodel.w[6];
@@ -829,7 +859,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[6] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[6]] =
           (ghost_m[0] + ghost_m[3] - 2. * (ghost_m[6] + ghost_m[12] + ghost_m[16] - ghost_m[18]))
           * lbmodel.w[5];
@@ -848,7 +884,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[7] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[7]] =
           (ghost_m[0] - ghost_m[1] - ghost_m[2] + ghost_m[4] + 2.*ghost_m[6] + ghost_m[7]
            - ghost_m[10] - ghost_m[11] - ghost_m[13] - ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
@@ -868,7 +910,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[8] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[8]] =
           (ghost_m[0] + ghost_m[1] + ghost_m[2] + ghost_m[4] + 2.*ghost_m[6] + ghost_m[7]
            + ghost_m[10] + ghost_m[11] + ghost_m[13] + ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
@@ -888,7 +936,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[9] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[9]] =
           (ghost_m[0] - ghost_m[1] + ghost_m[2] + ghost_m[4] + 2.*ghost_m[6] - ghost_m[7]
            - ghost_m[10] + ghost_m[11] - ghost_m[13] + ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
@@ -908,7 +962,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[10] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[10]] =
           (ghost_m[0] + ghost_m[1] - ghost_m[2] + ghost_m[4] + 2.*ghost_m[6] - ghost_m[7]
            + ghost_m[10] - ghost_m[11] + ghost_m[13] - ghost_m[14] + ghost_m[16] + 2.*ghost_m[18])
@@ -928,7 +988,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[11] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[11]] =
           (ghost_m[0] - ghost_m[1] - ghost_m[3] + ghost_m[4] + ghost_m[5] - ghost_m[6]
            + ghost_m[8] - ghost_m[10] - ghost_m[12] + ghost_m[13] - ghost_m[15] + ghost_m[16]
@@ -948,7 +1014,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[12] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[12]] =
           (ghost_m[0] + ghost_m[1] + ghost_m[3] + ghost_m[4] + ghost_m[5] - ghost_m[6]
            + ghost_m[8] + ghost_m[10] + ghost_m[12] - ghost_m[13] + ghost_m[15] + ghost_m[16]
@@ -968,7 +1040,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[13] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[13]] =
           (ghost_m[0] - ghost_m[1] + ghost_m[3] + ghost_m[4] + ghost_m[5] - ghost_m[6]
            - ghost_m[8] - ghost_m[10] + ghost_m[12] + ghost_m[13] + ghost_m[15] + ghost_m[16]
@@ -988,7 +1066,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[14] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[14]] =
           (ghost_m[0] + ghost_m[1] - ghost_m[3] + ghost_m[4] + ghost_m[5] - ghost_m[6]
            - ghost_m[8] + ghost_m[10] - ghost_m[12] - ghost_m[13] - ghost_m[15] + ghost_m[16]
@@ -1008,7 +1092,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[15] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[15]] =
           (ghost_m[0] - ghost_m[2] - ghost_m[3] + ghost_m[4] - ghost_m[5] - ghost_m[6]
            + ghost_m[9] - ghost_m[11] - ghost_m[12] + ghost_m[14] + ghost_m[15] + ghost_m[16]
@@ -1028,7 +1118,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[16] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[16]] =
           (ghost_m[0] + ghost_m[2] + ghost_m[3] + ghost_m[4] - ghost_m[5] - ghost_m[6]
            + ghost_m[9] + ghost_m[11] + ghost_m[12] - ghost_m[14] - ghost_m[15] + ghost_m[16]
@@ -1048,7 +1144,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[17] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[17]] =
           (ghost_m[0] - ghost_m[2] + ghost_m[3] + ghost_m[4] - ghost_m[5] - ghost_m[6]
            - ghost_m[9] - ghost_m[11] + ghost_m[12] + ghost_m[14] - ghost_m[15] + ghost_m[16]
@@ -1068,7 +1170,13 @@ int lbadapt_calc_n_from_modes_push (int qid) {
     else {
       data = &lbadapt_ghost_data[next[18] - lq];
       if (ghost) {
-        ghost_m = data->modes;
+        for (int i = 0; i < 19; i++) {
+          ghost_m[i] = data->modes[i];
+        }
+        /* normalization factors enter in the back transformation */
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        }
         currCellData->lbfluid[1][inv[18]] =
           (ghost_m[0] + ghost_m[2] - ghost_m[3] + ghost_m[4] - ghost_m[5] - ghost_m[6]
            - ghost_m[9] + ghost_m[11] - ghost_m[12] - ghost_m[14] + ghost_m[15] + ghost_m[16]
@@ -1083,6 +1191,7 @@ int lbadapt_calc_n_from_modes_push (int qid) {
 
   return 0;
 }
+
 
 /*** ITERATOR CALLBACKS ***/
 void lbadapt_get_boundary_status (p8est_iter_volume_info_t * info, void * user_data) {
@@ -1136,7 +1245,7 @@ void lbadapt_get_density_values (p8est_iter_volume_info_t * info, void * user_da
   arrayoffset = local_id;      /* each local quadrant has 2^d (P4EST_CHILDREN) values in u_interp */
 
   /* just grab the value of each cell and pass it into solution vector */
-  double avg_rho = 0;//lbpar.rho[0] * h * h * h;
+  double avg_rho = lbpar.rho[0] * h * h * h;
 
   if (data->boundary) {
     dens = 0;
@@ -1200,10 +1309,10 @@ void lbadapt_set_recalc_fields (p8est_iter_volume_info_t * info, void * user_dat
   data->lbfields.recalc_fields = 1;
 }
 
+
 void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_data) {
   p8est_quadrant_t  * q     = info->quad;                           /* get current global cell id */
   lbadapt_payload_t * data  = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
-
   double h;                                                         /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
@@ -1222,10 +1331,9 @@ void lbadapt_init_force_per_cell (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_data) {
-  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
+  p8est_quadrant_t * q = info->quad;                              /* get current global cell id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
-
-  double h;                                                             /* local meshwidth */
+  double h;                                                       /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
   // convert rho to lattice units
@@ -1238,11 +1346,10 @@ void lbadapt_init_fluid_per_cell (p8est_iter_volume_info_t * info, void * user_d
 
 
 void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) {
-  double *rho = (double *) user_data;                           /* passed double to fill */
-  p8est_quadrant_t * q = info->quad;                            /* get current global cell id */
+  double *rho = (double *) user_data;                             /* passed double to fill */
+  p8est_quadrant_t * q = info->quad;                              /* get current global cell id */
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data; /* payload of cell */
-
-  double h;                                                     /* local meshwidth */
+  double h;                                                       /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
 #ifndef D3Q19
@@ -1344,7 +1451,7 @@ void lbadapt_collide_streamI (p8est_iter_volume_info_t * info, void * user_data)
   /* collect some dates from iteration info */
   p8est_quadrant_t * q = info->quad;
   lbadapt_payload_t *data = (lbadapt_payload_t *) q->p.user_data;
-  double h;                                                     /* local meshwidth */
+  double h;    /* local meshwidth */
   h = (double) P8EST_QUADRANT_LEN(q->level) / (double) P8EST_ROOT_LEN;
 
 #ifdef LB_BOUNDARIES
@@ -1384,12 +1491,12 @@ void lbadapt_collide_streamII (p8est_iter_volume_info_t *info, void *user_data) 
 void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 #ifdef D3Q19
 #ifndef PULL
-  p8est_quadrant_t  *currCell     = info->quad;     // current cell
+  p8est_quadrant_t  *currCell     = info->quad;  // current cell
   lbadapt_payload_t *currCellData =
-    (lbadapt_payload_t *) currCell->p.user_data;    // payload of current cell
-  int qid = info->quadid;                           // quadid of current cell
-  int lq = p8est->local_num_quadrants;              // local number of quadrants
-  double h;                                         // local meshwidth
+    (lbadapt_payload_t *) currCell->p.user_data; // payload of current cell
+  int qid = info->quadid;                        // quadid of current cell
+  int lq = p8est->local_num_quadrants;           // local number of quadrants
+  double h;                                      // local meshwidth
   h = (double) P8EST_QUADRANT_LEN(currCell->level) / (double) P8EST_ROOT_LEN;
 
   int next[19];
@@ -1514,10 +1621,6 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
   lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
-  double temp[19];
   std::swap(data->lbfluid[0], data->lbfluid[1]);
-  // memcpy(temp, data->lbfluid[0], sizeof(19*sizeof(double)));
-  // memcpy(data->lbfluid[0], data->lbfluid[1], sizeof(19*sizeof(double)));
-  // memcpy(data->lbfluid[1], temp, sizeof(19*sizeof(double)));
 }
 #endif // LB_ADAPTIVE

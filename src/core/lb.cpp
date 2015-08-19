@@ -2965,8 +2965,7 @@ inline void lb_collide_stream() {
   }
 #endif // LB_BOUNDARIES
   p8est_iterate (p8est,                   /* forest */
-                 // lbadapt_ghost,           /* no ghost */
-                 NULL,
+                 NULL,                    /* no ghost necessary */
                  NULL,                    /* no user_data */
                  lbadapt_collide_streamI, /* volume callback */
                  NULL,                    /* face callback */
@@ -2976,10 +2975,6 @@ inline void lb_collide_stream() {
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
   lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
-
-  std::cout << "global number of cells: " << p8est->global_num_quadrants << std::endl;
-  std::cout << "size of ghost layer: " << lbadapt_ghost->ghosts.elem_count << std::endl;
-
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 
   lbadapt_mesh = p8est_mesh_new_ext (p8est,               /* forest */
@@ -2989,8 +2984,7 @@ inline void lb_collide_stream() {
                                      P8EST_CONNECT_FULL); /* fully connected */
 
   p8est_iterate (p8est,                    /* forest */
-                 // lbadapt_ghost,            /* no ghost */
-                 NULL,
+                 NULL,                     /* no ghost necessary */
                  NULL,                     /* no user_data */
                  lbadapt_collide_streamII, /* volume callback */
                  NULL,                     /* face callback */
@@ -3002,8 +2996,7 @@ inline void lb_collide_stream() {
 
   // bounce back on boundaries
   p8est_iterate (p8est,               /* forest */
-                 // lbadapt_ghost,       /* ghost */
-                 NULL,
+                 NULL,                /* no ghost necessary */
                  NULL,                /* no user_data */
                  lbadapt_bounce_back, /* volume callback */
                  NULL,                /* face callback */
@@ -3013,8 +3006,7 @@ inline void lb_collide_stream() {
 
   // swap pre-/postcollision pointers
   p8est_iterate (p8est,                 /* forest */
-                 // lbadapt_ghost,         /* no ghost */
-                 NULL,
+                 NULL,                  /* no ghost necessary */
                  NULL,                  /* no user_data */
                  lbadapt_swap_pointers, /* volume callback */
                  NULL,                  /* face callback */
@@ -3576,6 +3568,8 @@ void calc_particle_lattice_ia() {
                     NULL,
                     NULL,
                     NULL);
+      p8est_ghost_destroy(lbadapt_ghost);
+      P4EST_FREE(lbadapt_ghost_data);
 #else // LB_ADAPTIVE
       for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
         lbfields[i].recalc_fields = 1;

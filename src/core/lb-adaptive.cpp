@@ -371,11 +371,9 @@ int lbadapt_calc_modes(double population[2][19], double * mode) {
   mode[13] = n4m + n5m - n6m - n7m;
   mode[14] = n4m - n5m - n8m - n9m;
   mode[15] = n6m - n7m - n8m + n9m;
-  mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p
-    - 2.*(n1p + n2p + n3p);
+  mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2.*(n1p + n2p + n3p);
   mode[17] = - n1p + n2p + n6p + n7p - n8p - n9p;
-  mode[18] = - n1p - n2p -n6p - n7p - n8p - n9p
-    + 2.*(n3p + n4p + n5p);
+  mode[18] = - n1p - n2p -n6p - n7p - n8p - n9p + 2.*(n3p + n4p + n5p);
 #endif // !OLD_FLUCT
 
 #else // D3Q19
@@ -425,7 +423,7 @@ int lbadapt_relax_modes (double * mode, double * force, double h) {
   pi_eq[5] = j[1] * j[2] / rho;
 
   /* relax the stress modes */
-  mode[4] = pi_eq[0] + gamma_bulk * (mode[4] - pi_eq[0]);
+  mode[4] = pi_eq[0] + gamma_bulk  * (mode[4] - pi_eq[0]);
   mode[5] = pi_eq[1] + gamma_shear * (mode[5] - pi_eq[1]);
   mode[6] = pi_eq[2] + gamma_shear * (mode[6] - pi_eq[2]);
   mode[7] = pi_eq[3] + gamma_shear * (mode[7] - pi_eq[3]);
@@ -435,15 +433,15 @@ int lbadapt_relax_modes (double * mode, double * force, double h) {
 #ifndef OLD_FLUCT
   /* relax the ghost modes (project them out) */
   /* ghost modes have no equilibrium part due to orthogonality */
-  mode[10] = gamma_odd*mode[10];
-  mode[11] = gamma_odd*mode[11];
-  mode[12] = gamma_odd*mode[12];
-  mode[13] = gamma_odd*mode[13];
-  mode[14] = gamma_odd*mode[14];
-  mode[15] = gamma_odd*mode[15];
-  mode[16] = gamma_even*mode[16];
-  mode[17] = gamma_even*mode[17];
-  mode[18] = gamma_even*mode[18];
+  mode[10] = gamma_odd  * mode[10];
+  mode[11] = gamma_odd  * mode[11];
+  mode[12] = gamma_odd  * mode[12];
+  mode[13] = gamma_odd  * mode[13];
+  mode[14] = gamma_odd  * mode[14];
+  mode[15] = gamma_odd  * mode[15];
+  mode[16] = gamma_even * mode[16];
+  mode[17] = gamma_even * mode[17];
+  mode[18] = gamma_even * mode[18];
 #endif // !OLD_FLUCT
 
   return 0;
@@ -456,72 +454,72 @@ int lbadapt_thermalize_modes(double * mode, double h) {
   double rootrho_gauss = sqrt(fabs(mode[0]+lbpar.rho[0] * h * h * h));
 
   /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss*lb_phi[4]*gaussian_random());
-  mode[5] += (fluct[1] = rootrho_gauss*lb_phi[5]*gaussian_random());
-  mode[6] += (fluct[2] = rootrho_gauss*lb_phi[6]*gaussian_random());
-  mode[7] += (fluct[3] = rootrho_gauss*lb_phi[7]*gaussian_random());
-  mode[8] += (fluct[4] = rootrho_gauss*lb_phi[8]*gaussian_random());
-  mode[9] += (fluct[5] = rootrho_gauss*lb_phi[9]*gaussian_random());
+  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random());
+  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random());
+  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random());
+  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random());
+  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random());
+  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random());
 
 #ifndef OLD_FLUCT
   /* ghost modes */
-  mode[10] += rootrho_gauss*lb_phi[10]*gaussian_random();
-  mode[11] += rootrho_gauss*lb_phi[11]*gaussian_random();
-  mode[12] += rootrho_gauss*lb_phi[12]*gaussian_random();
-  mode[13] += rootrho_gauss*lb_phi[13]*gaussian_random();
-  mode[14] += rootrho_gauss*lb_phi[14]*gaussian_random();
-  mode[15] += rootrho_gauss*lb_phi[15]*gaussian_random();
-  mode[16] += rootrho_gauss*lb_phi[16]*gaussian_random();
-  mode[17] += rootrho_gauss*lb_phi[17]*gaussian_random();
-  mode[18] += rootrho_gauss*lb_phi[18]*gaussian_random();
+  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random();
+  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random();
+  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random();
+  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random();
+  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random();
+  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random();
+  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random();
+  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random();
+  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random();
 #endif // !OLD_FLUCT
 
 #elif defined (GAUSSRANDOMCUT)
   double rootrho_gauss = sqrt(fabs(mode[0]+lbpar.rho[0] * h * h * h));
 
   /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss*lb_phi[4]*gaussian_random_cut());
-  mode[5] += (fluct[1] = rootrho_gauss*lb_phi[5]*gaussian_random_cut());
-  mode[6] += (fluct[2] = rootrho_gauss*lb_phi[6]*gaussian_random_cut());
-  mode[7] += (fluct[3] = rootrho_gauss*lb_phi[7]*gaussian_random_cut());
-  mode[8] += (fluct[4] = rootrho_gauss*lb_phi[8]*gaussian_random_cut());
-  mode[9] += (fluct[5] = rootrho_gauss*lb_phi[9]*gaussian_random_cut());
+  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random_cut());
+  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random_cut());
+  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random_cut());
+  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random_cut());
+  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random_cut());
+  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random_cut());
 
 #ifndef OLD_FLUCT
   /* ghost modes */
-  mode[10] += rootrho_gauss*lb_phi[10]*gaussian_random_cut();
-  mode[11] += rootrho_gauss*lb_phi[11]*gaussian_random_cut();
-  mode[12] += rootrho_gauss*lb_phi[12]*gaussian_random_cut();
-  mode[13] += rootrho_gauss*lb_phi[13]*gaussian_random_cut();
-  mode[14] += rootrho_gauss*lb_phi[14]*gaussian_random_cut();
-  mode[15] += rootrho_gauss*lb_phi[15]*gaussian_random_cut();
-  mode[16] += rootrho_gauss*lb_phi[16]*gaussian_random_cut();
-  mode[17] += rootrho_gauss*lb_phi[17]*gaussian_random_cut();
-  mode[18] += rootrho_gauss*lb_phi[18]*gaussian_random_cut();
+  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random_cut();
+  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random_cut();
+  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random_cut();
+  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random_cut();
+  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random_cut();
+  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random_cut();
+  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random_cut();
+  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random_cut();
+  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random_cut();
 #endif // OLD_FLUCT
 
 #elif defined (FLATNOISE)
   double rootrho = sqrt(fabs(12.0*(mode[0]+lbpar.rho[0] * h * h * h)));
 
   /* stress modes */
-  mode[4] += (fluct[0] = rootrho*lb_phi[4]*(d_random()-0.5));
-  mode[5] += (fluct[1] = rootrho*lb_phi[5]*(d_random()-0.5));
-  mode[6] += (fluct[2] = rootrho*lb_phi[6]*(d_random()-0.5));
-  mode[7] += (fluct[3] = rootrho*lb_phi[7]*(d_random()-0.5));
-  mode[8] += (fluct[4] = rootrho*lb_phi[8]*(d_random()-0.5));
-  mode[9] += (fluct[5] = rootrho*lb_phi[9]*(d_random()-0.5));
+  mode[4] += (fluct[0] = rootrho * lb_phi[4] * (d_random() - 0.5));
+  mode[5] += (fluct[1] = rootrho * lb_phi[5] * (d_random() - 0.5));
+  mode[6] += (fluct[2] = rootrho * lb_phi[6] * (d_random() - 0.5));
+  mode[7] += (fluct[3] = rootrho * lb_phi[7] * (d_random() - 0.5));
+  mode[8] += (fluct[4] = rootrho * lb_phi[8] * (d_random() - 0.5));
+  mode[9] += (fluct[5] = rootrho * lb_phi[9] * (d_random() - 0.5));
 
 #ifndef OLD_FLUCT
   /* ghost modes */
-  mode[10] += rootrho*lb_phi[10]*(d_random()-0.5);
-  mode[11] += rootrho*lb_phi[11]*(d_random()-0.5);
-  mode[12] += rootrho*lb_phi[12]*(d_random()-0.5);
-  mode[13] += rootrho*lb_phi[13]*(d_random()-0.5);
-  mode[14] += rootrho*lb_phi[14]*(d_random()-0.5);
-  mode[15] += rootrho*lb_phi[15]*(d_random()-0.5);
-  mode[16] += rootrho*lb_phi[16]*(d_random()-0.5);
-  mode[17] += rootrho*lb_phi[17]*(d_random()-0.5);
-  mode[18] += rootrho*lb_phi[18]*(d_random()-0.5);
+  mode[10] += rootrho * lb_phi[10] * (d_random() - 0.5);
+  mode[11] += rootrho * lb_phi[11] * (d_random() - 0.5);
+  mode[12] += rootrho * lb_phi[12] * (d_random() - 0.5);
+  mode[13] += rootrho * lb_phi[13] * (d_random() - 0.5);
+  mode[14] += rootrho * lb_phi[14] * (d_random() - 0.5);
+  mode[15] += rootrho * lb_phi[15] * (d_random() - 0.5);
+  mode[16] += rootrho * lb_phi[16] * (d_random() - 0.5);
+  mode[17] += rootrho * lb_phi[17] * (d_random() - 0.5);
+  mode[18] += rootrho * lb_phi[18] * (d_random() - 0.5);
 #endif // !OLD_FLUCT
 #else // GAUSSRANDOM
 #error No noise type defined for the CPU LB

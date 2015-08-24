@@ -427,7 +427,7 @@ int lb_lbfluid_set_agrid(double p_agrid){
       if (fabs(box_l[dir]-tmp[dir]*p_agrid) > ROUND_ERROR_PREC) {
         ostringstream msg;
         msg <<"Lattice spacing p_agrid= " << p_agrid << " is incompatible with box_l[" << dir << "]="
-          << box_l[dir] << ", factor=" << tmp[dir] << " err= " << fabs(box_l[dir]-tmp[dir]*p_agrid);
+            << box_l[dir] << ", factor=" << tmp[dir] << " err= " << fabs(box_l[dir]-tmp[dir]*p_agrid);
         runtimeError(msg);
       }
     }
@@ -1679,8 +1679,8 @@ static void halo_push_communication() {
    * X direction *
    ***************/
   count = 5*lblattice.halo_grid[1]*lblattice.halo_grid[2];
-  sbuf = (double*) malloc(count*sizeof(double));
-  rbuf = (double*) malloc(count*sizeof(double));
+    sbuf = (double*) Utils::malloc(count*sizeof(double));
+    rbuf = (double*) Utils::malloc(count*sizeof(double));
 
   /* send to right, recv from left i = 1, 7, 9, 11, 13 */
   snode = node_neighbors[1];
@@ -1774,8 +1774,8 @@ static void halo_push_communication() {
    * Y direction *
    ***************/
   count = 5*lblattice.halo_grid[0]*lblattice.halo_grid[2];
-  sbuf = (double*) realloc(sbuf, count*sizeof(double));
-  rbuf = (double*) realloc(rbuf, count*sizeof(double));
+    sbuf = (double*) Utils::realloc(sbuf, count*sizeof(double));
+    rbuf = (double*) Utils::realloc(rbuf, count*sizeof(double));
 
   /* send to right, recv from left i = 3, 7, 10, 15, 17 */
   snode = node_neighbors[3];
@@ -1873,8 +1873,8 @@ static void halo_push_communication() {
    * Z direction *
    ***************/
   count = 5*lblattice.halo_grid[0]*lblattice.halo_grid[1];
-  sbuf = (double*) realloc(sbuf, count*sizeof(double));
-  rbuf = (double*) realloc(rbuf, count*sizeof(double));
+    sbuf = (double*) Utils::realloc(sbuf, count*sizeof(double));
+    rbuf = (double*) Utils::realloc(rbuf, count*sizeof(double));
 
   /* send to right, recv from left i = 5, 11, 14, 15, 18 */
   snode = node_neighbors[5];
@@ -2036,8 +2036,8 @@ void lb_pre_init() {
   // one can define p4ests verbosity here.
   p4est_init(NULL, SC_LP_PRODUCTION);
 #else // LB_ADAPTIVE
-  lbfluid[0]  = (double**) malloc(2*lbmodel.n_veloc*sizeof(double *));
-  lbfluid[0][0] = (double*) malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
+  lbfluid[0]  = (double**) Utils::malloc(2*lbmodel.n_veloc*sizeof(double *));
+  lbfluid[0][0] = (double*) Utils::malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
 #endif // LB_ADAPTIVE
 }
 
@@ -2049,8 +2049,8 @@ static void lb_realloc_fluid() {
 
   LB_TRACE(printf("reallocating fluid\n"));
 
-  lbfluid[0]  = (double**) realloc(*lbfluid,2*lbmodel.n_veloc*sizeof(double *));
-  lbfluid[0][0] = (double*) realloc(**lbfluid,2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
+    lbfluid[0]    = (double**) Utils::realloc(*lbfluid,2*lbmodel.n_veloc*sizeof(double *));
+    lbfluid[0][0] = (double*) Utils::realloc(**lbfluid,2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
   lbfluid[1]  = (double **)lbfluid[0] + lbmodel.n_veloc;
   lbfluid[1][0] = (double *)lbfluid[0][0] + lblattice.halo_grid_volume*lbmodel.n_veloc;
 
@@ -2059,7 +2059,7 @@ static void lb_realloc_fluid() {
     lbfluid[1][i] = lbfluid[1][0] + i*lblattice.halo_grid_volume;
   }
 
-  lbfields = (LB_FluidNode*) realloc(lbfields,lblattice.halo_grid_volume*sizeof(*lbfields));
+    lbfields = (LB_FluidNode*) Utils::realloc(lbfields,lblattice.halo_grid_volume*sizeof(*lbfields));
 #endif // LB_ADAPTIVE
 }
 
@@ -2083,7 +2083,7 @@ static void lb_prepare_communication() {
   prepare_halo_communication(&comm, &lblattice, FIELDTYPE_DOUBLE, MPI_DOUBLE);
 
   update_halo_comm.num = comm.num;
-  update_halo_comm.halo_info = (HaloInfo*) realloc(update_halo_comm.halo_info,comm.num*sizeof(HaloInfo));
+    update_halo_comm.halo_info = (HaloInfo*) Utils::realloc(update_halo_comm.halo_info,comm.num*sizeof(HaloInfo));
 
   /* replicate the halo structure */
   for (i=0; i<comm.num; i++) {
@@ -2349,7 +2349,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
   double local_rho, local_j[3], local_pi[6], trace;
   const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
 
-  local_rho  = rho;
+  local_rho = rho;
 
   local_j[0] = j[0];
   local_j[1] = j[1];

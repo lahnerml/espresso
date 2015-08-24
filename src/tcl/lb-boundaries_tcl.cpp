@@ -280,7 +280,7 @@ LB_Boundary *generate_lbboundary()
 {
   n_lb_boundaries++;
 
-  lb_boundaries = (LB_Boundary*) realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));
+  lb_boundaries = (LB_Boundary*) Utils::realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));
 
   assert (lb_boundaries != NULL);
 

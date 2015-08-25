@@ -3545,9 +3545,9 @@ void calc_particle_lattice_ia() {
     if (lbpar.resend_halo) { /* first MD step after last LB update */
       /* exchange halo regions (for fluid-particle coupling) */
 #ifdef LB_ADAPTIVE
-      lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
-      lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
-      p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+      // lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_FULL);
+      // lbadapt_ghost_data = P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+      // p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 #else // LB_ADAPTIVE
       halo_communication(&update_halo_comm, (char*)**lbfluid);
 #endif // LB ADAPTIVE
@@ -3561,15 +3561,15 @@ void calc_particle_lattice_ia() {
 
       /* all fields have to be recalculated */
 #ifdef LB_ADAPTIVE
-      p8est_iterate(p8est,
+      /* p8est_iterate(p8est,
                     NULL,
                     NULL,
                     lbadapt_set_recalc_fields,
                     NULL,
                     NULL,
-                    NULL);
-      p8est_ghost_destroy(lbadapt_ghost);
-      P4EST_FREE(lbadapt_ghost_data);
+                    NULL); */
+      // p8est_ghost_destroy(lbadapt_ghost);
+      // P4EST_FREE(lbadapt_ghost_data);
 #else // LB_ADAPTIVE
       for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
         lbfields[i].recalc_fields = 1;

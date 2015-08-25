@@ -2034,7 +2034,8 @@ void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
   // one can define p4ests verbosity here.
-  p4est_init(NULL, SC_LP_PRODUCTION);
+  p4est_init(NULL, SC_LP_ESSENTIAL);
+  // p4est_init(NULL, SC_LP_PRODUCTION);
 #else // LB_ADAPTIVE
   lbfluid[0]  = (double**) Utils::malloc(2*lbmodel.n_veloc*sizeof(double *));
   lbfluid[0][0] = (double*) Utils::malloc(2*lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));

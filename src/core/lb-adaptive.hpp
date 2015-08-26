@@ -88,13 +88,22 @@ void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
 
-/** Refinement function that refines all cells with probability 0. with probability 0.55
+/** Refinement function that refines all cells with probability 0.55
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
  * \param [in] quadrant    The Quadrant.
  */
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
+
+/** Refinement function that refines all cells for whichs anchor point holds 0.25 <= z < 0.75
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ */
+int refine_regional (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q);
 
 
 /*** HELPER FUNCTIONS ***/

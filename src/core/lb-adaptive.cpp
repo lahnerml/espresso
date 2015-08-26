@@ -131,6 +131,17 @@ int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 }
 
 
+int refine_regional (p8est_t *p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q) {
+  if ((0.25 <= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
+                ((double)(1 << (int)q->level))) + 1./((double)(1 << (int)q->level))) &&
+      (0.75 >= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
+                ((double)(1 << (int)q->level))))) {
+    return 1;
+  }
+  return 0;
+}
+
+
 /*** HELPER FUNCTIONS ***/
 void lbadapt_get_midpoint (p8est_t * p8est,
                            p4est_topidx_t which_tree,
@@ -1542,6 +1553,12 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
   // with boundary cells ending in the ghost layer.
 
   for (int i = 0; i < 19; i++) {
+    // skip adaptive stuff
+    if (next[i] < 0 ||
+        lbadapt_mesh->quad_to_edge[next[i]] < 0 ||
+        lbadapt_mesh->quad_to_edge[next[i]] > 23) {
+      continue;
+    }
     tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
                                                lbadapt_mesh->quad_to_tree[next[i]]);
     if (next[i] < lq) {

@@ -180,6 +180,7 @@ static int terminated = 0;
   CB(mpi_lbadapt_vtk_print_velocity) \
   CB(mpi_unif_refinement) \
   CB(mpi_rand_refinement) \
+  CB(mpi_reg_refinement) \
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -2185,7 +2186,7 @@ void mpi_bcast_constraint_slave(int node, int parm)
   else {
     memmove(&constraints[parm],&constraints[n_constraints-1],sizeof(Constraint));
     n_constraints--;
-    constraints = (Constraint*)Utils::realloc(constraints,n_constraints*sizeof(Constraint));    
+    constraints = (Constraint*)Utils::realloc(constraints,n_constraints*sizeof(Constraint));
   }
 
   on_constraint_change();
@@ -2245,7 +2246,7 @@ void mpi_bcast_lbboundary_slave(int node, int parm)
   else {
     memmove(&lb_boundaries[parm],&lb_boundaries[n_lb_boundaries-1],sizeof(LB_Boundary));
     n_lb_boundaries--;
-    lb_boundaries = (LB_Boundary*) Utils::realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));    
+    lb_boundaries = (LB_Boundary*) Utils::realloc(lb_boundaries,n_lb_boundaries*sizeof(LB_Boundary));
   }
 #endif
 
@@ -2879,6 +2880,12 @@ void mpi_rand_refinement (int node, int maxLevel) {
 #endif // LB_ADAPTIVE
 }
 
+void mpi_reg_refinement (int node, int param) {
+  p8est_refine (p8est, 0, refine_regional, NULL);
+  p8est_balance (p8est, P8EST_CONNECT_FULL, lbadapt_init);
+  p8est_partition (p8est, 0, NULL);
+}
+
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES
   if (node==this_node) {
@@ -3319,7 +3326,7 @@ void mpi_external_potential_sum_energies() {
   for (int i=0; i<n_external_potentials; i++) {
     energies[i]=external_potentials[i].energy;
   }
-  double* energies_sum = (double*) Utils::malloc(n_external_potentials*sizeof(double)); 
+  double* energies_sum = (double*) Utils::malloc(n_external_potentials*sizeof(double));
   MPI_Reduce(energies, energies_sum, n_external_potentials, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
   for (int i=0; i<n_external_potentials; i++) {
     external_potentials[i].energy=energies_sum[i];

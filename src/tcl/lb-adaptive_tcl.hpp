@@ -31,4 +31,5 @@ int tclcommand_set_unif_ref(ClientData data,Tcl_Interp *interp, int argc, char *
 
 int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
+int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 #endif // LB_ADAPTIVE_TCL

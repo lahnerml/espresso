@@ -120,6 +120,31 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
 }
 
 
+static void
+lbadapt_replace_quads (p8est_t * p8est,
+                       p4est_topidx_t which_tree,
+                       int num_outgoing,
+                       p8est_quadrant_t * outgoing[],
+                       int num_incoming,
+                       p8est_quadrant_t * incoming[]) {
+  lbadapt_payload_t *parent_data, *child_data;
+  double h;
+
+  if (num_outgoing > 1) {
+    // coarsening
+  } else {
+    // refinement
+    parent_data = (lbadapt_payload_t *) outgoing[0]->p.user_data;
+    for (int i = 0; i < P8EST_CHILDREN; i++) {
+      child_data = (lbadapt_payload_t *) incoming[i]->p.user_data;
+      for (int j = 0; j < lbmodel.n_veloc; j++) {
+        child_data->lbfluid[0][j] = parent_data->lbfluid[0][j];
+      }
+    }
+  }
+}
+
+
 /*** REFINEMENT ***/
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
   return 1;

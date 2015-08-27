@@ -2881,8 +2881,15 @@ void mpi_rand_refinement (int node, int maxLevel) {
 }
 
 void mpi_reg_refinement (int node, int param) {
-  p8est_refine (p8est, 0, refine_regional, NULL);
-  p8est_balance (p8est, P8EST_CONNECT_FULL, lbadapt_init);
+  p8est_refine (p8est,                  // forest
+                0,                      // no recursive refinement
+                refine_regional,        // return true to refine cell
+                lbadapt_init);           // init data
+  // lbadapt_replace_quads); // replace data
+  p8est_balance (p8est,                 // forest
+                 P8EST_CONNECT_FULL,    // connection type
+                 lbadapt_init);          // init data
+  // lbadapt_replace_quads);// replace data
   p8est_partition (p8est, 0, NULL);
 }
 

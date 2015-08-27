@@ -74,8 +74,33 @@ extern lbadapt_payload_t    *lbadapt_ghost_data;
  */
 
 /** setup function
+ *
+ * \param [in]      p8est      The forest
+ * \param [in]      which_tree The tree in the forest containing \a quadrant
+ * \param [in][out] quadrant   The quadrant to be initialized
  */
-void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+void lbadapt_init (p8est_t* p8est,
+		   p4est_topidx_t which_tree,
+		   p8est_quadrant_t *quadrant);
+
+
+/** interpolating function
+ *
+ * \param [in]      p8est        The forest
+ * \param [in]      which_tree   The tree in the forest \a q.
+ * \param [in]      num_outgoing The number of quadrants being replaced.
+ *                               1 for refinement, 8 for coarsening.
+ * \param [in]      outgoing     The actual quadrants that will be replaced.
+ * \param [in]      num_incoming The number of quadarants that will be added.
+ * \param [in][out] incoming     Quadrants whose data needs to be initialized.
+ */
+static void
+lbadapt_replace_quads (p8est_t * p8est,
+                       p4est_topidx_t which_tree,
+                       int num_outgoing,
+                       p8est_quadrant_t * outgoing[],
+                       int num_incoming,
+                       p8est_quadrant_t * incoming[]);
 
 
 /*** REFINEMENT ***/

@@ -2126,13 +2126,13 @@ void lb_reinit_parameters() {
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
-    gamma_shear = 1. - 2./(6.*lbpar.viscosity[0]*lbpar.tau/(lbpar.agrid*lbpar.agrid)+1.);
+    gamma_shear = 1. - 2./(6.*lbpar.viscosity[0]*lbpar.tau/SQR(lbpar.agrid)+1.);
   }
 
   if (lbpar.bulk_viscosity[0] > 0.0) {
     /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
-    gamma_bulk = 1. - 2./(9.*lbpar.bulk_viscosity[0]*lbpar.tau/(lbpar.agrid*lbpar.agrid)+1.);
+    gamma_bulk = 1. - 2./(9.*lbpar.bulk_viscosity[0]*lbpar.tau/SQR(lbpar.agrid)+1.);
   }
 
   gamma_odd = lbpar.gamma_odd[0];
@@ -2140,14 +2140,13 @@ void lb_reinit_parameters() {
 
   double mu = 0.0;
 
-  if (temperature > 0.0)
-    {
+  if (temperature > 0.0) {
     /* fluctuating hydrodynamics ? */
     fluct = 1;
 
     /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).
      * Note that the modes are not normalized as in the paper here! */
-    mu = temperature/lbmodel.c_sound_sq*lbpar.tau*lbpar.tau/(lbpar.agrid*lbpar.agrid);
+    mu = temperature/lbmodel.c_sound_sq*SQR(lbpar.tau)/SQR(lbpar.agrid);
     //mu *= agrid*agrid*agrid;  // Marcello's conjecture
 #ifdef D3Q19
     double (*e)[19] = d3q19_modebase;
@@ -2176,7 +2175,7 @@ void lb_reinit_parameters() {
      */
     lb_coupl_pref = sqrt(12.*2.*lbpar.friction[0]*temperature/time_step);
     lb_coupl_pref2 = sqrt(2.*lbpar.friction[0]*temperature/time_step);
-    } else {
+  } else {
     /* no fluctuations at zero temperature */
     fluct = 0;
     for (i = 0; i < lbmodel.n_veloc; i++) lb_phi[i] = 0.0;

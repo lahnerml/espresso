@@ -2273,6 +2273,8 @@ void lb_reinit_fluid() {
 void lb_init() {
   LB_TRACE(printf("Begin initialzing fluid on CPU\n"));
 
+  /* allocate regular grid */
+#ifndef LB_ADAPTIVE
   if (lbpar.agrid <= 0.0) {
     ostringstream msg;
     msg << "Lattice Boltzmann agrid not set when initializing fluid";
@@ -2281,8 +2283,6 @@ void lb_init() {
 
   if (check_runtime_errors()) return;
 
-  /* allocate regular grid */
-#ifndef LB_ADAPTIVE
   double temp_agrid[3];
   double temp_offset[3];
   for (int i = 0; i < 3; i++) {
@@ -2294,13 +2294,13 @@ void lb_init() {
   lblattice.init(temp_agrid, temp_offset, 1, 0);
 
   if (check_runtime_errors()) return;
-#endif // !LB_ADAPTIVE
 
   /* allocate memory for data structures */
   lb_realloc_fluid();
 
   /* prepare the halo communication */
   lb_prepare_communication();
+#endif // !LB_ADAPTIVE
 
   /* initialize derived parameters */
   lb_reinit_parameters();

@@ -94,13 +94,12 @@ void lbadapt_init (p8est_t* p8est,
  * \param [in]      num_incoming The number of quadarants that will be added.
  * \param [in][out] incoming     Quadrants whose data needs to be initialized.
  */
-static void
-lbadapt_replace_quads (p8est_t * p8est,
-                       p4est_topidx_t which_tree,
-                       int num_outgoing,
-                       p8est_quadrant_t * outgoing[],
-                       int num_incoming,
-                       p8est_quadrant_t * incoming[]);
+void lbadapt_replace_quads (p8est_t * p8est,
+			    p4est_topidx_t which_tree,
+			    int num_outgoing,
+			    p8est_quadrant_t * outgoing[],
+			    int num_incoming,
+			    p8est_quadrant_t * incoming[]);
 
 
 /*** REFINEMENT ***/

@@ -57,6 +57,7 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **
   return TCL_OK;
 }
 
+
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char **argv) {
   /* container for parameters */
   int level = 0;
@@ -88,6 +89,7 @@ int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char 
   return TCL_OK;
 }
 
+
 int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
   int level;
 
@@ -113,6 +115,21 @@ int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char *
 
   mpi_call(mpi_rand_refinement, -1, level);
   mpi_rand_refinement(0, level);
+
+  return TCL_OK;
+}
+
+
+int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+  if (argc != 1) {
+    Tcl_AppendResult(interp,
+        "Setting regional refinement does not allow setting parameters.",
+        (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_reg_refinement, -1, 0);
+  mpi_reg_refinement(0, 0);
 
   return TCL_OK;
 }

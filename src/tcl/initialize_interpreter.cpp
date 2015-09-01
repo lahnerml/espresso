@@ -1,20 +1,20 @@
 /*
   Copyright (C) 2012,2013,2014 The ESPResSo project
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <tcl.h>
 #include <unistd.h>
@@ -102,7 +102,7 @@ int tclcommand_cuda(ClientData data, Tcl_Interp *interp,
 int tclcommand_imd(ClientData data, Tcl_Interp *interp,
 		   int argc, char **argv);
 /** tcl procedure for nemd steering.
-    USAGE: nemd \<n_slabs\> \<n_exchange\>   
+    USAGE: nemd \<n_slabs\> \<n_exchange\>
     see also \ref tclcommand_nemd. See \ref nemd_tcl.cpp */
 int tclcommand_nemd(ClientData data, Tcl_Interp *interp,
 		    int argc, char **argv);
@@ -205,6 +205,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);
   REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
   REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
+  REGISTER_COMMAND("lbadapt-regref", tclcommand_set_reg_ref);
 #endif // LB_ADAPTIVE
   /* here */
   REGISTER_COMMAND("replacestdchannel", tclcommand_replacestdchannel);
@@ -255,7 +256,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
 #endif
 #ifdef CUDA
   REGISTER_COMMAND("harmonic_well", tclcommand_HarmonicWell);
-  
+
 #ifdef ROTATION
   REGISTER_COMMAND("harmonic_orientation_well", tclcommand_HarmonicOrientationWell);
 #endif
@@ -311,7 +312,7 @@ int tcl_appinit(Tcl_Interp *interp)
   char *scriptdir = getenv("ESPRESSO_SCRIPTS");
   if (!scriptdir)
     scriptdir = get_default_scriptsdir();
-  
+
   /*  fprintf(stderr,"Script directory: %s\n", scriptdir);*/
 
   char cwd[1024];

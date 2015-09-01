@@ -500,6 +500,8 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len);
 void mpi_unif_refinement (int node, int level);
 
 void mpi_rand_refinement (int node, int maxLevel);
+
+void mpi_reg_refinement (int node, int param=0);
 #endif // LB_ADAPTIVE
 
 

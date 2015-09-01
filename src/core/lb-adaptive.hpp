@@ -74,8 +74,32 @@ extern lbadapt_payload_t    *lbadapt_ghost_data;
  */
 
 /** setup function
+ *
+ * \param [in]      p8est      The forest
+ * \param [in]      which_tree The tree in the forest containing \a quadrant
+ * \param [in][out] quadrant   The quadrant to be initialized
  */
-void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+void lbadapt_init (p8est_t* p8est,
+		   p4est_topidx_t which_tree,
+		   p8est_quadrant_t *quadrant);
+
+
+/** interpolating function
+ *
+ * \param [in]      p8est        The forest
+ * \param [in]      which_tree   The tree in the forest \a q.
+ * \param [in]      num_outgoing The number of quadrants being replaced.
+ *                               1 for refinement, 8 for coarsening.
+ * \param [in]      outgoing     The actual quadrants that will be replaced.
+ * \param [in]      num_incoming The number of quadarants that will be added.
+ * \param [in][out] incoming     Quadrants whose data needs to be initialized.
+ */
+void lbadapt_replace_quads (p8est_t * p8est,
+			    p4est_topidx_t which_tree,
+			    int num_outgoing,
+			    p8est_quadrant_t * outgoing[],
+			    int num_incoming,
+			    p8est_quadrant_t * incoming[]);
 
 
 /*** REFINEMENT ***/
@@ -88,13 +112,22 @@ void lbadapt_init (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
 
 
-/** Refinement function that refines all cells with probability 0. with probability 0.55
+/** Refinement function that refines all cells with probability 0.55
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
  * \param [in] quadrant    The Quadrant.
  */
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant);
+
+
+/** Refinement function that refines all cells for whichs anchor point holds 0.25 <= z < 0.75
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ */
+int refine_regional (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q);
 
 
 /*** HELPER FUNCTIONS ***/

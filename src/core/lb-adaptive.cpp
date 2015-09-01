@@ -120,6 +120,41 @@ void lbadapt_init(p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q
 }
 
 
+void lbadapt_replace_quads (p8est_t * p8est,
+                            p4est_topidx_t which_tree,
+                            int num_outgoing,
+                            p8est_quadrant_t * outgoing[],
+                            int num_incoming,
+                            p8est_quadrant_t * incoming[]) {
+  lbadapt_payload_t *parent_data, *child_data;
+  double h;
+
+  if (num_outgoing > 1) {
+    // coarsening
+  } else {
+    // refinement
+    parent_data = (lbadapt_payload_t *) outgoing[0]->p.user_data;
+    h = (double) P8EST_QUADRANT_LEN(incoming[0]->level) / (double) P8EST_ROOT_LEN;
+    for (int i = 0; i < P8EST_CHILDREN; i++) {
+      child_data = (lbadapt_payload_t *) incoming[i]->p.user_data;
+      // init cells: first insert lbfields as good as possible
+      // and calc populations from those values.
+      // init force
+      for (int j = 0; j < 3; j++) child_data->lbfields.force[j] = 0.25 * parent_data->lbfields.force[j];
+      child_data->lbfields.rho[0] = 0.125 * parent_data->lbfields.rho[0];
+      for (int j = 0; j < 3; j++) child_data->lbfields.j[j] = 0.;
+      for (int j = 0; j < 6; j++) child_data->lbfields.pi[j] = 0.;
+
+      lbadapt_calc_n_from_rho_j_pi(child_data->lbfluid,
+                                   child_data->lbfields.rho[0],
+                                   child_data->lbfields.j,
+                                   child_data->lbfields.pi,
+                                   h);
+    }
+  }
+}
+
+
 /*** REFINEMENT ***/
 int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
   return 1;
@@ -128,6 +163,17 @@ int refine_uniform (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t 
 
 int refine_random (p8est_t* p8est, p4est_topidx_t which_tree, p8est_quadrant_t *quadrant) {
   return rand() % 2;
+}
+
+
+int refine_regional (p8est_t *p8est, p4est_topidx_t which_tree, p8est_quadrant_t *q) {
+  if ((0.25 <= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
+                ((double)(1 << (int)q->level))) + 1./((double)(1 << (int)q->level))) &&
+      (0.75 >= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
+                ((double)(1 << (int)q->level))))) {
+    return 1;
+  }
+  return 0;
 }
 
 
@@ -156,9 +202,7 @@ int lbadapt_calc_n_from_rho_j_pi (double datafield[2][19],
 
   local_rho  = rho;
 
-  local_j[0] = j[0];
-  local_j[1] = j[1];
-  local_j[2] = j[2];
+  for (i = 0; i < 3; i++) local_j[i] = j[i];
 
   for (i = 0; i < 6; i++) local_pi[i] = pi[i];
 
@@ -194,37 +238,37 @@ int lbadapt_calc_n_from_rho_j_pi (double datafield[2][19],
   tmp2 = 2.0 * local_pi[1];
 
   datafield[0][7]  = rho_times_coeff + 1./12.*(local_j[0]+local_j[1])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][8]  = rho_times_coeff - 1./12.*(local_j[0]+local_j[1])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][9]  = rho_times_coeff + 1./12.*(local_j[0]-local_j[1])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
   datafield[0][10] = rho_times_coeff - 1./12.*(local_j[0]-local_j[1])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
 
   tmp1 = local_pi[0] + local_pi[5];
   tmp2 = 2.0 * local_pi[3];
 
   datafield[0][11] = rho_times_coeff + 1./12.*(local_j[0]+local_j[2])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][12] = rho_times_coeff - 1./12.*(local_j[0]+local_j[2])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][13] = rho_times_coeff + 1./12.*(local_j[0]-local_j[2])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
   datafield[0][14] = rho_times_coeff - 1./12.*(local_j[0]-local_j[2])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
 
   tmp1 = local_pi[2] + local_pi[5];
   tmp2 = 2.0 * local_pi[4];
 
   datafield[0][15] = rho_times_coeff + 1./12.*(local_j[1]+local_j[2])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][16] = rho_times_coeff - 1./12.*(local_j[1]+local_j[2])
-                     + 1./8.*(tmp1+tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1+tmp2) - 1./24.*trace;
   datafield[0][17] = rho_times_coeff + 1./12.*(local_j[1]-local_j[2])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
   datafield[0][18] = rho_times_coeff - 1./12.*(local_j[1]-local_j[2])
-                     + 1./8.*(tmp1-tmp2) - 1./24.*trace;
+                     + 0.125*(tmp1-tmp2) - 1./24.*trace;
 #else // D3Q19
   int i;
   double tmp=0.0;
@@ -1542,6 +1586,12 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
   // with boundary cells ending in the ghost layer.
 
   for (int i = 0; i < 19; i++) {
+    // skip adaptive stuff
+    if (next[i] < 0 ||
+        lbadapt_mesh->quad_to_edge[next[i]] < 0 ||
+        lbadapt_mesh->quad_to_edge[next[i]] > 23) {
+      continue;
+    }
     tree = (p8est_tree_t *) sc_array_index_int(p8est->trees,
                                                lbadapt_mesh->quad_to_tree[next[i]]);
     if (next[i] < lq) {

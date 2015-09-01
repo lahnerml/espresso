@@ -320,7 +320,7 @@ void lb_calc_modes(index_t index, double *mode);
 inline void lb_calc_local_rho(index_t index, double *rho) {
 #ifndef LB_ADAPTIVE
 #ifndef D3Q19
-#error Only D3Q19 is implemened!
+#error Only D3Q19 is implemented!
 #endif // D3Q19
 
   // unit conversion: mass density

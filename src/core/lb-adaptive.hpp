@@ -242,5 +242,8 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data);
 
 
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data);
+
+
+void lbadapt_dump2file (p8est_iter_volume_info_t * info, void * user_data);
 #endif // LB_ADAPTIVE
 #endif //LB_ADAPTIVE_H

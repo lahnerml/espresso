@@ -26,6 +26,7 @@
  */
 
 #include <stdlib.h>
+#include <fstream>
 #include <iostream>
 #include <algorithm>
 
@@ -1672,5 +1673,24 @@ void lbadapt_bounce_back (p8est_iter_volume_info_t * info, void * user_data) {
 void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
   lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
   std::swap(data->lbfluid[0], data->lbfluid[1]);
+}
+
+
+void lbadapt_dump2file (p8est_iter_volume_info_t * info, void * user_data) {
+  lbadapt_payload_t * data = (lbadapt_payload_t *) info->quad->p.user_data;
+  std::string * filename = (std::string *) user_data;
+
+  ofstream myfile;
+  myfile.open(*filename);
+  myfile << "id: " << info->quadid << std::endl << " - distributions: pre streaming: ";
+  for (int i = 0; i < 19; i++) myfile << data->lbfluid[0][i] << " - ";
+  myfile << std::endl << "post streaming: ";
+  for (int i = 0; i < 19; i++) myfile << data->lbfluid[1][i] << " - ";
+  myfile << std::endl << "modes: ";
+  for (int i = 0; i < 19; i++) myfile << data->modes[i] << " - ";
+  myfile.flush();
+  myfile.close();
+
+  return;
 }
 #endif // LB_ADAPTIVE

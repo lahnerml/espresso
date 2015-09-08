@@ -81,6 +81,9 @@ void lbboundary_mindist_position(double pos[3], double* mindist, double distvec[
       case CONSTRAINT_SPHEROCYLINDER:
         calculate_spherocylinder_dist(p1, pos, (Particle*) NULL, &lb_boundaries[n].c.spherocyl, &dist, vec);
         break;
+	  case LB_BOUNDARY_VOXEL: // needed for fluid calculation ???
+		  calculate_voxel_dist(p1, pos, (Particle*) NULL, &lb_boundaries[n].c.voxel, &dist, vec);
+        break;
     }
 
     if (dist<*mindist || n == 0) {
@@ -197,6 +200,11 @@ void lb_init_boundaries() {
               case LB_BOUNDARY_SPHEROCYLINDER:
                 calculate_spherocylinder_dist((Particle*) NULL, pos, (Particle*) NULL, &lb_boundaries[n].c.spherocyl, &dist_tmp, dist_vec);
                 break;
+
+			  case LB_BOUNDARY_VOXEL:	// voxel data do not need dist
+				//calculate_voxel_dist((Particle*) NULL, pos, (Particle*) NULL, &lb_boundaries[n].c.voxel, &dist_tmp, dist_vec);
+				dist_tmp=1e99;
+				break;
 
               default:
                 ostringstream msg;
@@ -347,6 +355,11 @@ void lb_init_boundaries() {
                 calculate_hollow_cone_dist((Particle*) NULL, pos, (Particle*) NULL, &lb_boundaries[n].c.hollow_cone, &dist_tmp, dist_vec);
                 break;
 
+              case LB_BOUNDARY_VOXEL:	// voxel data do not need dist
+                dist_tmp=1e99;
+                //calculate_voxel_dist((Particle*) NULL, pos, (Particle*) NULL, &lb_boundaries[n].c.voxel, &dist_tmp, dist_vec);
+				break;
+                
               default:
                 ostringstream msg;
                 msg <<"lbboundary type " << lb_boundaries[n].type << " not implemented in lb_init_boundaries()\n";

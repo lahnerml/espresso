@@ -560,7 +560,7 @@ void lb_bounce_back() {
                 lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k] + population_shift;
               } else {
                 // else bounce back
-                lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k];
+                lbfluid[1][reverse[i]][k-next[i]]   = lbfluid[1][i][k] = 0.0;
               }
             }
           }

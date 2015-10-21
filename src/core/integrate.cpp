@@ -302,7 +302,7 @@ void integrate_vv(int n_steps, int reuse_forces)
       rescale_forces();
 #ifdef ROTATION
       convert_initial_torques();
-#endif
+#endif // ROTATION
     }
 
     thermo_cool_down();
@@ -312,8 +312,8 @@ void integrate_vv(int n_steps, int reuse_forces)
     if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO)
       for(int j=0;j<3;++j)
         nptiso.p_vir[j] += virial_store[j];
-#endif
-#endif
+#endif // NPT
+#endif // MULTI_TIMESTEP
 
 #ifdef COLLISION_DETECTION
     handle_collisions();
@@ -556,8 +556,12 @@ void integrate_vv(int n_steps, int reuse_forces)
   }
 
   /* verlet list statistics */
-  if(n_verlet_updates>0) verlet_reuse = n_steps/(double) n_verlet_updates;
-  else verlet_reuse = 0;
+  if (n_verlet_updates>0) {
+    verlet_reuse = n_steps/(double) n_verlet_updates;
+  }
+  else {
+    verlet_reuse = 0;
+  }
 
 #ifdef NPT
   if(integ_switch == INTEG_METHOD_NPT_ISO) {

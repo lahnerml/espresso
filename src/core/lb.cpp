@@ -3179,6 +3179,7 @@ inline void lb_stream_collide() {
  * This function is called from the integrator. Since the time step
  * for the lattice dynamics can be coarser than the MD time step, we
  * monitor the time since the last lattice update.
+ * Good practice: tau == time_step
  */
 void lattice_boltzmann_update() {
   int factor = (int)round(lbpar.tau/time_step);

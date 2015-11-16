@@ -1,6 +1,6 @@
 # Copyright (C) 2012,2013,2014 The ESPResSo project
 # Copyright (C) 2006,2007,2008,2009,2010,2011 Olaf Lenz, Axel Arnold
-# Copyright (C) 2008,2009,2010 
+# Copyright (C) 2008,2009,2010
 #   Max-Planck-Institute for Polymer Research, Theory Group
 #
 # This program is free software: you can redistribute it and/or modify
@@ -95,7 +95,7 @@ AS_IF([test x"$use_mpi_fake" = xyes], [
     AS_HELP_STRING([--with-mympiexec@<:@=SCRIPT@:>@],
       [specify the mpiexec-like program or script that should be
        used to run ESPResSo in parallel. If the script doesn't
-       exist, it will try to use mpiexec. 
+       exist, it will try to use mpiexec.
 	 @<:@SCRIPT=./mympiexec.sh@:>@]),
     [if test x"$with_mympiexec" = xno; then
        MYMPIEXEC=""
@@ -196,8 +196,8 @@ AC_PATH_PROG(PDFLATEX,pdflatex,no)
 AC_PATH_PROG(MAKEINDEX,makeindex,no)
 AC_PATH_PROG(BIBTEX,bibtex,no)
 AM_CONDITIONAL(HAVE_LATEX,
-	[test .$PDFLATEX != .no && 
-	test .$MAKEINDEX != .no && 
+	[test .$PDFLATEX != .no &&
+	test .$MAKEINDEX != .no &&
 	test .$BIBTEX != .no])
 
 
@@ -276,7 +276,7 @@ AC_ARG_WITH([cuda],
 	specified by setting the NVCC environment variable. The CUDA
 	library and header can be manually specified by using
 	CPPFLAGS, LDFLAGS and LIBS. [guess]]), ,
-	with_cuda=guess) 
+	with_cuda=guess)
 AC_MSG_RESULT($with_cuda)
 
 AS_IF([test x$with_cuda = xguess || test x$with_cuda = xyes],[
@@ -310,7 +310,7 @@ AS_IF([test x$with_cuda != xno],[
     # since we link with mpic++, we need to find the cuda libraries manually
     ES_ADDPATH_CHECK_LIB(cudart, cudaGetDevice, [], [
         cuda_ok=no
-        
+
         AS_IF([test x$with_cuda = xyes],[
             AC_MSG_FAILURE([could not find cuda runtime library (cudart), specify location using LDFLAGS])
         ],[
@@ -320,7 +320,7 @@ AS_IF([test x$with_cuda != xno],[
 
     ES_ADDPATH_CHECK_LIB(cufft, cufftPlan3d, [], [
         cuda_ok=no
-        
+
         AS_IF([test x$with_cuda = xyes],[
             AC_MSG_FAILURE([could not find cuda FFT library (cufft), specify location using LDFLAGS])
         ],[
@@ -330,7 +330,7 @@ AS_IF([test x$with_cuda != xno],[
 
     ES_ADDPATH_CHECK_LIB(cublas, cublasDgemm_v2, [], [
         cuda_ok=no
-        
+
         AS_IF([test x$with_cuda = xyes],[
             AC_MSG_FAILURE([could not find cuda BLAS library (cublas), specify location using LDFLAGS])
         ],[
@@ -340,7 +340,7 @@ AS_IF([test x$with_cuda != xno],[
 
     ES_ADDPATH_CHECK_HEADER([cublas_v2.h],, [
     	cuda_ok=no
-        
+
         AS_IF([test x$with_cuda = xyes],[
             AC_MSG_FAILURE([could not find cuda BLAS header files (cublas_v2.h), specify location using CPPFLAGS])
         ],[
@@ -351,7 +351,7 @@ AS_IF([test x$with_cuda != xno],[
 
     ES_ADDPATH_CHECK_LIB(curand, curandCreateGenerator, [], [
         cuda_ok=no
-        
+
         AS_IF([test x$with_cuda = xyes],[
             AC_MSG_FAILURE([could not find cuda RAND library (curand), specify location using LDFLAGS])
         ],[
@@ -361,15 +361,15 @@ AS_IF([test x$with_cuda != xno],[
 
     # NVCC compile check
     AC_MSG_CHECKING([whether CUDA compiles])
-    
+
     # if no other compute capability is defined by the user, we default to 2.0
     case "$NVCCFLAGS" in
        *-arch=*) ;;
        *) NVCCFLAGS="$NVCCFLAGS --ptxas-options=-v -gencode arch=compute_20,code=compute_20"
     esac
-    
+
     # use nvcc
-    
+
     # autoconf currently doesn't allow to define new languages like cuda, this is a workaround
     save_noncuda_CXX=$CXX
     save_noncuda_CXXFLAGS=$CXXFLAGS
@@ -381,7 +381,7 @@ AS_IF([test x$with_cuda != xno],[
     # libtool linking options likely break NVCC linking, sort out all but simple -L options
     AS_IF([test -n "$LDFLAGS"],[ LDFLAGS="-Xlinker `echo $LDFLAGS | sed -e ['s|-[^L][^ 	]*||g' -e 's|[ 	][ 	]*|,|g']`" ])
     AS_IF([test -n "$LIBS"   ],[ LIBS="-Xlinker `echo $LIBS | sed ['s|[ 	][ 	]*|,|g']`"])
-    
+
     AC_COMPILE_IFELSE([AC_LANG_PROGRAM([#include <cuda.h>],[cudaGetDevice(0);])], [
         AC_MSG_RESULT(yes)
     ],[
@@ -396,9 +396,9 @@ AS_IF([test x$with_cuda != xno],[
 
     # NVCC compile check
     AC_MSG_CHECKING([whether CUDA runs])
-    
+
     AC_RUN_IFELSE([AC_LANG_PROGRAM([#include <cuda.h>],[
-    int no; 
+    int no;
     cudaGetDeviceCount(&no);
     if (no == 0) return 1;
     ])], [
@@ -420,8 +420,8 @@ AS_IF([test x$with_cuda != xno],[
     CXXFLAGS=$save_noncuda_CXXFLAGS
     LDFLAGS=$save_noncuda_LDFLAGS
     LIBS=$save_noncuda_LIBS
-    
-    AS_IF([test x$cuda_ok == xyes], [       
+
+    AS_IF([test x$cuda_ok == xyes], [
         AC_DEFINE(CUDA,[],[Whether CUDA is available])
     ],[
         # reset standard compiler options
@@ -499,7 +499,7 @@ AC_MSG_RESULT($with_arpack)
 
 ES_ADDPATH_CHECK_LIB(arpack, dnaupd_, [arpack_found=yes], [
 	arpack_found=no
-        
+
         AS_IF([test x$with_arpack = xyes],[
             AC_MSG_FAILURE([could not find ARPACK library, specify location using LDFLAGS])
         ],[
@@ -552,17 +552,17 @@ EOF
 
 ES_ADDPATH_CHECK_LIB(sc, sc_init, [p4est_found=yes], [
 	p4est_found=no
-        
+
         AS_IF([test x$with_p4est = xyes],[
             AC_MSG_FAILURE([could not find sc library in $p4est_path which is needed for p4est, specify location using LDFLAGS])
         ],[
             AC_MSG_WARN([could not find p4est library. Some features will not be available!])
         ])
     ], [$p4est_path/lib])
-    
+
 ES_ADDPATH_CHECK_HEADER([sc.h],, [
    	p4est_found=no
-        
+
         AS_IF([test x$with_p4est = xyes],[
             AC_MSG_FAILURE([could not find sc library header files specify location using CPPFLAGS])
         ],[
@@ -578,17 +578,17 @@ EOF
 
 ES_ADDPATH_CHECK_LIB(p4est, p4est_init, [p4est_found=yes], [
 	p4est_found=no
-        
+
         AS_IF([test x$with_p4est = xyes],[
             AC_MSG_FAILURE([could not find p4est library in $p4est_path, specify location using LDFLAGS])
         ],[
             AC_MSG_WARN([could not find p4est library. Some features will not be available!])
         ])
     ], [$p4est_path/lib])
-    
+
 ES_ADDPATH_CHECK_HEADER([p4est.h],, [
    	p4est_found=no
-        
+
         AS_IF([test x$with_p4est = xyes],[
             AC_MSG_FAILURE([could not find p4est library header files specify location using CPPFLAGS])
         ],[
@@ -630,13 +630,13 @@ if test .$PYTHON != .no; then
 fi
 
 AC_MSG_CHECKING([whether the python interface is wanted])
-AC_ARG_WITH([python-interface], AS_HELP_STRING([--with-python-interface], 
+AC_ARG_WITH([python-interface], AS_HELP_STRING([--with-python-interface],
                       [specify whether or not to use python [guess]]),
                       [], [with_python_interface=guess])
 AC_MSG_RESULT($with_python_interface)
-dnl with_python_interface=yes  try to find a working PYTHON devel version, 
+dnl with_python_interface=yes  try to find a working PYTHON devel version,
 dnl                            bail out if none is found
-dnl with_python_interface=guess  try to find a working PYTHON devel version, 
+dnl with_python_interface=guess  try to find a working PYTHON devel version,
 dnl with_python_interface=no   do not use python interface
 
 AS_IF([test .$with_python_interface != .no], [
@@ -657,7 +657,7 @@ AS_IF([test .$with_python_interface != .no], [
 
 	AS_IF([test .$with_python_interface = .yes && test .$build_python_interface = .no],
 		[AC_MSG_FAILURE([Cannot build python interface!])])
-   	AC_DEFINE(PYTHON_DEV,[],[Whether Python is available]) 
+   	AC_DEFINE(PYTHON_DEV,[],[Whether Python is available])
 ])
 AM_CONDITIONAL(PYTHON_INTERFACE, [test .$build_python_interface = .yes])
 # export libtool objdir, so that we can link the .so files to the dir itself
@@ -715,7 +715,7 @@ case $target_os in
 esac
 
 if test .$use_tcl != .none; then
-   ES_ADDPATH_CHECK_HEADER(tcl.h, [], 
+   ES_ADDPATH_CHECK_HEADER(tcl.h, [],
 			[AC_MSG_FAILURE([
 ********************************************************************************
 * Could not find the Tcl header files (tcl.h).                                 *
@@ -789,7 +789,7 @@ Try --with-tcl=tcl to also use a generic Tcl version, which may fit better.])
 		  extrapaths="/usr/include/$version /usr/include/$use_tcl" ;;
 	(*) ;;
 	esac
-	ES_ADDPATH_CHECK_HEADER(tk.h, [], 
+	ES_ADDPATH_CHECK_HEADER(tk.h, [],
 		[AC_MSG_ERROR([Tk headers not found. Please add the include path to CPPFLAGS (e.g. configure CPPFLAGS=-I/usr/include/tcl8.4).])
 		]
 		,$extrapaths)
@@ -809,7 +809,7 @@ AC_MSG_RESULT($with_h5md)
 if test .$with_h5md = .yes; then
   ES_ADDPATH_CHECK_LIB(hdf5,H5open,[hdf5_found=yes],[hdf5_found=no])
 
-  ES_ADDPATH_CHECK_HEADER(hdf5.h, [], 
+  ES_ADDPATH_CHECK_HEADER(hdf5.h, [],
 		[AC_MSG_ERROR([hdf5 headers not found. Please add the include path to
                        CPPFLAGS (e.g. configure CPPFLAGS=-I/usr/include/hdf5).])
 		]
@@ -843,7 +843,7 @@ AC_MSG_RESULT($with_efence)
 
 ##################################
 # Handling the myconfig-header
-AC_ARG_VAR([MYCONFIG], 
+AC_ARG_VAR([MYCONFIG],
            [Which myconfig file to use. @<:@myconfig.hpp@:>@])
 AC_MSG_CHECKING([whether the variable MYCONFIG is set])
 AS_IF([test "x$MYCONFIG" != "x"], [
@@ -892,7 +892,7 @@ AC_CONFIG_FILES([
 	src/python/espressomd/Makefile
 	src/core/unit_tests/Makefile
 	tools/Makefile
-	scripts/Makefile 
+	scripts/Makefile
 	testsuite/Makefile
 	doc/Makefile
 	doc/logo/Makefile
@@ -901,14 +901,14 @@ AC_CONFIG_FILES([
 	doc/doxygen/Makefile
 	doc/tutorials/Makefile
 	doc/tutorials/00-building_espresso/Makefile
-	doc/tutorials/01-lennard_jones/Makefile 
-	doc/tutorials/02-charged_system/Makefile 
-	doc/tutorials/03-object_in_fluid/Makefile 
-        doc/tutorials/04-lattice_boltzmann/Makefile 
-	doc/tutorials/05-raspberry_electrophoresis/Makefile 
-	doc/tutorials/06-active_matter/Makefile 
-	doc/tutorials/07-electrokinetics/Makefile 
-	doc/tutorials/08-visualization/Makefile 
+	doc/tutorials/01-lennard_jones/Makefile
+	doc/tutorials/02-charged_system/Makefile
+	doc/tutorials/03-object_in_fluid/Makefile
+        doc/tutorials/04-lattice_boltzmann/Makefile
+	doc/tutorials/05-raspberry_electrophoresis/Makefile
+	doc/tutorials/06-active_matter/Makefile
+	doc/tutorials/07-electrokinetics/Makefile
+	doc/tutorials/08-visualization/Makefile
 	doc/latexit.sh
 	])
 AC_CONFIG_FILES([testsuite/runtest.sh],

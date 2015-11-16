@@ -324,9 +324,6 @@ inline void force_calc()
   // mark that forces are now up-to-date
   recalc_forces = 0;
 
-#ifdef COLLISION_DETECTION
-  handle_collisions();
-#endif // COLLISION_DETECTION
 }
 
 
@@ -574,7 +571,7 @@ inline void add_non_bonded_pair_force(Particle *p1, Particle *p2,
   switch (coulomb.Dmethod) {
 #ifdef DP3M
   case  DIPOLAR_MDLC_P3M:
-   //fall trough
+   //fall through
   case DIPOLAR_P3M: {
 #ifdef NPT
     double eng = dp3m_add_pair_force(p1,p2,d,dist2,dist,force);

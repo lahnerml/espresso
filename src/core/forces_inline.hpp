@@ -76,8 +76,7 @@
 #include "quartic.hpp"
 #ifdef ELECTROSTATICS
 #include "bonded_coulomb.hpp"
-#endif // ELECTROSTATICS
-#include "actor/EwaldgpuForce_ShortRange.hpp"
+#include "actor/EwaldGPU_ShortRange.hpp"
 #include "debye_hueckel.hpp"
 #include "reaction_field.hpp"
 #endif

@@ -66,6 +66,7 @@ if (WITH_PYTHON)
   find_package(Cython REQUIRED)
   find_package(PythonLibs REQUIRED)
   find_package(NumPy REQUIRED)
+  list(APPEND LIBRARIES ${PYTHON_LIBRARY})
 endif(WITH_PYTHON)
 
 find_package(FFTW3)
@@ -87,8 +88,10 @@ find_package(HDF5)
 if(HDF5_FOUND)
   set(H5MD 1)
   list(APPEND LIBRARIES ${HDF5_LIBRARIES})
-  include_directories(${HDF5_INCLUDE_DIRES})
+  include_directories(${HDF5_INCLUDE_DIRS})
 endif()
+
+include(RequireCXX11)
 
 #######################################################################
 # Process MPI settings

@@ -134,7 +134,7 @@ dummy_SOURCES = dummy.cpp
 # Also, like this, the .so-files are installed to the right place.
 LAFILES = $(PYXFILES:.pyx=.la)
 $(LAFILES): %.la: %.lo
-	$(AM_V_CXXLD)$(CXXLINK) -rpath $(pyexecdir) $<
+	$(AM_V_CXXLD)$(CXXLINK) -rpath $(abs_builddir) -L$(top_builddir)/src/core/.libs -lEspresso -rpath $(pyexecdir) $<
 CLEANFILES += $(LAFILES)
 
 # create links to the ./libs/*.so in the dir
@@ -154,7 +154,7 @@ gen_pxiconfig.cpp: $(srcdir)/gen_pxiconfig.py $(top_srcdir)/src/features.def
 	$(AM_V_GEN)$(PYTHON) $(srcdir)/gen_pxiconfig.py \
 	  $(top_srcdir)/src/features.def gen_pxiconfig.cpp
 
-gen_pxiconfig_CPPFLAGS=-I$(top_srcdir)/src/core -I$(top_builddir)/src/core -I$(top_builddir)/src
+gen_pxiconfig_CPPFLAGS=-I$(top_srcdir)/src/core -I$(top_builddir)/src/core -I$(top_builddir)/src -DHAVE_CONFIG_H
 gen_pxiconfig: gen_pxiconfig.cpp $(top_builddir)/src/core/config.hpp $(top_builddir)/src/core/myconfig-final.hpp
 	$(AM_V_CXXLD)$(CXXLINK) $(gen_pxiconfig_CPPFLAGS) $<
 

@@ -1,4 +1,6 @@
-# Copyright (C) 2014 Olaf Lenz
+# Copyright (C) 2009,2010,2011,2012,2015 The ESPResSo project
+# Copyright (C) 2009,2010 
+#   Max-Planck-Institute for Polymer Research, Theory Group
 #
 # This file is part of ESPResSo.
 #
@@ -15,20 +17,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#
-# Define the espressomd package
 
-# Initialize MPI, start the main loop on the slaves
-import espressomd._init
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-# Initialize the Tcl Interpreter if available
-try:
-    import espressomd._tcl
-    tcl = espressomd._tcl.TclInterpreter()
-except ImportError:
-    pass
+message(STATUS "writing ${CMAKE_BINARY_DIR}/myconfig-sample.hpp")
+execute_process(COMMAND ${PYTHON_EXECUTABLE}  
+                ${CMAKE_CURRENT_SOURCE_DIR}/gen_sampleconfig.py 
+                ${CMAKE_SOURCE_DIR}/src/features.def
+                OUTPUT_FILE ${CMAKE_BINARY_DIR}/myconfig-sample.hpp
+                )
 
-espressomd._init.setup()
 
-from espressomd.system import System
-from espressomd.code_info import features
+

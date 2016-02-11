@@ -79,6 +79,7 @@
 #include "actor/EwaldGPU_ShortRange.hpp"
 #include "debye_hueckel.hpp"
 #include "reaction_field.hpp"
+#include "scafacos.hpp"
 #endif
 #ifdef IMMERSED_BOUNDARY
 #include "immersed_boundary/ibm_main.hpp"
@@ -423,9 +424,16 @@ inline void add_non_bonded_pair_force(Particle *p1, Particle *p2,
 	  if (q1q2) add_ewald_gpu_coulomb_pair_force(p1,p2,d,dist,force);
 	  break;
 #endif
-  default:
-	  break;
-  }
+#ifdef SCAFACOS
+     case COULOMB_SCAFACOS:
+       if(q1q2) {
+         Electrostatics::Scafacos::add_pair_force(p1, p2, d, dist, force);
+       }
+       break;
+#endif
+     default:
+       break;
+   }
 
 #endif /*ifdef ELECTROSTATICS */
 

@@ -566,6 +566,10 @@ int lb_lbfluid_print_vtk_density(char** filename);
 int lb_lbfluid_print_boundary(char* filename);
 int lb_lbfluid_print_velocity(char* filename);
 
+/** debug **/
+void lb_dump2file(std::string filename, int id, double* preStreaming,
+                  double* postStreaming, double *modes);
+
 int lb_lbfluid_save_checkpoint(char* filename, int binary);
 int lb_lbfluid_load_checkpoint(char* filename, int binary);
 

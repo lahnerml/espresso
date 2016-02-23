@@ -27,6 +27,11 @@
  *
  */
 
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include <algorithm>
+
 #include <mpi.h>
 #include <cstdio>
 #include "utils.hpp"
@@ -634,6 +639,63 @@ int lb_lbfluid_get_ext_force (double* p_f) {
 #endif // LB
   }
   return 0;
+}
+
+int separateBy2(int x) {
+  if(4 == sizeof(x)) {
+    x &= 0x0000ffff;
+    x = (x ^ (x << 8)) & 0x00ff00ff;
+    x = (x ^ (x << 4)) & 0x0f0f0f0f;
+    x = (x ^ (x << 2)) & 0x33333333;
+    x = (x ^ (x << 1)) & 0x55555555;
+  }
+  else if (8 == sizeof(x)) {
+    x &= 0x00000000ffffffff;
+    x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
+    x = (x ^ (x <<  8)) & 0x00ff00ff00ff00ff;
+    x = (x ^ (x <<  4)) & 0x0f0f0f0f0f0f0f0f;
+    x = (x ^ (x <<  2)) & 0x3333333333333333;
+    x = (x ^ (x <<  1)) & 0x5555555555555555;
+  }
+  return x;
+}
+
+int mortonEnc(int x, int y, int z) {
+  return (separateBy2(x) | separateBy2(y) << 1 | separateBy2(z) << 2);
+}
+
+void lb_dump2file(std::string filename, int id, double* preStreaming,
+                  double* postStreaming, double *modes) {
+  std::ofstream myfile;
+  myfile.open(filename);
+
+  // convert id from lexicographic to Morton index
+  int gridsize[3];
+  int x, y, z;
+
+  gridsize[0] = box_l[0] / lbpar.agrid;
+  gridsize[1] = box_l[1] / lbpar.agrid;
+  gridsize[2] = box_l[2] / lbpar.agrid;
+
+  x = id % gridsize[0];
+  id = (int) id / gridsize[0];
+  y = id % gridsize[1];
+  id = (int) id / gridsize[1];
+  z = id % gridsize[2];
+
+  id = mortonEnc(x, y, z);
+
+  myfile << "id: " << id << std::endl
+         << " - distributions: pre streaming: ";
+  for (int i = 0; i < 19; ++i) myfile << preStreaming[i] << " - ";
+  myfile << std::endl << "post streaming: ";
+  for (int i = 0; i < 19; ++i) myfile << postStreaming[i] << " - ";
+  myfile << std::endl << "modes: ";
+  for (int i = 0; i < 19; ++i) myfile << modes[i] << " - ";
+  myfile << std::endl << std::endl << std::endl;
+  myfile.flush();
+  myfile.close();
+
 }
 
 
@@ -2993,6 +3055,13 @@ inline void lb_collide_stream() {
                  NULL                 /* corner callback */
   );
 
+  std::stringstream ss;
+  ss << "lbadapt_" << p8est->mpirank << ".txt";
+
+  std::string * filename;
+  *filename = ss.str();
+  p8est_iterate(p8est, NULL, filename, lbadapt_dump2file, NULL, NULL, NULL);
+
   // swap pre-/postcollision pointers
   p8est_iterate (p8est,                 /* forest */
                  NULL,                  /* no ghost necessary */
@@ -3061,6 +3130,21 @@ inline void lb_collide_stream() {
 #else // EXTERNAL_FORCES
           if (lbfields[index].has_force) lb_apply_forces(index, modes);
 #endif // EXTERNAL_FORCES
+
+          std::stringstream ss;
+          ss << "lbreg.txt";
+
+          std::string * filename;
+          *filename = ss.str();
+
+          double preStreaming[19], postStreaming[19];
+          for (int i = 0; i < 19; ++i) {
+            preStreaming[i]  = lbfluid[0][i][index];
+            postStreaming[i] = lbfluid[1][i][index];
+          }
+
+          lb_dump2file(*filename, index, preStreaming, postStreaming, modes);
+
 
           /* transform back to populations and streaming */
           lb_calc_n_from_modes_push(index, modes);

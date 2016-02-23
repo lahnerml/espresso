@@ -1364,9 +1364,7 @@ void lbadapt_calc_local_rho (p8est_iter_volume_info_t * info, void * user_data) 
 
   // unit conversion: mass density
   if (!(lattice_switch & LATTICE_LB)) {
-      ostringstream msg;
-      msg <<"Error in lb_calc_local_rho in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-      runtimeError(msg);
+      runtimeErrorMsg() <<"Error in lb_calc_local_rho in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
     *rho = 0;
     return;
   }
@@ -1400,9 +1398,7 @@ void lbadapt_calc_local_j (p8est_iter_volume_info_t * info, void *user_data) {
 #error Only D3Q19 is implemened!
 #endif // D3Q19
   if (!(lattice_switch & LATTICE_LB)) {
-    ostringstream msg;
-    msg <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
-    runtimeError(msg);
+    runtimeErrorMsg() <<"Error in lb_calc_local_j in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
     j[0]=j[1]=j[2]=0;
     return;
   }
@@ -1639,19 +1635,21 @@ void lbadapt_swap_pointers (p8est_iter_volume_info_t * info, void * user_data) {
 
 void lbadapt_dump2file (p8est_iter_volume_info_t * info, void * user_data) {
   lbadapt_payload_t * data = (lbadapt_payload_t *) info->quad->p.user_data;
-  std::string * filename = (std::string *) user_data;
 
-  ofstream myfile;
+  std::string * filename = (std::string *) user_data;
+  std::ofstream myfile;
   myfile.open(*filename);
-  myfile << "id: " << info->quadid << std::endl << " - distributions: pre streaming: ";
-  for (int i = 0; i < 19; i++) myfile << data->lbfluid[0][i] << " - ";
+  myfile << "id: " << info->quadid << std::endl
+         << " - distributions: pre streaming: ";
+  for (int i = 0; i < 19; ++i) myfile << data->lbfluid[0][i] << " - ";
   myfile << std::endl << "post streaming: ";
-  for (int i = 0; i < 19; i++) myfile << data->lbfluid[1][i] << " - ";
+  for (int i = 0; i < 19; ++i) myfile << data->lbfluid[1][i] << " - ";
   myfile << std::endl << "modes: ";
-  for (int i = 0; i < 19; i++) myfile << data->modes[i] << " - ";
+  for (int i = 0; i < 19; ++i) myfile << data->modes[i] << " - ";
+  myfile << std::endl << std::endl;
+
   myfile.flush();
   myfile.close();
-
-  return;
 }
+
 #endif // LB_ADAPTIVE

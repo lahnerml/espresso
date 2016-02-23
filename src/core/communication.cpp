@@ -3022,6 +3022,7 @@ void mpi_rand_refinement (int node, int maxLevel) {
 }
 
 void mpi_reg_refinement (int node, int param) {
+#ifdef LB_ADAPTIVE
   p8est_refine_ext (p8est,                  // forest
                     0,                      // no recursive refinement
                     P8EST_MAXLEVEL - 1,
@@ -3044,6 +3045,7 @@ void mpi_reg_refinement (int node, int param) {
                  lbadapt_init);          // init data
   */
   p8est_partition (p8est, 0, NULL);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {

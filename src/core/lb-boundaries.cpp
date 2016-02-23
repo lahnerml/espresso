@@ -430,9 +430,7 @@ int lbadapt_is_boundary(double pos[3]) {
         break;
 
       default:
-        ostringstream msg;
-        msg <<"lbboundary type " << lb_boundaries[n].type << " not implemented in lb_init_boundaries()\n";
-        runtimeError(msg);
+        runtimeErrorMsg() <<"lbboundary type " << lb_boundaries[n].type << " not implemented in lb_init_boundaries()\n";
     }
 
     if (dist_tmp < dist || n == 0) {

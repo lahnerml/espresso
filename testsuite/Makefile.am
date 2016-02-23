@@ -21,7 +21,9 @@ tests = \
 	analysis.tcl \
 	angle.tcl \
 	bonded_coulomb.tcl \
+	collision-detection-angular.tcl \
 	collision-detection-centers.tcl \
+	collision-detection-glue.tcl \
 	collision-detection-poc.tcl \
 	comforce.tcl \
 	comfixed.tcl \
@@ -29,9 +31,9 @@ tests = \
 	constraints.tcl \
 	constraints_reflecting.tcl \
 	correlation.tcl \
-	correlation_checkpoint.tcl \
 	constraints_rhomboid.tcl \
 	coulomb_cloud_wall.tcl \
+	dawaanr-and-dds-gpu.tcl \
 	dh.tcl \
 	dielectric.tcl \
 	dihedral.tcl \
@@ -65,6 +67,7 @@ tests = \
 	intppbc.tcl \
 	kinetic.tcl \
 	langevin.tcl \
+	langevin_per_particle.tcl \
 	layered.tcl \
 	lb.tcl \
 	lb_fluid_coupling.tcl \
@@ -85,6 +88,7 @@ tests = \
 	magnetic-field.tcl \
 	mass.tcl \
 	mass-and-rinertia.tcl \
+	mass-and-rinertia_per_particle.tcl \
 	mdlc.tcl \
 	minimize_energy.tcl \
 	minimize_energy_rotation.tcl \

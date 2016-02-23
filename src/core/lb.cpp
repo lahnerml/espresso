@@ -83,6 +83,8 @@ LB_Parameters lbpar = {
     {0.},
     // gamma_even
     {0.},
+    // is_TRT
+    false,
     // resend_halo
     0
 };
@@ -297,11 +299,13 @@ int lb_lbfluid_set_bulk_visc (double *p_bulk_visc) {
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
       lbpar_gpu.bulk_viscosity[ii] = (float)p_bulk_visc[ii];
+      lbpar_gpu.is_TRT = false;
       on_lb_params_change_gpu(LBPAR_BULKVISC);
 #endif // LB_GPU
     } else {
 #ifdef LB
       lbpar.bulk_viscosity[ii] = p_bulk_visc[ii];
+      lbpar.is_TRT = false;
       mpi_bcast_lb_params(LBPAR_BULKVISC);
 #endif // LB
     }
@@ -316,11 +320,13 @@ int lb_lbfluid_set_gamma_odd (double *p_gamma_odd) {
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
       lbpar_gpu.gamma_odd[ii] = (float)p_gamma_odd[ii];
+      lbpar_gpu.is_TRT = false;
       on_lb_params_change_gpu(0);
 #endif // LB_GPU
     } else {
 #ifdef LB
       lbpar.gamma_odd[ii] = gamma_odd = p_gamma_odd[ii];
+      lbpar.is_TRT = false;
       mpi_bcast_lb_params(0);
 #endif // LB
     }
@@ -335,11 +341,13 @@ int lb_lbfluid_set_gamma_even (double *p_gamma_even) {
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
       lbpar_gpu.gamma_even[ii] = (float)p_gamma_even[ii];
+      lbpar_gpu.is_TRT = false;
       on_lb_params_change_gpu(0);
 #endif // LB_GPU
     } else {
 #ifdef LB
       lbpar.gamma_even[ii] = gamma_even = p_gamma_even[ii];
+      lbpar.is_TRT = false;
       mpi_bcast_lb_params(0);
 #endif // LB
     }
@@ -423,10 +431,8 @@ int lb_lbfluid_set_agrid (double p_agrid) {
     for (int dir=0;dir<3;dir++) {
       /* check if box_l is compatible with lattice spacing */
       if (fabs(box_l[dir]-tmp[dir]*p_agrid) > ROUND_ERROR_PREC) {
-        ostringstream msg;
-        msg <<"Lattice spacing p_agrid= " << p_agrid << " is incompatible with box_l[" << dir << "]="
+          runtimeErrorMsg() <<"Lattice spacing p_agrid= " << p_agrid << " is incompatible with box_l[" << dir << "]="
             << box_l[dir] << ", factor=" << tmp[dir] << " err= " << fabs(box_l[dir]-tmp[dir]*p_agrid);
-        runtimeError(msg);
       }
     }
     lbpar_gpu.number_of_nodes = lbpar_gpu.dim_x * lbpar_gpu.dim_y * lbpar_gpu.dim_z;
@@ -1260,9 +1266,7 @@ int lb_lbfluid_load_checkpoint(char* filename, int binary) {
 //  mpi_bcast_lb_params(0);
 #endif // LB
   } else {
-    ostringstream msg;
-    msg <<"To load an LB checkpoint one needs to have already initialized the LB fluid with the same grid size.";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"To load an LB checkpoint one needs to have already initialized the LB fluid with the same grid size.";
     return ES_ERROR;
   }
   return ES_OK;
@@ -1962,51 +1966,35 @@ int lb_sanity_checks() {
   int ret = 0;
 
   if (lbpar.agrid <= 0.0) {
-    ostringstream msg;
-    msg <<"Lattice Boltzmann agrid not set";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"Lattice Boltzmann agrid not set";
     ret = 1;
   }
   if (lbpar.tau <= 0.0) {
-    ostringstream msg;
-    msg <<"Lattice Boltzmann time step not set";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"Lattice Boltzmann time step not set";
     ret = 1;
   }
   if (lbpar.rho[0] <= 0.0) {
-    ostringstream msg;
-    msg <<"Lattice Boltzmann fluid density not set";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"Lattice Boltzmann fluid density not set";
     ret = 1;
   }
   if (lbpar.viscosity[0] <= 0.0) {
-    ostringstream msg;
-    msg <<"Lattice Boltzmann fluid viscosity not set";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"Lattice Boltzmann fluid viscosity not set";
     ret = 1;
   }
   if (cell_structure.type != CELL_STRUCTURE_DOMDEC) {
-    ostringstream msg;
-    msg <<"LB requires domain-decomposition cellsystem";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"LB requires domain-decomposition cellsystem";
     ret = -1;
   }
   if (skin == 0.0) {
-    ostringstream msg;
-    msg <<"LB requires a positive skin";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"LB requires a positive skin";
     ret = 1;
   }
   if (dd.use_vList && skin>=lbpar.agrid/2.0) {
-    ostringstream msg;
-    msg <<"LB requires either no Verlet lists or that the skin of the verlet list to be less than half of lattice-Boltzmann grid spacing";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"LB requires either no Verlet lists or that the skin of the verlet list to be less than half of lattice-Boltzmann grid spacing";
     ret = -1;
   }
   if (thermo_switch & ~THERMO_LB) {
-    ostringstream msg;
-    msg <<"LB must not be used with other thermostats";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"LB must not be used with other thermostats";
     ret = 1;
   }
   return ret;
@@ -2122,6 +2110,24 @@ void lb_reinit_parameters() {
 
   gamma_odd = lbpar.gamma_odd[0];
   gamma_even = lbpar.gamma_even[0];
+
+    if (lbpar.is_TRT) {
+        gamma_bulk = gamma_shear;
+        gamma_even = gamma_shear;
+        gamma_odd = -(7.0*gamma_even+1.0)/(gamma_even+7.0);
+        //gamma_odd = gamma_shear; //uncomment for BGK
+    }
+
+    //gamma_shear = 0.0; //uncomment for special case of BGK
+    //gamma_bulk = 0.0;
+    //gamma_odd = 0.0;
+    //gamma_even = 0.0;
+
+    //printf("gamma_shear=%e\n", gamma_shear);
+    //printf("gamma_bulk=%e\n", gamma_bulk);
+    //printf("gamma_odd=%e\n", gamma_odd);
+    //printf("gamma_even=%e\n", gamma_even);
+    //printf("\n");
 
   double mu = 0.0;
 
@@ -2260,9 +2266,7 @@ void lb_init() {
   /* allocate regular grid */
 #ifndef LB_ADAPTIVE
   if (lbpar.agrid <= 0.0) {
-    ostringstream msg;
-    msg << "Lattice Boltzmann agrid not set when initializing fluid";
-    runtimeError(msg);
+      runtimeErrorMsg() <<"Lattice Boltzmann agrid not set when initializing fluid";
   }
 
   if (check_runtime_errors()) return;
@@ -3179,6 +3183,7 @@ inline void lb_stream_collide() {
  * This function is called from the integrator. Since the time step
  * for the lattice dynamics can be coarser than the MD time step, we
  * monitor the time since the last lattice update.
+ * Good practice: tau == time_step
  */
 void lattice_boltzmann_update() {
   int factor = (int)round(lbpar.tau/time_step);
@@ -3722,9 +3727,7 @@ void lb_calc_average_rho() {
 static int compare_buffers(double *buf1, double *buf2, int size) {
   int ret;
   if (memcmp(buf1,buf2,size)) {
-    ostringstream msg;
-    msg <<"Halo buffers are not identical";
-    runtimeError(msg);
+        runtimeErrorMsg() <<"Halo buffers are not identical";
     ret = 1;
   } else {
     ret = 0;

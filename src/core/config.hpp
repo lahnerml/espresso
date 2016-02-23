@@ -29,8 +29,17 @@
     the documentation of the features.
  */
 
+#ifdef HAVE_CONFIG_H
 /* Include the defines created by configure. */
 #include <acconfig.hpp>
+#else
+#include <cmake_config.hpp>
+#endif
+
+/* If nvcc is used we disable c++11 support. */
+#if defined(__CUDACC__) && defined(HAVE_CXX11)
+#undef HAVE_CXX11
+#endif
 
 /* Prevent C++ bindings in MPI (there is a DataType called LB in there) */
 #define OMPI_SKIP_MPICXX

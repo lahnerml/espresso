@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
 
    This file is part of ESPResSo.
-  
+
    ESPResSo is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-   
+
    ESPResSo is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -47,25 +47,25 @@
 #error The implementation only works for D3Q19 so far!
 #endif
 
-#if (LB_COMPONENTS==1) 
+#if (LB_COMPONENTS==1)
 #    define  SC0 {0.0}
 #    define  SC20 {0.0, 0.0}
 #    define  SC1 {1.0}
 #    define  SCM1 {-1.0}
-#endif 
-#if (LB_COMPONENTS==2) 
-#    define  SC0 { 0.0 , 0.0 } 
+#endif
+#if (LB_COMPONENTS==2)
+#    define  SC0 { 0.0 , 0.0 }
 #    define  SC20 {0.0, 0.0, 0.0, 0.0}
-#    define  SC1 { 1.0 , 1.0 } 
-#    define  SCM1 { -1.0, -1.0 } 
-#endif 
+#    define  SC1 { 1.0 , 1.0 }
+#    define  SCM1 { -1.0, -1.0 }
+#endif
 
 
 /** Struct holding the Lattice Boltzmann parameters */
 // LB_parameters_gpu lbpar_gpu = { .rho=SC0, .mu=SC0, .viscosity=SC0, .gamma_shear=SC0, .gamma_bulk=SC0,
 //                                 .gamma_odd=SC0,.gamma_even=SC0, .agrid=0.0, .tau=-1.0, .friction=SC0, .time_step=0.0, .lb_coupl_pref=SC1 ,
-//                                 .lb_coupl_pref2=SC0, .bulk_viscosity=SCM1, .dim_x=0, .dim_y=0, .dim_z=0, .number_of_nodes=0, 
-//                                 .number_of_particles=0, .fluct=0, .calc_val=1, .external_force=0, .ext_force={0.0, 0.0, 0.0}, 
+//                                 .lb_coupl_pref2=SC0, .bulk_viscosity=SCM1, .dim_x=0, .dim_y=0, .dim_z=0, .number_of_nodes=0,
+//                                 .number_of_particles=0, .fluct=0, .calc_val=1, .external_force=0, .ext_force={0.0, 0.0, 0.0},
 //                                  .your_seed=12345, .reinit=0,
 // #ifdef SHANCHEN
 //                                 .coupling=SC20, .gamma_mobility=SC1
@@ -73,7 +73,7 @@
 // };
 LB_parameters_gpu lbpar_gpu = {
   // rho
-  SC0, 
+  SC0,
   // mu
   SC0,
   // viscosity
@@ -81,7 +81,7 @@ LB_parameters_gpu lbpar_gpu = {
   // gamma_shear
   SC0,
   // gamma_bulk
-  SC0, 
+  SC0,
   // gamma_odd
   SC0,
   // gamma_even
@@ -135,7 +135,7 @@ LB_parameters_gpu lbpar_gpu = {
   SC20,
   // remove_momentum
   0
-#endif // SHANCHEN  
+#endif // SHANCHEN
 };
 
 
@@ -180,7 +180,7 @@ void lattice_boltzmann_calc_shanchen_gpu(void){
 
   int factor = (int)round(lbpar_gpu.tau/time_step);
 
-  if (fluidstep+1 >= factor) 
+  if (fluidstep+1 >= factor)
      lb_calc_shanchen_GPU();
 }
 #endif //SHANCHEN
@@ -196,7 +196,7 @@ void lattice_boltzmann_update_gpu() {
 
   if (fluidstep>=factor) {
 
-    fluidstep=0; 
+    fluidstep=0;
     lb_integrate_GPU();
 #ifdef SHANCHEN
     if(lbpar_gpu.remove_momentum) lb_remove_fluid_momentum_GPU();
@@ -231,7 +231,7 @@ void lb_reinit_fluid_gpu() {
 //#ifdef SHANCHEN
 //  lb_calc_particle_lattice_ia_gpu();
 //  copy_forces_from_GPU();
-//#endif 
+//#endif
   if(lbpar_gpu.number_of_nodes != 0){
     lb_reinit_GPU(&lbpar_gpu);
     lbpar_gpu.reinit = 1;
@@ -242,11 +242,11 @@ void lb_reinit_fluid_gpu() {
 
 /** Release the fluid. */
 /*not needed in Espresso but still not deleted.
-  Despite the name (TODO: change it), it releases 
+  Despite the name (TODO: change it), it releases
   only the fluid-related memory on the gpu.*/
 void lb_release_gpu(){
 
-  if(host_nodes !=NULL) { free(host_nodes); host_nodes=NULL ;} 
+  if(host_nodes !=NULL) { free(host_nodes); host_nodes=NULL ;}
   if(host_values!=NULL) { free(host_values); host_values=NULL;}
 //  if(host_forces!=NULL) free(host_forces);
 //  if(host_data  !=NULL) free(host_data);
@@ -258,12 +258,12 @@ void lb_reinit_parameters_gpu() {
   lbpar_gpu.time_step = (float)time_step;
   for(ii=0;ii<LB_COMPONENTS;++ii){
     lbpar_gpu.mu[ii] = 0.0;
-  
+
     if (lbpar_gpu.viscosity[ii] > 0.0) {
       /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-      lbpar_gpu.gamma_shear[ii] = 1. - 2./(6.*lbpar_gpu.viscosity[ii]*lbpar_gpu.tau/(lbpar_gpu.agrid*lbpar_gpu.agrid) + 1.);   
+      lbpar_gpu.gamma_shear[ii] = 1. - 2./(6.*lbpar_gpu.viscosity[ii]*lbpar_gpu.tau/(lbpar_gpu.agrid*lbpar_gpu.agrid) + 1.);
     }
-  
+
     if (lbpar_gpu.bulk_viscosity[ii] > 0.0) {
       /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
       lbpar_gpu.gamma_bulk[ii] = 1. - 2./(9.*lbpar_gpu.bulk_viscosity[ii]*lbpar_gpu.tau/(lbpar_gpu.agrid*lbpar_gpu.agrid) + 1.);
@@ -278,19 +278,19 @@ void lb_reinit_parameters_gpu() {
     //  m* = m_eq + gamma * (m - m_eq)
     //as opposed to this reference, where
     //  m* = m + lambda * (m - m_eq)
-    
+
     if (lbpar_gpu.is_TRT) {
       lbpar_gpu.gamma_bulk[ii] = lbpar_gpu.gamma_shear[ii];
       lbpar_gpu.gamma_even[ii] = lbpar_gpu.gamma_shear[ii];
       lbpar_gpu.gamma_odd[ii] = -(7.0f*lbpar_gpu.gamma_even[ii]+1.0f)/(lbpar_gpu.gamma_even[ii]+7.0f);
       //lbpar_gpu.gamma_odd[ii] = lbpar_gpu.gamma_shear[ii]; //uncomment for BGK
     }
-    
+
     //lbpar_gpu.gamma_even[ii] = 0.0; //uncomment for special case of BGK
     //lbpar_gpu.gamma_odd[ii] = 0.0;
     //lbpar_gpu.gamma_shear[ii] = 0.0;
     //lbpar_gpu.gamma_bulk[ii] = 0.0;
-    
+
     //printf("gamma_shear=%e\n", lbpar_gpu.gamma_shear[ii]);
     //printf("gamma_bulk=%e\n", lbpar_gpu.gamma_bulk[ii]);
     //printf("TRT gamma_odd=%e\n", lbpar_gpu.gamma_odd[ii]);
@@ -303,30 +303,30 @@ void lb_reinit_parameters_gpu() {
     }
 #endif
     if (temperature > 0.0) {  /* fluctuating hydrodynamics ? */
-  
+
       lbpar_gpu.fluct = 1;
-  	LB_TRACE (fprintf(stderr, "fluct on \n"));
+        LB_TRACE (fprintf(stderr, "fluct on \n"));
       /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).*/
       /* Note that the modes are not normalized as in the paper here! */
-      lbpar_gpu.mu[ii] = (float)temperature*lbpar_gpu.tau*lbpar_gpu.tau/c_sound_sq/(lbpar_gpu.agrid*lbpar_gpu.agrid); 
-  
+      lbpar_gpu.mu[ii] = (float)temperature*lbpar_gpu.tau*lbpar_gpu.tau/c_sound_sq/(lbpar_gpu.agrid*lbpar_gpu.agrid);
+
       /* lb_coupl_pref is stored in MD units (force)
        * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
        * The factor 12 comes from the fact that we use random numbers
        * from -0.5 to 0.5 (equally distributed) which have variance 1/12.
        * time_step comes from the discretization.
        */
-  
+
       lbpar_gpu.lb_coupl_pref[ii] = sqrt(12.f*2.f*lbpar_gpu.friction[ii]*(float)temperature/lbpar_gpu.time_step);
       lbpar_gpu.lb_coupl_pref2[ii] = sqrt(2.f*lbpar_gpu.friction[ii]*(float)temperature/lbpar_gpu.time_step);
-  
+
     } else {
       /* no fluctuations at zero temperature */
       lbpar_gpu.fluct = 0;
       lbpar_gpu.lb_coupl_pref[ii] = 0.0;
       lbpar_gpu.lb_coupl_pref2[ii] = 0.0;
     }
-  	LB_TRACE (fprintf(stderr,"lb_reinit_prarameters_gpu \n"));
+        LB_TRACE (fprintf(stderr,"lb_reinit_prarameters_gpu \n"));
   }
 
 
@@ -335,29 +335,29 @@ void lb_reinit_parameters_gpu() {
     lbpar_gpu.dim_x = (unsigned int) round(box_l[0] / lbpar_gpu.agrid); //TODO code duplication with lb.c start
     lbpar_gpu.dim_y = (unsigned int) round(box_l[1] / lbpar_gpu.agrid);
     lbpar_gpu.dim_z = (unsigned int) round(box_l[2] / lbpar_gpu.agrid);
-    
+
     unsigned int tmp[3];
-    
+
     tmp[0] = lbpar_gpu.dim_x;
     tmp[1] = lbpar_gpu.dim_y;
     tmp[2] = lbpar_gpu.dim_z;
-    
+
     /* sanity checks */
     int dir;
-    
+
     for (dir=0;dir<3;dir++) {
     /* check if box_l is compatible with lattice spacing */
       if (fabs(box_l[dir] - tmp[dir] * lbpar_gpu.agrid) > 1.0e-3) {
           runtimeErrorMsg() <<"Lattice spacing lbpar_gpu.agrid= "<< lbpar_gpu.agrid << " is incompatible with box_l[" << dir << "]=" << box_l[dir];
       }
     }
-    
+
     lbpar_gpu.number_of_nodes = lbpar_gpu.dim_x * lbpar_gpu.dim_y * lbpar_gpu.dim_z;
     lbpar_gpu.tau = (float) time_step; //TODO code duplication with lb.c end
   }
 #endif
-  
-	LB_TRACE (fprintf(stderr,"lb_reinit_prarameters_gpu \n"));
+
+        LB_TRACE (fprintf(stderr,"lb_reinit_prarameters_gpu \n"));
 
   reinit_parameters_GPU(&lbpar_gpu);
 }
@@ -374,7 +374,7 @@ void lb_init_gpu() {
   lb_realloc_particles_gpu();
 
   lb_init_GPU(&lbpar_gpu);
-  
+
   gpu_init_particle_comm();
   cuda_bcast_global_part_params();
 
@@ -395,14 +395,14 @@ int lb_lbnode_set_extforce_GPU(int ind[3], double f[3])
 
   size_t  size_of_extforces = (n_extern_nodeforces+1)*sizeof(LB_extern_nodeforce_gpu);
   host_extern_nodeforces = (LB_extern_nodeforce_gpu*) Utils::realloc(host_extern_nodeforces, size_of_extforces);
-  
+
   host_extern_nodeforces[n_extern_nodeforces].force[0] = (float)f[0];
   host_extern_nodeforces[n_extern_nodeforces].force[1] = (float)f[1];
   host_extern_nodeforces[n_extern_nodeforces].force[2] = (float)f[2];
-  
+
   host_extern_nodeforces[n_extern_nodeforces].index = index;
   n_extern_nodeforces++;
-  
+
   if(lbpar_gpu.external_force == 0)lbpar_gpu.external_force = 1;
 
   lb_init_extern_nodeforces_GPU(n_extern_nodeforces, host_extern_nodeforces, &lbpar_gpu);

@@ -651,7 +651,7 @@ void on_lb_params_change(int field) {
   lb_reinit_parameters();
 
 }
-#endif
+#endif // LB
 
 #if defined (LB) || defined (LB_GPU)
 void on_lb_params_change_gpu(int field) {
@@ -662,16 +662,16 @@ void on_lb_params_change_gpu(int field) {
     lb_init_gpu();
 #ifdef LB_BOUNDARIES_GPU
     lb_init_boundaries();
-#endif
+#endif // LB_BOUNDARIES_GPU
   }
   if (field == LBPAR_DENSITY) {
     lb_reinit_fluid_gpu();
   }
 
   lb_reinit_parameters_gpu();
-#endif
+#endif // LB_GPU
 }
-#endif
+#endif // defined (LB) || defined (LB_GPU)
 
 void on_ghost_flags_change()
 {

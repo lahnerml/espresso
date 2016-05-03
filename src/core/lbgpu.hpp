@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
 
    This file is part of ESPResSo.
-  
+
    ESPResSo is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-   
+
    ESPResSo is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -138,7 +138,7 @@ typedef struct {
   float mobility[LB_COMPONENTS];
   float coupling[LB_COMPONENTS*LB_COMPONENTS];
   int remove_momentum;
-#endif // SHANCHEN  
+#endif // SHANCHEN
 
 } LB_parameters_gpu;
 
@@ -152,16 +152,16 @@ typedef struct {
   float v[3];
 
 } LB_rho_v_gpu;
-/* this structure is almost duplicated for memory efficiency. When the stress 
+/* this structure is almost duplicated for memory efficiency. When the stress
    tensor element are needed at every timestep, this features should be explicitly
    switched on */
-typedef struct { 
+typedef struct {
   /** density of the node */
   float rho[LB_COMPONENTS];
   /** veolcity of the node */
   float v[3];
   /** pressure tensor */
-  float pi[6];  
+  float pi[6];
 } LB_rho_v_pi_gpu;
 
 /** Data structure holding the velocity densities for the Lattice Boltzmann system. */
@@ -215,7 +215,7 @@ void on_lb_params_change_gpu(int field);
 /************************************************************/
 /*@{*/
 
-/** 
+/**
  */
 
 /** Switch indicating momentum exchange between particles and fluid */

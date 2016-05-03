@@ -222,15 +222,16 @@ int tclcommand_lbfluid(ClientData data, Tcl_Interp *interp, int argc, char **arg
 #ifdef LB
   if( !(lattice_switch & LATTICE_LB_GPU) )
     lattice_switch = lattice_switch | LATTICE_LB;
-#else
+#else // LB
   lattice_switch = lattice_switch | LATTICE_LB_GPU;
-#endif
+#endif // LB
 
   int err = TCL_OK;
   int intarg;
   double floatarg;
   double vectarg[3+LB_COMPONENTS + (LB_COMPONENTS*(LB_COMPONENTS-1))/2];
 
+  // if command is not used properly: Explain howto
   if (argc < 1)
   {
     lbfluid_tcl_print_usage(interp);
@@ -246,6 +247,7 @@ int tclcommand_lbfluid(ClientData data, Tcl_Interp *interp, int argc, char **arg
     lbfluid_tcl_print_usage(interp);
     return TCL_ERROR;
   }
+  // begin parsing process
   else
   {
     while (argc > 0)
@@ -255,20 +257,20 @@ int tclcommand_lbfluid(ClientData data, Tcl_Interp *interp, int argc, char **arg
 #ifdef LB_GPU
         lattice_switch = (lattice_switch &~ LATTICE_LB) | LATTICE_LB_GPU;
         argc--; argv++;
-#else
+#else // LB_GPU
         Tcl_AppendResult(interp, "LB_GPU is not compiled in!", NULL);
         return TCL_ERROR;
-#endif
+#endif // LB_GPU
       }
       else if (ARG0_IS_S_EXACT("cpu") || ARG0_IS_S_EXACT("CPU"))
       {
 #ifdef LB
         lattice_switch = (lattice_switch & ~LATTICE_LB_GPU) | LATTICE_LB;
         argc--; argv++;
-#else
+#else // LB
         Tcl_AppendResult(interp, "LB is not compiled in!", NULL);
         return TCL_ERROR;
-#endif
+#endif // LB
       }
       else if ( ARG0_IS_S_EXACT("grid") || ARG0_IS_S_EXACT("agrid") )
       {

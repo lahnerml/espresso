@@ -204,7 +204,7 @@ void mpi_send_mu_E(int node, int part, double mu_E[3]);
     \param rinertia its new rotational inertia.
 */
 void mpi_send_rotational_inertia(int node, int part, double rinertia[3]);
-#endif
+#endif // ROTATIONAL_INTERTIA
 
 #ifdef AFFINITY
 /** Issue REQ_SET_AFFINITY: send particle affinity.
@@ -214,7 +214,7 @@ void mpi_send_rotational_inertia(int node, int part, double rinertia[3]);
     \param bond_site its new site of the affinity bond.
 */
 void mpi_send_affinity(int node, int part, double bond_site[3]);
-#endif
+#endif // AFFINITY
 
 #ifdef MEMBRANE_COLLISION
 /** Issue REQ_SET_MEMBRANE_COLLISION: send outward direction of the particle.
@@ -224,7 +224,7 @@ void mpi_send_affinity(int node, int part, double bond_site[3]);
  \param out_direction its new outward direction.
  */
 void mpi_send_out_direction(int node, int part, double out_direction[3]);
-#endif
+#endif // MEMBRANE_COLLISION
 
 #ifdef ROTATION
 /** Issue REQ_SET_QUAT: send particle orientation.
@@ -260,7 +260,7 @@ void mpi_send_omega(int node, int part, double omega[3]);
     \param torque its new torque.
 */
 void mpi_send_torque(int node, int part, double torque[3]);
-#endif
+#endif // ROTATION
 
 
 #ifdef DIPOLES
@@ -278,7 +278,7 @@ void mpi_send_dip(int node, int part, double dip[3]);
     \param dipm its new dipole moment (absolut value).
 */
 void mpi_send_dipm(int node, int part, double dipm);
-#endif
+#endif // DIPOLES
 
 #ifdef VIRTUAL_SITES
 /** Issue REQ_SET_DIPM: send particle dipole moment.
@@ -288,11 +288,11 @@ void mpi_send_dipm(int node, int part, double dipm);
     \param isVirtual its new isVirtual.
 */
 void mpi_send_virtual(int node, int part, int isVirtual);
-#endif
+#endif // VIRTUAL_SITES
 
 #ifdef VIRTUAL_SITES_RELATIVE
 void mpi_send_vs_relative(int node, int part, int vs_relative_to, double vs_distance, double* rel_ori);
-#endif
+#endif // VIRTUAL_SITES_RELATIVE
 
 #ifdef MULTI_TIMESTEP
 /** Issue REQ_SET_SMALLER_TIMESTEP: send smaller time step value.
@@ -302,7 +302,7 @@ void mpi_send_vs_relative(int node, int part, int vs_relative_to, double vs_dist
     \param smaller_timestep its new smaller_timestep.
 */
 void mpi_send_smaller_timestep_flag(int node, int part, int smaller_timestep_flag);
-#endif
+#endif // MULTI_TIMESTEP
 
 #ifdef CONFIGTEMP
 /** Issue REQ_SET_CONFIGTEMP: send configurational temperature flag.
@@ -312,7 +312,7 @@ void mpi_send_smaller_timestep_flag(int node, int part, int smaller_timestep_fla
     \param configtemp the configurational temperature flag.
 */
 void mpi_send_configtemp_flag(int node, int part, int configtemp_flag);
-#endif
+#endif // CONFIGTEMP
 
 /** Issue REQ_SET_TYPE: send particle type.
     Also calls \ref on_particle_change.
@@ -463,7 +463,7 @@ void mpi_set_time_step(double time_step);
 /** Issue REQ_SET_SMALLER_TIME_STEP: send new \ref smaller_time_step.
     Requires MULTI_TIMESTEP feature. */
 void mpi_set_smaller_time_step(double smaller_time_step);
-#endif
+#endif // MULTI_TIMESTEP
 
 /** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
 void mpi_bcast_coulomb_params();
@@ -485,7 +485,7 @@ void mpi_set_particle_temperature(int pnode, int part, double _T);
 void mpi_set_particle_gamma(int pnode, int part, double gamma);
 #ifdef ROTATION
 void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot);
-#endif
+#endif // ROTATION
 #endif // LANGEVIN_PER_PARTICLE
 
 /** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
@@ -494,7 +494,7 @@ void mpi_bcast_constraint(int del_num);
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
 void mpi_bcast_lbboundary(int del_num);
-#endif
+#endif // defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 
 /** Issue REQ_RANDOM_SEED: read/set seed of random number generators on each node. */
 void mpi_random_seed(int cnt, std::vector<int> &seeds);
@@ -508,7 +508,7 @@ void mpi_get_constraint_force(int constraint, double force[3]);
 #ifdef CONFIGTEMP
 /** Issue REQ_GET_CONFIGTEMP: get configurational temperature */
 void mpi_get_configtemp(double cfgtmp[2]);
-#endif
+#endif // CONFIGTEMP
 
 /** Issue REQ_RESCALE_PART: rescales all particle positions in direction 'dir' by a factor 'scale'. */
 void mpi_rescale_particles(int dir, double scale);
@@ -620,7 +620,7 @@ void mpi_external_potential_sum_energies_slave();
 #ifdef CUDA
 /** Gather CUDA devices from all nodes */
 std::vector<EspressoGpuDevice> mpi_gather_cuda_devices();
-#endif
+#endif // CUDA
 
 /** CPU Thermostat */
 void mpi_thermalize_cpu(int temp);

@@ -159,13 +159,13 @@ int lb_set_lattice_switch(int py_switch){
     if( !(lattice_switch & LATTICE_LB_GPU) )
       lattice_switch = lattice_switch | LATTICE_LB;
       return 0;
-#endif
+#endif // LB
 #ifdef LB_GPU
   }else if(py_switch == 2){
     lattice_switch = lattice_switch | LATTICE_LB_GPU;
     return 0;
-#endif
-  }else{
+#endif // LB_GPU
+  } else {
     return 1;
   }
 }
@@ -177,8 +177,9 @@ int lb_get_lattice_switch(int* py_switch){
   if(lattice_switch){
     *py_switch = lattice_switch;
     return 0;
-  }else
+  } else {
     return 1;
+  }
 }
 
 #ifdef SHANCHEN

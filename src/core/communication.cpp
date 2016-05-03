@@ -24,7 +24,7 @@
 #include <cstring>
 #ifdef OPEN_MPI
 #include <dlfcn.h>
-#endif
+#endif // OPEN_MPI
 #include "utils.hpp"
 #include "communication.hpp"
 #include "interaction_data.hpp"
@@ -43,6 +43,7 @@
 #include "random.hpp"
 #include "lj.hpp"
 #include "lb.hpp"
+#include "lbgpu.hpp"
 #include "lb-boundaries.hpp"
 #include "morse.hpp"
 #include "buckingham.hpp"
@@ -131,6 +132,7 @@ static int terminated = 0;
   CB(mpi_send_solvation_slave) \
   CB(mpi_send_exclusion_slave) \
   CB(mpi_bcast_lb_params_slave) \
+  CB(mpi_bcast_lb_gpu_params_slave) \
   CB(mpi_bcast_cuda_global_part_vars_slave) \
   CB(mpi_send_dip_slave) \
   CB(mpi_send_dipm_slave) \
@@ -2628,6 +2630,24 @@ void mpi_sync_topo_part_info_slave(int node,int parm ) {
 
   sync_topo_part_info();
 
+}
+
+/****************** REQ_BCAST_LBPARGPU ******************/
+
+void mpi_bcast_lb_gpu_params(int field)
+{
+#ifdef LB_GPU
+  mpi_call(mpi_bcast_lb_gpu_params_slave, -1, field);
+  mpi_bcast_lb_gpu_params_slave(-1, field);
+#endif // LB_GPU
+}
+
+void mpi_bcast_lb_gpu_params_slave(int node, int field)
+{
+#ifdef LB_GPU
+  MPI_Bcast(&lbpar_gpu, sizeof(LB_parameters_gpu), MPI_BYTE, 0, comm_cart);
+  on_lb_params_change_gpu(field);
+#endif // LB_GPU
 }
 
 /******************* REQ_BCAST_LBPAR ********************/

@@ -56,8 +56,8 @@ static void lb_check_halo_regions();
 int transfer_momentum = 0;
 
 /** Struct holding the Lattice Boltzmann parameters */
-// LB_Parameters lbpar = { .rho={0.0}, .viscosity={0.0}, .bulk_viscosity={-1.0}, .agrid=-1.0, .tau=-1.0, .friction={0.0}, .ext_force={ 0.0, 0.0, 0.0},.rho_lb_units={0.},.gamma_odd={0.}, .gamma_even={0.} };
-LB_Parameters lbpar = {
+// LB_parameters lbpar = { .rho={0.0}, .viscosity={0.0}, .bulk_viscosity={-1.0}, .agrid=-1.0, .tau=-1.0, .friction={0.0}, .ext_force={ 0.0, 0.0, 0.0},.rho_lb_units={0.},.gamma_odd={0.}, .gamma_even={0.} };
+LB_parameters lbpar = {
     // rho
     {0.0},
     // viscosity

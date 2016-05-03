@@ -178,13 +178,13 @@ typedef struct {
 
   int resend_halo;
 
-} LB_Parameters;
+} LB_parameters;
 
 /** The DnQm model to be used. */
 extern LB_Model lbmodel;
 
 /** Struct holding the Lattice Boltzmann parameters */
-extern LB_Parameters lbpar;
+extern LB_parameters lbpar;
 
 /** The underlying lattice */
 extern Lattice lblattice;

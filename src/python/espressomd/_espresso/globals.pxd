@@ -94,9 +94,9 @@ cdef extern from "dpd.hpp":
 
 IF LB:
     cdef extern from "lb.hpp":
-        ctypedef struct LB_Parameters:
+        ctypedef struct LB_parameters:
             double tau
-        extern LB_Parameters lbpar
+        extern LB_parameters lbpar
 
 IF LB_GPU:
     cdef extern from "lbgpu.hpp":

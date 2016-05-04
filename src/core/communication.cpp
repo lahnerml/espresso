@@ -25,6 +25,10 @@
 #ifdef OPEN_MPI
 #include <dlfcn.h>
 #endif // OPEN_MPI
+
+#include <boost/mpi.hpp>
+#include <boost/serialization/string.hpp>
+
 #include "utils.hpp"
 #include "communication.hpp"
 #include "interaction_data.hpp"
@@ -81,6 +85,7 @@ using namespace std;
 int this_node = -1;
 int n_nodes = -1;
 MPI_Comm comm_cart;
+boost::mpi::communicator boost_comm;
 int graceful_exit = 0;
 /* whether there is already a termination going on. */
 static int terminated = 0;
@@ -116,6 +121,8 @@ static int terminated = 0;
   CB(mpi_remove_particle_slave) \
   CB(mpi_bcast_constraint_slave) \
   CB(mpi_random_seed_slave) \
+  CB(mpi_random_get_stat_slave) \
+  CB(mpi_random_set_stat_slave) \
   CB(mpi_cap_forces_slave) \
   CB(mpi_get_constraint_force_slave) \
   CB(mpi_get_configtemp_slave) \
@@ -278,13 +285,14 @@ void mpi_init(int *argc, char ***argv)
 #endif
 
   for(int i = 0; i < N_CALLBACKS; ++i)  {
-    request_map.insert(std::pair<SlaveCallback *, int>(slave_callbacks[i], i));
+    request_map.insert(std::make_pair(slave_callbacks[i], i));
   }
 
   initRuntimeErrorCollector();
+
+  boost_comm = boost::mpi::communicator(comm_cart, boost::mpi::comm_attach);
 }
 
-#ifdef HAVE_MPI
 void mpi_call(SlaveCallback cb, int node, int param) {
   request_map_type::iterator req_it = request_map.find(cb);
   if (req_it == request_map.end())
@@ -306,11 +314,6 @@ void mpi_call(SlaveCallback cb, int node, int param) {
   MPI_Bcast(request, 3, MPI_INT, 0, comm_cart);
   COMM_TRACE(fprintf(stderr, "%d: finished sending.\n", this_node));
 }
-#else
-
-void mpi_call(SlaveCallback cb, int node, int param) {}
-
-#endif
 
 /**************** REQ_TERM ************/
 
@@ -2380,7 +2383,6 @@ void mpi_bcast_lbboundary_slave(int node, int parm)
 #endif
 }
 
-/*************** REQ_RANDOM_SEED ************/
 void mpi_random_seed(int cnt, std::vector<int> &seeds) {
   int this_idum;
   mpi_call(mpi_random_seed_slave, -1, cnt);
@@ -2401,6 +2403,44 @@ void mpi_random_seed_slave(int pnode, int cnt) {
   printf("%d: Received seed %d\n",this_node,this_idum);
 #endif
   init_random_seed(this_idum);
+}
+
+void mpi_random_set_stat(const std::vector<std::string> &stat) {
+  mpi_call(mpi_random_set_stat_slave, 0, 0);
+  
+  for(int i = 1; i < n_nodes; i++) {
+    boost_comm.send(i, SOME_TAG, stat[i]);
+  }
+
+  Random::set_state(stat[0]);
+}
+
+void mpi_random_set_stat_slave(int, int) {
+  std::string msg;
+  boost_comm.recv(0, SOME_TAG, msg);
+
+  Random::set_state(msg);
+}
+
+std::string mpi_random_get_stat() {
+  std::string res = Random::get_state();
+
+  mpi_call(mpi_random_get_stat_slave, 0, 0);
+   
+  for(int i = 1; i < n_nodes; i++) {
+    std::string tmp;
+    boost_comm.recv(i, SOME_TAG, tmp);
+    res.append(" ");
+    res.append(tmp);
+  }
+
+  return res;
+}
+
+void mpi_random_get_stat_slave(int, int) {
+  std::string state = Random::get_state();
+
+  boost_comm.send(0, SOME_TAG, state);
 }
 
 void mpi_cap_forces(double fc)

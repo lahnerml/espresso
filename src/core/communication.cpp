@@ -25,6 +25,9 @@
 #ifdef OPEN_MPI
 #include <dlfcn.h>
 #endif // OPEN_MPI
+#ifdef CUDA_AWARE_MPI
+#include <cuda_runtime.h>
+#endif // CUDA_AWARE_MPI
 
 #include <boost/mpi.hpp>
 #include <boost/serialization/string.hpp>

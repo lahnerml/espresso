@@ -212,10 +212,10 @@ static int request[3];
 /** Map callback function pointers to request codes */
 #ifndef HAVE_CXX11
 typedef std::map<SlaveCallback *, int> request_map_type;
-#else
+#else // !HAVE_CXX11
 #include <unordered_map>
 typedef std::unordered_map<SlaveCallback *, int> request_map_type;
-#endif
+#endif // !HAVE_CXX11
 static request_map_type request_map;
 
 /** Forward declarations */
@@ -234,7 +234,7 @@ void mpi_core(MPI_Comm *comm, int *errcode,...) {
   fprintf(stderr, "%d: Aborting due to MPI error %d: %s. Forcing core dump.\n", this_node, *errcode, string);
   core();
 }
-#endif
+#endif // MPI_CORE
 
 void mpi_init(int *argc, char ***argv)
 {
@@ -243,7 +243,7 @@ void mpi_init(int *argc, char ***argv)
   int mode = RTLD_NOW | RTLD_GLOBAL;
 #ifdef RTLD_NOLOAD
   mode |= RTLD_NOLOAD;
-#endif
+#endif // RTLD_NOLOAD
   void * _openmpi_symbol = dlsym(RTLD_DEFAULT, "MPI_Init");
   if (!_openmpi_symbol)
   {
@@ -260,11 +260,11 @@ void mpi_init(int *argc, char ***argv)
     fprintf(stderr, "%d: Aborting because unable to load libmpi into the global symbol space.\n", this_node);
     errexit();
   }
-#endif
+#endif // OPEN_MPI
 
 #ifdef MPI_CORE
   MPI_Errhandler mpi_errh;
-#endif
+#endif // MPI_CORE
 
   MPI_Init(argc, argv);
 
@@ -282,7 +282,18 @@ void mpi_init(int *argc, char ***argv)
 #ifdef MPI_CORE
   MPI_Comm_create_errhandler((MPI_Handler_function *)mpi_core, &mpi_errh);
   MPI_Comm_set_errhandler(comm_cart, mpi_errh);
-#endif
+#endif // MPI_CORE
+
+#ifdef CUDA_AWARE_MPI
+  int nGPUs;
+  cudaGetDeviceCount(&nGPUs);
+  if (n_nodes <= nGPUs) {
+    cudaSetDevice(this_node);
+  } else {
+    fprintf(stderr, "Aborting because more nodes than GPUs.\n");
+    errexit();
+  }
+#endif // CUDA_AWARE_MPI
 
   for(int i = 0; i < N_CALLBACKS; ++i)  {
     request_map.insert(std::make_pair(slave_callbacks[i], i));

@@ -25,9 +25,6 @@
 #ifdef OPEN_MPI
 #include <dlfcn.h>
 #endif // OPEN_MPI
-#ifdef CUDA_AWARE_MPI
-#include <cuda_runtime.h>
-#endif // CUDA_AWARE_MPI
 
 #include <boost/mpi.hpp>
 #include <boost/serialization/string.hpp>
@@ -82,6 +79,11 @@
 #include "minimize_energy.hpp"
 #include "scafacos.hpp"
 #include "mpiio.hpp"
+
+#ifdef CUDAWARE_MPI
+#include <cuda_runtime_api.h>
+#include <cuda.h>
+#endif // CUDAWARE_MPI
 
 using namespace std;
 
@@ -287,16 +289,27 @@ void mpi_init(int *argc, char ***argv)
   MPI_Comm_set_errhandler(comm_cart, mpi_errh);
 #endif // MPI_CORE
 
-#ifdef CUDA_AWARE_MPI
+#ifdef CUDAWARE_MPI
   int nGPUs;
+  int canAccessPeer;
   cudaGetDeviceCount(&nGPUs);
+  fprintf(stderr, "%d GPUs detected.\n", nGPUs);
   if (n_nodes <= nGPUs) {
     cudaSetDevice(this_node);
+    for (int i = 0; i < nGPUs; ++i) {
+      if (i == this_node) continue;
+      cudaDeviceCanAccessPeer(&canAccessPeer, this_node, i);
+      if (canAccessPeer) {
+        fprintf(stderr, "Direct access available to GPU %d.\n", i);
+      } else {
+        fprintf(stderr, "No direct access avaiable to GPU %d.\n", i);
+      }
+    }
   } else {
     fprintf(stderr, "Aborting because more nodes than GPUs.\n");
     errexit();
   }
-#endif // CUDA_AWARE_MPI
+#endif // CUDAWARE_MPI
 
   for(int i = 0; i < N_CALLBACKS; ++i)  {
     request_map.insert(std::make_pair(slave_callbacks[i], i));
@@ -2700,6 +2713,7 @@ void mpi_bcast_lb_gpu_params_slave(int node, int field)
 {
 #ifdef LB_GPU
   MPI_Bcast(&lbpar_gpu, sizeof(LB_parameters_gpu), MPI_BYTE, 0, comm_cart);
+  std::cout << "[GPU " << this_node << "] received lbpar" << std::endl;
   on_lb_params_change_gpu(field);
 #endif // LB_GPU
 }

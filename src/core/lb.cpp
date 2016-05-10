@@ -202,7 +202,11 @@ int lb_lbfluid_set_shanchen_coupling(double *p_coupling) {
       break;
 
   }
+#ifdef CUDAWARE_MPI
+  mpi_bcast_lb_gpu_params(LBPAR_COUPLING);
+#else // CUDAWARE_MPI
   on_lb_params_change_gpu(LBPAR_COUPLING);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
 #ifdef LB
 #error not implemented
@@ -220,7 +224,11 @@ int lb_lbfluid_set_mobility(double *p_mobility) {
         if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
             lbpar_gpu.mobility[ii] = (float)p_mobility[ii];
+#ifdef CUDAWARE_MPI
+            mpi_bcast_lb_gpu_params(LBPAR_MOBILITY);
+#else // CUDAWARE_MPI
             on_lb_params_change_gpu(LBPAR_MOBILITY);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
         } else {
 #ifdef LB
@@ -258,7 +266,11 @@ int lb_lbfluid_set_density(double *p_dens) {
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
       lbpar_gpu.rho[ii] = (float)p_dens[ii];
+#ifdef CUDAWARE_MPI
+      mpi_bcast_lb_gpu_params(LBPAR_DENSITY);
+#else // CUDAWARE_MPI
       on_lb_params_change_gpu(LBPAR_DENSITY);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -277,7 +289,11 @@ int lb_lbfluid_set_visc(double * p_visc) {
     if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
       lbpar_gpu.viscosity[ii] = (float)p_visc[ii];
+#ifdef CUDAWARE_MPI
+      mpi_bcast_lb_gpu_params(LBPAR_VISCOSITY);
+#else // CUDAWARE_MPI
       on_lb_params_change_gpu(LBPAR_VISCOSITY);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -297,7 +313,11 @@ int lb_lbfluid_set_bulk_visc(double *p_bulk_visc) {
 #ifdef LB_GPU
       lbpar_gpu.bulk_viscosity[ii] = (float)p_bulk_visc[ii];
       lbpar_gpu.is_TRT = false;
+#ifdef CUDAWARE_MPI
+      mpi_bcast_lb_gpu_params(LBPAR_BULKVISC);
+#else // CUDAWARE_MPI
       on_lb_params_change_gpu(LBPAR_BULKVISC);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -318,7 +338,11 @@ int lb_lbfluid_set_gamma_odd(double *p_gamma_odd) {
 #ifdef LB_GPU
       lbpar_gpu.gamma_odd[ii] = (float)p_gamma_odd[ii];
       lbpar_gpu.is_TRT = false;
+#ifdef CUDAWARE_MPI
+      mpi_bcast_lb_gpu_params(0);
+#else // CUDAWARE_MPI
       on_lb_params_change_gpu(0);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -340,7 +364,11 @@ int lb_lbfluid_set_gamma_even(double *p_gamma_even)
 #ifdef LB_GPU
       lbpar_gpu.gamma_even[ii] = (float)p_gamma_even[ii];
       lbpar_gpu.is_TRT = false;
+#ifdef CUDAWARE_MPI
+      mpi_bcast_lb_gpu_params(0);
+#else // CUDAWARE_MPI
       on_lb_params_change_gpu(0);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -436,7 +464,11 @@ int lb_lbfluid_set_agrid(double p_agrid){
       }
     }
     lbpar_gpu.number_of_nodes = lbpar_gpu.dim_x * lbpar_gpu.dim_y * lbpar_gpu.dim_z;
+#ifdef CUDAWARE_MPI
+    mpi_bcast_lb_gpu_params(LBPAR_AGRID);
+#else // CUDAWARE_MPI
     on_lb_params_change_gpu(LBPAR_AGRID);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
     } else {
 #ifdef LB
@@ -454,7 +486,11 @@ int lb_lbfluid_set_tau(double p_tau){
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     lbpar_gpu.tau = (float)p_tau;
+#ifdef CUDAWARE_MPI
+    mpi_bcast_lb_gpu_params(0);
+#else // CUDAWARE_MPI
     on_lb_params_change_gpu(0);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
   } else {
 #ifdef LB
@@ -471,7 +507,11 @@ int lb_lbfluid_set_remove_momentum(void){
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     lbpar_gpu.remove_momentum = 1;
+#ifdef CUDAWARE_MPI
+    mpi_bcast_lb_gpu_params(0);
+#else // CUDAWARE_MPI
     on_lb_params_change_gpu(0);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
   } else {
 #ifdef LB
@@ -497,7 +537,11 @@ int lb_lbfluid_set_ext_force(int component, double p_fx, double p_fy, double p_f
     lbpar_gpu.ext_force[3*component+1] = (float)p_fy;
     lbpar_gpu.ext_force[3*component+2] = (float)p_fz;
     lbpar_gpu.external_force = 1;
+#ifdef CUDAWARE_MPI
+    mpi_bcast_lb_gpu_params(LBPAR_EXTFORCE);
+#else // CUDAWARE_MPI
     lb_reinit_extern_nodeforce_GPU(&lbpar_gpu);
+#endif // CUDAWARE_MPI
 #endif // LB_GPU
   } else {
 #ifdef LB

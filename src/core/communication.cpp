@@ -2713,7 +2713,6 @@ void mpi_bcast_lb_gpu_params_slave(int node, int field)
 {
 #ifdef LB_GPU
   MPI_Bcast(&lbpar_gpu, sizeof(LB_parameters_gpu), MPI_BYTE, 0, comm_cart);
-  std::cout << "[GPU " << this_node << "] received lbpar" << std::endl;
   on_lb_params_change_gpu(field);
 #endif // LB_GPU
 }

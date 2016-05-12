@@ -33,7 +33,7 @@ int Lattice::init(double *agrid, double* offset, int halo_size, size_t dim) {
     this->dim=dim;
 
     /* determine the number of local lattice nodes */
-    for (int d=0; d<3; d++) {
+    for (int d = 0; d < this.dim; ++d) {
         this->agrid[d] = agrid[d];
         this->global_grid[d] = (int)dround(box_l[d]/agrid[d]);
         this->offset[d]=offset[d];
@@ -45,7 +45,7 @@ int Lattice::init(double *agrid, double* offset, int halo_size, size_t dim) {
     }
 
     // sanity checks
-    for (int dir=0;dir<3;dir++) {
+    for (int dir = 0; dir < this.dim; ++dir) {
       // check if local_box_l is compatible with lattice spacing
       if (fabs(local_box_l[dir]-this->grid[dir]*agrid[dir]) > ROUND_ERROR_PREC*box_l[dir]) {
           runtimeErrorMsg() << "Lattice spacing agrid["<< dir << "]=" << agrid[dir] \
@@ -55,33 +55,35 @@ int Lattice::init(double *agrid, double* offset, int halo_size, size_t dim) {
       }
     }
 
-    this->element_size = this->dim*sizeof(double);
+    this->element_size = this->dim * sizeof(double);
 
-    LATTICE_TRACE(fprintf(stderr,"%d: box_l (%.3f,%.3f,%.3f) grid (%d,%d,%d) node_neighbors (%d,%d,%d,%d,%d,%d)\n",this_node,local_box_l[0],local_box_l[1],local_box_l[2],this->grid[0],this->grid[1],this->grid[2],node_neighbors[0],node_neighbors[1],node_neighbors[2],node_neighbors[3],node_neighbors[4],node_neighbors[5]));
+    LATTICE_TRACE(fprintf(stderr,"%d: box_l (%.3f,%.3f,%.3f) grid (%d,%d,%d) node_neighbors (%d,%d,%d,%d,%d,%d)\n",
+                  this_node,
+                  local_box_l[0], local_box_l[1], local_box_l[2],
+                  this->grid[0], this->grid[1], this->grid[2],
+                  node_neighbors[0], node_neighbors[1], node_neighbors[2],
+                  node_neighbors[3], node_neighbors[4], node_neighbors[5]));
 
     this->halo_size = halo_size;
     /* determine the number of total nodes including halo */
-    this->halo_grid[0] = this->grid[0] + 2*halo_size ;
-    this->halo_grid[1] = this->grid[1] + 2*halo_size ;
-    this->halo_grid[2] = this->grid[2] + 2*halo_size ;
+    this->halo_grid[0] = this->grid[0] + 2 * halo_size ;
+    this->halo_grid[1] = this->grid[1] + 2 * halo_size ;
+    this->halo_grid[2] = this->grid[2] + 2 * halo_size ;
 
-    this->grid_volume = this->grid[0]*this->grid[1]*this->grid[2] ;
-    this->halo_grid_volume = this->halo_grid[0]*this->halo_grid[1]*this->halo_grid[2] ;
+    this->grid_volume       = this->grid[0] * this->grid[1] * this->grid[2] ;
+    this->halo_grid_volume  = this->halo_grid[0] * this->halo_grid[1] * this->halo_grid[2] ;
     this->halo_grid_surface = this->halo_grid_volume - this->grid_volume ;
-    this->halo_offset = get_linear_index(halo_size,halo_size,halo_size,this->halo_grid) ;
+    this->halo_offset       = get_linear_index(halo_size, halo_size, halo_size, this->halo_grid) ;
 
     this->interpolation_type = INTERPOLATION_LINEAR;
 
     allocate_memory();
     return ES_OK;
-
 }
 
 void Lattice::allocate_memory() {
-
     this->_data = Utils::malloc(this->element_size*this->halo_grid_volume);
     memset(this->_data, (unsigned int)(-1), this->element_size*this->halo_grid_volume);
-
 }
 
 void Lattice::interpolate(double* pos, double* value) {

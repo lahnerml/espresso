@@ -1,6 +1,6 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
   Max-Planck-Institute for Polymer Research, Theory Group
 
   This file is part of ESPResSo.
@@ -16,9 +16,9 @@
   GNU General Public License for more details.
 
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/** \file lattice.hpp 
+/** \file lattice.hpp
  *
  * Lattice class definition
  * Contains the lattice layout and pointers to the data fields.
@@ -45,8 +45,10 @@ extern int lattice_switch;
 #define index_t long
 #define LATTICE_OFF  0  /** Lattice off */
 
-enum { LATTICE_ANISOTROPIC = 1, 
-       LATTICE_X_NOTEXT = 2, LATTICE_Y_NOTEXT = 4, LATTICE_Z_NOTEXT = 8 };
+enum { LATTICE_ANISOTROPIC = 1,
+       LATTICE_X_NOTEXT    = 2,
+       LATTICE_Y_NOTEXT    = 4,
+       LATTICE_Z_NOTEXT    = 8 };
 
 class Lattice {
 public:

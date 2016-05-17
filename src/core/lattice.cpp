@@ -33,7 +33,7 @@ int Lattice::init(double *agrid, double* offset, int halo_size, size_t dim) {
     this->dim=dim;
 
     /* determine the number of local lattice nodes */
-    for (int d = 0; d < this.dim; ++d) {
+    for (int d = 0; d < this->dim; ++d) {
         this->agrid[d] = agrid[d];
         this->global_grid[d] = (int)dround(box_l[d]/agrid[d]);
         this->offset[d]=offset[d];
@@ -45,7 +45,7 @@ int Lattice::init(double *agrid, double* offset, int halo_size, size_t dim) {
     }
 
     // sanity checks
-    for (int dir = 0; dir < this.dim; ++dir) {
+    for (int dir = 0; dir < this->dim; ++dir) {
       // check if local_box_l is compatible with lattice spacing
       if (fabs(local_box_l[dir]-this->grid[dir]*agrid[dir]) > ROUND_ERROR_PREC*box_l[dir]) {
           runtimeErrorMsg() << "Lattice spacing agrid["<< dir << "]=" << agrid[dir] \
@@ -238,7 +238,7 @@ void Lattice::set_data_for_global_position_with_periodic_image(double* pos, void
     index_t halo_index[3];
 
 
-    for (int i = 0; i < this.dim; ++i) {
+    for (int i = 0; i < this->dim; ++i) {
         global_index[i] = (int)dround((pos[i]-this->offset[i])/this->agrid[i]);
     }
 
@@ -277,11 +277,11 @@ int Lattice::global_pos_in_local_halobox(double pos[3]) {
 
 int Lattice::global_pos_to_lattice_index_checked(double pos[3], int* index) {
     int i;
-    for (i = 0; i < this.dim; ++i)
+    for (i = 0; i < this->dim; ++i)
         if (fabs(fmod(pos[i]-this->offset[i],this->agrid[i])) > ROUND_ERROR_PREC)
             return ES_ERROR;
     int ind[3];
-    for (i = 0; i < this.dim; ++i)
+    for (i = 0; i < this->dim; ++i)
         ind[i] = (int) round((pos[i]-this->offset[i])/this->agrid[i]);
     *index = get_linear_index(this->halo_size + ind[0], this->halo_size + ind[1], this->halo_size + ind[2], this->halo_grid);
     return ES_OK;
@@ -308,7 +308,7 @@ void Lattice::map_local_index_to_pos(index_t* index, double* pos) {
 
 int Lattice::map_global_index_to_halo_index(index_t* global_index, index_t* halo_index) {
     int out=0;
-    for (int d = 0; d < this.dim; ++d) {
+    for (int d = 0; d < this->dim; ++d) {
         halo_index[d] = global_index[d]-this->local_index_offset[d] +this->halo_size;
         if (halo_index[d] < 0 || halo_index[d] >= this->halo_grid[d])
             out=1;
@@ -334,7 +334,7 @@ void Lattice::map_position_to_lattice(const double pos[3], index_t node_index[8]
 
     /* determine the elementary lattice cell containing the particle
        and the relative position of the particle in this cell */
-    for (dir = 0; dir < this.dim; ++dir) {
+    for (dir = 0; dir < this->dim; ++dir) {
         lpos = pos[dir] - my_left[dir];
         rel = lpos/this->agrid[dir] + 0.5; // +1 for halo offset
         ind[dir] = (int)floor(rel);
@@ -395,7 +395,7 @@ void Lattice::set_data_for_local_grid_index(index_t* ind, void* data) {
 }
 
 int Lattice::global_pos_to_lattice_halo_index(double* pos, index_t*  ind) {
-    for (int i = 0; i < this.dim; ++i) {
+    for (int i = 0; i < this->dim; ++i) {
         ind[i] = (int)dround((pos[i]-this->local_offset[i])/this->agrid[i])+this->halo_size;
         if (ind[i] < 0 || ind[i] >= this->halo_grid[i])
             return 0;
@@ -410,26 +410,25 @@ void Lattice::map_position_to_lattice_global (double pos[3], int ind[3], double 
   int i;
   double rel[3];
   // fold the position onto the local box, note here ind is used as a dummy variable
-  for (i = 0; i < this.dim; ++i) {
+  for (i = 0; i < 3; ++i) {
     pos[i] = pos[i]-0.5*tmp_agrid;
   }
 
   fold_position (pos,ind);
 
   // convert the position into lower left grid point
-  for (i = 0; i < this.dim; ++i) {
+  for (i = 0; i < 3; ++i) {
     rel[i] = (pos[i])/tmp_agrid;
   }
 
     // calculate the index of the position
-    for (i = 0; i < this.dim; ++i) {
+    for (i = 0; i < 3; ++i) {
         ind[i] = floor(rel[i]);
     }
 
     // calculate the linear interpolation weighting
-    for (i = 0; i < this.dim; ++i) {
+    for (i = 0; i < 3; ++i) {
         delta[3+i] = rel[i] - ind[i];
         delta[i] = 1 - delta[3+i];
     }
-
 }

@@ -2056,7 +2056,7 @@ void lb_reinit_fluid() {
 // double pi[6] = { rho*lbmodel.c_sound_sq, 0., rho*lbmodel.c_sound_sq, 0., 0., rho*lbmodel.c_sound_sq };
     double pi[6] = { 0., 0., 0., 0., 0., 0. };
 
-    LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
+    LB_TRACE(fprintf(stderr, "Initializing the fluid with equilibrium populations\n"););
 
     for (index_t index = 0; index < lblattice.halo_grid_volume; index++) {
       // calculate equilibrium distribution
@@ -2079,7 +2079,7 @@ void lb_reinit_fluid() {
  *  the Lattice Boltzmann system. All derived parameters
  *  and the fluid are reset to their default values. */
 void lb_init() {
-  LB_TRACE(printf("Begin initialzing fluid on CPU\n"));
+  LB_TRACE(printf("Begin initializing fluid on CPU\n"));
 
   if (lbpar.agrid <= 0.0) {
       runtimeErrorMsg() <<"Lattice Boltzmann agrid not set when initializing fluid";
@@ -2089,9 +2089,9 @@ void lb_init() {
 
   double temp_agrid[3];
   double temp_offset[3];
-  for (int i = 0; i < 3; i++) {
-    temp_agrid[i]=lbpar.agrid;
-    temp_offset[i]=0.5;
+  for (int i = 0; i < 3; ++i) {
+    temp_agrid[i] = lbpar.agrid;
+    temp_offset[i] = 0.5;
   }
 
   /* initialize the local lattice domain */

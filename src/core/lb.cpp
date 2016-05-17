@@ -2089,7 +2089,7 @@ void lb_init() {
 
   double temp_agrid[3];
   double temp_offset[3];
-  for (int i =0; i<3; i++) {
+  for (int i = 0; i < 3; i++) {
     temp_agrid[i]=lbpar.agrid;
     temp_offset[i]=0.5;
   }

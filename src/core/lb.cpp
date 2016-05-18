@@ -2087,15 +2087,16 @@ void lb_init() {
 
   if (check_runtime_errors()) return;
 
-  double temp_agrid[3];
-  double temp_offset[3];
-  for (int i = 0; i < 3; ++i) {
+  const size_t dim = 3;
+  double temp_agrid[dim];
+  double temp_offset[dim];
+  for (int i = 0; i < dim; ++i) {
     temp_agrid[i] = lbpar.agrid;
     temp_offset[i] = 0.5;
   }
 
   /* initialize the local lattice domain */
-  lblattice.init(temp_agrid, temp_offset, 1, 0);
+  lblattice.init(temp_agrid, temp_offset, 1, dim);
 
   if (check_runtime_errors()) return;
 

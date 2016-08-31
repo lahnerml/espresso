@@ -99,6 +99,10 @@ void lbadapt_init_fluid_per_cell();
  */
 void lbadapt_reinit_fluid_per_cell();
 
+/** Get maxlevel of p4est
+ */
+int lbadapt_get_global_maxlevel();
+
 /** interpolating function
  *
  * \param [in]      p8est        The forest

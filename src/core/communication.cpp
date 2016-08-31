@@ -324,8 +324,8 @@ void mpi_stop() {
 
   // shutdown p4est if it was used
 #ifdef LB_ADAPTIVE
-  if (lbadapt_ghost_data) {
-    P4EST_FREE (lbadapt_ghost_data);
+  if (lbadapt_ghost_virt) {
+    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   }
   if (lbadapt_mesh) {
     p8est_mesh_destroy(lbadapt_mesh);
@@ -352,8 +352,8 @@ void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
 #ifdef LB_ADAPTIVE
-  if (lbadapt_ghost_data) {
-    P4EST_FREE (lbadapt_ghost_data);
+  if (lbadapt_ghost_virt) {
+    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   }
   if (lbadapt_mesh) {
     p8est_mesh_destroy(lbadapt_mesh);
@@ -2702,9 +2702,10 @@ void mpi_lbadapt_grid_init (int node, int level) {
   // build initial versions of ghost, mesh and allocate payload
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
   lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
-  lbadapt_ghostvirt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
+  finest_level_global = lbadapt_get_global_maxlevel();
 #endif // LB_ADAPTIVE
 }
 

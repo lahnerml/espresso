@@ -60,6 +60,7 @@
 p8est_connectivity_t *conn;
 p8est_t *p8est;
 p8est_ghost_t *lbadapt_ghost;
+p8est_ghostvirt_t *lbadapt_ghost_virt;
 p8est_mesh_t *lbadapt_mesh;
 lbadapt_payload_t **lbadapt_local_data;
 lbadapt_payload_t **lbadapt_ghost_data;
@@ -208,6 +209,7 @@ void lbadapt_init() {
         }
       }
     }
+    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -249,6 +251,7 @@ void lbadapt_init_force_per_cell() {
 #endif // EXTERNAL_FORCES
       }
     }
+    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -285,6 +288,7 @@ void lbadapt_init_fluid_per_cell() {
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
       }
     }
+    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -321,7 +325,29 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_BOUNDARIES
       }
     }
+    p8est_meshiter_destroy(mesh_iter);
   }
+}
+
+int lbadapt_get_global_maxlevel() {
+  int i;
+  int local_res = -1;
+  int global_res;
+  p8est_tree_t *tree;
+
+  /* get local max level */
+  for (i = p8est->first_local_tree; i <= p8est->last_local_tree; ++i) {
+    tree = p8est_tree_array_index(p8est->trees, i);
+    if (local_res < tree->maxlevel) {
+      local_res = tree->maxlevel;
+    }
+  }
+
+  /* synchronize and return obtained result */
+  sc_MPI_Allreduce(&local_res, &global_res, 1, sc_MPI_INT, sc_MPI_MAX,
+                   p8est->mpicomm);
+
+  return global_res;
 }
 
 void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,

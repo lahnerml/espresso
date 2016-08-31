@@ -40,8 +40,8 @@
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
-#include "utils.hpp"
 #include "lb.hpp"
+#include "utils.hpp"
 
 /* "global variables" */
 extern p8est_t *p8est;

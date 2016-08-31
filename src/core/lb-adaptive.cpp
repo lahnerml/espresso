@@ -284,7 +284,9 @@ void lbadapt_init_fluid_per_cell() {
 }
 
 void lbadapt_reinit_fluid_per_cell() {
-  lbadapt_allocate_data();
+  if (lbadapt_local_data == NULL) {
+    lbadapt_allocate_data();
+  }
   int status = 0;
   lbadapt_payload_t *data;
   double h; /* local meshwidth */

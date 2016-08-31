@@ -2371,7 +2371,19 @@ void lb_init() {
 
 /** Release the fluid. */
 void lb_release_fluid() {
-#ifndef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE
+  int level;
+  /** cleanup custom managed payload */
+  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+    P4EST_FREE(lbadapt_local_data[level - coarsest_level_local]);
+  }
+  P4EST_FREE(lbadapt_local_data);
+
+  for (level = coarsest_level_ghost; level < finest_level_ghost; ++level) {
+    P4EST_FREE(lbadapt_ghost_data[level - coarsest_level_ghost]);
+  }
+  P4EST_FREE(lbadapt_ghost_data);
+#else // LB_ADAPTIVE
     free(lbfluid[0][0]);
     free(lbfluid[0]);
     free(lbfluid[1][0]);

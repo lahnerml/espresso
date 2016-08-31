@@ -63,6 +63,11 @@ p8est_ghost_t *lbadapt_ghost;
 p8est_mesh_t *lbadapt_mesh;
 lbadapt_payload_t **lbadapt_local_data;
 lbadapt_payload_t **lbadapt_ghost_data;
+int coarsest_level_local;
+int finest_level_local;
+int coarsest_level_ghost;
+int finest_level_ghost;
+int finest_level_global;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -92,10 +97,10 @@ lbadapt_payload_t **lbadapt_ghost_data;
 /*** SETUP ***/
 void lbadapt_allocate_data() {
   int level;
-  int coarsest_level_local = -1;
-  int finest_level_local = -1;
-  int coarsest_level_ghost = -1;
-  int finest_level_ghost = -1;
+  coarsest_level_local = -1;
+  finest_level_local = -1;
+  coarsest_level_ghost = -1;
+  finest_level_ghost = -1;
 
   /** local cells */
   for (level = 0; level < P8EST_MAXLEVEL; ++level) {

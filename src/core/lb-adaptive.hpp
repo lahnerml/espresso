@@ -51,6 +51,11 @@ extern p8est_ghostvirt_t *lbadapt_ghost_virt;
 extern p8est_mesh_t *lbadapt_mesh;
 extern lbadapt_payload_t **lbadapt_local_data;
 extern lbadapt_payload_t **lbadapt_ghost_data;
+extern int coarsest_level_local;
+extern int finest_level_local;
+extern int coarsest_level_ghost;
+extern int finest_level_ghost;
+extern int finest_level_global;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**

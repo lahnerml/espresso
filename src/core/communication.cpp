@@ -2698,9 +2698,12 @@ void mpi_lbadapt_grid_init (int node, int level) {
                          0,                          /* data size */
                          NULL,                       /* init function */
                          NULL                        /* user pointer */);
+
   // build initial versions of ghost, mesh and allocate payload
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
   lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_local_data = NULL;
+  lbadapt_ghost_data = NULL;
 #endif // LB_ADAPTIVE
 }
 

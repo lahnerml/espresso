@@ -2695,9 +2695,12 @@ void mpi_lbadapt_grid_init (int node, int level) {
                          0,                          /* min octants per process */
                          level,                      /* min level */
                          1,                          /* fill uniform */
-                         sizeof (lbadapt_payload_t), /* data size */
-                         lbadapt_init,               /* init function */
+                         0,                          /* data size */
+                         NULL,                       /* init function */
                          NULL                        /* user pointer */);
+  // build initial versions of ghost, mesh and allocate payload
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
 #endif // LB_ADAPTIVE
 }
 
@@ -2842,23 +2845,14 @@ void mpi_reg_refinement (int node, int param) {
                     0,                      // no recursive refinement
                     P8EST_MAXLEVEL - 1,
                     refine_regional,        // return true to refine cell
-                    lbadapt_init,           // init data
-                    lbadapt_replace_quads); // replace data
-  /* throw out regular refinement
-  p8est_refine (p8est,                  // forest
-                0,                      // no recursive refinement
-                refine_regional,        // return true to refine cell
-                lbadapt_init);          // init data
-  */
+                    NULL,                   // init data
+                    NULL);                  // replace data
+
   p8est_balance_ext (p8est,                  // forest
                      P8EST_CONNECT_EDGE,     // connection type
-                     lbadapt_init,           // init data
-                     lbadapt_replace_quads); // replace data
-  /* throw out regular balancing
-  p8est_balance (p8est,                 // forest
-                 P8EST_CONNECT_EDGE,    // connection type
-                 lbadapt_init);          // init data
-  */
+                     NULL,                   // init data
+                     NULL);                  // replace data
+
   p8est_partition (p8est, 0, NULL);
 #endif // LB_ADAPTIVE
 }

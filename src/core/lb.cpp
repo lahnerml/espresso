@@ -27,9 +27,13 @@
  *
  */
 
+#include <stdlib.h>
+#include <fstream>
+#include <iostream>
+#include <algorithm>
+
 #include <mpi.h>
 #include <cstdio>
-#include <iostream>
 #include "utils.hpp"
 #include "communication.hpp"
 #include "grid.hpp"
@@ -43,6 +47,11 @@
 #include "immersed_boundary/ibm_main.hpp"
 
 #include "cuda_interface.hpp"
+
+#ifdef LB_ADAPTIVE
+#include <sc.h>
+#include "lb-adaptive.hpp"
+#endif //LB_ADAPTIVE
 
 // global variable holding the number of fluid components (see global.cpp)
 int lb_components = LB_COMPONENTS;
@@ -99,6 +108,7 @@ LB_Model lbmodel = { 19, d3q19_lattice, d3q19_coefficients, d3q19_w, NULL, 1./3.
 #define FLATNOISE
 #endif // (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 
+#ifndef LB_ADAPTIVE
 /** The underlying lattice structure */
 Lattice lblattice;
 
@@ -110,26 +120,27 @@ LB_FluidNode *lbfields = NULL;
 
 /** Communicator for halo exchange between processors */
 HaloCommunicator update_halo_comm = { 0, NULL };
+#endif // LB_ADAPTIVE
 
 /** \name Derived parameters */
 /*@{*/
 /** Flag indicating whether fluctuations are present. */
-static int fluct;
+int fluct;
 
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
 /** relaxation of the odd kinetic modes */
-static double gamma_odd  = 0.0;
+double gamma_odd  = 0.0;
 /** relaxation of the even kinetic modes */
-static double gamma_even = 0.0;
+double gamma_even = 0.0;
 /** amplitudes of the fluctuations of the modes */
-static double lb_phi[19];
+double lb_phi[19];
 /** amplitude of the fluctuations in the viscous coupling */
-static double lb_coupl_pref = 0.0;
+double lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random numbers */
-static double lb_coupl_pref2 = 0.0;
+double lb_coupl_pref2 = 0.0;
 /*@}*/
 
 /** measures the MD time since the last fluid update */
@@ -635,8 +646,120 @@ int lb_lbfluid_get_ext_force(double* p_f){
   return 0;
 }
 
+int separateBy2(int x) {
+  if(4 == sizeof(x)) {
+    x &= 0x0000ffff;
+    x = (x ^ (x << 8)) & 0x00ff00ff;
+    x = (x ^ (x << 4)) & 0x0f0f0f0f;
+    x = (x ^ (x << 2)) & 0x33333333;
+    x = (x ^ (x << 1)) & 0x55555555;
+  }
+  else if (8 == sizeof(x)) {
+    x &= 0x00000000ffffffff;
+    x = (x ^ (x << 16)) & 0x0000ffff0000ffff;
+    x = (x ^ (x <<  8)) & 0x00ff00ff00ff00ff;
+    x = (x ^ (x <<  4)) & 0x0f0f0f0f0f0f0f0f;
+    x = (x ^ (x <<  2)) & 0x3333333333333333;
+    x = (x ^ (x <<  1)) & 0x5555555555555555;
+  }
+  return x;
+}
+
+int mortonEnc(int x, int y, int z) {
+  return (separateBy2(x) | separateBy2(y) << 1 | separateBy2(z) << 2);
+}
+
+void lb_dump2file(std::string filename, int id, double* preStreaming,
+                  double* postStreaming, double *modes) {
+  std::ofstream myfile;
+  myfile.open(filename, std::ofstream::out | std::ofstream::app);
+
+  // convert id from lexicographic to Morton index
+  int gridsize[3];
+  int x, y, z;
+
+  gridsize[0] = box_l[0] / lbpar.agrid;
+  gridsize[1] = box_l[1] / lbpar.agrid;
+  gridsize[2] = box_l[2] / lbpar.agrid;
+
+  x = id % gridsize[0];
+  id = (int) id / gridsize[0];
+  y = id % gridsize[1];
+  id = (int) id / gridsize[1];
+  z = id % gridsize[2];
+
+  id = mortonEnc(x, y, z);
+
+  // dump
+  myfile << "id: " << id << std::endl
+         << " - distributions: pre streaming: ";
+  for (int i = 0; i < 19; ++i) myfile << preStreaming[i] << " - ";
+  myfile << std::endl << "post streaming: ";
+  for (int i = 0; i < 19; ++i) myfile << postStreaming[i] << " - ";
+  myfile << std::endl << "modes: ";
+  for (int i = 0; i < 19; ++i) myfile << modes[i] << " - ";
+  myfile << std::endl << std::endl;
+  myfile.flush();
+  myfile.close();
+}
+
 
 int lb_lbfluid_print_vtk_boundary(char* filename) {
+#ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *boundary;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  boundary = P4EST_ALLOC(double, num_cells);
+
+#if 0
+  /* grab boundary cells */
+  p8est_iterate (p8est, NULL,
+                 boundary,
+                 lbadapt_get_boundary_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_dirty_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,   /* draw at full scale */
+                      1,    /* write tree-id */
+                      1,    /* write refinement level of each octant */
+                      1,    /* write mpi process id */
+                      0,    /* no rank wrapping */
+                      1,    /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      filename,
+                      "boundaries", boundary
+  );
+#endif // 0
+
+  /* free memory */
+  P4EST_FREE(boundary);
+
+#else // LB_ADAPTIVE
     FILE* fp = fopen(filename, "w");
 
     if(fp == NULL)
@@ -698,11 +821,67 @@ int lb_lbfluid_print_vtk_boundary(char* filename) {
 #endif // LB
     }
     fclose(fp);
+#endif // LB_ADAPTIVE
 	return 0;
 }
 
 
 int lb_lbfluid_print_vtk_density(char** filename) {
+#ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (*filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (*filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - *filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_density, -1, len);
+  MPI_Bcast(*filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *density;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  density = P4EST_ALLOC(double, num_cells);
+
+#if 0
+  /* grab density values of cells */
+  p8est_iterate (p8est, NULL,
+                 density,
+                 lbadapt_get_density_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_dirty_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      *filename,
+                      "density", density
+  );
+#endif // 0
+
+  /* free memory */
+  P4EST_FREE(density);
+
+#else // LB_ADAPTIVE
     int ii;
 
     for(ii=0;ii<LB_COMPONENTS;++ii) {
@@ -742,11 +921,68 @@ int lb_lbfluid_print_vtk_density(char** filename) {
         }
         fclose(fp);
     }
+#endif // LB_ADAPTIVE
+
     return 0;
 }
 
 
-int lb_lbfluid_print_vtk_velocity(char* filename, std::vector<int> bb1, std::vector<int> bb2) {
+int lb_lbfluid_print_vtk_velocity (char* filename, std::vector<int> bb1, std::vector<int> bb2) {
+#ifdef LB_ADAPTIVE
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk (filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk (filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_velocity, -1, len);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  /* perform master IO routine here. */
+  /* TODO: move this to communication? */
+
+  double *velocity;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  velocity = P4EST_ALLOC(double, P8EST_DIM * num_cells);
+
+#if 0
+  /* grab velocity values of cells */
+  p8est_iterate (p8est, NULL,
+                 velocity,
+                 lbadapt_get_velocity_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  /* call output routine */
+  p8est_dirty_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      0,      /* no cell scalar field */
+                      1,      /* one vector field of cell data */
+                      0, 0,   /* no point scalars or point vectors */
+                      filename,
+                      "velocity", velocity
+  );
+#endif // 0
+
+  /* free memory */
+  P4EST_FREE(velocity);
+#else // LB_ADAPTIVE
     FILE* fp = fopen(filename, "w");
 
     if(fp == NULL)
@@ -824,11 +1060,12 @@ int lb_lbfluid_print_vtk_velocity(char* filename, std::vector<int> bb1, std::vec
 #endif // LB
     }
     fclose(fp);
-
+#endif // LB_ADAPTIVE
 	return 0;
 }
 
 int lb_lbfluid_print_boundary(char* filename) {
+#ifndef LB_ADAPTIVE
     FILE* fp = fopen(filename, "w");
 
     if(fp == NULL)
@@ -884,6 +1121,7 @@ int lb_lbfluid_print_boundary(char* filename) {
     }
 
     fclose(fp);
+#endif //LB_ADAPTIVE
     return 0;
 }
 
@@ -920,6 +1158,7 @@ int lb_lbfluid_print_velocity(char* filename) {
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         int pos[3];
         double u[3];
         int gridsize[3];
@@ -946,6 +1185,7 @@ int lb_lbfluid_print_velocity(char* filename) {
                 }
             }
         }
+#endif // LB_ADAPTIVE
 #endif // LB
     }
 
@@ -1150,6 +1390,7 @@ int lb_lbnode_get_rho(int* ind, double* p_rho){
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
         double rho; double j[3]; double pi[6];
@@ -1162,6 +1403,7 @@ int lb_lbnode_get_rho(int* ind, double* p_rho){
         // unit conversion
         rho *= 1/lbpar.agrid/lbpar.agrid/lbpar.agrid;
         *p_rho = rho;
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1183,6 +1425,7 @@ int lb_lbnode_get_u(int* ind, double* p_u) {
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
         double rho; double j[3]; double pi[6];
@@ -1196,6 +1439,7 @@ int lb_lbnode_get_u(int* ind, double* p_u) {
         p_u[0] = j[0]/rho*lbpar.agrid/lbpar.tau;
         p_u[1] = j[1]/rho*lbpar.agrid/lbpar.tau;
         p_u[2] = j[2]/rho*lbpar.agrid/lbpar.tau;
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1314,6 +1558,7 @@ int lb_lbnode_get_pi_neq(int* ind, double* p_pi) {
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
         double rho; double j[3]; double pi[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
@@ -1330,6 +1575,7 @@ int lb_lbnode_get_pi_neq(int* ind, double* p_pi) {
         p_pi[3] = pi[3]/lbpar.tau/lbpar.tau/lbpar.agrid/lbpar.agrid/lbpar.agrid;
         p_pi[4] = pi[4]/lbpar.tau/lbpar.tau/lbpar.agrid/lbpar.agrid/lbpar.agrid;
         p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/lbpar.agrid/lbpar.agrid/lbpar.agrid;
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1346,6 +1592,7 @@ int lb_lbnode_get_boundary(int* ind, int* p_boundary) {
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
 
@@ -1354,6 +1601,7 @@ int lb_lbnode_get_boundary(int* ind, int* p_boundary) {
         index = get_linear_index(ind_shifted[0],ind_shifted[1],ind_shifted[2],lblattice.halo_grid);
 
         mpi_recv_fluid_boundary_flag(node,index,p_boundary);
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1366,6 +1614,7 @@ int lb_lbnode_get_pop(int* ind, double* p_pop) {
         fprintf(stderr, "Not implemented for GPU\n");
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
 
@@ -1373,6 +1622,7 @@ int lb_lbnode_get_pop(int* ind, double* p_pop) {
         node = lblattice.map_lattice_to_node(ind_shifted,grid);
         index = get_linear_index(ind_shifted[0],ind_shifted[1],ind_shifted[2],lblattice.halo_grid);
         mpi_recv_fluid_populations(node, index, p_pop);
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1392,6 +1642,7 @@ int lb_lbnode_set_rho(int* ind, double *p_rho){
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
         double rho; double j[3]; double pi[6];
@@ -1406,6 +1657,7 @@ int lb_lbnode_set_rho(int* ind, double *p_rho){
 
 //  lb_calc_average_rho();
 //  lb_reinit_parameters();
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1424,6 +1676,7 @@ int lb_lbnode_set_u(int* ind, double* u){
 #endif // LB_GPU
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
         double rho; double j[3]; double pi[6];
@@ -1439,6 +1692,7 @@ int lb_lbnode_set_u(int* ind, double* u){
         j[1] = rho*u[1]*lbpar.tau*lbpar.agrid;
         j[2] = rho*u[2]*lbpar.tau*lbpar.agrid;
         mpi_send_fluid(node,index,rho,j,pi) ;
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1460,6 +1714,7 @@ int lb_lbnode_set_pop(int* ind, double* p_pop) {
         printf("Not implemented in the LB GPU code!\n");
     } else {
 #ifdef LB
+#ifndef LB_ADAPTIVE
         index_t index;
         int node, grid[3], ind_shifted[3];
 
@@ -1467,6 +1722,7 @@ int lb_lbnode_set_pop(int* ind, double* p_pop) {
         node = lblattice.map_lattice_to_node(ind_shifted,grid);
         index = get_linear_index(ind_shifted[0],ind_shifted[1],ind_shifted[2],lblattice.halo_grid);
         mpi_send_fluid_populations(node, index, p_pop);
+#endif // LB_ADAPTIVE
 #endif // LB
     }
     return 0;
@@ -1482,6 +1738,7 @@ int lb_lbnode_set_extforce(int* ind, double* f) {
 /********************** The Main LB Part *************************************/
 /* Halo communication for push scheme */
 static void halo_push_communication() {
+#ifndef LB_ADAPTIVE
     index_t index;
     int x, y, z, count;
     int rnode, snode;
@@ -1782,6 +2039,7 @@ static void halo_push_communication() {
 
     free(rbuf);
     free(sbuf);
+#endif // LB_ADAPTIVE
 }
 
 /***********************************************************************/
@@ -1828,17 +2086,26 @@ int lb_sanity_checks() {
 
 /***********************************************************************/
 
-/** (Pre-)allocate memory for data structures */
+/** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
+#ifdef LB_ADAPTIVE
+  // one can define the verbosity of p4est and libsc here.
+  sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+  p4est_init(NULL, SC_LP_ESSENTIAL);
+  
+  //p4est_init(NULL, SC_LP_PRODUCTION);
+#else // LB_ADAPTIVE
     lbfluid[0]    = (double**) Utils::malloc(lbmodel.n_veloc*sizeof(double *));
     lbfluid[0][0] = (double*) Utils::malloc(lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
     lbfluid[1]    = (double**) Utils::malloc(lbmodel.n_veloc*sizeof(double *));
     lbfluid[1][0] = (double*) Utils::malloc(lblattice.halo_grid_volume*lbmodel.n_veloc*sizeof(double));
+#endif // LB_ADAPTIVE
 }
 
 
 /** (Re-)allocate memory for the fluid and initialize pointers. */
 static void lb_realloc_fluid() {
+#ifndef LB_ADAPTIVE
     int i;
 
     LB_TRACE(printf("reallocating fluid\n"));
@@ -1854,12 +2121,14 @@ static void lb_realloc_fluid() {
     }
 
     lbfields = (LB_FluidNode*) Utils::realloc(lbfields,lblattice.halo_grid_volume*sizeof(*lbfields));
+#endif // LB_ADAPTIVE
 }
 
 
 /** Sets up the structures for exchange of the halo regions.
  *  See also \ref halo.cpp */
 static void lb_prepare_communication() {
+#ifndef LB_ADAPTIVE
     int i;
     HaloCommunicator comm = { 0, NULL };
 
@@ -1905,6 +2174,7 @@ static void lb_prepare_communication() {
     }
 
     release_halo_communication(&comm);
+#endif // LB_ADAPTIVE
 }
 
 
@@ -1989,8 +2259,18 @@ void lb_reinit_parameters() {
 }
 
 
-/** Resets the forces on the fluid nodes */
+/** Resets the forces on the fluid nodes; needs to be called after lb_reinit-fluid
+ *  for boundaries to be set. */
 void lb_reinit_forces() {
+#ifdef LB_ADAPTIVE
+  p8est_iterate (p8est,
+                 NULL,
+                 NULL,
+                 lbadapt_init_force_per_cell,
+                 NULL,
+                 NULL,
+                 NULL);
+#else // LB_ADAPTIVE
     for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
@@ -2011,14 +2291,27 @@ void lb_reinit_forces() {
       lb_boundaries[i].force[2]=0.;
     }
 #endif // LB_BOUNDARIES
+#endif // LB_ADAPTIVE
 }
 
 
 /** (Re-)initializes the fluid according to the given value of rho. */
 void lb_reinit_fluid() {
+  LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
+
+#ifdef LB_ADAPTIVE
+  p8est_iterate (p8est,
+                 lbadapt_ghost,
+                 NULL,
+                 lbadapt_init_fluid_per_cell,
+                 NULL,
+                 NULL,
+                 NULL);
+#else // LB_ADAPTIVE
     /* default values for fields in lattice units */
     /* here the conversion to lb units is performed */
     double rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
+  // start with fluid at rest and no stress
     double j[3] = { 0., 0., 0. };
 // double pi[6] = { rho*lbmodel.c_sound_sq, 0., rho*lbmodel.c_sound_sq, 0., 0., rho*lbmodel.c_sound_sq };
     double pi[6] = { 0., 0., 0., 0., 0., 0. };
@@ -2034,6 +2327,7 @@ void lb_reinit_fluid() {
       lbfields[index].boundary = 0;
 #endif // LB_BOUNDARIES
     }
+#endif // LB_ADAPTIVE
 
     lbpar.resend_halo = 0;
 #ifdef LB_BOUNDARIES
@@ -2048,6 +2342,8 @@ void lb_reinit_fluid() {
 void lb_init() {
   LB_TRACE(printf("Begin initialzing fluid on CPU\n"));
   
+  /* allocate regular grid */
+#ifndef LB_ADAPTIVE
   if (lbpar.agrid <= 0.0) {
       runtimeErrorMsg() <<"Lattice Boltzmann agrid not set when initializing fluid";
   }
@@ -2071,6 +2367,7 @@ void lb_init() {
   
   /* prepare the halo communication */
   lb_prepare_communication();
+#endif // !LB_ADAPTIVE
   
   /* initialize derived parameters */
   lb_reinit_parameters();
@@ -2087,18 +2384,22 @@ void lb_init() {
 
 /** Release the fluid. */
 void lb_release_fluid() {
+#ifndef LB_ADAPTIVE
     free(lbfluid[0][0]);
     free(lbfluid[0]);
     free(lbfluid[1][0]);
     free(lbfluid[1]);
     free(lbfields);
+#endif // LB_ADAPTIVE
 }
 
 
 /** Release fluid and communication. */
 void lb_release() {
+#ifndef LB_ADAPTIVE
     lb_release_fluid();
     release_halo_communication(&update_halo_comm);
+#endif // LB_ADAPTIVE
 }
 
 /***********************************************************************/
@@ -2110,6 +2411,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
                              const double *j,
                              double *pi) 
 {
+#ifndef LB_ADAPTIVE
     int i;
     double local_rho, local_j[3], local_pi[6], trace;
     const double avg_rho = lbpar.rho[0]*lbpar.agrid*lbpar.agrid*lbpar.agrid;
@@ -2186,6 +2488,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
         lbfluid[0][i][index] += coeff[i][3] * trace;
     }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 /*@}*/
@@ -2194,6 +2497,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index,
 /** Calculation of hydrodynamic modes */
 void lb_calc_modes(index_t index, double *mode) 
 {
+#ifndef LB_ADAPTIVE
 #ifdef D3Q19
     double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p, n7m, n8p, n8m, n9p, n9m;
 
@@ -2253,6 +2557,7 @@ void lb_calc_modes(index_t index, double *mode)
 #endif // !OLD_FLUCT
 
 #else // D3Q19
+#endif // LB_ADAPTIVE
     int i, j;
     for (i = 0; i < lbmodel.n_veloc; i++) {
         mode[i] = 0.0;
@@ -2266,7 +2571,7 @@ void lb_calc_modes(index_t index, double *mode)
 
 /** Streaming and calculation of modes (pull scheme) */
 inline void lb_pull_calc_modes(index_t index, double *mode) {
-
+#ifndef LB_ADAPTIVE
     int yperiod = lblattice.halo_grid[0];
     int zperiod = lblattice.halo_grid[0]*lblattice.halo_grid[1];
 
@@ -2353,11 +2658,13 @@ inline void lb_pull_calc_modes(index_t index, double *mode) {
         }
     }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_relax_modes(index_t index, double *mode) 
 {
+#ifndef LB_ADAPTIVE
     double rho, j[3], pi_eq[6];
 
     /* re-construct the real density
@@ -2410,6 +2717,7 @@ inline void lb_relax_modes(index_t index, double *mode)
     mode[17] = gamma_even*mode[17];
     mode[18] = gamma_even*mode[18];
 #endif // !OLD_FLUCT
+#endif // LB_ADAPTIVE
 }
 
 
@@ -2497,7 +2805,7 @@ inline void lb_thermalize_modes(index_t index, double *mode) {
 
 
 inline void lb_apply_forces(index_t index, double* mode) {
-
+#ifndef LB_ADAPTIVE
     double rho, *f, u[3], C[6];
 
     f = lbfields[index].force;
@@ -2541,13 +2849,13 @@ inline void lb_apply_forces(index_t index, double* mode) {
     lbfields[index].force[2] = 0.0;
     lbfields[index].has_force = 0;
 #endif // EXTERNAL_FORCES
- 
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_calc_n_from_modes(index_t index, double *mode) 
 {
-  
+#ifndef LB_ADAPTIVE
   double *w = lbmodel.w;
   
 #ifdef D3Q19
@@ -2604,10 +2912,12 @@ inline void lb_calc_n_from_modes(index_t index, double *mode)
     lbfluid[0][i][index] *= w[i];
   }
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 
 inline void lb_calc_n_from_modes_push(index_t index, double *m) {
+#ifndef LB_ADAPTIVE
 #ifdef D3Q19
     int yperiod = lblattice.halo_grid[0];
     int zperiod = lblattice.halo_grid[0]*lblattice.halo_grid[1];
@@ -2691,12 +3001,91 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
           lbfluid[1][i][next[i]] += mode[j]*e[j][i]/e[19][j];
         lbfluid[1][i][index] *= w[i];
     }
+#endif // LB_ADAPTIVE
 #endif // D3Q19
 }
 
 
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
+#ifdef LB_ADAPTIVE
+  /* loop over all lattice cells (halo excluded) */
+#ifdef LB_BOUNDARIES
+  for (int i = 0; i < n_lb_boundaries; i++) {
+    lb_boundaries[i].force[0]=0.;
+    lb_boundaries[i].force[1]=0.;
+    lb_boundaries[i].force[2]=0.;
+  }
+#endif // LB_BOUNDARIES
+  p8est_iterate (p8est,                   /* forest */
+                 NULL,                    /* no ghost necessary */
+                 NULL,                    /* no user_data */
+                 lbadapt_collide_streamI, /* volume callback */
+                 NULL,                    /* face callback */
+                 NULL,                    /* edge callback */
+                 NULL                     /* corner callback */
+  );
+
+  if (lbadapt_ghost == 0) {
+    lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+    lbadapt_ghost_data =
+      P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+  }
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
+  if (lbadapt_mesh == 0) {
+    lbadapt_mesh = p8est_mesh_new_ext (p8est,               /* forest */
+                                       lbadapt_ghost,       /* ghost layer */
+                                       1,                   /* compute quad_to_tree */
+                                       1,                   /* compute quad_to_level */
+                                       1,                   /* compute virtual cells */
+                                       P8EST_CONNECT_EDGE); /* fully connected */
+  }
+
+  p8est_iterate (p8est,                    /* forest */
+                 NULL,                     /* no ghost necessary */
+                 NULL,                     /* no user_data */
+                 lbadapt_collide_streamII, /* volume callback */
+                 NULL,                     /* face callback */
+                 NULL,                     /* edge callback */
+                 NULL                      /* corner callback */
+  );
+
+  p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
+
+  // bounce back on boundaries
+  p8est_iterate (p8est,               /* forest */
+                 NULL,                /* no ghost necessary */
+                 NULL,                /* no user_data */
+                 lbadapt_bounce_back, /* volume callback */
+                 NULL,                /* face callback */
+                 NULL,                /* edge callback */
+                 NULL                 /* corner callback */
+  );
+
+  // std::stringstream ss;
+  // ss << "lbadapt_" << p8est->mpirank << ".txt";
+  // std::string filename = ss.str();
+  // p8est_iterate(p8est, NULL, &filename, lbadapt_dump2file, NULL, NULL, NULL);
+
+  // swap pre-/postcollision pointers
+  p8est_iterate (p8est,                 /* forest */
+                 NULL,                  /* no ghost necessary */
+                 NULL,                  /* no user_data */
+                 lbadapt_swap_pointers, /* volume callback */
+                 NULL,                  /* face callback */
+                 NULL,                  /* edge callback */
+                 NULL                   /* corner callback */
+  );
+
+  //p8est_mesh_destroy (lbadapt_mesh);
+  //P4EST_FREE (lbadapt_ghost_data);
+  //p8est_ghost_destroy (lbadapt_ghost);
+
+  //lbadapt_mesh       = NULL;
+  //lbadapt_ghost_data = NULL;
+  //lbadapt_ghost      = NULL;
+#else // LB_ADAPTIVE
     index_t index;
     int x, y, z;
     double modes[19];
@@ -2786,11 +3175,13 @@ inline void lb_collide_stream() {
 
     /* halo region is invalid after update */
     lbpar.resend_halo = 1;
+#endif // LB_ADAPTIVE
 }
 
 
 /** Streaming and collisions (pull scheme) */
 inline void lb_stream_collide() {
+#ifndef LB_ADAPTIVE
     index_t index;
     int x, y, z;
     double modes[19];
@@ -2856,6 +3247,7 @@ inline void lb_stream_collide() {
 #ifdef IMMERSED_BOUNDARY
   IBM_ResetLBForces_CPU();
 #endif
+#endif // LB_ADAPTIVE
 }
 
 
@@ -2870,6 +3262,7 @@ inline void lb_stream_collide() {
  * This function is called from the integrator. Since the time step
  * for the lattice dynamics can be coarser than the MD time step, we
  * monitor the time since the last lattice update.
+ * Good practice: tau == time_step
  */
 void lattice_boltzmann_update() {
     int factor = (int)round(lbpar.tau/time_step);
@@ -2898,6 +3291,7 @@ void lattice_boltzmann_update() {
  * @param force      Coupling force between particle and fluid (Output).
  */
 inline void lb_viscous_coupling(Particle *p, double force[3]) {
+#ifndef LB_ADAPTIVE
   int x,y,z;
   index_t node_index[8];
   double delta[6];
@@ -3073,11 +3467,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     }
   }
 #endif
-
+#endif // LB_ADAPTIVE
 }
 
 
 int lb_lbfluid_get_interpolated_velocity(double* p, double* v) {
+#ifndef LB_ADAPTIVE
   index_t node_index[8], index;
   double delta[6];
   double local_rho, local_j[3], interpolated_u[3];
@@ -3176,6 +3571,7 @@ int lb_lbfluid_get_interpolated_velocity(double* p, double* v) {
   v[1] *= lbpar.agrid/lbpar.tau;
   v[2] *= lbpar.agrid/lbpar.tau;
   return 0;
+#endif // LB_ADAPTIVE
 }
 
 
@@ -3223,7 +3619,12 @@ void calc_particle_lattice_ia() {
     if (lbpar.resend_halo) { /* first MD step after last LB update */
         
       /* exchange halo regions (for fluid-particle coupling) */
+#ifdef LB_ADAPTIVE
+
+#else // LB_ADAPTIVE
       halo_communication(&update_halo_comm, (char*)**lbfluid);
+#endif // LB ADAPTIVE
+
 #ifdef ADDITIONAL_CHECKS
       lb_check_halo_regions();
 #endif // ADDITIONAL_CHECKS
@@ -3232,8 +3633,11 @@ void calc_particle_lattice_ia() {
       lbpar.resend_halo = 0;
         
       /* all fields have to be recalculated */
-      for (int i = 0; i < lblattice.halo_grid_volume; ++i) 
+#ifndef LB_ADAPTIVE
+      for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
           lbfields[i].recalc_fields = 1;
+    }
+#endif // LB_ADAPTIVE
     }
 
     /* draw random numbers for local particles */
@@ -3298,6 +3702,7 @@ void calc_particle_lattice_ia() {
       }
     }
       
+#ifndef LB_ADAPTIVE
     /* ghost cells */
     for (int c = 0; c < ghost_cells.n ;c++) {
       cell = ghost_cells.cell[c] ;
@@ -3342,6 +3747,7 @@ void calc_particle_lattice_ia() {
           }
       }
     }
+#endif // LB_ADAPTIVE
   }
 }
 
@@ -3351,6 +3757,20 @@ void calc_particle_lattice_ia() {
  * This function has to be called after changing the density of
  * a local lattice site in order to set lbpar.rho consistently. */
 void lb_calc_average_rho() {
+  double local_rho, sum_rho;
+
+  local_rho = 0.0;
+#ifdef LB_ADAPTIVE
+  double * rho;
+  *rho = 0.0;
+  p8est_iterate (p8est,
+                 NULL,
+                 (void *) rho,
+                 lbadapt_calc_local_rho,
+                 NULL,
+                 NULL,
+                 NULL);
+#else // LB_ADAPTIVE
     index_t index;
     int x, y, z;
     double rho, local_rho, sum_rho;
@@ -3372,6 +3792,7 @@ void lb_calc_average_rho() {
       // skip halo region
       index += 2*lblattice.halo_grid[0];
     }
+#endif // LB_ADAPTIVE
     MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
     
     /* calculate average density in MD units */

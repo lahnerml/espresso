@@ -100,9 +100,11 @@ void lbboundary_mindist_position(double pos[3], double* mindist, double distvec[
 /** Initialize boundary conditions for all constraints in the system. */
 void lb_init_boundaries() {
 
+#ifndef LB_ADAPTIVE
   int n, x, y, z;
   //char *errtxt;
   double pos[3], dist, dist_tmp=0.0, dist_vec[3];
+#endif // LB_ADAPTIVE
   
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined (LB_GPU) && defined (LB_BOUNDARIES_GPU)
@@ -295,7 +297,7 @@ void lb_init_boundaries() {
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   }
   else {
-#if defined (LB) && defined (LB_BOUNDARIES)   
+#if defined (LB) && defined (LB_BOUNDARIES) && not defined (LB_ADAPTIVE)
     int node_domain_position[3], offset[3];
     int the_boundary=-1;
     map_node_array(this_node, node_domain_position);
@@ -374,140 +376,93 @@ void lb_init_boundaries() {
           }
         }
       }
+#elif defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
+    /* iterate over domain and put cell centers into cell function */
+    /* set boundary information in cell centers */
+    p8est_iterate(
+        p8est, NULL,                 /* no ghost */
+        NULL,                        /* no data */
+        lbadapt_get_boundary_status, /* function to call for volumes */
+        NULL,                        /* no callback for faces between octants */
+        NULL,                        /* no callback for edges between octants */
+        NULL);                       /* no callback for corners between octants */
+#endif // defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
     } 
-    //printf("init voxels\n\n");
-    // SET VOXEL BOUNDARIES DIRECTLY 
-    int xxx,yyy,zzz=0;
-    char line[80];
-	for (n=0;n<n_lb_boundaries;n++) {
-		switch (lb_boundaries[n].type) {                
-			case LB_BOUNDARY_VOXEL:
-				//lbfields[get_linear_index(lb_boundaries[n].c.voxel.pos[0],lb_boundaries[n].c.voxel.pos[1],lb_boundaries[n].c.voxel.pos[2],lblattice.halo_grid)].boundary = n+1;
-				FILE *fp;
-				//fp=fopen("/home/mgusenbauer/Daten/Copy/DUK/GentlePump/Optimierer/NSvsLBM/geometry_files/bottleneck_fine_voxel_data_d20_converted_noMirror.csv", "r");
-				//fp=fopen("/home/mgusenbauer/Daten/Copy/DUK/GentlePump/Optimierer/NSvsLBM/geometry_files/bottleneck_fine_voxel_data_d80_converted_noMirror.csv", "r");
-				//fp=fopen("/home/mgusenbauer/Daten/Copy/DUK/GentlePump/Optimierer/NSvsLBM/geometry_files/bottleneck_fine_voxel_data_d80_converted.csv", "r");
-				fp=fopen(lb_boundaries[n].c.voxel.filename, "r");
-
-				while(fgets(line, 80, fp) != NULL)
-			   {
-				 /* get a line, up to 80 chars from fp,  done if NULL */
-				 sscanf (line, "%d %d %d", &xxx,&yyy,&zzz);
-				 //printf("%d %d %d\n", xxx,yyy,zzz);
-				 //lbfields[get_linear_index(xxx,yyy+30,zzz,lblattice.halo_grid)].boundary = n+1;
-				 lbfields[get_linear_index(xxx,yyy,zzz,lblattice.halo_grid)].boundary = n+1;
 			   }
-			   fclose(fp); 
-				
-				
 
-				break;
+#ifdef LB_ADAPTIVE
+int lbadapt_is_boundary(double *pos) {
+  double dist, dist_tmp, dist_vec[3];
+  dist = DBL_MAX;
+  int the_boundary = -1;
 
-			default:
-				break;
-		}
-	}
-	
-	// CHECK FOR BOUNDARY NEIGHBOURS AND SET FLUID NORMAL VECTOR 
-	//int neighbours = {0,0,0,0,0,0};
-	//int x=0,y=0,z=0;
-	//double nn[]={0.0,0.0,0.0,0.0,0.0,0.0};
-	//for (n=0;n<n_lb_boundaries;n++) {
-		//switch (lb_boundaries[n].type) {                
-			//case LB_BOUNDARY_VOXEL:
-				//x=lb_boundaries[n].c.voxel.pos[0];
-				//y=lb_boundaries[n].c.voxel.pos[1];
-				//z=lb_boundaries[n].c.voxel.pos[2];
-				//if(((x-1) >= 0) && (lbfields[get_linear_index(x-1,y,z,lblattice.halo_grid)].boundary == 0)) nn[0] = -1.0;//neighbours[0] = -1;
-				//if(((x+1) <= lblattice.grid[0]) && (lbfields[get_linear_index(x+1,y,z,lblattice.halo_grid)].boundary == 0)) nn[1] = 1.0;//neighbours[1] = 1;
-				////printf("%.0lf %.0lf ",nn[0],nn[1]);
-				//lb_boundaries[n].c.voxel.n[0] = nn[0]+nn[1];
-				////nn=0.0;
-				
-				//if(((y-1) >= 0) && (lbfields[get_linear_index(x,y-1,z,lblattice.halo_grid)].boundary == 0)) nn[2] = -1.0;//neighbours[2] = -1;
-				//if(((y+1) <= lblattice.grid[1]) && (lbfields[get_linear_index(x,y+1,z,lblattice.halo_grid)].boundary == 0)) nn[3] = 1.0;//neighbours[3] = 1;
-				////printf("%.0lf %.0lf ",nn[2],nn[3]);
-				//lb_boundaries[n].c.voxel.n[1] = nn[2]+nn[3];
-				////nn=0.0;
-				
-				//if(((z-1) >= 0) && (lbfields[get_linear_index(x,y,z-1,lblattice.halo_grid)].boundary == 0)) nn[4] = -1.0;//neighbours[4] = -1;
-				//if(((z+1) <= lblattice.grid[2]) && (lbfields[get_linear_index(x,y,z+1,lblattice.halo_grid)].boundary == 0)) nn[5] = 1.0;//neighbours[5]= 1;
-				////printf("%.0lf %.0lf ",nn[4],nn[5]);
-				//lb_boundaries[n].c.voxel.n[2] = nn[4]+nn[5];
-				//nn[0]=0.0,nn[1]=0.0,nn[2]=0.0,nn[3]=0.0,nn[4]=0.0,nn[5]=0.0;
-				
-				////printf("t %d pos: %.0lf %.0lf %.0lf, fluid normal %.0lf %.0lf %.0lf\n",n, x,y,z,lb_boundaries[n].c.voxel.normal[0],lb_boundaries[n].c.voxel.normal[1],lb_boundaries[n].c.voxel.normal[2]);
-				////printf("boundaries: %d %d %d %d %d %d\n",lbfields[get_linear_index(x-1,y,z,lblattice.halo_grid)].boundary,lbfields[get_linear_index(x+1,y,z,lblattice.halo_grid)].boundary,lbfields[get_linear_index(x,y-1,z,lblattice.halo_grid)].boundary,lbfields[get_linear_index(x,y+1,z,lblattice.halo_grid)].boundary,lbfields[get_linear_index(x,y,z-1,lblattice.halo_grid)].boundary,lbfields[get_linear_index(x,y,z+1,lblattice.halo_grid)].boundary);
-				//break;
+  for (int n = 0; n < n_lb_boundaries; ++n) {
+    switch (lb_boundaries[n].type) {
+    case LB_BOUNDARY_WAL:
+      calculate_wall_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.wal, &dist_tmp, dist_vec);
+      break;
 
-			//default:
-				//break;
-		//}
-	//}
-	
-	//// DO THE SAME FOR THE CONSTRAINTS: CONSTRAINTS MUST BE SET AND THE SAME AS LB_BOUNDARY !!!
-	//for(n=0;n<n_constraints;n++) {
-		//switch(constraints[n].type) {
-			//case CONSTRAINT_VOXEL: 
-				//x=constraints[n].c.voxel.pos[0];
-				//y=constraints[n].c.voxel.pos[1];
-				//z=constraints[n].c.voxel.pos[2];
-				//if(((x-1) >= 0) && (lbfields[get_linear_index(x-1,y,z,lblattice.halo_grid)].boundary == 0)) nn[0] = -1.0;//neighbours[0] = -1;
-				//if(((x+1) <= lblattice.grid[0]) && (lbfields[get_linear_index(x+1,y,z,lblattice.halo_grid)].boundary == 0)) nn[1] = 1.0;//neighbours[1] = 1;
-				////printf("%.0lf %.0lf ",nn[0],nn[1]);
-				//constraints[n].c.voxel.n[0] = nn[0]+nn[1];
-				////nn=0.0;
-				
-				//if(((y-1) >= 0) && (lbfields[get_linear_index(x,y-1,z,lblattice.halo_grid)].boundary == 0)) nn[2] = -1.0;//neighbours[2] = -1;
-				//if(((y+1) <= lblattice.grid[1]) && (lbfields[get_linear_index(x,y+1,z,lblattice.halo_grid)].boundary == 0)) nn[3] = 1.0;//neighbours[3] = 1;
-				////printf("%.0lf %.0lf ",nn[2],nn[3]);
-				//constraints[n].c.voxel.n[1] = nn[2]+nn[3];
-				////nn=0.0;
-				
-				//if(((z-1) >= 0) && (lbfields[get_linear_index(x,y,z-1,lblattice.halo_grid)].boundary == 0)) nn[4] = -1.0;//neighbours[4] = -1;
-				//if(((z+1) <= lblattice.grid[2]) && (lbfields[get_linear_index(x,y,z+1,lblattice.halo_grid)].boundary == 0)) nn[5] = 1.0;//neighbours[5]= 1;
-				////printf("%.0lf %.0lf ",nn[4],nn[5]);
-				//constraints[n].c.voxel.n[2] = nn[4]+nn[5];
-				//nn[0]=0.0,nn[1]=0.0,nn[2]=0.0,nn[3]=0.0,nn[4]=0.0,nn[5]=0.0;
-	
-				//break;
-			//default:
-				//break;		
-		//}	
-	//}
+    case LB_BOUNDARY_SPH:
+      calculate_sphere_dist((Particle *)NULL, pos, (Particle *)NULL,
+                            &lb_boundaries[n].c.sph, &dist_tmp, dist_vec);
+      break;
 
-    
-    //#ifdef VOXEL_BOUNDARIES
-    /*
-	for (z=0; z<lblattice.grid[2]+2; z++) {
-      for (y=0; y<lblattice.grid[1]+2; y++) {
-        for (x=0; x<lblattice.grid[0]+2; x++) {
-			lbfields[get_linear_index(x,y,z,lblattice.halo_grid)].boundary = 1;
-		}
-	  }
-	}
-	static const char filename[] = "/home/mgusenbauer/Daten/Copy/DUK/GentlePump/Optimierer/voxels/stl/data_final.csv";
-	FILE *file = fopen ( filename, "r" );
-	int coords[3];
-	printf("start new\n");
-	if ( file != NULL ){
-		char line [ 128 ]; // or other suitable maximum line size 
-		while ( fgets ( line, sizeof line, file ) != NULL ) {// read a line
-			//fputs ( line, stdout ); // write the line 
-			//coords = line.Split(' ').Select(n => Convert.ToInt32(n)).ToArray();
-			//printf("readline: %s\n",line);
-			int i;
-			sscanf(line, "%d %d %d", &coords[0],&coords[1],&coords[2]);
-			//printf("%d %d %d\n", coords[0],coords[1],coords[2]);
-			lbfields[get_linear_index(coords[0]+5,coords[1]+5,coords[2]+5,lblattice.halo_grid)].boundary = 0;
-		}
-		fclose ( file );
-	}
-	printf("end new\n");
-	*/
-#endif
+    case LB_BOUNDARY_CYL:
+      calculate_cylinder_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.cyl, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_RHOMBOID:
+      calculate_rhomboid_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.rhomboid, &dist_tmp,
+                              dist_vec);
+      break;
+
+    case LB_BOUNDARY_POR:
+      calculate_pore_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.pore, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_STOMATOCYTE:
+      calculate_stomatocyte_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.stomatocyte, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    case LB_BOUNDARY_HOLLOW_CONE:
+      calculate_hollow_cone_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.hollow_cone, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    default:
+      runtimeErrorMsg() << "lbboundary type " << lb_boundaries[n].type
+                        << " not implemented in lb_init_boundaries()\n";
+    }
+
+    // if (dist_tmp < dist || n == 0) {
+    if (dist_tmp < dist) {
+      dist = dist_tmp;
+      the_boundary = n;
+    }
+  }
+
+  // if (pos[2] < (1./16.) || pos[2] > (15./16.)) {
+  //   std::cout << std::fixed << std::setprecision(5)
+  //             << "pos: " << pos[0] << ", " << pos[1] << ", " << pos[2]
+  //             << "; dist: " << dist
+  //             << "; bnd: " << the_boundary << std::endl;
+  // }
+
+  // if (dist <= 0 && the_boundary >= 0 && n_lb_boundaries > 0) {
+  if (dist <= 0 && n_lb_boundaries > 0) {
+    return the_boundary + 1;
+  } else {
+    return 0;
   }
 }
+#endif // LB_ADAPTIVE
 
 int lbboundary_get_force(int no, double* f) {
 #if defined (LB_BOUNDARIES) || defined (LB_BOUNDARIES_GPU)
@@ -547,7 +502,7 @@ int lbboundary_get_force(int no, double* f) {
 #ifdef LB_BOUNDARIES
 
 void lb_bounce_back() {
-
+#ifndef LB_ADAPTIVE
 #ifdef D3Q19
 #ifndef PULL
   int k,i,l;
@@ -616,7 +571,8 @@ void lb_bounce_back() {
 #endif
 #else
 #error Bounce back boundary conditions are only implemented for D3Q19!
-#endif
+#endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 #endif

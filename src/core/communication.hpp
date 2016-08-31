@@ -527,6 +527,43 @@ void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3]);
 /** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
 void mpi_bcast_constraint(int del_num);
 
+#ifdef LB_ADAPTIVE
+/** initialize adaptive grid
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] level refine grid uniformly up to this level
+ */
+void mpi_lbadapt_grid_init (int node, int level);
+
+/** Call for parallel IO of boundary
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_lbadapt_vtk_print_boundary(int node, int len);
+
+/** Call for parallel IO of density
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_lbadapt_vtk_print_density (int node, int len);
+
+/** Call for parallel IO of velocity
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_lbadapt_vtk_print_velocity(int node, int len);
+
+void mpi_unif_refinement (int node, int level);
+
+void mpi_rand_refinement (int node, int maxLevel);
+
+void mpi_reg_refinement (int node, int param=0);
+#endif // LB_ADAPTIVE
+
+
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
 void mpi_bcast_lbboundary(int del_num);

@@ -54,6 +54,7 @@
 #include "initialize.hpp"
 #include "integrate.hpp"
 #include "interaction_data.hpp"
+#include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "lj.hpp"
@@ -179,7 +180,14 @@ static int terminated = 0;
   CB(mpi_gather_cuda_devices_slave)                                            \
   CB(mpi_thermalize_cpu_slave)                                                 \
   CB(mpi_scafacos_set_parameters_slave)                                        \
-  CB(mpi_mpiio_slave)
+  CB(mpi_mpiio_slave)                                                          \
+  CB(mpi_lbadapt_grid_init)                                                    \
+  CB(mpi_lbadapt_vtk_print_boundary)                                           \
+  CB(mpi_lbadapt_vtk_print_density)                                            \
+  CB(mpi_lbadapt_vtk_print_velocity)                                           \
+  CB(mpi_unif_refinement)                                                      \
+  CB(mpi_rand_refinement)                                                      \
+  CB(mpi_reg_refinement)                                                       \
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -314,6 +322,26 @@ void mpi_stop() {
 
   mpi_call(mpi_stop_slave, -1, 0);
 
+  // shutdown p4est if it was used
+#ifdef LB_ADAPTIVE
+  if (lbadapt_ghost_data) {
+    P4EST_FREE (lbadapt_ghost_data);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
+  }
+  if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
+
+  sc_finalize();
+#endif
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -323,6 +351,25 @@ void mpi_stop() {
 void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
+#ifdef LB_ADAPTIVE
+  if (lbadapt_ghost_data) {
+    P4EST_FREE (lbadapt_ghost_data);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
+  }
+  if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
+
+  sc_finalize();
+#endif
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -2636,6 +2683,184 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
     *boundary = data;
   }
 #endif
+}
+
+void mpi_lbadapt_grid_init (int node, int level) {
+#ifdef LB_ADAPTIVE
+  /* create connectivity and octree */
+  conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
+                                       periodic & 1, periodic & 2, periodic & 4);
+  p8est = p8est_new_ext (comm_cart,                  /* mpi communicator */
+                         conn,                       /* connectivity */
+                         0,                          /* min octants per process */
+                         level,                      /* min level */
+                         1,                          /* fill uniform */
+                         sizeof (lbadapt_payload_t), /* data size */
+                         lbadapt_init,               /* init function */
+                         NULL                        /* user pointer */);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_boundary (int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  double *boundary;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  boundary = P4EST_ALLOC(double, num_cells);
+
+#if 0
+  p8est_iterate (p8est, NULL,
+                 boundary,
+                 lbadapt_get_boundary_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  p8est_dirty_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      filename,
+                      "boundaries", boundary
+  );
+#endif // 0
+
+  P4EST_FREE(boundary);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_density (int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  double *density;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  density = P4EST_ALLOC(double, num_cells);
+
+#if 0
+  p8est_iterate (p8est, NULL,
+                 density,
+                 lbadapt_get_boundary_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  p8est_dirty_vtk_writeAll (p8est,  /* p8est */
+                      NULL,   /* geometry */
+                      1.,     /* draw at full scale */
+                      1,      /* write tree-id */
+                      1,      /* write refinement level of each octant */
+                      1,      /* write mpi process id */
+                      0,      /* no rank wrapping */
+                      1,      /* one scalar field of cell data */
+                      0, 0, 0,/* no cell vectors, point scalars or point vectors */
+                      filename,
+                      "density", density
+  );
+#endif // 0
+
+  P4EST_FREE(density);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_velocity (int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  double *velocity;
+  p4est_locidx_t num_cells;
+  num_cells = p8est->local_num_quadrants;
+  velocity = P4EST_ALLOC(double, P8EST_DIM * num_cells);
+
+#if 0
+  p8est_iterate (p8est, NULL,
+                 velocity,
+                 lbadapt_get_velocity_values_dirty,
+                 NULL,
+                 NULL,
+                 NULL
+  );
+
+  p8est_vtk_write_file (p8est,  /* p8est */
+                        NULL,   /* geometry */
+                        1.,     /* draw at full scale */
+                        1,      /* write tree-id */
+                        1,      /* write refinement level of each octant */
+                        1,      /* write mpi process id */
+                        0,      /* no rank wrapping */
+                        0,      /* no cell scalar field */
+                        1,      /* one vector field of cell data */
+                        0, 0,   /* no point scalars or point vectors */
+                        filename,
+                        "velocity", velocity
+  );
+#endif // 0
+
+  P4EST_FREE(velocity);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_unif_refinement (int node, int level) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < level; i++) {
+    p8est_refine(p8est, 0, refine_uniform, NULL);
+    p8est_partition (p8est, 0, NULL);
+  }
+  p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
+#endif //LB_ADAPTIVE
+}
+
+void mpi_rand_refinement (int node, int maxLevel) {
+#ifdef LB_ADAPTIVE
+  // assert level 0 is refined
+  p8est_refine (p8est, 0, refine_uniform, NULL);
+
+  // for remaining levels 50% chance they will be refined
+  // refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
+  for (int i = 0; i < maxLevel; i++) {
+    p8est_refine(p8est, 0, refine_random, NULL);
+    p8est_partition (p8est, 0, NULL);
+  }
+  p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
+#endif // LB_ADAPTIVE
+}
+
+void mpi_reg_refinement (int node, int param) {
+#ifdef LB_ADAPTIVE
+  p8est_refine_ext (p8est,                  // forest
+                    0,                      // no recursive refinement
+                    P8EST_MAXLEVEL - 1,
+                    refine_regional,        // return true to refine cell
+                    lbadapt_init,           // init data
+                    lbadapt_replace_quads); // replace data
+  /* throw out regular refinement
+  p8est_refine (p8est,                  // forest
+                0,                      // no recursive refinement
+                refine_regional,        // return true to refine cell
+                lbadapt_init);          // init data
+  */
+  p8est_balance_ext (p8est,                  // forest
+                     P8EST_CONNECT_EDGE,     // connection type
+                     lbadapt_init,           // init data
+                     lbadapt_replace_quads); // replace data
+  /* throw out regular balancing
+  p8est_balance (p8est,                 // forest
+                 P8EST_CONNECT_EDGE,    // connection type
+                 lbadapt_init);          // init data
+  */
+  p8est_partition (p8est, 0, NULL);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {

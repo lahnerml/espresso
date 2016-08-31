@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** \file lb.hpp
  * Header file for lb.cpp
@@ -40,8 +40,8 @@ extern int lb_components ; // global variable holding the number of fluid compon
  * thus making the code more efficient. */
 #define D3Q19
 
-/** \name Parameter fields for Lattice Boltzmann 
- * The numbers are referenced in \ref mpi_bcast_lb_params 
+/** \name Parameter fields for Lattice Boltzmann
+ * The numbers are referenced in \ref mpi_bcast_lb_params
  * to determine what actions have to take place upon change
  * of the respective parameter. */
 /*@{*/
@@ -57,7 +57,7 @@ extern int lb_components ; // global variable holding the number of fluid compon
 #define LB_COUPLE_NULL        1
 #define LB_COUPLE_TWO_POINT   2
 #define LB_COUPLE_THREE_POINT 4
-  
+
 /*@}*/
   /** Some general remarks:
    * This file implements the LB D3Q19 method to Espresso. The LB_Model
@@ -186,6 +186,7 @@ extern LB_Model lbmodel;
 /** Struct holding the Lattice Boltzmann parameters */
 extern LB_Parameters lbpar; 
 
+#ifndef LB_ADAPTIVE
 /** The underlying lattice */
 extern Lattice lblattice;
 
@@ -196,6 +197,17 @@ extern double **lbfluid[2];
 
 /** Pointer to the hydrodynamic fields of the fluid */
 extern LB_FluidNode *lbfields;
+#else // LB_ADAPTIVE
+typedef struct lbadapt_payload {
+  int  boundary;
+  double lbfluid[2][19];
+  double modes[19];
+  LB_FluidNode lbfields;
+} lbadapt_payload_t;
+#endif // LB_ADAPTIVE
+
+/* int to indicate fluctuations */
+extern int fluct;
 
 /** Switch indicating momentum exchange between particles and fluid */
 extern int transfer_momentum;
@@ -210,6 +222,12 @@ extern int resend_halo;
 
 extern double gamma_shear;
 extern double gamma_bulk;
+
+extern double gamma_odd;
+extern double gamma_even;
+extern double lb_phi[19];
+extern double lb_coupl_pref;
+extern double lb_coupl_pref2;
 
 /************************************************************/
 /** \name Exported Functions */
@@ -279,7 +297,7 @@ void lb_propagate();
 /** Calculates the coupling of MD particles to the LB fluid.
  * This function  is called from \ref force_calc. The force is added
  * to the particle force and the corresponding momentum exchange is
- * applied to the fluid. 
+ * applied to the fluid.
  * Note that this function changes the state of the fluid!
  */
 void calc_particle_lattice_ia();
@@ -305,7 +323,7 @@ void lb_calc_modes(index_t index, double *mode);
  * @param rho   local fluid density
  */
 inline void lb_calc_local_rho(index_t index, double *rho) {
-
+#ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
 #endif
@@ -330,7 +348,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
 	       + lbfluid[0][13][index] + lbfluid[0][14][index] 
          + lbfluid[0][15][index] + lbfluid[0][16][index] 
 	       + lbfluid[0][17][index] + lbfluid[0][18][index];
-
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate the local fluid momentum.
@@ -339,7 +357,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
  * @param j local fluid speed
  */
 inline void lb_calc_local_j(index_t index, double *j) {
-
+#ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
 #endif
@@ -364,7 +382,7 @@ inline void lb_calc_local_j(index_t index, double *j) {
          - lbfluid[0][13][index] + lbfluid[0][14][index]
          + lbfluid[0][15][index] - lbfluid[0][16][index] 
          - lbfluid[0][17][index] + lbfluid[0][18][index];
-
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate the local fluid stress.
@@ -395,7 +413,7 @@ inline void lb_calc_local_pi(index_t index, double *pi) {
  * @param pi      local fluid pressure
  */
 inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *pi) {
-
+#ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
     runtimeErrorMsg() <<"Error in lb_calc_local_fields in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
     *rho=0; j[0]=j[1]=j[2]=0; pi[0]=pi[1]=pi[2]=pi[3]=pi[4]=pi[5]=0;
@@ -471,11 +489,12 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *
   pi[4] = mode[9];                                                  // yz
   pi[5] = ( mode[0] + mode[4] - mode[6] )/3.0;                      // zz
 
+#endif // !LB_ADAPTIVE
 }
 
 #ifdef LB_BOUNDARIES
 inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
-  
+#ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
     runtimeErrorMsg() <<"Error in lb_local_fields_get_boundary_flag in " << __FILE__ << __LINE__ << ": CPU LB not switched on.";
     *boundary = 0;
@@ -483,6 +502,7 @@ inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
   }
 
   *boundary = lbfields[index].boundary;
+#endif // LB_ADAPTIVE
 }
 #endif
 
@@ -492,19 +512,23 @@ inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
  * @param pop fluid population
  */
 inline void lb_get_populations(index_t index, double* pop) {
+#ifndef LB_ADAPTIVE
   int i=0;
   for (i=0; i<19*LB_COMPONENTS; i++) {
     pop[i]=lbfluid[0][i][index]+lbmodel.coeff[i%19][0]*lbpar.rho[i/19];
   }
+#endif // LB_ADAPTIVE
 }
 
 inline void lb_set_populations(index_t index, double* pop) {
+#ifndef LB_ADAPTIVE
   int i=0;
   for (i=0; i<19*LB_COMPONENTS; i++) {
     lbfluid[0][i][index]=pop[i]-lbmodel.coeff[i%19][0]*lbpar.rho[i/19];
   }
+#endif // LB_ADAPTIVE
 }
-#endif
+#endif // LB
 
 #include "lbgpu.hpp"
 
@@ -541,6 +565,10 @@ int lb_lbfluid_print_vtk_velocity(char* filename, std::vector<int> = {-1, -1, -1
 int lb_lbfluid_print_vtk_density(char** filename);
 int lb_lbfluid_print_boundary(char* filename);
 int lb_lbfluid_print_velocity(char* filename);
+
+/** debug **/
+void lb_dump2file(std::string filename, int id, double* preStreaming,
+                  double* postStreaming, double *modes);
 
 int lb_lbfluid_save_checkpoint(char* filename, int binary); 
 int lb_lbfluid_load_checkpoint(char* filename, int binary);

@@ -105,6 +105,28 @@ if test "${CXXFLAGS+set}" != set; then
   ],[
     AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
   ])
+
+  ##################################
+  # test for -Wextra
+  AC_MSG_CHECKING([whether the compiler accepts -Wextra])
+  saved_CXXFLAGS=$CXXFLAGS
+  CXXFLAGS="-Wextra $CXXFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[
+    AC_MSG_RESULT(yes);try_add_flag_res=yes
+  ],[
+    AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
+  ])
+
+  ##################################
+  # test for -pedantic
+  AC_MSG_CHECKING([whether the compiler accepts -pedantic])
+  saved_CXXFLAGS=$CXXFLAGS
+  CXXFLAGS="-pedantic $CXXFLAGS"
+  AC_COMPILE_IFELSE([AC_LANG_PROGRAM([],[])],[
+    AC_MSG_RESULT(yes);try_add_flag_res=yes
+  ],[
+    AC_MSG_RESULT(no); CXXFLAGS=$saved_CXXFLAGS; try_add_flag_res=no
+  ])
 fi
 
 ##################################
@@ -469,7 +491,92 @@ AS_IF([test x$arpack_found = xyes],[
   AC_DEFINE(ARPACK,[],[Whether ARPACK is available])])
 # end of check for ARPACK
 
+cat <<EOF
+****************************************************************
+*                  Checking for p4est                          *
+****************************************************************
+EOF
+# check whether the p4est library is available
+# This is needed for using adaptive grids in LBM
 
+## Checking for libsc
+################################
+AS_IF([test x$with_p4est = xguess || test x$with_p4est = xyes || test x$with_p4est = xno],[
+   p4est_path=/usr/local/p4est
+],[test x$with_p4est != xno],[
+   p4est_path=$with_p4est
+   with_p4est=yes
+])
+
+AC_MSG_CHECKING([whether to use p4est])
+
+AC_ARG_WITH([P4EST],
+	AS_HELP_STRING([--with-p4est],
+                       [specify whether or not to use p4est [guess]]),
+	, with_p4est=guess)
+AC_MSG_RESULT($with_p4est)
+
+cat <<EOF
+1/2: find libsc
+EOF
+
+ES_ADDPATH_CHECK_LIB(sc, sc_init, [p4est_found=yes], [
+	p4est_found=no
+
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find sc library in $p4est_path which is needed for p4est, specify location using LDFLAGS])
+        ],[
+            AC_MSG_WARN([could not find p4est library. Some features will not be available!])
+        ])
+    ], [$p4est_path/lib])
+
+ES_ADDPATH_CHECK_HEADER([sc.h],, [
+   	p4est_found=no
+
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find sc library header files specify location using CPPFLAGS])
+        ],[
+            AC_MSG_WARN([did not look for sc library header files as it is not used.])
+        ])
+    ], [$p4est_path/include])
+
+## Checking for libp4est
+################################
+cat <<EOF
+2/2: find p4est
+EOF
+
+ES_ADDPATH_CHECK_LIB(p4est, p4est_init, [p4est_found=yes], [
+	p4est_found=no
+
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find p4est library in $p4est_path, specify location using LDFLAGS])
+        ],[
+            AC_MSG_WARN([could not find p4est library. Some features will not be available!])
+        ])
+    ], [$p4est_path/lib])
+
+ES_ADDPATH_CHECK_HEADER([p4est.h],, [
+   	p4est_found=no
+
+        AS_IF([test x$with_p4est = xyes],[
+            AC_MSG_FAILURE([could not find p4est library header files specify location using CPPFLAGS])
+        ],[
+            AC_MSG_WARN([did not look for p4est library header files as it is not used.])
+        ])
+    ], [$p4est_path/include])
+
+AS_IF([test x$p4est_found = xno],[
+  AS_IF([test x$with_p4est = xyes],[
+    AC_MSG_FAILURE([p4est requested, but p4est was not found!])
+    ],[ AS_IF([test x$with_p4est = xguess], [
+          AC_MSG_WARN([p4est not found. Some features will not be available!])
+         ])
+    ])
+  ])
+AS_IF([test x$p4est_found = xyes],[
+  AC_DEFINE(P4EST,[],[Whether p4est is available])])
+# end of check for p4est
 
 cat <<EOF
 ****************************************************************

@@ -33,8 +33,10 @@
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
+#include <p8est_ghostvirt.h>
 #include <p8est_iterate.h>
 #include <p8est_mesh.h>
+#include <p8est_meshiter.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
@@ -45,8 +47,10 @@
 extern p8est_t *p8est;
 extern p8est_connectivity_t *conn;
 extern p8est_ghost_t *lbadapt_ghost;
+extern p8est_ghostvirt_t *lbadapt_ghost_virt;
 extern p8est_mesh_t *lbadapt_mesh;
-extern lbadapt_payload_t *lbadapt_ghost_data;
+extern lbadapt_payload_t **lbadapt_local_data;
+extern lbadapt_payload_t **lbadapt_ghost_data;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -73,14 +77,22 @@ extern lbadapt_payload_t *lbadapt_ghost_data;
  * |           18 |          - |          2 | { 0, -1,  1} |
  */
 
-/** setup function
- *
- * \param [in]      p8est      The forest
- * \param [in]      which_tree The tree in the forest containing \a quadrant
- * \param [in][out] quadrant   The quadrant to be initialized
+/** setup function for lbadapt_payload_t by setting as many values as possible
+ *  to 0
  */
-void lbadapt_init(p8est_t *p8est, p4est_topidx_t which_tree,
-                  p8est_quadrant_t *quadrant);
+void lbadapt_init();
+
+/** Init cell-local force values
+ */
+void lbadapt_init_force_per_cell();
+
+/** Init cell-local LBM probability densities
+ */
+void lbadapt_init_fluid_per_cell();
+
+/** (Re-)initialize the fluid according to the given value of rho
+ */
+void lbadapt_reinit_fluid_per_cell();
 
 /** interpolating function
  *
@@ -207,12 +219,6 @@ void lbadapt_get_velocity_values_dirty(p8est_iter_volume_info_t *info,
                                        void *user_data);
 
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
-
-void lbadapt_init_force_per_cell(p8est_iter_volume_info_t *info,
-                                 void *user_data);
-
-void lbadapt_init_fluid_per_cell(p8est_iter_volume_info_t *info,
-                                 void *user_data);
 
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data);
 

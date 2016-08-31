@@ -2263,13 +2263,7 @@ void lb_reinit_parameters() {
  *  for boundaries to be set. */
 void lb_reinit_forces() {
 #ifdef LB_ADAPTIVE
-  p8est_iterate (p8est,
-                 NULL,
-                 NULL,
-                 lbadapt_init_force_per_cell,
-                 NULL,
-                 NULL,
-                 NULL);
+  lbadapt_init_force_per_cell();
 #else // LB_ADAPTIVE
     for (index_t index=0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES
@@ -2298,15 +2292,8 @@ void lb_reinit_forces() {
 /** (Re-)initializes the fluid according to the given value of rho. */
 void lb_reinit_fluid() {
   LB_TRACE(fprintf(stderr, "Initialising the fluid with equilibrium populations\n"););
-
 #ifdef LB_ADAPTIVE
-  p8est_iterate (p8est,
-                 lbadapt_ghost,
-                 NULL,
-                 lbadapt_init_fluid_per_cell,
-                 NULL,
-                 NULL,
-                 NULL);
+  lbadapt_reinit_fluid_per_cell();
 #else // LB_ADAPTIVE
     /* default values for fields in lattice units */
     /* here the conversion to lb units is performed */
@@ -3028,8 +3015,10 @@ inline void lb_collide_stream() {
 
   if (lbadapt_ghost == 0) {
     lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+#if 0
     lbadapt_ghost_data =
       P4EST_ALLOC (lbadapt_payload_t, lbadapt_ghost->ghosts.elem_count);
+#endif // 0
   }
   p8est_ghost_exchange_data (p8est, lbadapt_ghost, lbadapt_ghost_data);
 

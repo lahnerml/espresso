@@ -25,18 +25,18 @@
  * Implementation file for \ref lb-adaptive.hpp.
  */
 
+#include <algorithm>
 #include <assert.h>
-#include <stdlib.h>
 #include <fstream>
 #include <iostream>
-#include <algorithm>
+#include <stdlib.h>
 
-#include "constraint.hpp"
 #include "communication.hpp"
-#include "lb.hpp"
+#include "constraint.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb-d3q19.hpp"
+#include "lb.hpp"
 #include "random.hpp"
 #include "utils.hpp"
 
@@ -61,7 +61,8 @@ p8est_connectivity_t *conn;
 p8est_t *p8est;
 p8est_ghost_t *lbadapt_ghost;
 p8est_mesh_t *lbadapt_mesh;
-lbadapt_payload_t *lbadapt_ghost_data;
+lbadapt_payload_t **lbadapt_local_data;
+lbadapt_payload_t **lbadapt_ghost_data;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -89,37 +90,230 @@ lbadapt_payload_t *lbadapt_ghost_data;
  */
 
 /*** SETUP ***/
-void lbadapt_init(p8est_t *p8est, p4est_topidx_t which_tree,
-                  p8est_quadrant_t *quadrant) {
-  lbadapt_payload_t *data = (lbadapt_payload_t *)quadrant->p.user_data;
+void lbadapt_allocate_data() {
+  int level;
+  int coarsest_level_local = -1;
+  int finest_level_local = -1;
+  int coarsest_level_ghost = -1;
+  int finest_level_ghost = -1;
 
-  data->boundary = 0;
-  // data->lbfields = (LB_FluidNode) malloc(sizeof(LB_FluidNode));
-  for (int i = 0; i < lbmodel.n_veloc; i++) {
-    data->lbfluid[0][i] = 0.;
-    data->lbfluid[1][i] = 0.;
-    data->modes[i] = 0.;
+  /** local cells */
+  for (level = 0; level < P8EST_MAXLEVEL; ++level) {
+    if ((((lbadapt_mesh->quad_level + level)->elem_count > 0) ||
+         ((lbadapt_mesh->virtual_qlevels + level)->elem_count > 0)) &&
+        coarsest_level_local == -1) {
+      coarsest_level_local = level;
+    }
+    if ((coarsest_level_local != -1) &&
+        (((lbadapt_mesh->quad_level + level)->elem_count == 0) &&
+         ((lbadapt_mesh->virtual_qlevels + level)->elem_count == 0))) {
+      finest_level_local = level;
+      break;
+    }
+  }
+  if (finest_level_local - coarsest_level_local > 0) {
+    lbadapt_local_data = P4EST_ALLOC(lbadapt_payload_t *,
+                                     finest_level_local - coarsest_level_local);
+    for (level = coarsest_level_local; level < finest_level_local; ++level) {
+      lbadapt_local_data[level - coarsest_level_local] = P4EST_ALLOC(
+          lbadapt_payload_t,
+          (lbadapt_mesh->quad_level + level)->elem_count +
+              P8EST_CHILDREN *
+                  (lbadapt_mesh->virtual_qlevels + level)->elem_count);
+    }
   }
 
-  // ints
-  data->lbfields.recalc_fields = 1;
-  data->lbfields.has_force = 0;
+  /** ghost */
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
+         ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0)) &&
+        coarsest_level_ghost == -1) {
+      coarsest_level_ghost = level;
+    }
+    if ((coarsest_level_ghost != -1) &&
+        (((lbadapt_mesh->ghost_level + level)->elem_count == 0) &&
+         ((lbadapt_mesh->virtual_glevels + level)->elem_count == 0))) {
+      finest_level_ghost = level;
+      break;
+    }
+  }
+  if (finest_level_ghost - coarsest_level_ghost > 0) {
+    lbadapt_ghost_data = P4EST_ALLOC(lbadapt_payload_t *,
+                                     finest_level_ghost - coarsest_level_ghost);
+    for (level = coarsest_level_ghost; level < finest_level_ghost; ++level) {
+      lbadapt_ghost_data[level - coarsest_level_ghost] = P4EST_ALLOC(
+          lbadapt_payload_t,
+          (lbadapt_mesh->ghost_level + level)->elem_count +
+              P8EST_CHILDREN *
+                  (lbadapt_mesh->virtual_glevels + level)->elem_count);
+    }
+  }
+}
 
-  // 1D "array"
-  data->lbfields.rho[0] = 0.;
+void lbadapt_init() {
+  if (lbadapt_local_data == NULL) {
+    lbadapt_allocate_data();
+  }
+  int status = 0;
+  lbadapt_payload_t *data;
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
 
-  // 3D arrays
-  for (int i = 0; i < 3; i++) {
-    data->lbfields.j[i] = 0;
-    data->lbfields.force[i] = 0;
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        if (!mesh_iter->current_is_ghost) {
+          data =
+              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        } else {
+          data =
+              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        }
+
+        data->boundary = 0;
+        // data->lbfields = (LB_FluidNode) malloc(sizeof(LB_FluidNode));
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          data->lbfluid[0][i] = 0.;
+          data->lbfluid[1][i] = 0.;
+          data->modes[i] = 0.;
+        }
+
+        // ints
+        data->lbfields.recalc_fields = 1;
+        data->lbfields.has_force = 0;
+
+        // 1D "array"
+        data->lbfields.rho[0] = 0.;
+
+        // 3D arrays
+        for (int i = 0; i < 3; i++) {
+          data->lbfields.j[i] = 0;
+          data->lbfields.force[i] = 0;
 #ifdef IMMERSED_BOUNDARY
-    data->lbfields.force_buf[i] = 0;
+          data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
-  }
+        }
 
-  // 6D array
-  for (int i = 0; i < 6; i++) {
-    data->lbfields.pi[i] = 0;
+        // 6D array
+        for (int i = 0; i < 6; i++) {
+          data->lbfields.pi[i] = 0;
+        }
+      }
+    }
+  }
+}
+
+void lbadapt_init_force_per_cell() {
+  if (lbadapt_local_data == NULL) {
+    lbadapt_allocate_data();
+  }
+  int status = 0;
+  lbadapt_payload_t *data;
+  double h; /* local meshwidth */
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        if (!mesh_iter->current_is_ghost) {
+          data =
+              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        } else {
+          data =
+              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        }
+#ifdef EXTERNAL_FORCES
+        // unit conversion: force density
+        data->lbfields.force[0] = lbpar.ext_force[0] * SQR(h) * SQR(lbpar.tau);
+        data->lbfields.force[1] = lbpar.ext_force[1] * SQR(h) * SQR(lbpar.tau);
+        data->lbfields.force[2] = lbpar.ext_force[2] * SQR(h) * SQR(lbpar.tau);
+#else  // EXTERNAL_FORCES
+        data->lbfields.force[0] = 0.0;
+        data->lbfields.force[1] = 0.0;
+        data->lbfields.force[2] = 0.0;
+        data->lbfields.has_force = 0;
+#endif // EXTERNAL_FORCES
+      }
+    }
+  }
+}
+
+void lbadapt_init_fluid_per_cell() {
+  if (lbadapt_local_data == NULL) {
+    lbadapt_allocate_data();
+  }
+  int status = 0;
+  lbadapt_payload_t *data;
+  double h; /* local meshwidth */
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        if (!mesh_iter->current_is_ghost) {
+          data =
+              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        } else {
+          data =
+              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        }
+        // convert rho to lattice units
+        double rho = lbpar.rho[0] * h * h * h;
+        // start with fluid at rest and no stress
+        double j[3] = {0., 0., 0.};
+        double pi[6] = {0., 0., 0., 0., 0., 0.};
+        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
+      }
+    }
+  }
+}
+
+void lbadapt_reinit_fluid_per_cell() {
+  lbadapt_allocate_data();
+  int status = 0;
+  lbadapt_payload_t *data;
+  double h; /* local meshwidth */
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        if (!mesh_iter->current_is_ghost) {
+          data =
+              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        } else {
+          data =
+              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+                  mesh_iter)];
+        }
+        // calculate equilibrium distribution
+        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, data->lbfields.rho[0],
+                                     data->lbfields.j, data->lbfields.pi, h);
+#ifdef LB_BOUNDARIES
+        data->lbfields.boundary = 0;
+#endif // LB_BOUNDARIES
+      }
+    }
   }
 }
 
@@ -364,7 +558,8 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   // correspond to those used by U. Schiller. In terms of populations this
   // expression then corresponds exactly to those in Eqs. 116 - 121 in the
   // Duenweg and Ladd paper, when these are written out in populations.
-  // But to ensure this, the expression in Schiller's modes has to be different!
+  // But to ensure this, the expression in Schiller's modes has to be
+  // different!
 
   pi[0] =
       (2.0 * (cpmode[0] + cpmode[4]) + cpmode[6] + 3.0 * cpmode[5]) / 6.0; // xx
@@ -599,7 +794,8 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   rho = mode[0] + lbpar.rho[0] * h * h * h;
 
-  /* hydrodynamic momentum density is redefined when external forces present */
+  /* hydrodynamic momentum density is redefined when external forces present
+   */
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
@@ -751,7 +947,7 @@ int lbadapt_calc_n_from_modes_push(int qid) {
 
     // convert direction
     int direction = ci_to_p4est[(dir - 1)];
-    // get neighboring cells
+// get neighboring cells
 #if 0
     p8est_mesh_get_neighbors(p8est, lbadapt_ghost, lbadapt_mesh, qid, direction,
                              neighboring_quads, neighboring_encs);
@@ -773,7 +969,7 @@ int lbadapt_calc_n_from_modes_push(int qid) {
         ghostID = q - firstGhost;
 
         /* obtain and normalize ghost modes */
-        data = &lbadapt_ghost_data[ghostID];
+        data = lbadapt_ghost_data[ghostID];
         for (int i = 0; i < lbmodel.n_veloc; ++i) {
           ghost_m[i] = data->modes[i];
           ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
@@ -993,8 +1189,7 @@ void lbadapt_get_velocity_values_dirty(p8est_iter_volume_info_t *info,
   tree = p8est_tree_array_index(p8est->trees, which_tree);
   local_id +=
       tree->quadrants_offset; /* now the id is relative to the MPI process */
-  arrayoffset =
-      P8EST_DIM * local_id; /* each local quadrant has 3 values in */
+  arrayoffset = P8EST_DIM * local_id; /* each local quadrant has 3 values in */
 
   /* calculate values to write */
   double rho;
@@ -1016,43 +1211,6 @@ void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info,
   lbadapt_payload_t *data = (lbadapt_payload_t *)q->p.user_data;
 
   data->lbfields.recalc_fields = 1;
-}
-
-void lbadapt_init_force_per_cell(p8est_iter_volume_info_t *info,
-                                 void *user_data) {
-  p8est_quadrant_t *q = info->quad; /* get current global cell id */
-  lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-  double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
-
-#ifdef EXTERNAL_FORCES
-  // unit conversion: force density
-  data->lbfields.force[0] = lbpar.ext_force[0] * SQR(h) * SQR(lbpar.tau);
-  data->lbfields.force[1] = lbpar.ext_force[1] * SQR(h) * SQR(lbpar.tau);
-  data->lbfields.force[2] = lbpar.ext_force[2] * SQR(h) * SQR(lbpar.tau);
-#else  // EXTERNAL_FORCES
-  data->lbfields.force[0] = 0.0;
-  data->lbfields.force[1] = 0.0;
-  data->lbfields.force[2] = 0.0;
-  data->lbfields.has_force = 0;
-#endif // EXTERNAL_FORCES
-}
-
-void lbadapt_init_fluid_per_cell(p8est_iter_volume_info_t *info,
-                                 void *user_data) {
-  p8est_quadrant_t *q = info->quad; /* get current global cell id */
-  lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-  double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
-
-  // convert rho to lattice units
-  double rho = lbpar.rho[0] * h * h * h;
-  // start with fluid at rest and no stress
-  double j[3] = {0., 0., 0.};
-  double pi[6] = {0., 0., 0., 0., 0., 0.};
-  lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
 }
 
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
@@ -1191,7 +1349,7 @@ void lbadapt_collide_streamI(p8est_iter_volume_info_t *info, void *user_data) {
 }
 
 void lbadapt_collide_streamII(p8est_iter_volume_info_t *info, void *user_data) {
-  lbadapt_payload_t *data = (lbadapt_payload_t *) info->quad->p.user_data;
+  lbadapt_payload_t *data = (lbadapt_payload_t *)info->quad->p.user_data;
   if (!data->boundary) {
     p8est_tree_t *tree;
     tree = p8est_tree_array_index(info->p4est->trees, info->treeid);
@@ -1211,7 +1369,7 @@ void lbadapt_bounce_back(p8est_iter_volume_info_t *info, void *user_data) {
   tree = p8est_tree_array_index(info->p4est->trees, info->treeid);
   int qid = info->quadid + tree->quadrants_offset;
 
-  double h;                                       // local meshwidth
+  double h; // local meshwidth
   h = (double)P8EST_QUADRANT_LEN(currCell->level) / (double)P8EST_ROOT_LEN;
 
   double population_shift;
@@ -1257,7 +1415,7 @@ void lbadapt_bounce_back(p8est_iter_volume_info_t *info, void *user_data) {
 
       // convert direction
       int direction = ci_to_p4est[i - 1];
-      // get neighboring cells
+// get neighboring cells
 #if 0
       p8est_mesh_get_neighbors(p8est, lbadapt_ghost, lbadapt_mesh, qid,
                                direction, neighboring_quads, neighboring_encs);
@@ -1276,7 +1434,7 @@ void lbadapt_bounce_back(p8est_iter_volume_info_t *info, void *user_data) {
               (p8est_quadrant_t *)sc_array_index_int(&lbadapt_ghost->ghosts, 0);
           ghostID = q - firstGhost;
 
-          data = &lbadapt_ghost_data[ghostID];
+          data = lbadapt_ghost_data[ghostID];
         } else {
           is_ghost = 0;
 

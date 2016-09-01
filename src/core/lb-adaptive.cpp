@@ -164,7 +164,9 @@ void lbadapt_init() {
   lbadapt_payload_t *data;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -224,7 +226,9 @@ void lbadapt_init_force_per_cell() {
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -266,7 +270,9 @@ void lbadapt_init_fluid_per_cell() {
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -303,7 +309,9 @@ void lbadapt_reinit_fluid_per_cell() {
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE, 1, 1, 0);
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);

@@ -1140,12 +1140,12 @@ void lbadapt_bounce_back(int level) {
             p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
             if (mesh_iter->neighbor_is_ghost) {
               data = &lbadapt_ghost_data[mesh_iter->current_level]
-                                       [p8est_meshiter_get_neighbor_storage_id(
-                                           mesh_iter)];
+                                        [p8est_meshiter_get_neighbor_storage_id(
+                                            mesh_iter)];
             } else {
               data = &lbadapt_local_data[mesh_iter->current_level]
-                                       [p8est_meshiter_get_neighbor_storage_id(
-                                           mesh_iter)];
+                                        [p8est_meshiter_get_neighbor_storage_id(
+                                            mesh_iter)];
             }
           }
 
@@ -1229,15 +1229,8 @@ void lbadapt_swap_pointers(int level) {
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
-        if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
-        } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
-        }
+        data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+            mesh_iter)];
         std::swap(data->lbfluid[0], data->lbfluid[1]);
       }
     }

@@ -208,6 +208,49 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h);
  */
 int lbadapt_calc_pop_from_modes(double *populations, double *m);
 
+/** collision
+ * CAUTION: sync ghost data after collision
+ *
+ * \param [in] level   The level on which to perform the collision step
+ */
+void lbadapt_collide(int level);
+
+/** Populate virtual cells with post-collision values from their respective
+ * father cell
+ *
+ * \param [in] level   The level of the real cells whose virtual subcells are
+ *                     populated.
+ */
+void lbadapt_populate_virtuals(int level);
+
+/** streaming
+ * CAUTION: sync ghost data before streaming
+ *
+ * \param [in] level   The level on which to perform the streaming step
+ */
+void lbadapt_stream(int level);
+
+/** bounce back
+ * CAUTION: sync ghost data before streaming
+ *
+ * \param [in] level   The level on which to perform the bounce-back step
+ */
+void lbadapt_bounce_back(int level);
+
+/** Update population of real cells from streaming steps from neighboring
+ * quadrants.
+ *
+ * \param [in] level   The level of the real cells whose populations are updated
+ *                     from their respective virtual subcells.
+ */
+void lbadapt_update_populations_from_virtuals(int level);
+
+/** swap pre- and poststreaming pointers
+ *
+ * \param [in] level   The level on which to swap lbfluid pointers
+ */
+void lbadapt_swap_pointers(int level);
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status(p8est_iter_volume_info_t *info,
                                  void *user_data);
@@ -234,16 +277,6 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data);
 void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
-
-/* collision */
-void lbadapt_collide_streamI(p8est_iter_volume_info_t *info, void *user_data);
-
-/* streaming; in-between syncing of ghost data */
-void lbadapt_collide_streamII(p8est_iter_volume_info_t *info, void *user_data);
-
-void lbadapt_bounce_back(p8est_iter_volume_info_t *info, void *user_data);
-
-void lbadapt_swap_pointers(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 #endif // LB_ADAPTIVE

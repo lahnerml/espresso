@@ -1060,7 +1060,35 @@ void lbadapt_collide(int level) {
   p8est_meshiter_destroy(mesh_iter);
 }
 
-void lbadapt_populate_virtuals(int level) { ; }
+void lbadapt_populate_virtuals(int level) {
+  int status = 0;
+  int parent_sid;
+  lbadapt_payload_t *data;
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    // virtual quads are local if their parent is local, ghost analogous
+    if (!mesh_iter->current_is_ghost) {
+      parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+      memcpy(
+          &lbadapt_local_data[level + 1]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)],
+          &lbadapt_local_data[level][parent_sid], sizeof(lbadapt_payload_t));
+    } else {
+      parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+      memcpy(
+          &lbadapt_ghost_data[level + 1]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)],
+          &lbadapt_ghost_data[level][parent_sid], sizeof(lbadapt_payload_t));
+    }
+  }
+
+  p8est_meshiter_destroy(mesh_iter);
+}
 
 void lbadapt_stream(int level) {
   int status = 0;

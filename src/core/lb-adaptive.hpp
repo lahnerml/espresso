@@ -251,24 +251,18 @@ void lbadapt_update_populations_from_virtuals(int level);
  */
 void lbadapt_swap_pointers(int level);
 
+/** Obtain boundary information of each quadrant for vtk output
+ */
+void lbadapt_get_boundary_values(sc_array_t *boundary_values);
+
+void lbadapt_get_density_values(sc_array_t *density_values);
+
+void lbadapt_get_velocity_values(sc_array_t *velocity_values);
+
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_get_boundary_status(p8est_iter_volume_info_t *info,
                                  void *user_data);
-
-void lbadapt_get_boundary_values(p8est_iter_volume_info_t *info,
-                                 void *user_data);
-void lbadapt_get_boundary_values_dirty(p8est_iter_volume_info_t *info,
-                                       void *user_data);
-
-void lbadapt_get_density_values(p8est_iter_volume_info_t *info,
-                                void *user_data);
-void lbadapt_get_density_values_dirty(p8est_iter_volume_info_t *info,
-                                      void *user_data);
-
-void lbadapt_get_velocity_values(p8est_iter_volume_info_t *info,
-                                 void *user_data);
-void lbadapt_get_velocity_values_dirty(p8est_iter_volume_info_t *info,
-                                       void *user_data);
 
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 

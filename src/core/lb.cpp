@@ -3160,12 +3160,12 @@ inline void lb_collide_stream() {
 
   for (level = 0; level <= finest_level_global; ++level) {
     if (n_lbsteps % (1 << lvl_diff) == 0) {
+      lbadapt_update_populations_from_virtuals(level);
       lbadapt_stream(level);
       p8est_ghostvirt_exchange_data(
           p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
       lbadapt_bounce_back(level);
-      lbadapt_update_populations_from_virtuals(level);
       lbadapt_swap_pointers(level);
     }
   }

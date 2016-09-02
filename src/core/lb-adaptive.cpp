@@ -1243,7 +1243,51 @@ void lbadapt_bounce_back(int level) {
   }
 }
 
-void lbadapt_update_populations_from_virtuals(int level) { ; }
+void lbadapt_update_populations_from_virtuals(int level) {
+  int status = 0;
+  int parent_sid;
+  lbadapt_payload_t *data, *parent_data;
+  int vel;
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    // virtual quads are local if their parent is local, ghost analogous
+    if (!mesh_iter->current_is_ghost) {
+      parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+      data =
+          &lbadapt_local_data[level + 1]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+      parent_data = &lbadapt_local_data[level][parent_sid];
+
+      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+        if (mesh_iter->current_vid == 0) {
+          parent_data->lbfluid[1][vel] = 0.;
+        }
+        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+      }
+    } else {
+      parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+      data =
+          &lbadapt_ghost_data[level + 1]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+      parent_data = &lbadapt_ghost_data[level][parent_sid];
+      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+        if (mesh_iter->current_vid == 0) {
+          // TODO: 0 or 1?
+          parent_data->lbfluid[1][vel] = 0.;
+        }
+
+        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+      }
+    }
+  }
+
+  p8est_meshiter_destroy(mesh_iter);
+}
 
 void lbadapt_swap_pointers(int level) {
   int status = 0;

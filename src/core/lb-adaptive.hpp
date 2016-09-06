@@ -255,15 +255,19 @@ void lbadapt_swap_pointers(int level);
  */
 void lbadapt_get_boundary_values(sc_array_t *boundary_values);
 
+/** Obtain density values of each quadrant for vtk output
+ */
 void lbadapt_get_density_values(sc_array_t *density_values);
 
+/** Obtain velocity values of each quadrant for vtk output
+ */
 void lbadapt_get_velocity_values(sc_array_t *velocity_values);
 
+/** Init boudary flag of each quadrant.
+ */
+void lbadapt_get_boundary_status();
 
 /*** ITERATION CALLBACKS ***/
-void lbadapt_get_boundary_status(p8est_iter_volume_info_t *info,
-                                 void *user_data);
-
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data);

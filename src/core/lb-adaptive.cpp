@@ -162,6 +162,7 @@ void lbadapt_init() {
   }
   int status = 0;
   lbadapt_payload_t *data;
+  int lvl;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -172,13 +173,13 @@ void lbadapt_init() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_local;
+          data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_ghost;
+          data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
 
         data->boundary = 0;
@@ -220,6 +221,7 @@ void lbadapt_init_force_per_cell() {
     lbadapt_allocate_data();
   }
   int status = 0;
+  int lvl;
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
@@ -234,13 +236,13 @@ void lbadapt_init_force_per_cell() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_local;
+          data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_ghost;
+          data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
@@ -264,6 +266,7 @@ void lbadapt_init_fluid_per_cell() {
     lbadapt_allocate_data();
   }
   int status = 0;
+  int lvl;
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
@@ -278,13 +281,13 @@ void lbadapt_init_fluid_per_cell() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_local;
+          data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_ghost;
+          data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
         // convert rho to lattice units
         double rho = lbpar.rho[0] * h * h * h;
@@ -303,6 +306,7 @@ void lbadapt_reinit_fluid_per_cell() {
     lbadapt_allocate_data();
   }
   int status = 0;
+  int lvl;
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
@@ -317,13 +321,13 @@ void lbadapt_reinit_fluid_per_cell() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_local;
+          data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          lvl = level - coarsest_level_ghost;
+          data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
         // calculate equilibrium distribution
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, data->lbfields.rho[0],
@@ -414,14 +418,16 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 /*** HELPER FUNCTIONS ***/
-void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, double *xyz) {
-  int base = P8EST_QUADRANT_LEN(q->level);
+void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
+  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
   int root = P8EST_ROOT_LEN;
   double half_length = ((double)base / (double)root) * 0.5;
 
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(p8est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
 
   for (int i = 0; i < P8EST_DIM; ++i) {
     xyz[i] += half_length;
@@ -953,7 +959,7 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
   lbadapt_payload_t *data, *currCellData;
 
   currCellData =
-      &lbadapt_local_data[mesh_iter->current_level]
+      &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                          [p8est_meshiter_get_current_storage_id(mesh_iter)];
   double *m = currCellData->modes;
   double ghost_m[19];
@@ -965,7 +971,7 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
 
 #ifndef OLD_FLUCT
   /* cell itself cannot be ghost cell */
-  data = &lbadapt_local_data[mesh_iter->current_level]
+  data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
   data->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
 
@@ -984,9 +990,10 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
       // streaming step and stream information into the current cell
       if (mesh_iter->neighbor_is_ghost) {
         /* obtain and normalize ghost modes */
-        data = &lbadapt_ghost_data[mesh_iter->current_level]
-                                  [p8est_meshiter_get_neighbor_storage_id(
-                                      mesh_iter)];
+        data =
+            &lbadapt_ghost_data[mesh_iter->current_level - coarsest_level_ghost]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
         for (int i = 0; i < lbmodel.n_veloc; ++i) {
           ghost_m[i] = data->modes[i];
           ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
@@ -995,9 +1002,10 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
         currCellData->lbfluid[1][inv[dir]] =
             lbadapt_backTransformation(ghost_m, inv[dir]) * lbmodel.w[inv[dir]];
       } else {
-        data = &lbadapt_local_data[mesh_iter->current_level]
-                                  [p8est_meshiter_get_neighbor_storage_id(
-                                      mesh_iter)];
+        data =
+            &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
         data->lbfluid[1][dir] =
             lbadapt_backTransformation(m, dir) * lbmodel.w[dir];
       }
@@ -1023,13 +1031,9 @@ void lbadapt_collide(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
-      if (!mesh_iter->current_is_ghost) {
-        data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
-      } else {
-        data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
-      }
+      data =
+          &lbadapt_local_data[level - coarsest_level_local]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
 #ifdef LB_BOUNDARIES
       if (!data->boundary)
 #endif // LB_BOUNDARIES
@@ -1064,6 +1068,7 @@ void lbadapt_populate_virtuals(int level) {
   int status = 0;
   int parent_sid;
   lbadapt_payload_t *data;
+  int lvl;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
@@ -1072,27 +1077,31 @@ void lbadapt_populate_virtuals(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     // virtual quads are local if their parent is local, ghost analogous
-    if (!mesh_iter->current_is_ghost) {
-      parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
-      memcpy(
-          &lbadapt_local_data[level + 1]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)],
-          &lbadapt_local_data[level][parent_sid], sizeof(lbadapt_payload_t));
-    } else {
-      parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-      memcpy(
-          &lbadapt_ghost_data[level + 1]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)],
-          &lbadapt_ghost_data[level][parent_sid], sizeof(lbadapt_payload_t));
+    if (status != P8EST_MESHITER_DONE) {
+      if (!mesh_iter->current_is_ghost) {
+        lvl = level - coarsest_level_local;
+        parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+        memcpy(
+            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                mesh_iter)],
+            &lbadapt_local_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
+      } else {
+        lvl = level - coarsest_level_ghost;
+        parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+        memcpy(
+            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                mesh_iter)],
+            &lbadapt_ghost_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
+      }
     }
   }
-
   p8est_meshiter_destroy(mesh_iter);
 }
 
 void lbadapt_stream(int level) {
   int status = 0;
   lbadapt_payload_t *data;
+  int lvl = level - coarsest_level_local;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
@@ -1102,7 +1111,7 @@ void lbadapt_stream(int level) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
       data =
-          &lbadapt_local_data[level]
+          &lbadapt_local_data[lvl]
                              [p8est_meshiter_get_current_storage_id(mesh_iter)];
       if (!data->boundary) {
         lbadapt_calc_n_from_modes_push(mesh_iter);
@@ -1115,132 +1124,132 @@ void lbadapt_stream(int level) {
 void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
-    double h;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+  int lvl = level - coarsest_level_local;
+  double h;
+  h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
-    while (status != P8EST_MESHITER_DONE) {
-      status = p8est_meshiter_next(mesh_iter);
-      if (status != P8EST_MESHITER_DONE) {
-        currCellData =
-            &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                mesh_iter)];
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      currCellData =
+          &lbadapt_local_data[lvl]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
 
 #ifdef D3Q19
 #ifndef PULL
-        double population_shift;
+      double population_shift;
 
-        /* vector of inverse c_i, 0 is inverse to itself. */
-        // clang-format off
+      /* vector of inverse c_i, 0 is inverse to itself. */
+      // clang-format off
         int reverse[] = {0,
                          2,  1,  4,  3,  6,  5,
                          8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
-        // clang-format on
+      // clang-format on
 
-        // We cannot copy this with minimal invasiveness, because boundary cells
-        // can
-        // end in the ghost layer and p4est_iterate does not visit ghost cells.
-        // Therefore we have to inspect in each cell, if it has neighbors that
-        // are
-        // part of the ghost layer.
-        // Then there are 2 cases where we have to bounce back:
-        // 1. Current cell itself is boundary cell
-        //    In this case we perform the same algorithm as in the regular grid
-        // 2. Current cell is fluid cell and has ghost neighbors that are
-        // boundary
-        //    cells.
-        //    In this case we do the opposite of the above algorithm:
-        //    Instead of bouncing back from the current to the neighboring cell
-        //    we
-        //    bounce back from the neighboring ghost cell into the current cell.
-        for (int i = 0; i < 19; ++i) {
-          // fetch neighboring quadrant's payload
-          if (i == 0) {
-            data = currCellData;
+      // We cannot copy this with minimal invasiveness, because boundary cells
+      // can
+      // end in the ghost layer and p4est_iterate does not visit ghost cells.
+      // Therefore we have to inspect in each cell, if it has neighbors that
+      // are
+      // part of the ghost layer.
+      // Then there are 2 cases where we have to bounce back:
+      // 1. Current cell itself is boundary cell
+      //    In this case we perform the same algorithm as in the regular grid
+      // 2. Current cell is fluid cell and has ghost neighbors that are
+      // boundary
+      //    cells.
+      //    In this case we do the opposite of the above algorithm:
+      //    Instead of bouncing back from the current to the neighboring cell
+      //    we
+      //    bounce back from the neighboring ghost cell into the current cell.
+      for (int i = 0; i < 19; ++i) {
+        // fetch neighboring quadrant's payload
+        if (i == 0) {
+          data = currCellData;
+        } else {
+          // convert direction
+          int direction = ci_to_p4est[i - 1];
+          // get neighboring cells
+          p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
+          if (mesh_iter->neighbor_is_ghost) {
+            data = &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                      [p8est_meshiter_get_neighbor_storage_id(
+                                          mesh_iter)];
           } else {
-            // convert direction
-            int direction = ci_to_p4est[i - 1];
-            // get neighboring cells
-            p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
-            if (mesh_iter->neighbor_is_ghost) {
-              data = &lbadapt_ghost_data[mesh_iter->current_level]
-                                        [p8est_meshiter_get_neighbor_storage_id(
-                                            mesh_iter)];
-            } else {
-              data = &lbadapt_local_data[mesh_iter->current_level]
-                                        [p8est_meshiter_get_neighbor_storage_id(
-                                            mesh_iter)];
-            }
-          }
-
-          // case 1
-          if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
-            // lbadapt_calc_modes(currCellData->lbfluid, modes);
-            // calculate population shift (moving boundary)
-            population_shift = 0;
-            for (int l = 0; l < 3; l++) {
-              population_shift -=
-                  h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
-                  lbmodel.w[i] *
-                  lb_boundaries[currCellData->boundary - 1].velocity[l] /
-                  lbmodel.c_sound_sq;
-            }
-
-            if (!data->boundary) {
-              for (int l = 0; l < 3; l++) {
-                lb_boundaries[currCellData->boundary - 1].force[l] +=
-                    (2 * currCellData->lbfluid[1][i] + population_shift) *
-                    lbmodel.c[i][l];
-              }
-              data->lbfluid[1][reverse[i]] =
-                  currCellData->lbfluid[1][i] + population_shift;
-            } else {
-              // else bounce back
-              data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
-            }
-          }
-
-          // case 2
-          else if (mesh_iter->neighbor_is_ghost && data->boundary) {
-            // lbadapt_calc_modes(data->lbfluid, ghost_modes);
-            // calculate population shift (moving boundary)
-            population_shift = 0;
-            for (int l = 0; l < 3; l++) {
-              population_shift -=
-                  h * h * h * h * h * lbpar.rho[0] * 2 *
-                  lbmodel.c[reverse[i]][l] * lbmodel.w[reverse[i]] *
-                  lb_boundaries[data->boundary - 1].velocity[l] /
-                  lbmodel.c_sound_sq;
-            }
-
-            if (!currCellData->boundary) {
-              for (int l = 0; l < 3; l++) {
-                lb_boundaries[data->boundary - 1].force[l] +=
-                    (2 * data->lbfluid[1][reverse[i]] + population_shift) *
-                    lbmodel.c[reverse[i]][l];
-              }
-              currCellData->lbfluid[1][i] =
-                  data->lbfluid[1][reverse[i]] + population_shift;
-            } else {
-              // else bounce back
-              currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
-            }
+            data =
+                &lbadapt_local_data[lvl][p8est_meshiter_get_neighbor_storage_id(
+                    mesh_iter)];
           }
         }
+
+        // case 1
+        if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
+          // lbadapt_calc_modes(currCellData->lbfluid, modes);
+          // calculate population shift (moving boundary)
+          population_shift = 0;
+          for (int l = 0; l < 3; l++) {
+            population_shift -=
+                h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
+                lbmodel.w[i] *
+                lb_boundaries[currCellData->boundary - 1].velocity[l] /
+                lbmodel.c_sound_sq;
+          }
+
+          if (!data->boundary) {
+            for (int l = 0; l < 3; l++) {
+              lb_boundaries[currCellData->boundary - 1].force[l] +=
+                  (2 * currCellData->lbfluid[1][i] + population_shift) *
+                  lbmodel.c[i][l];
+            }
+            data->lbfluid[1][reverse[i]] =
+                currCellData->lbfluid[1][i] + population_shift;
+          } else {
+            // else bounce back
+            data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
+          }
+        }
+
+        // case 2
+        else if (mesh_iter->neighbor_is_ghost && data->boundary) {
+          // lbadapt_calc_modes(data->lbfluid, ghost_modes);
+          // calculate population shift (moving boundary)
+          population_shift = 0;
+          for (int l = 0; l < 3; l++) {
+            population_shift -= h * h * h * h * h * lbpar.rho[0] * 2 *
+                                lbmodel.c[reverse[i]][l] *
+                                lbmodel.w[reverse[i]] *
+                                lb_boundaries[data->boundary - 1].velocity[l] /
+                                lbmodel.c_sound_sq;
+          }
+
+          if (!currCellData->boundary) {
+            for (int l = 0; l < 3; l++) {
+              lb_boundaries[data->boundary - 1].force[l] +=
+                  (2 * data->lbfluid[1][reverse[i]] + population_shift) *
+                  lbmodel.c[reverse[i]][l];
+            }
+            currCellData->lbfluid[1][i] =
+                data->lbfluid[1][reverse[i]] + population_shift;
+          } else {
+            // else bounce back
+            currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+          }
+        }
+      }
 #else // !PULL
 #error Bounce back boundary conditions are only implemented for PUSH scheme!
 #endif // !PULL
 #else  // D3Q19
 #error Bounce back boundary conditions are only implemented for D3Q19!
 #endif // D3Q19
-      }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
+  p8est_meshiter_destroy(mesh_iter);
 }
 
 void lbadapt_update_populations_from_virtuals(int level) {
@@ -1250,38 +1259,39 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int vel;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
-    // virtual quads are local if their parent is local, ghost analogous
-    if (!mesh_iter->current_is_ghost) {
-      parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
-      data =
-          &lbadapt_local_data[level + 1]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
-      parent_data = &lbadapt_local_data[level][parent_sid];
+    if (status != P8EST_MESHITER_DONE) {
+      // virtual quads are local if their parent is local, ghost analogous
+      if (!mesh_iter->current_is_ghost) {
+        parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+        data = &lbadapt_local_data[level + 1]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+        parent_data = &lbadapt_local_data[level][parent_sid];
 
-      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-        if (mesh_iter->current_vid == 0) {
-          parent_data->lbfluid[1][vel] = 0.;
+        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+          if (mesh_iter->current_vid == 0) {
+            parent_data->lbfluid[1][vel] = 0.;
+          }
+          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
         }
-        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
-      }
-    } else {
-      parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-      data =
-          &lbadapt_ghost_data[level + 1]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
-      parent_data = &lbadapt_ghost_data[level][parent_sid];
-      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-        if (mesh_iter->current_vid == 0) {
-          // TODO: 0 or 1?
-          parent_data->lbfluid[1][vel] = 0.;
-        }
+      } else {
+        parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+        data = &lbadapt_ghost_data[level + 1]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+        parent_data = &lbadapt_ghost_data[level][parent_sid];
+        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+          if (mesh_iter->current_vid == 0) {
+            parent_data->lbfluid[1][vel] = 0.;
+          }
 
-        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+        }
       }
     }
   }
@@ -1292,22 +1302,22 @@ void lbadapt_update_populations_from_virtuals(int level) {
 void lbadapt_swap_pointers(int level) {
   int status = 0;
   lbadapt_payload_t *data;
-  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+  int lvl = level - coarsest_level_local;
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
 
-    while (status != P8EST_MESHITER_DONE) {
-      status = p8est_meshiter_next(mesh_iter);
-      if (status != P8EST_MESHITER_DONE) {
-        data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
-        std::swap(data->lbfluid[0], data->lbfluid[1]);
-      }
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      data =
+          &lbadapt_local_data[lvl]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+      std::swap(data->lbfluid[0], data->lbfluid[1]);
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
+  p8est_meshiter_destroy(mesh_iter);
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
@@ -1316,7 +1326,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
   double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
 
-  /* set boundary status */
+  /* get boundary status */
   for (level = coarsest_level_local; level < finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -1346,7 +1356,6 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
-  /* set boundary status */
   for (level = coarsest_level_local; level < finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -1396,7 +1405,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   double *dens_ptr, h;
   lbadapt_payload_t *data;
 
-  /* set boundary status */
   for (level = coarsest_level_local; level < finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -1419,8 +1427,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
 
-        double *veloc_ptr =
-            (double *)sc_array_index_int(velocity_values, mesh_iter->current_qid);
+        double *veloc_ptr = (double *)sc_array_index_int(
+            velocity_values, 3 * mesh_iter->current_qid);
 
         /* pass it into solution vector */
         std::memcpy(veloc_ptr, j, 3 * sizeof(double));
@@ -1430,20 +1438,40 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   }
 }
 
-/*** ITERATOR CALLBACKS ***/
-void lbadapt_get_boundary_status(p8est_iter_volume_info_t *info,
-                                 void *user_data) {
-  p8est_quadrant_t *q = info->quad;         /* get current global cell id */
-  p4est_topidx_t which_tree = info->treeid; /* get current tree id */
-  lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
+void lbadapt_get_boundary_status() {
+  int status = 0;
+  int level;
+  double *dens_ptr, h;
+  lbadapt_payload_t *data;
 
-  double midpoint[3];
-  lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+  /* set boundary status */
+  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
+        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
 
-  data->boundary = lbadapt_is_boundary(midpoint);
+    int lvl = level - coarsest_level_local;
+    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+            mesh_iter)];
+
+        double midpoint[3];
+        lbadapt_get_midpoint(mesh_iter, midpoint);
+
+        data->boundary = lbadapt_is_boundary(midpoint);
+      }
+    }
+    p8est_meshiter_destroy(mesh_iter);
+  }
 }
 
+/*** ITERATOR CALLBACKS ***/
+/** should no longer be needed */
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info,
                                void *user_data) {
   p8est_quadrant_t *q = info->quad;

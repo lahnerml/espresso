@@ -257,6 +257,9 @@ void lb_reinit_parameters();
 /** (Re-)initializes the fluid. */
 void lb_reinit_fluid();
 
+/** deallocate lb fluid */
+void lb_release();
+
 /** Resets the forces on the fluid nodes */
 void lb_reinit_forces();
 

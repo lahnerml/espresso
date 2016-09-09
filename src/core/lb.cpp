@@ -3137,7 +3137,8 @@ inline void lb_collide_stream() {
 #endif // LB_BOUNDARIES
   // perform subcycling here
   int lvl_diff, level;
-  for (lvl_diff = finest_level_global; 0 <= lvl_diff; --lvl_diff) {
+  for (level = coarsest_level_local; level <= finest_level_global; ++level) {
+    lvl_diff = finest_level_global - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       level = finest_level_global - lvl_diff;
       lbadapt_collide(level);
@@ -3148,7 +3149,8 @@ inline void lb_collide_stream() {
     }
   }
 
-  for (level = 0; level <= finest_level_global; ++level) {
+  for (level = coarsest_level_local; level <= finest_level_global; ++level) {
+    lvl_diff = finest_level_global - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       lbadapt_update_populations_from_virtuals(level);
       lbadapt_stream(level);

@@ -126,10 +126,27 @@ void lbadapt_allocate_data() {
           (lbadapt_mesh->quad_level + level)->elem_count +
               P8EST_CHILDREN *
                   (lbadapt_mesh->virtual_qlevels + level)->elem_count);
+      std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
+                << (lbadapt_mesh->quad_level + level)->elem_count
+                << " real and "
+                << P8EST_CHILDREN *
+                       (lbadapt_mesh->virtual_qlevels + level)->elem_count
+                << " virtual local quadrants of level " << level << std::endl;
     }
   }
 
-  /** ghost */
+/** ghost */
+#if 0
+  if (p8est->mpirank == 0) {
+    for (int temp = 0; temp < lbadapt_mesh->ghost_num_quadrants; ++temp) {
+      p8est_quadrant_t *g =
+          p8est_quadrant_array_index(&lbadapt_ghost->ghosts, temp);
+      std::cout << "ghost " << temp << " (level " << (int)g->level
+                << ") contains virtuals: "
+                << (int)lbadapt_mesh->virtual_gflags[temp] << std::endl;
+    }
+  }
+#endif // 0
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
          ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0)) &&
@@ -152,6 +169,12 @@ void lbadapt_allocate_data() {
           (lbadapt_mesh->ghost_level + level)->elem_count +
               P8EST_CHILDREN *
                   (lbadapt_mesh->virtual_glevels + level)->elem_count);
+      std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
+                << (lbadapt_mesh->ghost_level + level)->elem_count
+                << " real and "
+                << P8EST_CHILDREN *
+                       (lbadapt_mesh->virtual_glevels + level)->elem_count
+                << " virtual ghost quadrants of level " << level << std::endl;
     }
   }
 }
@@ -164,6 +187,7 @@ void lbadapt_init() {
   lbadapt_payload_t *data;
   int lvl;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
         P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
@@ -225,6 +249,7 @@ void lbadapt_init_force_per_cell() {
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    status = 0;
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -270,6 +295,7 @@ void lbadapt_init_fluid_per_cell() {
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    status = 0;
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -310,6 +336,7 @@ void lbadapt_reinit_fluid_per_cell() {
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    status = 0;
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -971,9 +998,7 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
 
 #ifndef OLD_FLUCT
   /* cell itself cannot be ghost cell */
-  data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
-                            [p8est_meshiter_get_current_storage_id(mesh_iter)];
-  data->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
+  currCellData->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
 
   /*******************************/
   /* stream to surrounding cells */
@@ -1081,17 +1106,49 @@ void lbadapt_populate_virtuals(int level) {
       if (!mesh_iter->current_is_ghost) {
         lvl = level - coarsest_level_local;
         parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+        // start with copying payload from coarse cell
         memcpy(
             &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                 mesh_iter)],
             &lbadapt_local_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
+        // synchronize pre- and post-collision values
+        memcpy(
+            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                                             mesh_iter)]
+                 .lbfluid[0],
+            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                                             mesh_iter)]
+                 .lbfluid[1],
+            lbmodel.n_veloc * sizeof(double));
+        // adjust parameters where necessary
+        for (int i = 0; i < P8EST_DIM; ++i) {
+          lbadapt_local_data[lvl + 1]
+                            [p8est_meshiter_get_current_storage_id(mesh_iter)]
+                                .lbfields.force[i] *= 0.5;
+        }
       } else {
         lvl = level - coarsest_level_ghost;
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+        // start with copying payload from coarse cell
         memcpy(
             &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                 mesh_iter)],
             &lbadapt_ghost_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
+        // synchronize pre- and post-collision values
+        memcpy(
+            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                                             mesh_iter)]
+                 .lbfluid[0],
+            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                                             mesh_iter)]
+                 .lbfluid[1],
+            lbmodel.n_veloc * sizeof(double));
+        // adjust parameters where necessary
+        for (int i = 0; i < P8EST_DIM; ++i) {
+          lbadapt_local_data[lvl + 1]
+                            [p8est_meshiter_get_current_storage_id(mesh_iter)]
+                                .lbfields.force[i] *= 0.5;
+        }
       }
     }
   }
@@ -1146,9 +1203,9 @@ void lbadapt_bounce_back(int level) {
 
       /* vector of inverse c_i, 0 is inverse to itself. */
       // clang-format off
-        int reverse[] = {0,
-                         2,  1,  4,  3,  6,  5,
-                         8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+      int reverse[] = {0,
+                       2,  1,  4,  3,  6,  5,
+                       8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
       // clang-format on
 
       // We cannot copy this with minimal invasiveness, because boundary cells
@@ -1176,68 +1233,70 @@ void lbadapt_bounce_back(int level) {
           int direction = ci_to_p4est[i - 1];
           // get neighboring cells
           p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
-          if (mesh_iter->neighbor_is_ghost) {
-            data = &lbadapt_ghost_data[level - coarsest_level_ghost]
-                                      [p8est_meshiter_get_neighbor_storage_id(
-                                          mesh_iter)];
-          } else {
-            data =
-                &lbadapt_local_data[lvl][p8est_meshiter_get_neighbor_storage_id(
-                    mesh_iter)];
-          }
-        }
-
-        // case 1
-        if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
-          // lbadapt_calc_modes(currCellData->lbfluid, modes);
-          // calculate population shift (moving boundary)
-          population_shift = 0;
-          for (int l = 0; l < 3; l++) {
-            population_shift -=
-                h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
-                lbmodel.w[i] *
-                lb_boundaries[currCellData->boundary - 1].velocity[l] /
-                lbmodel.c_sound_sq;
-          }
-
-          if (!data->boundary) {
-            for (int l = 0; l < 3; l++) {
-              lb_boundaries[currCellData->boundary - 1].force[l] +=
-                  (2 * currCellData->lbfluid[1][i] + population_shift) *
-                  lbmodel.c[i][l];
+          if (mesh_iter->neighbor_qid != -1) {
+            if (mesh_iter->neighbor_is_ghost) {
+              data = &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                        [p8est_meshiter_get_neighbor_storage_id(
+                                            mesh_iter)];
+            } else {
+              data = &lbadapt_local_data[lvl]
+                                        [p8est_meshiter_get_neighbor_storage_id(
+                                            mesh_iter)];
             }
-            data->lbfluid[1][reverse[i]] =
-                currCellData->lbfluid[1][i] + population_shift;
-          } else {
-            // else bounce back
-            data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
-          }
-        }
-
-        // case 2
-        else if (mesh_iter->neighbor_is_ghost && data->boundary) {
-          // lbadapt_calc_modes(data->lbfluid, ghost_modes);
-          // calculate population shift (moving boundary)
-          population_shift = 0;
-          for (int l = 0; l < 3; l++) {
-            population_shift -= h * h * h * h * h * lbpar.rho[0] * 2 *
-                                lbmodel.c[reverse[i]][l] *
-                                lbmodel.w[reverse[i]] *
-                                lb_boundaries[data->boundary - 1].velocity[l] /
-                                lbmodel.c_sound_sq;
           }
 
-          if (!currCellData->boundary) {
-            for (int l = 0; l < 3; l++) {
-              lb_boundaries[data->boundary - 1].force[l] +=
-                  (2 * data->lbfluid[1][reverse[i]] + population_shift) *
-                  lbmodel.c[reverse[i]][l];
+          // case 1
+          if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
+            // lbadapt_calc_modes(currCellData->lbfluid, modes);
+            // calculate population shift (moving boundary)
+            population_shift = 0;
+            for (int l = 0; l < 3; ++l) {
+              population_shift -=
+                  h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
+                  lbmodel.w[i] *
+                  lb_boundaries[currCellData->boundary - 1].velocity[l] /
+                  lbmodel.c_sound_sq;
             }
-            currCellData->lbfluid[1][i] =
-                data->lbfluid[1][reverse[i]] + population_shift;
-          } else {
-            // else bounce back
-            currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+
+            if (!data->boundary) {
+              for (int l = 0; l < 3; ++l) {
+                lb_boundaries[currCellData->boundary - 1].force[l] +=
+                    (2 * currCellData->lbfluid[1][i] + population_shift) *
+                    lbmodel.c[i][l];
+              }
+              data->lbfluid[1][reverse[i]] =
+                  currCellData->lbfluid[1][i] + population_shift;
+            } else {
+              // else bounce back
+              data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
+            }
+          }
+
+          // case 2
+          else if (mesh_iter->neighbor_is_ghost && data->boundary) {
+            // lbadapt_calc_modes(data->lbfluid, ghost_modes);
+            // calculate population shift (moving boundary)
+            population_shift = 0;
+            for (int l = 0; l < 3; l++) {
+              population_shift -=
+                  h * h * h * h * h * lbpar.rho[0] * 2 *
+                  lbmodel.c[reverse[i]][l] * lbmodel.w[reverse[i]] *
+                  lb_boundaries[data->boundary - 1].velocity[l] /
+                  lbmodel.c_sound_sq;
+            }
+
+            if (!currCellData->boundary) {
+              for (int l = 0; l < 3; ++l) {
+                lb_boundaries[data->boundary - 1].force[l] +=
+                    (2 * data->lbfluid[1][reverse[i]] + population_shift) *
+                    lbmodel.c[reverse[i]][l];
+              }
+              currCellData->lbfluid[1][i] =
+                  data->lbfluid[1][reverse[i]] + population_shift;
+            } else {
+              // else bounce back
+              currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+            }
           }
         }
       }
@@ -1257,10 +1316,12 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int parent_sid;
   lbadapt_payload_t *data, *parent_data;
   int vel;
+  int lvl;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
+  lvl = level - coarsest_level_local;
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1268,10 +1329,10 @@ void lbadapt_update_populations_from_virtuals(int level) {
       // virtual quads are local if their parent is local, ghost analogous
       if (!mesh_iter->current_is_ghost) {
         parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
-        data = &lbadapt_local_data[level + 1]
-                                  [p8est_meshiter_get_current_storage_id(
-                                      mesh_iter)];
-        parent_data = &lbadapt_local_data[level][parent_sid];
+        data =
+            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                mesh_iter)];
+        parent_data = &lbadapt_local_data[lvl][parent_sid];
 
         for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
           if (mesh_iter->current_vid == 0) {

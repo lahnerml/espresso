@@ -177,7 +177,6 @@ typedef struct {
   bool is_TRT;
 
   int resend_halo;
-          
 } LB_Parameters;
 
 /** The DnQm model to be used. */
@@ -204,6 +203,8 @@ typedef struct lbadapt_payload {
   double modes[19];
   LB_FluidNode lbfields;
 } lbadapt_payload_t;
+
+extern double lb_step_factor;
 #endif // LB_ADAPTIVE
 
 /* int to indicate fluctuations */
@@ -256,6 +257,10 @@ void lb_reinit_parameters();
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_fluid();
+
+#ifdef LB_ADAPTIVE
+void lb_release_fluid();
+#endif // LB_ADAPTIVE
 
 /** deallocate lb fluid */
 void lb_release();

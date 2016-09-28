@@ -1298,7 +1298,6 @@ void lbadapt_update_populations_from_virtuals(int level) {
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
-  lvl = level - coarsest_level_local;
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1306,6 +1305,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
       // virtual quads are local if their parent is local, ghost analogous
       if (!mesh_iter->current_is_ghost) {
         parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+        lvl = level - coarsest_level_local;
         data =
             &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                 mesh_iter)];
@@ -1319,10 +1319,11 @@ void lbadapt_update_populations_from_virtuals(int level) {
         }
       } else {
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-        data = &lbadapt_ghost_data[lvl_g + 1]
-                                  [p8est_meshiter_get_current_storage_id(
-                                      mesh_iter)];
-        parent_data = &lbadapt_ghost_data[lvl_g][parent_sid];
+        lvl = level - coarsest_level_ghost;
+        data =
+            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
+                mesh_iter)];
+        parent_data = &lbadapt_ghost_data[lvl][parent_sid];
         for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
           if (mesh_iter->current_vid == 0) {
             parent_data->lbfluid[1][vel] = 0.;

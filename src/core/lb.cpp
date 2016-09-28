@@ -3167,7 +3167,6 @@ inline void lb_collide_stream() {
                 << " [Done] Populate virtual quadrants on level " << level + 1
                 << std::endl;
 
-#if 0
       std::cout << "[p4est " << p8est->mpirank << "]"
                 << " Perform ghost exchange on level " << level
                 << std::endl;
@@ -3178,6 +3177,7 @@ inline void lb_collide_stream() {
                 << " [Done] Perform ghost exchange on level " << level
                 << std::endl;
 
+#if 0
       std::cout << "[p4est " << p8est->mpirank << "]"
                 << " Perform ghost exchange on level " << level + 1
                 << std::endl;

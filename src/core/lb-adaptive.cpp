@@ -947,7 +947,7 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   mode[8] += C[3];
   mode[9] += C[4];
 
-/* reset force */
+// reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   lbfields->force[0] =

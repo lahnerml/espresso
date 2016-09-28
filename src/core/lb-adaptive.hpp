@@ -89,11 +89,7 @@ void lbadapt_init();
 
 /** Init cell-local force values
  */
-void lbadapt_init_force_per_cell();
-
-/** Init cell-local LBM probability densities
- */
-void lbadapt_init_fluid_per_cell();
+void lbadapt_reinit_force_per_cell();
 
 /** (Re-)initialize the fluid according to the given value of rho
  */

@@ -2337,7 +2337,7 @@ void lb_reinit_parameters() {
  *  for boundaries to be set. */
 void lb_reinit_forces() {
 #ifdef LB_ADAPTIVE
-  lbadapt_init_force_per_cell();
+  lbadapt_reinit_force_per_cell();
 #else // LB_ADAPTIVE
   for (index_t index = 0; index < lblattice.halo_grid_volume; index++) {
 #ifdef EXTERNAL_FORCES

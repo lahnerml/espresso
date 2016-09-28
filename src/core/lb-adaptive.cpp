@@ -177,6 +177,10 @@ void lbadapt_allocate_data() {
                 << " virtual ghost quadrants of level " << level << std::endl;
     }
   }
+  // set finest level values from one level greater than the finest cell to the
+  // actual value
+  --finest_level_local;
+  --finest_level_ghost;
 }
 
 void lbadapt_init() {
@@ -1366,7 +1370,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
   lbadapt_payload_t *data;
 
   /* get boundary status */
-  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
@@ -1395,7 +1399,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
-  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
@@ -1444,7 +1448,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   double *dens_ptr, h;
   lbadapt_payload_t *data;
 
-  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
@@ -1484,7 +1488,7 @@ void lbadapt_get_boundary_status() {
   lbadapt_payload_t *data;
 
   /* set boundary status */
-  for (level = coarsest_level_local; level < finest_level_local; ++level) {
+  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,

@@ -80,6 +80,10 @@ LB_Parameters lbpar = {
     -1.0,
     // tau
     -1.0,
+#ifdef LB_ADAPTIVE
+    // base level for calculation of tau
+    -1,
+#endif // LB_ADAPTIVE
     // friction
     {0.0},
     // ext_force
@@ -2141,7 +2145,7 @@ int lb_sanity_checks() {
 void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   // one can define the verbosity of p4est and libsc here.
-  sc_init(comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+  sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
   p4est_init(NULL, SC_LP_VERBOSE);
 
 // p4est_init(NULL, SC_LP_PRODUCTION);
@@ -2351,6 +2355,7 @@ void lb_reinit_forces() {
     lbfields[index].has_force = 0;
 #endif // EXTERNAL_FORCES
   }
+#endif // LB_ADAPTIVE
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
     lb_boundaries[i].force[0] = 0.;
@@ -2358,7 +2363,6 @@ void lb_reinit_forces() {
     lb_boundaries[i].force[2] = 0.;
   }
 #endif // LB_BOUNDARIES
-#endif // LB_ADAPTIVE
 }
 
 /** (Re-)initializes the fluid according to the given value of rho. */

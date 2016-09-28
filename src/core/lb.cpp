@@ -2603,8 +2603,8 @@ void lb_calc_n_from_rho_j_pi(const index_t index, const double rho,
 
 /** Calculation of hydrodynamic modes */
 void lb_calc_modes(index_t index, double *mode) {
-#ifndef LB_ADAPTIVE
 #ifdef D3Q19
+#ifndef LB_ADAPTIVE
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p,
       n7m, n8p, n8m, n9p, n9m;
 
@@ -2660,9 +2660,8 @@ void lb_calc_modes(index_t index, double *mode) {
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
 #endif // !OLD_FLUCT
-
-#else  // D3Q19
 #endif // LB_ADAPTIVE
+#else  // D3Q19
   int i, j;
   for (i = 0; i < lbmodel.n_veloc; i++) {
     mode[i] = 0.0;
@@ -3201,12 +3200,12 @@ inline void lb_collide_stream() {
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 
       std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Updating populations from virtuals on level " << level
+                << " Updating populations from virtuals on level " << level + 1
                 << std::endl;
       lbadapt_update_populations_from_virtuals(level);
       std::cout << "[p4est " << p8est->mpirank << "]"
                 << " [Done] Updating populations from virtuals on level "
-                << level
+                << level + 1
                 << std::endl;
 
       std::cout << "[p4est " << p8est->mpirank << "]"

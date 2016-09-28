@@ -126,6 +126,7 @@ void lbadapt_allocate_data() {
           (lbadapt_mesh->quad_level + level)->elem_count +
               P8EST_CHILDREN *
                   (lbadapt_mesh->virtual_qlevels + level)->elem_count);
+
       std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
                 << (lbadapt_mesh->quad_level + level)->elem_count
                 << " real and "

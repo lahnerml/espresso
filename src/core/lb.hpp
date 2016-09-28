@@ -202,7 +202,7 @@ extern double **lbfluid[2];
 extern LB_FluidNode *lbfields;
 #else // LB_ADAPTIVE
 typedef struct lbadapt_payload {
-  int  boundary;
+  int boundary;
   double lbfluid[2][19];
   double modes[19];
   LB_FluidNode lbfields;

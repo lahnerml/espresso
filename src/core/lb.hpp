@@ -160,6 +160,10 @@ typedef struct {
    *  Note: Has to be larger than MD time step! */
   double tau;
 
+#ifdef LB_ADAPTIVE
+  int base_level;
+#endif // LB_ADAPTIVE
+
   /** friction coefficient for viscous coupling (LJ units)
    * Note that the friction coefficient is quite high and may
    * lead to numerical artifacts with low order integrators */

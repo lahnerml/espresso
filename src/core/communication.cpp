@@ -2708,6 +2708,8 @@ void mpi_lbadapt_grid_init (int node, int level) {
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
   finest_level_global = lbadapt_get_global_maxlevel();
+
+  lbpar.base_level = level;
 #endif // LB_ADAPTIVE
 }
 

@@ -1094,16 +1094,17 @@ void lbadapt_populate_virtuals(int level) {
         memcpy(
             &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                                              mesh_iter)]
-                 .lbfluid[0],
+                 .lbfluid[1],
             &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                                              mesh_iter)]
-                 .lbfluid[1],
+                 .lbfluid[0],
             lbmodel.n_veloc * sizeof(double));
         // adjust parameters where necessary
         for (int i = 0; i < P8EST_DIM; ++i) {
+          // 0.25 = 0.5 * 0.5 (scaling of tau and h)
           lbadapt_local_data[lvl + 1]
                             [p8est_meshiter_get_current_storage_id(mesh_iter)]
-                                .lbfields.force[i] *= 0.5;
+                                .lbfields.force[i] *= 0.25;
         }
       } else {
         lvl = level - coarsest_level_ghost;
@@ -1314,20 +1315,20 @@ void lbadapt_update_populations_from_virtuals(int level) {
           if (mesh_iter->current_vid == 0) {
             parent_data->lbfluid[1][vel] = 0.;
           }
-          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
         }
       } else {
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-        data = &lbadapt_ghost_data[level + 1]
+        data = &lbadapt_ghost_data[lvl_g + 1]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
-        parent_data = &lbadapt_ghost_data[level][parent_sid];
+        parent_data = &lbadapt_ghost_data[lvl_g][parent_sid];
         for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
           if (mesh_iter->current_vid == 0) {
             parent_data->lbfluid[1][vel] = 0.;
           }
 
-          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
         }
       }
     }

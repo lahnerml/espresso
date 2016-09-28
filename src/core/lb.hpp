@@ -136,9 +136,9 @@ typedef struct {
    int boundary;
 
   /** normal vector of the boundary surface */
-  double *nvec; //doesn't work like that any more, I think (georg, 17.08.10)
-#endif // LB_BOUNDARIES
+  //double *nvec; //doesn't work like that any more, I think (georg, 17.08.10)
 
+#endif // LB_BOUNDARIES
 } LB_FluidNode;
 
 /** Data structure holding the parameters for the Lattice Boltzmann system. */

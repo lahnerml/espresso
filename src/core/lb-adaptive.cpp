@@ -561,7 +561,7 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 #endif // LB_BOUNDARIES
 
   // scale tau and gamma values
-  int level = (double)P8EST_ROOT_LEN / h;
+  int level = (double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
@@ -722,7 +722,7 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   double rho, j[3], pi_eq[6];
 
   // scale tau and gamma values
-  int level = (double)P8EST_ROOT_LEN / h;
+  int level = (double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
@@ -891,7 +891,7 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double rho, u[3], C[6], *f;
 
   // scale tau and gamma values
-  int level = (double)P8EST_ROOT_LEN / h;
+  int level = (double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));

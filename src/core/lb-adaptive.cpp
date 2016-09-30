@@ -259,7 +259,7 @@ void lbadapt_reinit_force_per_cell() {
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
     tau_prefactor = (level <= lbpar.base_level)
                         ? (1 << (lbpar.base_level - level))
-                        : (1. / (double)(1 << level - lbpar.base_level));
+                        : (1. / (double)(1 << (level - lbpar.base_level)));
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -564,7 +564,7 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   int level = (double)P8EST_ROOT_LEN / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << level - lbpar.base_level));
+                             : (1. / (double)(1 << (level - lbpar.base_level)));
   double l_gamma_shear, l_gamma_bulk;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
@@ -725,7 +725,7 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   int level = (double)P8EST_ROOT_LEN / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << level - lbpar.base_level));
+                             : (1. / (double)(1 << (level - lbpar.base_level)));
   double l_gamma_shear, l_gamma_bulk;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
@@ -894,7 +894,7 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   int level = (double)P8EST_ROOT_LEN / h;
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << level - lbpar.base_level));
+                             : (1. / (double)(1 << (level - lbpar.base_level)));
   double l_gamma_shear, l_gamma_bulk;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */

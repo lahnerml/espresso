@@ -1144,8 +1144,9 @@ void lbadapt_collide(int level) {
 
 void lbadapt_populate_virtuals(int level) {
   int status = 0;
+  int current_sid;
   int parent_sid;
-  lbadapt_payload_t *data;
+  lbadapt_payload_t *current_data, *parent_data;
   int lvl;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
@@ -1158,51 +1159,31 @@ void lbadapt_populate_virtuals(int level) {
     if (status != P8EST_MESHITER_DONE) {
       if (!mesh_iter->current_is_ghost) {
         lvl = level - coarsest_level_local;
+
         parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
-        // start with copying payload from coarse cell
-        memcpy(
-            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                mesh_iter)],
-            &lbadapt_local_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
-        // synchronize pre- and post-collision values
-        memcpy(
-            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                                             mesh_iter)]
-                 .lbfluid[1],
-            &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                                             mesh_iter)]
-                 .lbfluid[0],
-            lbmodel.n_veloc * sizeof(double));
-        // adjust parameters where necessary
-        for (int i = 0; i < P8EST_DIM; ++i) {
-          // 0.25 = 0.5 * 0.5 (scaling of tau and h)
-          lbadapt_local_data[lvl + 1]
-                            [p8est_meshiter_get_current_storage_id(mesh_iter)]
-                                .lbfields.force[i] *= 0.25;
-        }
+        current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
+
+        parent_data = &lbadapt_local_data[lvl][parent_sid];
+        current_data = &lbadapt_local_data[lvl + 1][current_sid];
       } else {
         lvl = level - coarsest_level_ghost;
+
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-        // start with copying payload from coarse cell
-        memcpy(
-            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                mesh_iter)],
-            &lbadapt_ghost_data[lvl][parent_sid], sizeof(lbadapt_payload_t));
-        // synchronize pre- and post-collision values
-        memcpy(
-            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                                             mesh_iter)]
-                 .lbfluid[0],
-            &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
-                                             mesh_iter)]
-                 .lbfluid[1],
-            lbmodel.n_veloc * sizeof(double));
-        // adjust parameters where necessary
-        for (int i = 0; i < P8EST_DIM; ++i) {
-          lbadapt_local_data[lvl + 1]
-                            [p8est_meshiter_get_current_storage_id(mesh_iter)]
-                                .lbfields.force[i] *= 0.5;
-        }
+        current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
+
+        parent_data = &lbadapt_ghost_data[lvl][parent_sid];
+        current_data = &lbadapt_ghost_data[lvl + 1][current_sid];
+      }
+      // start with copying payload from coarse cell
+      memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
+
+      // synchronize pre- and post-collision values
+      memcpy(current_data->lbfluid[1], current_data->lbfluid[0],
+             lbmodel.n_veloc * sizeof(double));
+      // adjust parameters where necessary
+      for (int i = 0; i < P8EST_DIM; ++i) {
+        // force is scaled with tau**2 and h**2 => 0.5**4 = 1./16.
+        current_data->lbfields.force[i] *= 0.0625; // 1./16.
       }
     }
   }

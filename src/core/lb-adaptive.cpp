@@ -1484,7 +1484,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
                + data->lbfluid[0][18];
           // clang-format on
         }
-        double *dens_ptr =
+        dens_ptr =
             (double *)sc_array_index(density_values, mesh_iter->current_qid);
         *dens_ptr = dens;
       }
@@ -1496,7 +1496,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   int status = 0;
   int level;
-  double *dens_ptr, h;
+  double *veloc_ptr, h;
   lbadapt_payload_t *data;
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
@@ -1521,7 +1521,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
 
-        double *veloc_ptr = (double *)sc_array_index_int(
+        veloc_ptr = (double *)sc_array_index_int(
             velocity_values, 3 * mesh_iter->current_qid);
 
         /* pass it into solution vector */
@@ -1535,7 +1535,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 void lbadapt_get_boundary_status() {
   int status = 0;
   int level;
-  double *dens_ptr, h;
   lbadapt_payload_t *data;
 
   /* set boundary status */
@@ -1546,7 +1545,6 @@ void lbadapt_get_boundary_status() {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1618,7 +1616,7 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
   double tau_prefactor =
       (q->level <= lbpar.base_level)
           ? (1 << (lbpar.base_level - q->level))
-          : (1. / (double)(1 << q->level - lbpar.base_level));
+          : (1. / (double)(1 << (q->level - lbpar.base_level)));
 
   double j[3];
 

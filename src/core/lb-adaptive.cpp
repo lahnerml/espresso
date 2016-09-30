@@ -565,7 +565,8 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear, l_gamma_bulk;
+  double l_gamma_shear = 0.;
+  double l_gamma_bulk  = 0.;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -726,7 +727,8 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear, l_gamma_bulk;
+  double l_gamma_shear = 0.;
+  double l_gamma_bulk = 0.;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -895,7 +897,8 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear, l_gamma_bulk;
+  double l_gamma_shear = 0.;
+  double l_gamma_bulk = 0.;
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity

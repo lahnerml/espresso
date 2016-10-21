@@ -1223,6 +1223,13 @@ void lbadapt_bounce_back(int level) {
   double h;
   h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
+  // vector of inverse c_i, 0 is inverse to itself.
+  // clang-format off
+  const int reverse[] = {0,
+                         2,  1,  4,  3,  6,  5,
+                         8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  // clang-format on
+
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
@@ -1238,13 +1245,6 @@ void lbadapt_bounce_back(int level) {
 #ifdef D3Q19
 #ifndef PULL
       double population_shift;
-
-      /* vector of inverse c_i, 0 is inverse to itself. */
-      // clang-format off
-      int reverse[] = {0,
-                       2,  1,  4,  3,  6,  5,
-                       8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
-      // clang-format on
 
       // We cannot copy this with minimal invasiveness, because boundary cells
       // can end in the ghost layer and p4est_iterate does not visit ghost
@@ -1263,6 +1263,9 @@ void lbadapt_bounce_back(int level) {
         // fetch neighboring quadrant's payload
         if (i == 0) {
           data = currCellData;
+          if (data->boundary) {
+            data->lbfluid[1][0] = 0.0;
+          }
         } else {
           // convert direction
           int direction = ci_to_p4est[i - 1];
@@ -1278,59 +1281,57 @@ void lbadapt_bounce_back(int level) {
                                         [p8est_meshiter_get_neighbor_storage_id(
                                             mesh_iter)];
             }
-          }
 
-          // case 1
-          if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
-            // lbadapt_calc_modes(currCellData->lbfluid, modes);
-            // calculate population shift (moving boundary)
-            population_shift = 0;
-            for (int l = 0; l < 3; ++l) {
-              population_shift -=
-                  h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
-                  lbmodel.w[i] *
-                  lb_boundaries[currCellData->boundary - 1].velocity[l] /
-                  lbmodel.c_sound_sq;
-            }
+            // case 1
+            if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
+              if (!data->boundary) {
+                // calculate population shift (moving boundary)
+                population_shift = 0;
+                for (int l = 0; l < 3; ++l) {
+                  population_shift -=
+                      h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
+                      lbmodel.w[i] *
+                      lb_boundaries[currCellData->boundary - 1].velocity[l] /
+                      lbmodel.c_sound_sq;
+                }
 
-            if (!data->boundary) {
-              for (int l = 0; l < 3; ++l) {
-                lb_boundaries[currCellData->boundary - 1].force[l] +=
-                    (2 * currCellData->lbfluid[1][i] + population_shift) *
-                    lbmodel.c[i][l];
-              }
-              data->lbfluid[1][reverse[i]] =
+                for (int l = 0; l < 3; ++l) {
+                  lb_boundaries[currCellData->boundary - 1].force[l] +=
+                      (2 * currCellData->lbfluid[1][i] + population_shift) *
+                      lbmodel.c[i][l];
+                }
+                data->lbfluid[1][reverse[i]] =
                   currCellData->lbfluid[1][i] + population_shift;
-            } else {
-              // else bounce back
-              data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
-            }
-          }
-
-          // case 2
-          else if (mesh_iter->neighbor_is_ghost && data->boundary) {
-            // lbadapt_calc_modes(data->lbfluid, ghost_modes);
-            // calculate population shift (moving boundary)
-            population_shift = 0;
-            for (int l = 0; l < 3; l++) {
-              population_shift -=
-                  h * h * h * h * h * lbpar.rho[0] * 2 *
-                  lbmodel.c[reverse[i]][l] * lbmodel.w[reverse[i]] *
-                  lb_boundaries[data->boundary - 1].velocity[l] /
-                  lbmodel.c_sound_sq;
-            }
-
-            if (!currCellData->boundary) {
-              for (int l = 0; l < 3; ++l) {
-                lb_boundaries[data->boundary - 1].force[l] +=
-                    (2 * data->lbfluid[1][reverse[i]] + population_shift) *
-                    lbmodel.c[reverse[i]][l];
+              } else {
+                // else bounce back
+                data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
               }
-              currCellData->lbfluid[1][i] =
-                  data->lbfluid[1][reverse[i]] + population_shift;
-            } else {
-              // else bounce back
-              currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+            }
+
+            // case 2
+            else if (mesh_iter->neighbor_is_ghost == 1 && data->boundary) {
+              if (!currCellData->boundary) {
+                // calculate population shift (moving boundary)
+                population_shift = 0;
+                for (int l = 0; l < 3; l++) {
+                  population_shift -=
+                      h * h * h * h * h * lbpar.rho[0] * 2 *
+                      lbmodel.c[reverse[i]][l] * lbmodel.w[reverse[i]] *
+                      lb_boundaries[data->boundary - 1].velocity[l] /
+                      lbmodel.c_sound_sq;
+                }
+
+                for (int l = 0; l < 3; ++l) {
+                  lb_boundaries[data->boundary - 1].force[l] +=
+                      (2 * data->lbfluid[1][reverse[i]] + population_shift) *
+                      lbmodel.c[reverse[i]][l];
+                }
+                currCellData->lbfluid[1][i] =
+                    data->lbfluid[1][reverse[i]] + population_shift;
+              } else {
+                // else bounce back
+                currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+              }
             }
           }
         }

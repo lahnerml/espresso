@@ -744,12 +744,12 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context, 1,
-                                       /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
-                                       1, /* write qids as scalar cell
+                                       1, /* write boundary as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
                                        "boundary", boundary, context);
@@ -860,12 +860,12 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context, 1,
-                                       /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
-                                       1, /* write qids as scalar cell
+                                       1, /* write density as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
                                        "density", density, context);
@@ -962,14 +962,15 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context, 1,
-                                       /* write tree indices */
+
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
-                                       0, /* write qids as scalar cell
+                                       0, /* no custom cell scalar data */
+                                       1, /* write velocities as cell vector
                                              data */
-                                       1, /* no custom cell vector data */
                                        "velocity", velocity, context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");

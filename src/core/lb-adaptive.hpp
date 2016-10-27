@@ -154,6 +154,14 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
                           p8est_quadrant_t *q, double xyz[3]);
 
+/** Get the coordinates of the midpoint of a quadrant
+ *
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the midpoint of the current
+ *                         quadrant that mesh_iter is pointing to.
+ */
+void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
+
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *

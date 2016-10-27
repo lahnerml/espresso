@@ -158,6 +158,8 @@ static int fluidstep = 0;
 static int n_lbsteps = 0;
 
 double lb_step_factor = 1.;
+
+int max_refinement_level = P8EST_QMAXLEVEL;
 #endif // LB_ADAPTIVE
 
 #ifdef ADDITIONAL_CHECKS

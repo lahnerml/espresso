@@ -27,6 +27,8 @@
 
 int tclcommand_setup_grid(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
+int tclcommand_set_max_level(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+
 int tclcommand_set_unif_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
 
 int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);

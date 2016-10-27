@@ -182,6 +182,7 @@ static int terminated = 0;
   CB(mpi_scafacos_set_parameters_slave)                                        \
   CB(mpi_mpiio_slave)                                                          \
   CB(mpi_lbadapt_grid_init)                                                    \
+  CB(mpi_lbadapt_set_max_level)                                                \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
   CB(mpi_lbadapt_vtk_print_density)                                            \
   CB(mpi_lbadapt_vtk_print_velocity)                                           \
@@ -2822,6 +2823,12 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
 
   /* free memory */
   sc_array_destroy(velocity);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_set_max_level (int node, int l_max) {
+#ifdef LB_ADAPTIVE
+  max_refinement_level = l_max;
 #endif // LB_ADAPTIVE
 }
 

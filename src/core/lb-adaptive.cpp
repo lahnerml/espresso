@@ -423,7 +423,7 @@ int refine_geometric (p8est_t *p8est, p4est_topidx_t which_tree,
                       p8est_quadrant_t *q) {
   int base = P8EST_QUADRANT_LEN(q->level);
   int root = P8EST_ROOT_LEN;
-  double side_length = (double)base / (double)root;
+  double half_length = 0.5 * sqrt(3) * ((double)base / (double)root);
 
   double midpoint[3];
   lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
@@ -483,8 +483,8 @@ int refine_geometric (p8est_t *p8est, p4est_topidx_t which_tree,
     }
   }
 
-  if (dist <= 0 && n_lb_boundaries > 0) {
-    return (abs(dist) < side_length);
+  if ((abs(dist) <= half_length) && n_lb_boundaries > 0) {
+    return 1;
   } else {
     return 0;
   }
@@ -648,25 +648,6 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear = 0.;
-  double l_gamma_bulk  = 0.;
-  if (lbpar.viscosity[0] > 0.0) {
-    /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_shear =
-        1. -
-        2. /
-            (6. * lbpar.viscosity[0] * tau_prefactor * lbpar.tau / SQR(h) + 1.);
-  }
-
-  if (lbpar.bulk_viscosity[0] > 0.0) {
-    /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_bulk = 1. -
-                   2. / (9. * lbpar.bulk_viscosity[0] * tau_prefactor *
-                             lbpar.tau / SQR(h) +
-                         1.);
-  }
 
   double cpmode[19];
   for (int i = 0; i < 19; ++i) {
@@ -702,17 +683,17 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
   cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * l_gamma_bulk) * (cpmode[4] - modes_from_pi_eq[0]);
+              (0.5 + 0.5 * gamma_bulk) * (cpmode[4] - modes_from_pi_eq[0]);
   cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * l_gamma_shear) * (cpmode[5] - modes_from_pi_eq[1]);
+              (0.5 + 0.5 * gamma_shear) * (cpmode[5] - modes_from_pi_eq[1]);
   cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * l_gamma_shear) * (cpmode[6] - modes_from_pi_eq[2]);
+              (0.5 + 0.5 * gamma_shear) * (cpmode[6] - modes_from_pi_eq[2]);
   cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * l_gamma_shear) * (cpmode[7] - modes_from_pi_eq[3]);
+              (0.5 + 0.5 * gamma_shear) * (cpmode[7] - modes_from_pi_eq[3]);
   cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * l_gamma_shear) * (cpmode[8] - modes_from_pi_eq[4]);
+              (0.5 + 0.5 * gamma_shear) * (cpmode[8] - modes_from_pi_eq[4]);
   cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * l_gamma_shear) * (cpmode[9] - modes_from_pi_eq[5]);
+              (0.5 + 0.5 * gamma_shear) * (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -810,25 +791,6 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear = 0.;
-  double l_gamma_bulk = 0.;
-  if (lbpar.viscosity[0] > 0.0) {
-    /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_shear =
-        1. -
-        2. /
-            (6. * lbpar.viscosity[0] * tau_prefactor * lbpar.tau / SQR(h) + 1.);
-  }
-
-  if (lbpar.bulk_viscosity[0] > 0.0) {
-    /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_bulk = 1. -
-                   2. / (9. * lbpar.bulk_viscosity[0] * tau_prefactor *
-                             lbpar.tau / SQR(h) +
-                         1.);
-  }
 
   /* re-construct the real density
    * remember that the populations are stored as differences to their
@@ -861,12 +823,12 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   /* relax the stress modes */
   // clang-format off
-  mode[4] = pi_eq[0] + l_gamma_bulk  * (mode[4] - pi_eq[0]);
-  mode[5] = pi_eq[1] + l_gamma_shear * (mode[5] - pi_eq[1]);
-  mode[6] = pi_eq[2] + l_gamma_shear * (mode[6] - pi_eq[2]);
-  mode[7] = pi_eq[3] + l_gamma_shear * (mode[7] - pi_eq[3]);
-  mode[8] = pi_eq[4] + l_gamma_shear * (mode[8] - pi_eq[4]);
-  mode[9] = pi_eq[5] + l_gamma_shear * (mode[9] - pi_eq[5]);
+  mode[4] = pi_eq[0] + gamma_bulk  * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + gamma_shear * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + gamma_shear * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + gamma_shear * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + gamma_shear * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + gamma_shear * (mode[9] - pi_eq[5]);
 // clang-format on
 
 #ifndef OLD_FLUCT
@@ -980,25 +942,6 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double tau_prefactor = (level <= lbpar.base_level)
                              ? (1 << (lbpar.base_level - level))
                              : (1. / (double)(1 << (level - lbpar.base_level)));
-  double l_gamma_shear = 0.;
-  double l_gamma_bulk = 0.;
-  if (lbpar.viscosity[0] > 0.0) {
-    /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_shear =
-        1. -
-        2. /
-            (6. * lbpar.viscosity[0] * tau_prefactor * lbpar.tau / SQR(h) + 1.);
-  }
-
-  if (lbpar.bulk_viscosity[0] > 0.0) {
-    /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-    // unit conversion: viscosity
-    l_gamma_bulk = 1. -
-                   2. / (9. * lbpar.bulk_viscosity[0] * tau_prefactor *
-                             lbpar.tau / SQR(h) +
-                         1.);
-  }
 
   f = lbfields->force;
 
@@ -1010,15 +953,15 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
 
-  C[0] = (1. + l_gamma_bulk) * u[0] * f[0] +
-         1. / 3. * (l_gamma_bulk - l_gamma_shear) * scalar(u, f);
-  C[2] = (1. + l_gamma_bulk) * u[1] * f[1] +
-         1. / 3. * (l_gamma_bulk - l_gamma_shear) * scalar(u, f);
-  C[5] = (1. + l_gamma_bulk) * u[2] * f[2] +
-         1. / 3. * (l_gamma_bulk - l_gamma_shear) * scalar(u, f);
-  C[1] = 0.5 * (1. + l_gamma_shear) * (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + l_gamma_shear) * (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + l_gamma_shear) * (u[1] * f[2] + u[2] * f[1]);
+  C[0] = (1. + gamma_bulk) * u[0] * f[0] +
+         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
+  C[2] = (1. + gamma_bulk) * u[1] * f[1] +
+         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
+  C[5] = (1. + gamma_bulk) * u[2] * f[2] +
+         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
+  C[1] = 0.5 * (1. + gamma_shear) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear) * (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];
@@ -1623,12 +1566,13 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 }
 
 void lbadapt_get_boundary_status() {
-  int status = 0;
+  int status;
   int level;
   lbadapt_payload_t *data;
 
   /* set boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+    status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,

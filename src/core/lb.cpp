@@ -2464,11 +2464,13 @@ void lb_release_fluid() {
       P4EST_FREE(lbadapt_local_data[level - coarsest_level_local]);
     }
     P4EST_FREE(lbadapt_local_data);
+    lbadapt_local_data = NULL;
 
     for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
       P4EST_FREE(lbadapt_ghost_data[level - coarsest_level_ghost]);
     }
     P4EST_FREE(lbadapt_ghost_data);
+    lbadapt_ghost_data = NULL;
   }
 #else  // LB_ADAPTIVE
   free(lbfluid[0][0]);
@@ -3140,8 +3142,6 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
 
 /* Collisions and streaming (push scheme) */
 inline void lb_collide_stream() {
-#ifdef LB_ADAPTIVE
-/* loop over all lattice cells (halo excluded) */
 #ifdef LB_BOUNDARIES
   for (int i = 0; i < n_lb_boundaries; i++) {
     lb_boundaries[i].force[0] = 0.;
@@ -3149,121 +3149,107 @@ inline void lb_collide_stream() {
     lb_boundaries[i].force[2] = 0.;
   }
 #endif // LB_BOUNDARIES
+
+#ifdef LB_ADAPTIVE
   // perform 1st half of subcycling here (process coarse before fine)
   int lvl_diff, level;
-  for (level = coarsest_level_local; level <= finest_level_global; ++level) {
-    lvl_diff = finest_level_global - level;
+  double step = 0.0;
+  do {
+    for (level = coarsest_level_local; level <= finest_level_global; ++level) {
+      lvl_diff = finest_level_global - level;
 
-    if (n_lbsteps % (1 << lvl_diff) == 0) {
+      if (n_lbsteps % (1 << lvl_diff) == 0) {
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform collision step on level " << level
-                << std::endl;
-      lbadapt_collide(level);
-      std::cout << "[p4est " << p8est->mpirank << "] "
-                << "[Done] Perform collision step on level " << level
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform collision step on level " << level
+                  << std::endl;
+        lbadapt_collide(level);
+        std::cout << "[p4est " << p8est->mpirank << "] "
+                  << "[Done] Perform collision step on level " << level
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Populate virtual quadrants on level " << level + 1
-                << std::endl;
-      lbadapt_populate_virtuals(level);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Populate virtual quadrants on level " << level + 1
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Populate virtual quadrants on level " << level + 1
+                  << std::endl;
+        lbadapt_populate_virtuals(level);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Populate virtual quadrants on level " << level + 1
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform ghost exchange on level " << level
-                << std::endl;
-      p8est_ghostvirt_exchange_data(
-          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Perform ghost exchange on level " << level
-                << std::endl;
-
-#if 0
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform ghost exchange on level " << level + 1
-                << std::endl;
-      p8est_ghostvirt_exchange_data(
-          p8est, lbadapt_ghost_virt, level + 1, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Perform ghost exchange on level " << level + 1
-                << std::endl;
-#endif // 0
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform ghost exchange on level " << level
+                  << std::endl;
+        p8est_ghostvirt_exchange_data(
+                                      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+                                      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Perform ghost exchange on level " << level
+                  << std::endl;
+      }
     }
-  }
 
-  // increment counter half way to keep coarse quadrants from streaming early
-  ++n_lbsteps;
+    // increment counter half way to keep coarse quadrants from streaming early
+    ++n_lbsteps;
 
-  // perform second half of subcycling here (process fine before coarse)
+    // perform second half of subcycling here (process fine before coarse)
 
-  for (level = finest_level_global; coarsest_level_local <= level; --level) {
-    lvl_diff = finest_level_global - level;
+    for (level = finest_level_global; coarsest_level_local <= level; --level) {
+      lvl_diff = finest_level_global - level;
 
-    if (n_lbsteps % (1 << lvl_diff) == 0) {
+      if (n_lbsteps % (1 << lvl_diff) == 0) {
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Updating populations from virtuals on level " << level + 1
-                << std::endl;
-      lbadapt_update_populations_from_virtuals(level);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Updating populations from virtuals on level "
-                << level + 1
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Updating populations from virtuals on level " << level + 1
+                  << std::endl;
+        lbadapt_update_populations_from_virtuals(level);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Updating populations from virtuals on level "
+                  << level + 1
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform streaming step on level " << level
-                << std::endl;
-      lbadapt_stream(level);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Perform streaming step on level " << level
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform streaming step on level " << level
+                  << std::endl;
+        lbadapt_stream(level);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Perform streaming step on level " << level
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform ghost exchange on level " << level
-                << std::endl;
-      p8est_ghostvirt_exchange_data(
-          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Perform ghost exchange on level " << level
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform ghost exchange on level " << level
+                  << std::endl;
+        p8est_ghostvirt_exchange_data(
+                                      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+                                      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Perform ghost exchange on level " << level
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " Perform bounce back step on " << level
-                << std::endl;
-      lbadapt_bounce_back(level);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] Perform bounce back step on " << level
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform bounce back step on " << level
+                  << std::endl;
+        lbadapt_bounce_back(level);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Perform bounce back step on " << level
+                  << std::endl;
 
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " swap pointers on level " << level
-                << std::endl;
-      lbadapt_swap_pointers(level);
-      std::cout << "[p4est " << p8est->mpirank << "]"
-                << " [Done] swap pointers on level " << level
-                << std::endl;
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " swap pointers on level " << level
+                  << std::endl;
+        lbadapt_swap_pointers(level);
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] swap pointers on level " << level
+                  << std::endl;
+      }
     }
-  }
+    step += lb_step_factor;
+  } while (step < 1);
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
   double modes[19];
 
 /* loop over all lattice cells (halo excluded) */
-#ifdef LB_BOUNDARIES
-  for (int i = 0; i < n_lb_boundaries; i++) {
-    lb_boundaries[i].force[0] = 0.;
-    lb_boundaries[i].force[1] = 0.;
-    lb_boundaries[i].force[2] = 0.;
-  }
-#endif // LB_BOUNDARIES
-
 #ifdef IMMERSED_BOUNDARY
   // Safeguard the node forces so that we can later use them for the IBM
   // particle update

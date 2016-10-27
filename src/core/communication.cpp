@@ -2889,6 +2889,9 @@ void mpi_reg_refinement (int node, int param) {
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
 #endif // LB_ADAPTIVE
 }
 
@@ -2917,13 +2920,14 @@ void mpi_geometric_refinement (int node, int param) {
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
 
-  // due to non-recursive refinement only 2 cases can occur: finest level
-  // increases or not.
-  lb_step_factor = (old_flg == finest_level_global) ? lb_step_factor : 0.5 * lb_step_factor;
+  lb_step_factor = lb_step_factor / (double)(1 << (finest_level_global - old_flg));
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
 #endif // LB_ADAPTIVE
 }
 

@@ -160,4 +160,18 @@ int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **
 
   return TCL_OK;
 }
+
+int tclcommand_set_geom_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+  if (argc != 1) {
+    Tcl_AppendResult(interp,
+        "Setting geometric refinement does not allow setting parameters.",
+        (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_geometric_refinement, -1, 0);
+  mpi_geometric_refinement(0, 0);
+
+  return TCL_OK;
+}
 #endif //LB_ADAPTIVE

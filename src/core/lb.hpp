@@ -161,6 +161,7 @@ typedef struct {
   double tau;
 
 #ifdef LB_ADAPTIVE
+  /** the initial level based on which the number of LB steps is defined */
   int base_level;
 #endif // LB_ADAPTIVE
 

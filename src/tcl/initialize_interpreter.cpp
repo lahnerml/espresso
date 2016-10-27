@@ -209,6 +209,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
   REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
   REGISTER_COMMAND("lbadapt-regref", tclcommand_set_reg_ref);
+  REGISTER_COMMAND("lbadapt-geom-ref", tclcommand_set_geom_ref);
 #endif // LB_ADAPTIVE
   /* here */
   REGISTER_COMMAND("replacestdchannel", tclcommand_replacestdchannel);

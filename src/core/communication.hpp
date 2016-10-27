@@ -556,11 +556,20 @@ void mpi_lbadapt_vtk_print_density (int node, int len);
  */
 void mpi_lbadapt_vtk_print_velocity(int node, int len);
 
+/** Set maximum refinement level
+ * 
+ * @param [in] node   The node on which this function is called (all)
+ * @param [in] l_max  New maximum refinement level
+ */
+void mpi_lbadapt_set_max_level (int node, int l_max);
+
 void mpi_unif_refinement (int node, int level);
 
 void mpi_rand_refinement (int node, int maxLevel);
 
 void mpi_reg_refinement (int node, int param=0);
+
+void mpi_geometric_refinement (int node, int param);
 #endif // LB_ADAPTIVE
 
 

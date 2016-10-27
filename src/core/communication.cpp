@@ -189,6 +189,7 @@ static int terminated = 0;
   CB(mpi_unif_refinement)                                                      \
   CB(mpi_rand_refinement)                                                      \
   CB(mpi_reg_refinement)                                                       \
+  CB(mpi_geometric_refinement)                                                 \
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -2890,6 +2891,42 @@ void mpi_reg_refinement (int node, int param) {
   lb_reinit_fluid();
 #endif // LB_ADAPTIVE
 }
+
+void mpi_geometric_refinement (int node, int param) {
+#ifdef LB_ADAPTIVE
+  p8est_refine_ext (p8est,                  // forest
+                    1,                      // no recursive refinement
+                    max_refinement_level,   // maximum refinement level
+                    refine_geometric,       // return true to refine cell
+                    NULL,                   // init data
+                    NULL);                  // replace data
+
+  p8est_balance_ext (p8est,                  // forest
+                     P8EST_CONNECT_EDGE,     // connection type
+                     NULL,                   // init data
+                     NULL);                  // replace data
+
+  p8est_partition (p8est, 0, NULL);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  int old_flg = finest_level_global;
+  finest_level_global = lbadapt_get_global_maxlevel();
+
+  // due to non-recursive refinement only 2 cases can occur: finest level
+  // increases or not.
+  lb_step_factor = (old_flg == finest_level_global) ? lb_step_factor : 0.5 * lb_step_factor;
+
+  // FIXME: Implement mapping between two trees
+  lb_release_fluid();
+  lb_reinit_fluid();
+#endif // LB_ADAPTIVE
+}
+
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES

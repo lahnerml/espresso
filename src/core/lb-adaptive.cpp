@@ -188,7 +188,7 @@ void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
   }
-  int status = 0;
+  int status;
   lbadapt_payload_t *data;
   int lvl;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
@@ -1419,13 +1419,14 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
-  int status = 0;
+  int status;
   int level;
   double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
 
   /* get boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+    status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
@@ -1449,12 +1450,13 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
-  int status = 0;
+  int status;
   int level;
   double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+    status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
@@ -1498,12 +1500,13 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
-  int status = 0;
+  int status;
   int level;
   double *veloc_ptr, h;
   lbadapt_payload_t *data;
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+    status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
         P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,

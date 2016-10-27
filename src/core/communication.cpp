@@ -2812,7 +2812,7 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
-                                       0, /* write qids as scalar cell
+                                       0, /* write tree-ids as scalar cell
                                              data */
                                        1, /* no custom cell vector data */
                                        "velocity", velocity, context);

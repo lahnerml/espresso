@@ -1525,11 +1525,11 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
 
-        veloc_ptr = (double *)sc_array_index_int(
-            velocity_values, 3 * mesh_iter->current_qid);
+        veloc_ptr = (double *)sc_array_index(
+            velocity_values, P8EST_DIM * mesh_iter->current_qid);
 
         /* pass it into solution vector */
-        std::memcpy(veloc_ptr, j, 3 * sizeof(double));
+        std::memcpy(veloc_ptr, j, P8EST_DIM * sizeof(double));
       }
     }
     p8est_meshiter_destroy(mesh_iter);

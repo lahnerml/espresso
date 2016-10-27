@@ -2435,6 +2435,8 @@ void lb_init() {
 
   /* prepare the halo communication */
   lb_prepare_communication();
+#else // !LB_ADAPTIVE
+  lbadapt_init();
 #endif // !LB_ADAPTIVE
 
   /* initialize derived parameters */
@@ -3145,7 +3147,7 @@ inline void lb_collide_stream() {
   }
 #endif // LB_BOUNDARIES
   // perform 1st half of subcycling here (process coarse before fine)
-  int lvl, lvl_diff, level;
+  int lvl_diff, level;
   for (level = coarsest_level_local; level <= finest_level_global; ++level) {
     lvl_diff = finest_level_global - level;
 

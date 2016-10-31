@@ -3173,10 +3173,13 @@ inline void lb_collide_stream() {
 
       if (n_lbsteps % (1 << lvl_diff) == 0) {
 
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform collision step on level " << level
                   << std::endl;
+#endif // 0
         lbadapt_collide(level);
+        #if 0
         std::cout << "[p4est " << p8est->mpirank << "] "
                   << "[Done] Perform collision step on level " << level
                   << std::endl;
@@ -3184,7 +3187,9 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Populate virtual quadrants on level " << level + 1
                   << std::endl;
+#endif // 0
         lbadapt_populate_virtuals(level);
+        #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Populate virtual quadrants on level " << level + 1
                   << std::endl;
@@ -3192,12 +3197,15 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform ghost exchange on level " << level
                   << std::endl;
+#endif // 0
         p8est_ghostvirt_exchange_data(
-                                      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-                                      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+        #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
                   << std::endl;
+#endif // 0
       }
     }
 
@@ -3211,10 +3219,13 @@ inline void lb_collide_stream() {
 
       if (n_lbsteps % (1 << lvl_diff) == 0) {
 
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Updating populations from virtuals on level " << level + 1
                   << std::endl;
+#endif // 0
         lbadapt_update_populations_from_virtuals(level);
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Updating populations from virtuals on level "
                   << level + 1
@@ -3223,7 +3234,9 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform streaming step on level " << level
                   << std::endl;
+#endif // 0
         lbadapt_stream(level);
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform streaming step on level " << level
                   << std::endl;
@@ -3231,9 +3244,11 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform ghost exchange on level " << level
                   << std::endl;
+#endif // 0
         p8est_ghostvirt_exchange_data(
-                                      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-                                      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
                   << std::endl;
@@ -3241,7 +3256,9 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform bounce back step on " << level
                   << std::endl;
+#endif // 0
         lbadapt_bounce_back(level);
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform bounce back step on " << level
                   << std::endl;
@@ -3249,10 +3266,13 @@ inline void lb_collide_stream() {
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " swap pointers on level " << level
                   << std::endl;
+#endif // 0
         lbadapt_swap_pointers(level);
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] swap pointers on level " << level
                   << std::endl;
+#endif // 0
       }
     }
     step += lb_step_factor;

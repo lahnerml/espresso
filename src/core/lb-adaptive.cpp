@@ -374,12 +374,12 @@ void lbadapt_reinit_force_per_cell() {
         }
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
-        data->lbfields.force[0] =
-            prefactors[level] * lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
-        data->lbfields.force[1] =
-            prefactors[level] * lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
-        data->lbfields.force[2] =
-            prefactors[level] * lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+        data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
+                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
+        data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
+                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
+        data->lbfields.force[2] = prefactors[level] * lbpar.ext_force[2] *
+                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -422,7 +422,9 @@ void lbadapt_reinit_fluid_per_cell() {
               mesh_iter)];
         }
         // convert rho to lattice units
-        double rho = lbpar.rho[0] * h * h * h;
+        double rho =
+            1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+            lbpar.rho[0] * h * h * h;
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
@@ -586,7 +588,10 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
                                  double *pi, double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
-  const double avg_rho = lbpar.rho[0] * h * h * h;
+  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+  const double avg_rho =
+      1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+      lbpar.rho[0] * h * h * h;
 
   local_rho = rho;
 
@@ -687,10 +692,12 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
 int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
                               int has_force, double h, double *rho, double *j,
                               double *pi) {
+  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
-    *rho = lbpar.rho[0] * h * h * h;
+    *rho = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+           lbpar.rho[0] * h * h * h;
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
@@ -705,7 +712,6 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
     return 0;
   }
 #endif // LB_BOUNDARIES
-  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   double cpmode[19];
   for (int i = 0; i < 19; ++i) {
@@ -713,7 +719,9 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   }
   double modes_from_pi_eq[6];
 
-  *rho = cpmode[0] + lbpar.rho[0] * h * h * h;
+  *rho = cpmode[0] +
+         1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+             lbpar.rho[0] * h * h * h;
 
   j[0] = cpmode[1];
   j[1] = cpmode[2];
@@ -740,18 +748,24 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
-  cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
-  cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
-  cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
-  cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
-  cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
-  cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
+  cpmode[4] =
+      modes_from_pi_eq[0] +
+      (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] =
+      modes_from_pi_eq[1] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] =
+      modes_from_pi_eq[2] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] =
+      modes_from_pi_eq[3] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] =
+      modes_from_pi_eq[4] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] =
+      modes_from_pi_eq[5] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -850,11 +864,16 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   /* re-construct the real density
    * remember that the populations are stored as differences to their
    * equilibrium value */
-  rho = mode[0] + lbpar.rho[0] * h * h * h;
+  rho = mode[0] +
+        1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+            lbpar.rho[0] * h * h * h;
 
-  j[0] = mode[1];
-  j[1] = mode[2];
-  j[2] = mode[3];
+  j[0] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+         mode[1];
+  j[1] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+         mode[2];
+  j[2] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+         mode[3];
 
 /* if forces are present, the momentum density is redefined to
  * include one half-step of the force action.  See the
@@ -906,9 +925,13 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 }
 
 int lbadapt_thermalize_modes(double *mode, double h) {
+  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
   double fluct[6];
 #ifdef GAUSSRANDOM
-  double rootrho_gauss = sqrt(fabs(mode[0] + lbpar.rho[0] * h * h * h));
+  double rootrho_gauss = sqrt(
+      fabs(mode[0] +
+           1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+               lbpar.rho[0] * h * h * h));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random());
@@ -932,7 +955,10 @@ int lbadapt_thermalize_modes(double *mode, double h) {
 #endif // !OLD_FLUCT
 
 #elif defined(GAUSSRANDOMCUT)
-  double rootrho_gauss = sqrt(fabs(mode[0] + lbpar.rho[0] * h * h * h));
+  double rootrho_gauss = sqrt(
+      fabs(mode[0] +
+           1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+               lbpar.rho[0] * h * h * h));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random_cut());
@@ -956,7 +982,10 @@ int lbadapt_thermalize_modes(double *mode, double h) {
 #endif // OLD_FLUCT
 
 #elif defined(FLATNOISE)
-  double rootrho = sqrt(fabs(12.0 * (mode[0] + lbpar.rho[0] * h * h * h)));
+  double rootrho = sqrt(fabs(
+      12.0 * (mode[0] +
+              1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+                  lbpar.rho[0] * h * h * h)));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho * lb_phi[4] * (d_random() - 0.5));
@@ -997,13 +1026,24 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   f = lbfields->force;
 
-  rho = mode[0] + lbpar.rho[0] * h * h * h;
+  rho = mode[0] +
+        1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+            lbpar.rho[0] * h * h * h;
 
   /* hydrodynamic momentum density is redefined when external forces present
    */
-  u[0] = (mode[1] + 0.5 * f[0]) / rho;
-  u[1] = (mode[2] + 0.5 * f[1]) / rho;
-  u[2] = (mode[3] + 0.5 * f[2]) / rho;
+  u[0] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+              mode[1] +
+          0.5 * f[0]) /
+         rho;
+  u[1] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+              mode[2] +
+          0.5 * f[1]) /
+         rho;
+  u[2] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+              mode[3] +
+          0.5 * f[2]) /
+         rho;
 
   C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
          1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
@@ -1031,12 +1071,12 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  lbfields->force[0] =
-      prefactors[level] * lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
-  lbfields->force[1] =
-      prefactors[level] * lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
-  lbfields->force[2] =
-      prefactors[level] * lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+  lbfields->force[0] = prefactors[level] * lbpar.ext_force[0] * SQR(h) *
+                       SQR(prefactors[level] * lbpar.tau);
+  lbfields->force[1] = prefactors[level] * lbpar.ext_force[1] * SQR(h) *
+                       SQR(prefactors[level] * lbpar.tau);
+  lbfields->force[2] = prefactors[level] * lbpar.ext_force[2] * SQR(h) *
+                       SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1214,6 +1254,7 @@ void lbadapt_collide(int level) {
 #ifdef EXTERNAL_FORCES
         lbadapt_apply_forces(modes, &data->lbfields, h);
 #else  // EXTERNAL_FORCES
+        // forces from MD-Coupling
         if (data->lbfields.has_force)
           lbadapt_apply_forces(modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
@@ -1388,8 +1429,11 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h * h * h * h * h * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
-                      lbmodel.w[i] *
+                      h * h * h * h * h * 1. /
+                      (prefactors[level] * prefactors[level] *
+                       prefactors[level] * prefactors[level] *
+                       prefactors[level]) *
+                      lbpar.rho[0] * 2 * lbmodel.c[i][l] * lbmodel.w[i] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
@@ -1415,8 +1459,12 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h * h * h * h * h * lbpar.rho[0] * 2 *
-                      lbmodel.c[reverse[i]][l] * lbmodel.w[reverse[i]] *
+                      h * h * h * h * h * 1. /
+                      (prefactors[level] * prefactors[level] *
+                       prefactors[level] * prefactors[level] *
+                       prefactors[level]) *
+                      lbpar.rho[0] * 2 * lbmodel.c[reverse[i]][l] *
+                      lbmodel.w[reverse[i]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
@@ -1572,7 +1620,9 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
 
-        double avg_rho = lbpar.rho[0] * h * h * h;
+        double avg_rho =
+            1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
+            lbpar.rho[0] * h * h * h;
 
         if (data->boundary) {
           dens = 0;
@@ -1701,7 +1751,9 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
     return;
   }
 
-  double avg_rho = lbpar.rho[0] * h * h * h;
+  double avg_rho = 1. / (prefactors[q->level] * prefactors[q->level] *
+                         prefactors[q->level]) *
+                   lbpar.rho[0] * h * h * h;
 
   // clang-format off
   *rho += avg_rho +

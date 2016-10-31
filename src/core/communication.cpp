@@ -2712,6 +2712,7 @@ void mpi_lbadapt_grid_init (int node, int level) {
   finest_level_global = lbadapt_get_global_maxlevel();
 
   lbpar.base_level = level;
+  max_refinement_level = level;
 #endif // LB_ADAPTIVE
 }
 
@@ -2830,6 +2831,8 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
 void mpi_lbadapt_set_max_level (int node, int l_max) {
 #ifdef LB_ADAPTIVE
   max_refinement_level = l_max;
+
+  lb_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
 
@@ -2889,6 +2892,7 @@ void mpi_reg_refinement (int node, int param) {
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
+  lb_reinit_forces();
 
   // reinitialize boundary
   lbadapt_get_boundary_status();
@@ -2925,6 +2929,7 @@ void mpi_geometric_refinement (int node, int param) {
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
+  lb_reinit_forces();
 
   // reinitialize boundary
   lbadapt_get_boundary_status();

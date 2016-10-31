@@ -87,6 +87,10 @@ extern int finest_level_global;
  */
 void lbadapt_init();
 
+/** Init lb parameters
+ */
+void lbadapt_reinit_parameters();
+
 /** Init cell-local force values
  */
 void lbadapt_reinit_force_per_cell();

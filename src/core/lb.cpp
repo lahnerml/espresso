@@ -134,10 +134,19 @@ HaloCommunicator update_halo_comm = {0, NULL};
 /** Flag indicating whether fluctuations are present. */
 int fluct;
 
+#ifdef LB_ADAPTIVE
+double prefactors[P8EST_MAXLEVEL] =
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_shear[P8EST_MAXLEVEL] =
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_bulk[P8EST_MAXLEVEL] =
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+#else // LB_ADAPTIVE
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
+#endif // LB_ADAPTIVE
 /** relaxation of the odd kinetic modes */
 double gamma_odd = 0.0;
 /** relaxation of the even kinetic modes */
@@ -2245,6 +2254,9 @@ static void lb_prepare_communication() {
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_parameters() {
+#ifdef LB_ADAPTIVE
+  lbadapt_reinit_parameters();
+#else // LB_ADAPTIVE
   int i;
 
   if (lbpar.viscosity[0] > 0.0) {
@@ -2275,10 +2287,10 @@ void lb_reinit_parameters() {
     // gamma_odd = gamma_shear; //uncomment for BGK
   }
 
-  // gamma_shear = 0.0; //uncomment for special case of BGK
-  // gamma_bulk = 0.0;
-  // gamma_odd = 0.0;
-  // gamma_even = 0.0;
+  gamma_shear = 0.0; //uncomment for special case of BGK
+  gamma_bulk = 0.0;
+  gamma_odd = 0.0;
+  gamma_even = 0.0;
 
   // printf("gamma_shear=%e\n", gamma_shear);
   // printf("gamma_bulk=%e\n", gamma_bulk);
@@ -2333,6 +2345,7 @@ void lb_reinit_parameters() {
                            "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
                    this_node, gamma_shear, gamma_bulk, lb_phi[9], lb_phi[4], mu,
                    lbpar.bulk_viscosity[0], lbpar.viscosity[0]));
+#endif // LB_ADAPTIVE
 }
 
 /** Resets the forces on the fluid nodes; needs to be called after

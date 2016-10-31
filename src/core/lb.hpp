@@ -27,6 +27,7 @@
 #ifndef LB_H
 #define LB_H
 
+#include <p8est.h>
 #include "utils.hpp"
 #include "lattice_inline.hpp"
 
@@ -188,7 +189,7 @@ typedef struct {
 extern LB_Model lbmodel;
 
 /** Struct holding the Lattice Boltzmann parameters */
-extern LB_Parameters lbpar; 
+extern LB_Parameters lbpar;
 
 #ifndef LB_ADAPTIVE
 /** The underlying lattice */
@@ -226,10 +227,16 @@ extern double lblambda;
 /** Eigenvalue of collision operator corresponding to bulk viscosity. */
 extern double lblambda_bulk;
 
+#ifdef LB_ADAPTIVE
+extern double prefactors[P8EST_MAXLEVEL];
+extern double gamma_shear[P8EST_MAXLEVEL];
+extern double gamma_bulk[P8EST_MAXLEVEL];
+#else // LB_ADAPTIVE
 extern int resend_halo;
 
 extern double gamma_shear;
 extern double gamma_bulk;
+#endif // LB_ADAPTIVE
 
 extern double gamma_odd;
 extern double gamma_even;

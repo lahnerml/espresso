@@ -38,6 +38,7 @@
 #include "lb-d3q19.hpp"
 #include "lb.hpp"
 #include "random.hpp"
+#include "thermostat.hpp"
 #include "utils.hpp"
 
 #ifdef LB_ADAPTIVE
@@ -245,6 +246,103 @@ void lbadapt_init() {
   }
 }
 
+void lbadapt_reinit_parameters() {
+  int i;
+
+  for (i = max_refinement_level; lbpar.base_level <= i; --i) {
+    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
+    prefactors[i] = 1 << (max_refinement_level - i);
+    if (lbpar.viscosity[0] > 0.0) {
+      /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
+      // unit conversion: viscosity
+      gamma_shear[i] =
+          1. -
+          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / SQR(h) +
+                1.);
+    }
+
+    if (lbpar.bulk_viscosity[0] > 0.0) {
+      /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
+      // unit conversion: viscosity
+      gamma_bulk[i] = 1. -
+                      2. / (9. * lbpar.bulk_viscosity[0] * prefactors[i] *
+                                lbpar.tau / SQR(h) +
+                            1.);
+    }
+  }
+
+  gamma_odd = lbpar.gamma_odd[0];
+  gamma_even = lbpar.gamma_even[0];
+
+  // if (lbpar.is_TRT) {
+  //   gamma_bulk = gamma_shear;
+  //   gamma_even = gamma_shear;
+  //   gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
+  //   // gamma_odd = gamma_shear; //uncomment for BGK
+  // }
+
+  // gamma_shear = 0.0; //uncomment for special case of BGK
+  // gamma_bulk = 0.0;
+  // gamma_odd = 0.0;
+  // gamma_even = 0.0;
+
+  // printf("gamma_shear=%e\n", gamma_shear);
+  // printf("gamma_bulk=%e\n", gamma_bulk);
+  // printf("gamma_odd=%e\n", gamma_odd);
+  // printf("gamma_even=%e\n", gamma_even);
+  // printf("\n");
+
+  double mu = 0.0;
+
+  if (temperature > 0.0) {
+#if 0
+    /* fluctuating hydrodynamics ? */
+    fluct = 1;
+
+    /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).
+     * Note that the modes are not normalized as in the paper here! */
+    mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
+         (lbpar.agrid * lbpar.agrid);
+// mu *= agrid*agrid*agrid;  // Marcello's conjecture
+#ifdef D3Q19
+    double(*e)[19] = d3q19_modebase;
+#else  // D3Q19
+    double **e = lbmodel.e;
+#endif // D3Q19
+    for (i = 0; i < 4; i++)
+      lb_phi[i] = 0.0;
+    lb_phi[4] = sqrt(mu * e[19][4] * (1. - SQR(gamma_bulk))); // SQR(x) == x*x
+    for (i = 5; i < 10; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1. - SQR(gamma_shear)));
+    for (i = 10; i < 16; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_odd)));
+    for (i = 16; i < 19; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_even)));
+
+    /* lb_coupl_pref is stored in MD units (force)
+     * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
+     * The factor 12 comes from the fact that we use random numbers
+     * from -0.5 to 0.5 (equally distributed) which have variance 1/12.
+     * time_step comes from the discretization.
+     */
+    lb_coupl_pref =
+        sqrt(12. * 2. * lbpar.friction[0] * temperature / time_step);
+    lb_coupl_pref2 = sqrt(2. * lbpar.friction[0] * temperature / time_step);
+#endif // 0
+  } else {
+    /* no fluctuations at zero temperature */
+    fluct = 0;
+    for (i = 0; i < lbmodel.n_veloc; i++)
+      lb_phi[i] = 0.0;
+    lb_coupl_pref = 0.0;
+    lb_coupl_pref2 = 0.0;
+  }
+  LB_TRACE(fprintf(stderr, "%d: gamma_shear=%lf gamma_bulk=%lf shear_fluct=%lf "
+                           "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
+                   this_node, gamma_shear, gamma_bulk, lb_phi[9], lb_phi[4], mu,
+                   lbpar.bulk_viscosity[0], lbpar.viscosity[0]));
+}
+
 void lbadapt_reinit_force_per_cell() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
@@ -253,13 +351,9 @@ void lbadapt_reinit_force_per_cell() {
   int lvl;
   lbadapt_payload_t *data;
   double h; /* local meshwidth */
-  double tau_prefactor;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
-    tau_prefactor = (level <= lbpar.base_level)
-                        ? (1 << (lbpar.base_level - level))
-                        : (1. / (double)(1 << (level - lbpar.base_level)));
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -281,11 +375,11 @@ void lbadapt_reinit_force_per_cell() {
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
         data->lbfields.force[0] =
-            lbpar.ext_force[0] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
         data->lbfields.force[1] =
-            lbpar.ext_force[1] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
         data->lbfields.force[2] =
-            lbpar.ext_force[2] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -364,38 +458,6 @@ int lbadapt_get_global_maxlevel() {
   return global_res;
 }
 
-void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
-                           int num_outgoing, p8est_quadrant_t *outgoing[],
-                           int num_incoming, p8est_quadrant_t *incoming[]) {
-  lbadapt_payload_t *parent_data, *child_data;
-  double h;
-
-  if (num_outgoing > 1) {
-    // coarsening
-  } else {
-    // refinement
-    parent_data = (lbadapt_payload_t *)outgoing[0]->p.user_data;
-    h = (double)P8EST_QUADRANT_LEN(incoming[0]->level) / (double)P8EST_ROOT_LEN;
-    for (int i = 0; i < P8EST_CHILDREN; i++) {
-      child_data = (lbadapt_payload_t *)incoming[i]->p.user_data;
-      // init cells: first insert lbfields as good as possible
-      // and calc populations from those values.
-      // init force
-      for (int j = 0; j < 3; j++)
-        child_data->lbfields.force[j] = 0.25 * parent_data->lbfields.force[j];
-      child_data->lbfields.rho[0] = 0.125 * parent_data->lbfields.rho[0];
-      for (int j = 0; j < 3; j++)
-        child_data->lbfields.j[j] = 0.;
-      for (int j = 0; j < 6; j++)
-        child_data->lbfields.pi[j] = 0.;
-
-      lbadapt_calc_n_from_rho_j_pi(
-          child_data->lbfluid, child_data->lbfields.rho[0],
-          child_data->lbfields.j, child_data->lbfields.pi, h);
-    }
-  }
-}
-
 /*** REFINEMENT ***/
 int refine_uniform(p8est_t *p8est, p4est_topidx_t which_tree,
                    p8est_quadrant_t *quadrant) {
@@ -419,8 +481,8 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
   return 0;
 }
 
-int refine_geometric (p8est_t *p8est, p4est_topidx_t which_tree,
-                      p8est_quadrant_t *q) {
+int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
+                     p8est_quadrant_t *q) {
   int base = P8EST_QUADRANT_LEN(q->level);
   int root = P8EST_ROOT_LEN;
   double half_length = 0.5 * sqrt(3) * ((double)base / (double)root);
@@ -497,7 +559,8 @@ void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
   int root = P8EST_ROOT_LEN;
   double half_length = ((double)base / (double)root) * 0.5;
 
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z, xyz);
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
   for (int i = 0; i < P8EST_DIM; ++i) {
     xyz[i] += half_length;
   }
@@ -642,12 +705,7 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
     return 0;
   }
 #endif // LB_BOUNDARIES
-
-  // scale tau and gamma values
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-  double tau_prefactor = (level <= lbpar.base_level)
-                             ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << (level - lbpar.base_level)));
 
   double cpmode[19];
   for (int i = 0; i < 19; ++i) {
@@ -683,17 +741,17 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
   cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * gamma_bulk) * (cpmode[4] - modes_from_pi_eq[0]);
+              (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
   cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * gamma_shear) * (cpmode[5] - modes_from_pi_eq[1]);
+              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
   cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * gamma_shear) * (cpmode[6] - modes_from_pi_eq[2]);
+              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
   cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * gamma_shear) * (cpmode[7] - modes_from_pi_eq[3]);
+              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
   cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * gamma_shear) * (cpmode[8] - modes_from_pi_eq[4]);
+              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
   cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * gamma_shear) * (cpmode[9] - modes_from_pi_eq[5]);
+              (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -788,9 +846,6 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   // scale tau and gamma values
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-  double tau_prefactor = (level <= lbpar.base_level)
-                             ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << (level - lbpar.base_level)));
 
   /* re-construct the real density
    * remember that the populations are stored as differences to their
@@ -823,12 +878,12 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   /* relax the stress modes */
   // clang-format off
-  mode[4] = pi_eq[0] + gamma_bulk  * (mode[4] - pi_eq[0]);
-  mode[5] = pi_eq[1] + gamma_shear * (mode[5] - pi_eq[1]);
-  mode[6] = pi_eq[2] + gamma_shear * (mode[6] - pi_eq[2]);
-  mode[7] = pi_eq[3] + gamma_shear * (mode[7] - pi_eq[3]);
-  mode[8] = pi_eq[4] + gamma_shear * (mode[8] - pi_eq[4]);
-  mode[9] = pi_eq[5] + gamma_shear * (mode[9] - pi_eq[5]);
+  mode[4] = pi_eq[0] + gamma_bulk[level]  * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + gamma_shear[level] * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + gamma_shear[level] * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + gamma_shear[level] * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + gamma_shear[level] * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + gamma_shear[level] * (mode[9] - pi_eq[5]);
 // clang-format on
 
 #ifndef OLD_FLUCT
@@ -939,9 +994,6 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   // scale tau and gamma values
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-  double tau_prefactor = (level <= lbpar.base_level)
-                             ? (1 << (lbpar.base_level - level))
-                             : (1. / (double)(1 << (level - lbpar.base_level)));
 
   f = lbfields->force;
 
@@ -953,15 +1005,15 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
 
-  C[0] = (1. + gamma_bulk) * u[0] * f[0] +
-         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
-  C[2] = (1. + gamma_bulk) * u[1] * f[1] +
-         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
-  C[5] = (1. + gamma_bulk) * u[2] * f[2] +
-         1. / 3. * (gamma_bulk - gamma_shear) * scalar(u, f);
-  C[1] = 0.5 * (1. + gamma_shear) * (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + gamma_shear) * (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + gamma_shear) * (u[1] * f[2] + u[2] * f[1]);
+  C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[1] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];
@@ -980,11 +1032,11 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   lbfields->force[0] =
-      lbpar.ext_force[0] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+      prefactors[level] * lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
   lbfields->force[1] =
-      lbpar.ext_force[1] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+      prefactors[level] * lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
   lbfields->force[2] =
-      lbpar.ext_force[2] * SQR(h) * SQR(tau_prefactor * lbpar.tau);
+      prefactors[level] * lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1169,6 +1221,32 @@ void lbadapt_collide(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+
+#if 0
+  /** this will be needed if the modes overwrite populations */
+  mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL, P8EST_TRAVERSE_PARBOUNDINNER);
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      data =
+          &lbadapt_local_data[level - coarsest_level_local]
+                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+#ifdef LB_BOUNDARIES
+      if (!data->boundary)
+#endif // LB_BOUNDARIES
+      {
+        /* place for storing modes */
+        double *modes = data->modes;
+
+        /* calculate modes locally */
+        lbadapt_calc_modes(data->lbfluid, modes);
+      }
+    }
+  }
+  p8est_meshiter_destroy(mesh_iter);
+#endif /* 0 */
 }
 
 void lbadapt_populate_virtuals(int level) {
@@ -1209,11 +1287,6 @@ void lbadapt_populate_virtuals(int level) {
       // synchronize pre- and post-collision values
       memcpy(current_data->lbfluid[1], current_data->lbfluid[0],
              lbmodel.n_veloc * sizeof(double));
-      // adjust parameters where necessary
-      for (int i = 0; i < P8EST_DIM; ++i) {
-        // force is scaled with tau**2 and h**2 => 0.5**4 = 1./16.
-        current_data->lbfields.force[i] *= 0.0625; // 1./16.
-      }
     }
   }
   p8est_meshiter_destroy(mesh_iter);
@@ -1327,10 +1400,11 @@ void lbadapt_bounce_back(int level) {
                       lbmodel.c[i][l];
                 }
                 data->lbfluid[1][reverse[i]] =
-                  currCellData->lbfluid[1][i] + population_shift;
+                    currCellData->lbfluid[1][i] + population_shift;
               } else {
                 // else bounce back
-                data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] = 0.0;
+                data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] =
+                    0.0;
               }
             }
 
@@ -1356,7 +1430,8 @@ void lbadapt_bounce_back(int level) {
                     data->lbfluid[1][reverse[i]] + population_shift;
               } else {
                 // else bounce back
-                currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] = 0.0;
+                currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] =
+                    0.0;
               }
             }
           }
@@ -1647,10 +1722,6 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
   double h;                                /* local meshwidth */
   h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
-  double tau_prefactor =
-      (q->level <= lbpar.base_level)
-          ? (1 << (lbpar.base_level - q->level))
-          : (1. / (double)(1 << (q->level - lbpar.base_level)));
 
   double j[3];
 
@@ -1682,9 +1753,9 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
   momentum[1] += j[1] + data->lbfields.force[1];
   momentum[2] += j[2] + data->lbfields.force[2];
 
-  momentum[0] *= h / (tau_prefactor * lbpar.tau);
-  momentum[1] *= h / (tau_prefactor * lbpar.tau);
-  momentum[2] *= h / (tau_prefactor * lbpar.tau);
+  momentum[0] *= h / (prefactors[q->level] * lbpar.tau);
+  momentum[1] *= h / (prefactors[q->level] * lbpar.tau);
+  momentum[2] *= h / (prefactors[q->level] * lbpar.tau);
 }
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {

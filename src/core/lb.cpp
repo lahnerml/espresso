@@ -137,16 +137,14 @@ int fluct;
 #ifdef LB_ADAPTIVE
 double prefactors[P8EST_MAXLEVEL] =
   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_shear[P8EST_MAXLEVEL] =
+double inverse_prefactors[P8EST_MAXLEVEL] =
   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_bulk[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#else // LB_ADAPTIVE
+#endif // LB_ADAPTIVE
+
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
-#endif // LB_ADAPTIVE
 /** relaxation of the odd kinetic modes */
 double gamma_odd = 0.0;
 /** relaxation of the even kinetic modes */
@@ -2254,10 +2252,13 @@ static void lb_prepare_communication() {
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_parameters() {
-#ifdef LB_ADAPTIVE
-  lbadapt_reinit_parameters();
-#else // LB_ADAPTIVE
   int i;
+#ifdef LB_ADAPTIVE
+  for (i = max_refinement_level; lbpar.base_level <= i; --i) {
+    prefactors[i] = 1 << (max_refinement_level - i);
+    inverse_prefactors[i] = 1. / prefactors[i];
+  }
+#endif //LB_ADAPTIVE
 
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
@@ -2345,7 +2346,6 @@ void lb_reinit_parameters() {
                            "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
                    this_node, gamma_shear, gamma_bulk, lb_phi[9], lb_phi[4], mu,
                    lbpar.bulk_viscosity[0], lbpar.viscosity[0]));
-#endif // LB_ADAPTIVE
 }
 
 /** Resets the forces on the fluid nodes; needs to be called after

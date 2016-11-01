@@ -127,13 +127,14 @@ void lbadapt_allocate_data() {
           (lbadapt_mesh->quad_level + level)->elem_count +
               P8EST_CHILDREN *
                   (lbadapt_mesh->virtual_qlevels + level)->elem_count);
-
+#if 0
       std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
                 << (lbadapt_mesh->quad_level + level)->elem_count
                 << " real and "
                 << P8EST_CHILDREN *
                        (lbadapt_mesh->virtual_qlevels + level)->elem_count
                 << " virtual local quadrants of level " << level << std::endl;
+#endif // 0
     }
   }
 
@@ -171,12 +172,14 @@ void lbadapt_allocate_data() {
           (lbadapt_mesh->ghost_level + level)->elem_count +
               P8EST_CHILDREN *
                   (lbadapt_mesh->virtual_glevels + level)->elem_count);
+#if 0
       std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
                 << (lbadapt_mesh->ghost_level + level)->elem_count
                 << " real and "
                 << P8EST_CHILDREN *
                        (lbadapt_mesh->virtual_glevels + level)->elem_count
                 << " virtual ghost quadrants of level " << level << std::endl;
+#endif // 0
     }
   }
   // set finest level values from one level greater than the finest cell to the
@@ -246,103 +249,6 @@ void lbadapt_init() {
   }
 }
 
-void lbadapt_reinit_parameters() {
-  int i;
-
-  for (i = max_refinement_level; lbpar.base_level <= i; --i) {
-    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
-    prefactors[i] = 1 << (max_refinement_level - i);
-    if (lbpar.viscosity[0] > 0.0) {
-      /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-      // unit conversion: viscosity
-      gamma_shear[i] =
-          1. -
-          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / SQR(h) +
-                1.);
-    }
-
-    if (lbpar.bulk_viscosity[0] > 0.0) {
-      /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
-      // unit conversion: viscosity
-      gamma_bulk[i] = 1. -
-                      2. / (9. * lbpar.bulk_viscosity[0] * prefactors[i] *
-                                lbpar.tau / SQR(h) +
-                            1.);
-    }
-  }
-
-  gamma_odd = lbpar.gamma_odd[0];
-  gamma_even = lbpar.gamma_even[0];
-
-  // if (lbpar.is_TRT) {
-  //   gamma_bulk = gamma_shear;
-  //   gamma_even = gamma_shear;
-  //   gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
-  //   // gamma_odd = gamma_shear; //uncomment for BGK
-  // }
-
-  // gamma_shear = 0.0; //uncomment for special case of BGK
-  // gamma_bulk = 0.0;
-  // gamma_odd = 0.0;
-  // gamma_even = 0.0;
-
-  // printf("gamma_shear=%e\n", gamma_shear);
-  // printf("gamma_bulk=%e\n", gamma_bulk);
-  // printf("gamma_odd=%e\n", gamma_odd);
-  // printf("gamma_even=%e\n", gamma_even);
-  // printf("\n");
-
-  double mu = 0.0;
-
-  if (temperature > 0.0) {
-#if 0
-    /* fluctuating hydrodynamics ? */
-    fluct = 1;
-
-    /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).
-     * Note that the modes are not normalized as in the paper here! */
-    mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
-         (lbpar.agrid * lbpar.agrid);
-// mu *= agrid*agrid*agrid;  // Marcello's conjecture
-#ifdef D3Q19
-    double(*e)[19] = d3q19_modebase;
-#else  // D3Q19
-    double **e = lbmodel.e;
-#endif // D3Q19
-    for (i = 0; i < 4; i++)
-      lb_phi[i] = 0.0;
-    lb_phi[4] = sqrt(mu * e[19][4] * (1. - SQR(gamma_bulk))); // SQR(x) == x*x
-    for (i = 5; i < 10; i++)
-      lb_phi[i] = sqrt(mu * e[19][i] * (1. - SQR(gamma_shear)));
-    for (i = 10; i < 16; i++)
-      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_odd)));
-    for (i = 16; i < 19; i++)
-      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_even)));
-
-    /* lb_coupl_pref is stored in MD units (force)
-     * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
-     * The factor 12 comes from the fact that we use random numbers
-     * from -0.5 to 0.5 (equally distributed) which have variance 1/12.
-     * time_step comes from the discretization.
-     */
-    lb_coupl_pref =
-        sqrt(12. * 2. * lbpar.friction[0] * temperature / time_step);
-    lb_coupl_pref2 = sqrt(2. * lbpar.friction[0] * temperature / time_step);
-#endif // 0
-  } else {
-    /* no fluctuations at zero temperature */
-    fluct = 0;
-    for (i = 0; i < lbmodel.n_veloc; i++)
-      lb_phi[i] = 0.0;
-    lb_coupl_pref = 0.0;
-    lb_coupl_pref2 = 0.0;
-  }
-  LB_TRACE(fprintf(stderr, "%d: gamma_shear=%lf gamma_bulk=%lf shear_fluct=%lf "
-                           "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
-                   this_node, gamma_shear, gamma_bulk, lb_phi[9], lb_phi[4], mu,
-                   lbpar.bulk_viscosity[0], lbpar.viscosity[0]));
-}
-
 void lbadapt_reinit_force_per_cell() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
@@ -350,10 +256,10 @@ void lbadapt_reinit_force_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h; /* local meshwidth */
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -375,11 +281,11 @@ void lbadapt_reinit_force_per_cell() {
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
         data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
-                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
+                                  SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
-                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
+                                  SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[2] = prefactors[level] * lbpar.ext_force[2] *
-                                  SQR(h) * SQR(prefactors[level] * lbpar.tau);
+                                  SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -399,7 +305,9 @@ void lbadapt_reinit_fluid_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h; /* local meshwidth */
+  double h;
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
     h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
@@ -422,13 +330,11 @@ void lbadapt_reinit_fluid_per_cell() {
               mesh_iter)];
         }
         // convert rho to lattice units
-        double rho =
-            1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-            lbpar.rho[0] * h * h * h;
+        double rho = lbpar.rho[0] * h_max * h_max * h_max;
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
-        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
+        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi);
 
 #ifdef LB_BOUNDARIES
         data->boundary = 0;
@@ -487,7 +393,8 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q) {
   int base = P8EST_QUADRANT_LEN(q->level);
   int root = P8EST_ROOT_LEN;
-  double half_length = 0.5 * sqrt(3) * ((double)base / (double)root);
+  // 0.6 instead of 0.5 for stability reasons
+  double half_length = 0.6 * sqrt(3) * ((double)base / (double)root);
 
   double midpoint[3];
   lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
@@ -585,13 +492,13 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
 }
 
 int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
-                                 double *pi, double h) {
+                                 double *pi) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
-  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-  const double avg_rho =
-      1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-      lbpar.rho[0] * h * h * h;
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+
+  const double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
   local_rho = rho;
 
@@ -693,11 +600,12 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
                               int has_force, double h, double *rho, double *j,
                               double *pi) {
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
-    *rho = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-           lbpar.rho[0] * h * h * h;
+    *rho = lbpar.rho[0] * h_max * h_max * h_max;
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
@@ -719,9 +627,7 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   }
   double modes_from_pi_eq[6];
 
-  *rho = cpmode[0] +
-         1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-             lbpar.rho[0] * h * h * h;
+  *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
   j[0] = cpmode[1];
   j[1] = cpmode[2];
@@ -748,24 +654,24 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
-  cpmode[4] =
-      modes_from_pi_eq[0] +
-      (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
-  cpmode[5] =
-      modes_from_pi_eq[1] +
-      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
-  cpmode[6] =
-      modes_from_pi_eq[2] +
-      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
-  cpmode[7] =
-      modes_from_pi_eq[3] +
-      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
-  cpmode[8] =
-      modes_from_pi_eq[4] +
-      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
-  cpmode[9] =
-      modes_from_pi_eq[5] +
-      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
+  cpmode[4] = modes_from_pi_eq[0] +
+              (0.5 + 0.5 * prefactors[level] * gamma_bulk) *
+                  (cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] = modes_from_pi_eq[1] +
+              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
+                  (cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] = modes_from_pi_eq[2] +
+              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
+                  (cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] = modes_from_pi_eq[3] +
+              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
+                  (cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] = modes_from_pi_eq[4] +
+              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
+                  (cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] = modes_from_pi_eq[5] +
+              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
+                  (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -858,22 +764,18 @@ int lbadapt_calc_modes(double population[2][19], double *mode) {
 int lbadapt_relax_modes(double *mode, double *force, double h) {
   double rho, j[3], pi_eq[6];
 
-  // scale tau and gamma values
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
   /* re-construct the real density
    * remember that the populations are stored as differences to their
    * equilibrium value */
-  rho = mode[0] +
-        1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-            lbpar.rho[0] * h * h * h;
+  rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
-  j[0] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-         mode[1];
-  j[1] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-         mode[2];
-  j[2] = 1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-         mode[3];
+  j[0] = mode[1];
+  j[1] = mode[2];
+  j[2] = mode[3];
 
 /* if forces are present, the momentum density is redefined to
  * include one half-step of the force action.  See the
@@ -897,12 +799,12 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   /* relax the stress modes */
   // clang-format off
-  mode[4] = pi_eq[0] + gamma_bulk[level]  * (mode[4] - pi_eq[0]);
-  mode[5] = pi_eq[1] + gamma_shear[level] * (mode[5] - pi_eq[1]);
-  mode[6] = pi_eq[2] + gamma_shear[level] * (mode[6] - pi_eq[2]);
-  mode[7] = pi_eq[3] + gamma_shear[level] * (mode[7] - pi_eq[3]);
-  mode[8] = pi_eq[4] + gamma_shear[level] * (mode[8] - pi_eq[4]);
-  mode[9] = pi_eq[5] + gamma_shear[level] * (mode[9] - pi_eq[5]);
+  mode[4] = pi_eq[0] + prefactors[level] * gamma_bulk  * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + prefactors[level] * gamma_shear * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + prefactors[level] * gamma_shear * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + prefactors[level] * gamma_shear * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + prefactors[level] * gamma_shear * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + prefactors[level] * gamma_shear * (mode[9] - pi_eq[5]);
 // clang-format on
 
 #ifndef OLD_FLUCT
@@ -924,14 +826,14 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
   return 0;
 }
 
-int lbadapt_thermalize_modes(double *mode, double h) {
-  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+int lbadapt_thermalize_modes(double *mode) {
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+
   double fluct[6];
 #ifdef GAUSSRANDOM
-  double rootrho_gauss = sqrt(
-      fabs(mode[0] +
-           1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-               lbpar.rho[0] * h * h * h));
+  double rootrho_gauss =
+      sqrt(fabs(mode[0] + lbpar.rho[0] * h_max * h_max * h_max));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random());
@@ -955,10 +857,8 @@ int lbadapt_thermalize_modes(double *mode, double h) {
 #endif // !OLD_FLUCT
 
 #elif defined(GAUSSRANDOMCUT)
-  double rootrho_gauss = sqrt(
-      fabs(mode[0] +
-           1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-               lbpar.rho[0] * h * h * h));
+  double rootrho_gauss =
+      sqrt(fabs(mode[0] + lbpar.rho[0] * h_max * h_max * h_max));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random_cut());
@@ -982,10 +882,8 @@ int lbadapt_thermalize_modes(double *mode, double h) {
 #endif // OLD_FLUCT
 
 #elif defined(FLATNOISE)
-  double rootrho = sqrt(fabs(
-      12.0 * (mode[0] +
-              1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-                  lbpar.rho[0] * h * h * h)));
+  double rootrho =
+      sqrt(fabs(12.0 * (mode[0] + lbpar.rho[0] * h_max * h_max * h_max)));
 
   /* stress modes */
   mode[4] += (fluct[0] = rootrho * lb_phi[4] * (d_random() - 0.5));
@@ -1022,38 +920,38 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double rho, u[3], C[6], *f;
 
   // scale tau and gamma values
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   f = lbfields->force;
 
-  rho = mode[0] +
-        1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-            lbpar.rho[0] * h * h * h;
+  rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
   /* hydrodynamic momentum density is redefined when external forces present
    */
-  u[0] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-              mode[1] +
-          0.5 * f[0]) /
-         rho;
-  u[1] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-              mode[2] +
-          0.5 * f[1]) /
-         rho;
-  u[2] = (1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-              mode[3] +
-          0.5 * f[2]) /
-         rho;
+  u[0] = (mode[1] + 0.5 * f[0]) / rho;
+  u[1] = (mode[2] + 0.5 * f[1]) / rho;
+  u[2] = (mode[3] + 0.5 * f[2]) / rho;
 
-  C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
-         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
-  C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
-         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
-  C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
-         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
-  C[1] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
+  C[0] = (1. + prefactors[level] * gamma_bulk) * u[0] * f[0] +
+         1. / 3. * (prefactors[level] * gamma_bulk -
+                    prefactors[level] * gamma_shear) *
+             scalar(u, f);
+  C[2] = (1. + prefactors[level] * gamma_bulk) * u[1] * f[1] +
+         1. / 3. * (prefactors[level] * gamma_bulk -
+                    prefactors[level] * gamma_shear) *
+             scalar(u, f);
+  C[5] = (1. + prefactors[level] * gamma_bulk) * u[2] * f[2] +
+         1. / 3. * (prefactors[level] * gamma_bulk -
+                    prefactors[level] * gamma_shear) *
+             scalar(u, f);
+  C[1] = 0.5 * (1. + prefactors[level] * gamma_shear) *
+         (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + prefactors[level] * gamma_shear) *
+         (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + prefactors[level] * gamma_shear) *
+         (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];
@@ -1071,12 +969,12 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  lbfields->force[0] = prefactors[level] * lbpar.ext_force[0] * SQR(h) *
-                       SQR(prefactors[level] * lbpar.tau);
-  lbfields->force[1] = prefactors[level] * lbpar.ext_force[1] * SQR(h) *
-                       SQR(prefactors[level] * lbpar.tau);
-  lbfields->force[2] = prefactors[level] * lbpar.ext_force[2] * SQR(h) *
-                       SQR(prefactors[level] * lbpar.tau);
+  lbfields->force[0] =
+      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  lbfields->force[1] =
+      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  lbfields->force[2] =
+      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1248,7 +1146,7 @@ void lbadapt_collide(int level) {
 
         /* fluctuating hydrodynamics */
         if (fluct)
-          lbadapt_thermalize_modes(modes, h);
+          lbadapt_thermalize_modes(modes);
 
 /* apply forces */
 #ifdef EXTERNAL_FORCES
@@ -1360,8 +1258,7 @@ void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
   int lvl = level - coarsest_level_local;
-  double h;
-  h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+  double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off

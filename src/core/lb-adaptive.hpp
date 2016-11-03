@@ -183,9 +183,10 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
  * \param [in]      rho        The fluids density.
  * \param [in]      j          The fluids velocity.
  * \param [in]      pi         The fluids stress tensor.
+ * \param [in]      h          The local mesh-width.
  */
 int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
-                                 double *pi);
+                                 double *pi, double h);
 
 /** Calculate modes for MRT scheme
  *

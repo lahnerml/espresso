@@ -249,6 +249,110 @@ void lbadapt_init() {
   }
 }
 
+void lbadapt_reinit_parameters() {
+  int i;
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+
+  for (i = max_refinement_level; lbpar.base_level <= i; --i) {
+    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
+    prefactors[i] = 1 << (max_refinement_level - i);
+    tau[i] = prefactors[i] * lbpar.tau;
+
+    if (lbpar.viscosity[0] > 0.0) {
+      /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
+      // unit conversion: viscosity
+#if 0
+      gamma_shear[i] =
+          1. - 2. / (6. * lbpar.viscosity[0] * (tau[i] / SQR(h)) + 1.);
+#endif // 0
+      gamma_shear[i] = 1. -
+                       2. / (6. * (1. / prefactors[i]) * lbpar.viscosity[0] *
+                                 (lbpar.tau / SQR(h_max)) +
+                             1.);
+    }
+
+    if (lbpar.bulk_viscosity[0] > 0.0) {
+      /* Eq. (81) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
+      // unit conversion: viscosity
+#if 0
+      gamma_bulk[i] =
+          1. - 2. / (9. * lbpar.bulk_viscosity[0] * (tau[i] / SQR(h)) + 1.);
+#endif // 0
+      gamma_bulk[i] = 1. -
+                      2. / (9. * (1. / prefactors[i]) *
+                                lbpar.bulk_viscosity[0] * (lbpar.tau / SQR(h_max)) +
+                            1.);
+    }
+  }
+  gamma_odd = lbpar.gamma_odd[0];
+  gamma_even = lbpar.gamma_even[0];
+
+  // if (lbpar.is_TRT) {
+  //   gamma_bulk = gamma_shear;
+  //   gamma_even = gamma_shear;
+  //   gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
+  //   // gamma_odd = gamma_shear; //uncomment for BGK
+  // }
+
+  // gamma_shear = 0.0; // uncomment for special case of BGK
+  // gamma_bulk = 0.0;
+  // gamma_odd = 0.0;
+  // gamma_even = 0.0;
+
+  // printf("gamma_shear=%e\n", gamma_shear);
+  // printf("gamma_bulk=%e\n", gamma_bulk);
+  // printf("gamma_odd=%e\n", gamma_odd);
+  // printf("gamma_even=%e\n", gamma_even);
+  // printf("\n");
+
+  double mu = 0.0;
+
+  if (temperature > 0.0) {
+#if 0
+    /* fluctuating hydrodynamics ? */
+    fluct = 1;
+
+    /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).
+     * Note that the modes are not normalized as in the paper here! */
+    mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
+         (lbpar.agrid * lbpar.agrid);
+// mu *= agrid*agrid*agrid;  // Marcello's conjecture
+#ifdef D3Q19
+    double(*e)[19] = d3q19_modebase;
+#else  // D3Q19
+    double **e = lbmodel.e;
+#endif // D3Q19
+    for (i = 0; i < 4; i++)
+      lb_phi[i] = 0.0;
+    lb_phi[4] = sqrt(mu * e[19][4] * (1. - SQR(gamma_bulk))); // SQR(x) == x*x
+    for (i = 5; i < 10; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1. - SQR(gamma_shear)));
+    for (i = 10; i < 16; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_odd)));
+    for (i = 16; i < 19; i++)
+      lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_even)));
+
+    /* lb_coupl_pref is stored in MD units (force)
+     * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
+     * The factor 12 comes from the fact that we use random numbers
+     * from -0.5 to 0.5 (equally distributed) which have variance 1/12.
+     * time_step comes from the discretization.
+     */
+    lb_coupl_pref =
+        sqrt(12. * 2. * lbpar.friction[0] * temperature / time_step);
+    lb_coupl_pref2 = sqrt(2. * lbpar.friction[0] * temperature / time_step);
+#endif // 0
+  } else {
+    /* no fluctuations at zero temperature */
+    fluct = 0;
+    for (i = 0; i < lbmodel.n_veloc; i++)
+      lb_phi[i] = 0.0;
+    lb_coupl_pref = 0.0;
+    lb_coupl_pref2 = 0.0;
+  }
+}
+
 void lbadapt_reinit_force_per_cell() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
@@ -258,6 +362,7 @@ void lbadapt_reinit_force_per_cell() {
   lbadapt_payload_t *data;
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
 
@@ -305,12 +410,11 @@ void lbadapt_reinit_fluid_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h;
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -334,7 +438,7 @@ void lbadapt_reinit_fluid_per_cell() {
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
-        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi);
+        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
 
 #ifdef LB_BOUNDARIES
         data->boundary = 0;
@@ -379,11 +483,9 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
-  if ((0.25 <= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
-                ((double)(1 << (int)q->level))) +
-                   1. / ((double)(1 << (int)q->level))) &&
-      (0.75 >= (((double)(q->z >> (P8EST_QMAXLEVEL - (int)q->level + 1))) /
-                ((double)(1 << (int)q->level))))) {
+  double midpoint[3];
+  lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+  if (midpoint[2] < 0.5) {
     return 1;
   }
   return 0;
@@ -492,7 +594,7 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
 }
 
 int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
-                                 double *pi) {
+                                 double *pi, double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
   double h_max =
@@ -629,9 +731,14 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 
   *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
+#if 0
   j[0] = cpmode[1];
   j[1] = cpmode[2];
   j[2] = cpmode[3];
+#endif // 0
+  j[0] = prefactors[level] * cpmode[1];
+  j[1] = prefactors[level] * cpmode[2];
+  j[2] = prefactors[level] * cpmode[3];
 
 #ifndef EXTERNAL_FORCES
   if (has_force)
@@ -654,24 +761,24 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
-  cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * prefactors[level] * gamma_bulk) *
-                  (cpmode[4] - modes_from_pi_eq[0]);
-  cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
-                  (cpmode[5] - modes_from_pi_eq[1]);
-  cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
-                  (cpmode[6] - modes_from_pi_eq[2]);
-  cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
-                  (cpmode[7] - modes_from_pi_eq[3]);
-  cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
-                  (cpmode[8] - modes_from_pi_eq[4]);
-  cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * prefactors[level] * gamma_shear) *
-                  (cpmode[9] - modes_from_pi_eq[5]);
+  cpmode[4] =
+      modes_from_pi_eq[0] +
+      (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] =
+      modes_from_pi_eq[1] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] =
+      modes_from_pi_eq[2] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] =
+      modes_from_pi_eq[3] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] =
+      modes_from_pi_eq[4] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] =
+      modes_from_pi_eq[5] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -764,18 +871,23 @@ int lbadapt_calc_modes(double population[2][19], double *mode) {
 int lbadapt_relax_modes(double *mode, double *force, double h) {
   double rho, j[3], pi_eq[6];
 
-  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   /* re-construct the real density
    * remember that the populations are stored as differences to their
    * equilibrium value */
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
+#if 0
   j[0] = mode[1];
   j[1] = mode[2];
   j[2] = mode[3];
+#endif // 0
+  j[0] = prefactors[level] * mode[1];
+  j[1] = prefactors[level] * mode[2];
+  j[2] = prefactors[level] * mode[3];
 
 /* if forces are present, the momentum density is redefined to
  * include one half-step of the force action.  See the
@@ -799,12 +911,12 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   /* relax the stress modes */
   // clang-format off
-  mode[4] = pi_eq[0] + prefactors[level] * gamma_bulk  * (mode[4] - pi_eq[0]);
-  mode[5] = pi_eq[1] + prefactors[level] * gamma_shear * (mode[5] - pi_eq[1]);
-  mode[6] = pi_eq[2] + prefactors[level] * gamma_shear * (mode[6] - pi_eq[2]);
-  mode[7] = pi_eq[3] + prefactors[level] * gamma_shear * (mode[7] - pi_eq[3]);
-  mode[8] = pi_eq[4] + prefactors[level] * gamma_shear * (mode[8] - pi_eq[4]);
-  mode[9] = pi_eq[5] + prefactors[level] * gamma_shear * (mode[9] - pi_eq[5]);
+  mode[4] = pi_eq[0] + gamma_bulk[level]  * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + gamma_shear[level] * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + gamma_shear[level] * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + gamma_shear[level] * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + gamma_shear[level] * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + gamma_shear[level] * (mode[9] - pi_eq[5]);
 // clang-format on
 
 #ifndef OLD_FLUCT
@@ -930,28 +1042,24 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   /* hydrodynamic momentum density is redefined when external forces present
    */
+#if 0
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
+#endif // 0
+  u[0] = (prefactors[level] * mode[1] + 0.5 * f[0]) / rho;
+  u[1] = (prefactors[level] * mode[2] + 0.5 * f[1]) / rho;
+  u[2] = (prefactors[level] * mode[3] + 0.5 * f[2]) / rho;
 
-  C[0] = (1. + prefactors[level] * gamma_bulk) * u[0] * f[0] +
-         1. / 3. * (prefactors[level] * gamma_bulk -
-                    prefactors[level] * gamma_shear) *
-             scalar(u, f);
-  C[2] = (1. + prefactors[level] * gamma_bulk) * u[1] * f[1] +
-         1. / 3. * (prefactors[level] * gamma_bulk -
-                    prefactors[level] * gamma_shear) *
-             scalar(u, f);
-  C[5] = (1. + prefactors[level] * gamma_bulk) * u[2] * f[2] +
-         1. / 3. * (prefactors[level] * gamma_bulk -
-                    prefactors[level] * gamma_shear) *
-             scalar(u, f);
-  C[1] = 0.5 * (1. + prefactors[level] * gamma_shear) *
-         (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + prefactors[level] * gamma_shear) *
-         (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + prefactors[level] * gamma_shear) *
-         (u[1] * f[2] + u[2] * f[1]);
+  C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[1] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];
@@ -1135,26 +1243,23 @@ void lbadapt_collide(int level) {
       if (!data->boundary)
 #endif // LB_BOUNDARIES
       {
-        /* place for storing modes */
-        double *modes = data->modes;
-
         /* calculate modes locally */
-        lbadapt_calc_modes(data->lbfluid, modes);
+        lbadapt_calc_modes(data->lbfluid, data->modes);
 
         /* deterministic collisions */
-        lbadapt_relax_modes(modes, data->lbfields.force, h);
+        lbadapt_relax_modes(data->modes, data->lbfields.force, h);
 
         /* fluctuating hydrodynamics */
         if (fluct)
-          lbadapt_thermalize_modes(modes);
+          lbadapt_thermalize_modes(data->modes);
 
 /* apply forces */
 #ifdef EXTERNAL_FORCES
-        lbadapt_apply_forces(modes, &data->lbfields, h);
+        lbadapt_apply_forces(data->modes, &data->lbfields, h);
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
         if (data->lbfields.has_force)
-          lbadapt_apply_forces(modes, &data->lbfields, h);
+          lbadapt_apply_forces(data->modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
       }
     }
@@ -1220,7 +1325,7 @@ void lbadapt_populate_virtuals(int level) {
         parent_data = &lbadapt_ghost_data[lvl][parent_sid];
         current_data = &lbadapt_ghost_data[lvl + 1][current_sid];
       }
-      // start with copying payload from coarse cell
+      // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
 
       // synchronize pre- and post-collision values
@@ -1415,13 +1520,6 @@ void lbadapt_update_populations_from_virtuals(int level) {
             &lbadapt_local_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                 mesh_iter)];
         parent_data = &lbadapt_local_data[lvl][parent_sid];
-
-        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-          if (mesh_iter->current_vid == 0) {
-            parent_data->lbfluid[1][vel] = 0.;
-          }
-          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
-        }
       } else {
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
         lvl = level - coarsest_level_ghost;
@@ -1429,13 +1527,12 @@ void lbadapt_update_populations_from_virtuals(int level) {
             &lbadapt_ghost_data[lvl + 1][p8est_meshiter_get_current_storage_id(
                 mesh_iter)];
         parent_data = &lbadapt_ghost_data[lvl][parent_sid];
-        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-          if (mesh_iter->current_vid == 0) {
-            parent_data->lbfluid[1][vel] = 0.;
-          }
-
-          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
+      }
+      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+        if (mesh_iter->current_vid == 0) {
+          parent_data->lbfluid[1][vel] = 0.;
         }
+        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
       }
     }
   }
@@ -1501,6 +1598,9 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
+    double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1517,9 +1617,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
 
-        double avg_rho =
-            1. / (prefactors[level] * prefactors[level] * prefactors[level]) *
-            lbpar.rho[0] * h * h * h;
+        double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
         if (data->boundary) {
           dens = 0;
@@ -1575,6 +1673,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         lbadapt_calc_local_fields(data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
+
+        j[0] = j[0] / rho * h / tau[level];
+        j[1] = j[1] / rho * h / tau[level];
+        j[2] = j[2] / rho * h / tau[level];
 
         veloc_ptr = (double *)sc_array_index(
             velocity_values, P8EST_DIM * mesh_iter->current_qid);
@@ -1635,6 +1737,8 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
   double h;                                /* local meshwidth */
   h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
@@ -1648,9 +1752,7 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
     return;
   }
 
-  double avg_rho = 1. / (prefactors[q->level] * prefactors[q->level] *
-                         prefactors[q->level]) *
-                   lbpar.rho[0] * h * h * h;
+  double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
   // clang-format off
   *rho += avg_rho +
@@ -1662,49 +1764,6 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
           data->lbfluid[0][15] + data->lbfluid[0][16] + data->lbfluid[0][17] +
           data->lbfluid[0][18];
   // clang-format on
-}
-
-void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
-  double *momentum = (double *)user_data; /* passed array to fill */
-  p8est_quadrant_t *q = info->quad;       /* get current global cell id */
-  lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-  double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
-
-  double j[3];
-
-#ifndef D3Q19
-#error Only D3Q19 is implemened!
-#endif // D3Q19
-  if (!(lattice_switch & LATTICE_LB)) {
-    runtimeErrorMsg() << "Error in lb_calc_local_j in " << __FILE__ << __LINE__
-                      << ": CPU LB not switched on.";
-    j[0] = j[1] = j[2] = 0;
-    return;
-  }
-
-  // clang-format off
-  j[0] = data->lbfluid[0][ 1] - data->lbfluid[0][ 2] + data->lbfluid[0][ 7] -
-         data->lbfluid[0][ 8] + data->lbfluid[0][ 9] - data->lbfluid[0][10] +
-         data->lbfluid[0][11] - data->lbfluid[0][12] + data->lbfluid[0][13] -
-         data->lbfluid[0][14];
-  j[1] = data->lbfluid[0][ 3] - data->lbfluid[0][ 4] + data->lbfluid[0][ 7] -
-         data->lbfluid[0][ 8] - data->lbfluid[0][ 9] + data->lbfluid[0][10] +
-         data->lbfluid[0][15] - data->lbfluid[0][16] + data->lbfluid[0][17] -
-         data->lbfluid[0][18];
-  j[2] = data->lbfluid[0][ 5] - data->lbfluid[0][ 6] + data->lbfluid[0][11] -
-         data->lbfluid[0][12] - data->lbfluid[0][13] + data->lbfluid[0][14] +
-         data->lbfluid[0][15] - data->lbfluid[0][16] - data->lbfluid[0][17] +
-         data->lbfluid[0][18];
-  // clang-format on
-  momentum[0] += j[0] + data->lbfields.force[0];
-  momentum[1] += j[1] + data->lbfields.force[1];
-  momentum[2] += j[2] + data->lbfields.force[2];
-
-  momentum[0] *= h / (prefactors[q->level] * lbpar.tau);
-  momentum[1] *= h / (prefactors[q->level] * lbpar.tau);
-  momentum[2] *= h / (prefactors[q->level] * lbpar.tau);
 }
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {

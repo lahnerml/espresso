@@ -230,13 +230,17 @@ extern double lblambda_bulk;
 #ifdef LB_ADAPTIVE
 extern double prefactors[P8EST_MAXLEVEL];
 
-extern double inverse_prefactors[P8EST_MAXLEVEL];
-#endif // LB_ADAPTIVE
+extern double tau[P8EST_MAXLEVEL];
 
+extern double gamma_shear[P8EST_MAXLEVEL];
+
+extern double gamma_bulk[P8EST_MAXLEVEL];
+#else // LB_ADAPTIVE
 extern int resend_halo;
 
 extern double gamma_shear;
 extern double gamma_bulk;
+#endif // LB_ADAPTIVE
 extern double gamma_odd;
 extern double gamma_even;
 extern double lb_phi[19];

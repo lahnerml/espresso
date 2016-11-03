@@ -89,7 +89,7 @@ void lbadapt_init();
 
 /** Init lb parameters
  */
-void lbadapt_reinit_parameters();
+//void lbadapt_reinit_parameters();
 
 /** Init cell-local force values
  */

@@ -3181,7 +3181,7 @@ inline void lb_collide_stream() {
                   << std::endl;
 #endif // 0
         lbadapt_collide(level);
-        #if 0
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "] "
                   << "[Done] Perform collision step on level " << level
                   << std::endl;
@@ -3191,7 +3191,7 @@ inline void lb_collide_stream() {
                   << std::endl;
 #endif // 0
         lbadapt_populate_virtuals(level);
-        #if 0
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Populate virtual quadrants on level " << level + 1
                   << std::endl;
@@ -3203,7 +3203,7 @@ inline void lb_collide_stream() {
         p8est_ghostvirt_exchange_data(
             p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
             (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
-        #if 0
+#if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
                   << std::endl;

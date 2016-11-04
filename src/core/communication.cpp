@@ -2709,7 +2709,7 @@ void mpi_lbadapt_grid_init (int node, int level) {
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
-  finest_level_global = lbadapt_get_global_maxlevel();
+  finest_level_global = level;
 
   lbpar.base_level = level;
   max_refinement_level = level;
@@ -2842,7 +2842,6 @@ void mpi_unif_refinement (int node, int level) {
     p8est_refine(p8est, 0, refine_uniform, NULL);
     p8est_partition (p8est, 0, NULL);
   }
-  p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
 #endif //LB_ADAPTIVE
 }
 
@@ -2857,7 +2856,6 @@ void mpi_rand_refinement (int node, int maxLevel) {
     p8est_refine(p8est, 0, refine_random, NULL);
     p8est_partition (p8est, 0, NULL);
   }
-  p8est_vtk_write_file (p8est, NULL, P8EST_STRING "_treeCheck");
 #endif // LB_ADAPTIVE
 }
 

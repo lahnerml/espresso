@@ -3170,7 +3170,7 @@ inline void lb_collide_stream() {
   int lvl_diff, level;
   double step = 0.0;
   do {
-    for (level = coarsest_level_local; level <= finest_level_global; ++level) {
+    for (level = lbpar.base_level; level <= finest_level_global; ++level) {
       lvl_diff = finest_level_global - level;
 
       if (n_lbsteps % (1 << lvl_diff) == 0) {
@@ -3216,7 +3216,7 @@ inline void lb_collide_stream() {
 
     // perform second half of subcycling here (process fine before coarse)
 
-    for (level = finest_level_global; coarsest_level_local <= level; --level) {
+    for (level = finest_level_global; lbpar.base_level <= level; --level) {
       lvl_diff = finest_level_global - level;
 
       if (n_lbsteps % (1 << lvl_diff) == 0) {

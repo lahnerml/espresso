@@ -284,6 +284,20 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values);
  */
 void lbadapt_get_boundary_status();
 
+/** Calculate local density from pre-collision moments
+ *
+ * \param [in]  mesh_iter    mesh-based iterator
+ * \param [out] rho          density
+ */
+void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
+
+/** Calculate local fluid velocity from pre-collision moments
+ *
+ * \param [in]  mesh_iter    mesh-based iterator
+ * \param [out] j            velocity
+ */
+void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 

@@ -1576,9 +1576,14 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         /* calculate values to write */
         double rho;
         double j[3];
+#if 0
+        lbadapt_calc_local_rho(mesh_iter, &rho);
+        lbadapt_calc_local_j(mesh_iter, j);
+#else // 0
         lbadapt_calc_local_fields(data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
+#endif // 0
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
@@ -1624,6 +1629,50 @@ void lbadapt_get_boundary_status() {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+}
+
+void lbadapt_calc_local_rho (p8est_meshiter_t * mesh_iter, double *rho) {
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  lbadapt_payload_t *data;
+  data =
+    &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+    [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
+
+  double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
+
+  // clang-format off
+  *rho += avg_rho +
+          data->lbfluid[0][ 0] + data->lbfluid[0][ 1] + data->lbfluid[0][ 2] +
+          data->lbfluid[0][ 3] + data->lbfluid[0][ 4] + data->lbfluid[0][ 5] +
+          data->lbfluid[0][ 6] + data->lbfluid[0][ 7] + data->lbfluid[0][ 8] +
+          data->lbfluid[0][ 9] + data->lbfluid[0][10] + data->lbfluid[0][11] +
+          data->lbfluid[0][12] + data->lbfluid[0][13] + data->lbfluid[0][14] +
+          data->lbfluid[0][15] + data->lbfluid[0][16] + data->lbfluid[0][17] +
+          data->lbfluid[0][18];
+  // clang-format on
+}
+
+void lbadapt_calc_local_j (p8est_meshiter_t * mesh_iter, double *j) {
+  lbadapt_payload_t *data;
+  data =
+    &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+    [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
+
+  // clang-format off
+  j[0] = data->lbfluid[0][ 1] - data->lbfluid[0][ 2] + data->lbfluid[0][ 7] -
+         data->lbfluid[0][ 8] + data->lbfluid[0][ 9] - data->lbfluid[0][10] +
+         data->lbfluid[0][11] - data->lbfluid[0][12] + data->lbfluid[0][13] -
+         data->lbfluid[0][14];
+  j[1] = data->lbfluid[0][ 3] - data->lbfluid[0][ 4] + data->lbfluid[0][ 7] -
+         data->lbfluid[0][ 8] - data->lbfluid[0][ 9] + data->lbfluid[0][10] +
+         data->lbfluid[0][15] - data->lbfluid[0][16] + data->lbfluid[0][17] -
+         data->lbfluid[0][18];
+  j[2] = data->lbfluid[0][ 5] - data->lbfluid[0][ 6] + data->lbfluid[0][11] -
+         data->lbfluid[0][12] - data->lbfluid[0][13] + data->lbfluid[0][14] +
+         data->lbfluid[0][15] - data->lbfluid[0][16] - data->lbfluid[0][17] +
+         data->lbfluid[0][18];
+  // clang-format on
 }
 
 /*** ITERATOR CALLBACKS ***/

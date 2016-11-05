@@ -2257,8 +2257,31 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
   int i;
 #ifdef LB_ADAPTIVE
+#if 1
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double dim_free_visc_shear[P8EST_MAXLEVEL] =
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+  double dim_free_visc_bulk[P8EST_MAXLEVEL] =
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+#endif // 0
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
+#if 1
+    dim_free_visc_shear[i] =
+      (lbpar.viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
+      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
+    dim_free_visc_bulk[i] =
+      (lbpar.bulk_viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
+      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
+    gamma_shear[i] =
+      (2 * dim_free_visc_shear[i] - 1) /
+      (2 * dim_free_visc_shear[i] + 1);
+    gamma_bulk[i] =
+    gamma_bulk[i] =
+      (3 * dim_free_visc_bulk[i] - 1) /
+      (3 * dim_free_visc_bulk[i] + 1);
+#else // 0
     gamma_shear[i] = 1. -
                   2. / (6. * lbpar.viscosity[0] * lbpar.tau /
                         (prefactors[i] * SQR(lbpar.agrid)) +
@@ -2268,6 +2291,7 @@ void lb_reinit_parameters() {
                  2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
                        (prefactors[i] * SQR(lbpar.agrid)) +
                        1.);
+#endif // 0
   }
 #else
   if (lbpar.viscosity[0] > 0.0) {

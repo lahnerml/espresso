@@ -137,17 +137,16 @@ int fluct;
 #ifdef LB_ADAPTIVE
 double prefactors[P8EST_MAXLEVEL] =
   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-// double tau[P8EST_MAXLEVEL] =
-//   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-// double gamma_shear[P8EST_MAXLEVEL] =
-//   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-// double gamma_bulk[P8EST_MAXLEVEL] =
-//   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#endif // LB_ADAPTIVE
+double gamma_shear[P8EST_MAXLEVEL] =
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_bulk[P8EST_MAXLEVEL] =
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
+#else // LB_ADAPTIVE
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
 double gamma_bulk = 0.0;
+#endif // LB_ADAPTIVE
 /** relaxation of the odd kinetic modes */
 double gamma_odd = 0.0;
 /** relaxation of the even kinetic modes */
@@ -2158,10 +2157,11 @@ int lb_sanity_checks() {
 void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   // one can define the verbosity of p4est and libsc here.
-  sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
-  p4est_init(NULL, SC_LP_VERBOSE);
+  //sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
+  sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
+  //p4est_init(NULL, SC_LP_VERBOSE);
+  p4est_init(NULL, SC_LP_PRODUCTION);
 
-// p4est_init(NULL, SC_LP_PRODUCTION);
 #else  // LB_ADAPTIVE
   lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
@@ -2259,9 +2259,17 @@ void lb_reinit_parameters() {
 #ifdef LB_ADAPTIVE
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
-  }
-#endif // LB_ADAPTIVE
+    gamma_shear[i] = 1. -
+                  2. / (6. * lbpar.viscosity[0] * lbpar.tau /
+                        (prefactors[i] * SQR(lbpar.agrid)) +
+                        1.);
 
+    gamma_bulk[i] = 1. -
+                 2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
+                       (prefactors[i] * SQR(lbpar.agrid)) +
+                       1.);
+  }
+#else
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -2279,21 +2287,22 @@ void lb_reinit_parameters() {
                            (lbpar.agrid * lbpar.agrid) +
                        1.);
   }
+#endif // LB_ADAPTIVE
 
   gamma_odd = lbpar.gamma_odd[0];
   gamma_even = lbpar.gamma_even[0];
 
-  if (lbpar.is_TRT) {
-    gamma_bulk = gamma_shear;
-    gamma_even = gamma_shear;
-    gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
-    // gamma_odd = gamma_shear; //uncomment for BGK
-  }
+  //if (lbpar.is_TRT) {
+  //  gamma_bulk = gamma_shear;
+  //  gamma_even = gamma_shear;
+  //  gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
+  //  // gamma_odd = gamma_shear; //uncomment for BGK
+  //}
 
-  gamma_shear = 0.0; //uncomment for special case of BGK
-  gamma_bulk = 0.0;
-  gamma_odd = 0.0;
-  gamma_even = 0.0;
+  //gamma_shear = 0.0; //uncomment for special case of BGK
+  //gamma_bulk = 0.0;
+  //gamma_odd = 0.0;
+  //gamma_even = 0.0;
 
   // printf("gamma_shear=%e\n", gamma_shear);
   // printf("gamma_bulk=%e\n", gamma_bulk);
@@ -2312,6 +2321,7 @@ void lb_reinit_parameters() {
     mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
          (lbpar.agrid * lbpar.agrid);
 // mu *= agrid*agrid*agrid;  // Marcello's conjecture
+#if 0
 #ifdef D3Q19
     double(*e)[19] = d3q19_modebase;
 #else  // D3Q19
@@ -2336,6 +2346,7 @@ void lb_reinit_parameters() {
     lb_coupl_pref =
         sqrt(12. * 2. * lbpar.friction[0] * temperature / time_step);
     lb_coupl_pref2 = sqrt(2. * lbpar.friction[0] * temperature / time_step);
+#endif // 0
   } else {
     /* no fluctuations at zero temperature */
     fluct = 0;

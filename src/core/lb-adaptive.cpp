@@ -658,22 +658,22 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
   cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_bulk) *
+              (0.5 + 0.5 * gamma_bulk[level]) *
                   (cpmode[4] - modes_from_pi_eq[0]);
   cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_shear) *
+              (0.5 + 0.5 * gamma_shear[level]) *
                   (cpmode[5] - modes_from_pi_eq[1]);
   cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_shear) *
+              (0.5 + 0.5 * gamma_shear[level]) *
                   (cpmode[6] - modes_from_pi_eq[2]);
   cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_shear) *
+              (0.5 + 0.5 * gamma_shear[level]) *
                   (cpmode[7] - modes_from_pi_eq[3]);
   cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_shear) *
+              (0.5 + 0.5 * gamma_shear[level]) *
                   (cpmode[8] - modes_from_pi_eq[4]);
   cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * 1. / prefactors[level] * gamma_shear) *
+              (0.5 + 0.5 * gamma_shear[level]) *
                   (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
@@ -807,12 +807,12 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 
   /* relax the stress modes */
   // clang-format off
-  mode[4] = pi_eq[0] + 1. / prefactors[level] * gamma_bulk  * (mode[4] - pi_eq[0]);
-  mode[5] = pi_eq[1] + 1. / prefactors[level] * gamma_shear * (mode[5] - pi_eq[1]);
-  mode[6] = pi_eq[2] + 1. / prefactors[level] * gamma_shear * (mode[6] - pi_eq[2]);
-  mode[7] = pi_eq[3] + 1. / prefactors[level] * gamma_shear * (mode[7] - pi_eq[3]);
-  mode[8] = pi_eq[4] + 1. / prefactors[level] * gamma_shear * (mode[8] - pi_eq[4]);
-  mode[9] = pi_eq[5] + 1. / prefactors[level] * gamma_shear * (mode[9] - pi_eq[5]);
+  mode[4] = pi_eq[0] + gamma_bulk[level]  * (mode[4] - pi_eq[0]);
+  mode[5] = pi_eq[1] + gamma_shear[level] * (mode[5] - pi_eq[1]);
+  mode[6] = pi_eq[2] + gamma_shear[level] * (mode[6] - pi_eq[2]);
+  mode[7] = pi_eq[3] + gamma_shear[level] * (mode[7] - pi_eq[3]);
+  mode[8] = pi_eq[4] + gamma_shear[level] * (mode[8] - pi_eq[4]);
+  mode[9] = pi_eq[5] + gamma_shear[level] * (mode[9] - pi_eq[5]);
 // clang-format on
 
 #ifndef OLD_FLUCT
@@ -947,23 +947,22 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   u[2] = (prefactors[level] * mode[3] + 0.5 * f[2]) / rho;
 #endif // 0
 
-  C[0] = (1. + 1. / prefactors[level] * gamma_bulk) * u[0] * f[0] +
-         1. / 3. * (1. / prefactors[level] * gamma_bulk -
-                    1. / prefactors[level] * gamma_shear) *
+  C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) *
              scalar(u, f);
-  C[2] = (1. + 1. / prefactors[level] * gamma_bulk) * u[1] * f[1] +
-         1. / 3. * (1. / prefactors[level] * gamma_bulk -
-                    1. / prefactors[level] * gamma_shear) *
+  C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
+         1. / 3. * (gamma_bulk[level] -
+                    gamma_shear[level]) *
              scalar(u, f);
-  C[5] = (1. + 1. / prefactors[level] * gamma_bulk) * u[2] * f[2] +
-         1. / 3. * (1. / prefactors[level] * gamma_bulk -
-                    1. / prefactors[level] * gamma_shear) *
+  C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
+         1. / 3. * (gamma_bulk[level] -
+                    gamma_shear[level]) *
              scalar(u, f);
-  C[1] = 0.5 * (1. + 1. / prefactors[level] * gamma_shear) *
+  C[1] = 0.5 * (1. + gamma_shear[level]) *
          (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + 1. / prefactors[level] * gamma_shear) *
+  C[3] = 0.5 * (1. + gamma_shear[level]) *
          (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + 1. / prefactors[level] * gamma_shear) *
+  C[4] = 0.5 * (1. + gamma_shear[level]) *
          (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */

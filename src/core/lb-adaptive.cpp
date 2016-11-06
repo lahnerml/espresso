@@ -261,6 +261,7 @@ void lbadapt_reinit_force_per_cell() {
 
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -280,13 +281,22 @@ void lbadapt_reinit_force_per_cell() {
               mesh_iter)];
         }
 #ifdef EXTERNAL_FORCES
-        // unit conversion: force density
+// unit conversion: force density
+#if 1
         data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
                                   SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
                                   SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[2] = prefactors[level] * lbpar.ext_force[2] *
                                   SQR(h_max) * SQR(lbpar.tau);
+#else  // 0
+        data->lbfields.force[0] =
+            lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+        data->lbfields.force[1] =
+            lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+        data->lbfields.force[2] =
+            lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#endif // 0
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -329,8 +339,12 @@ void lbadapt_reinit_fluid_per_cell() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-        // convert rho to lattice units
+// convert rho to lattice units
+#if 1
         double rho = lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+        double rho = lbpar.rho[0] * h * h * h;
+#endif // 0
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
@@ -493,10 +507,13 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
                                  double *pi, double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
+#if 1
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
-
   const double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+  const double avg_rho = lbpar.rho[0] * h * h * h;
+#endif // 0
 
   local_rho = rho;
 
@@ -602,8 +619,12 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 #ifdef LB_BOUNDARIES
   if (boundary) {
-    // set all to 0 on boundary
+// set all to 0 on boundary
+#if 1
     *rho = lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+    *rho = lbpar.rho[0] * h * h * h;
+#endif // 0
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
@@ -625,7 +646,11 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   }
   double modes_from_pi_eq[6];
 
+#if 1
   *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+  *rho = cpmode[0] + lbpar.rho[0] * h * h * h;
+#endif // 0
 
   j[0] = cpmode[1];
   j[1] = cpmode[2];
@@ -657,24 +682,24 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
-  cpmode[4] = modes_from_pi_eq[0] +
-              (0.5 + 0.5 * gamma_bulk[level]) *
-                  (cpmode[4] - modes_from_pi_eq[0]);
-  cpmode[5] = modes_from_pi_eq[1] +
-              (0.5 + 0.5 * gamma_shear[level]) *
-                  (cpmode[5] - modes_from_pi_eq[1]);
-  cpmode[6] = modes_from_pi_eq[2] +
-              (0.5 + 0.5 * gamma_shear[level]) *
-                  (cpmode[6] - modes_from_pi_eq[2]);
-  cpmode[7] = modes_from_pi_eq[3] +
-              (0.5 + 0.5 * gamma_shear[level]) *
-                  (cpmode[7] - modes_from_pi_eq[3]);
-  cpmode[8] = modes_from_pi_eq[4] +
-              (0.5 + 0.5 * gamma_shear[level]) *
-                  (cpmode[8] - modes_from_pi_eq[4]);
-  cpmode[9] = modes_from_pi_eq[5] +
-              (0.5 + 0.5 * gamma_shear[level]) *
-                  (cpmode[9] - modes_from_pi_eq[5]);
+  cpmode[4] =
+      modes_from_pi_eq[0] +
+      (0.5 + 0.5 * gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] =
+      modes_from_pi_eq[1] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] =
+      modes_from_pi_eq[2] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] =
+      modes_from_pi_eq[3] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] =
+      modes_from_pi_eq[4] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] =
+      modes_from_pi_eq[5] +
+      (0.5 + 0.5 * gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -771,10 +796,14 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
-  /* re-construct the real density
-   * remember that the populations are stored as differences to their
-   * equilibrium value */
+/* re-construct the real density
+ * remember that the populations are stored as differences to their
+ * equilibrium value */
+#if 1
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+  rho = mode[0] + lbpar.rho[0] * h * h * h;
+#endif // 0
 
   j[0] = mode[1];
   j[1] = mode[2];
@@ -934,36 +963,33 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   f = lbfields->force;
 
+#if 1
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
+#else  // 0
+  rho = mode[0] + lbpar.rho[0] * h * h * h_max;
+#endif // 0
 
 /* hydrodynamic momentum density is redefined when external forces present
  */
+#if 1
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
-#if 0
+#else  // 0
   u[0] = (prefactors[level] * mode[1] + 0.5 * f[0]) / rho;
   u[1] = (prefactors[level] * mode[2] + 0.5 * f[1]) / rho;
   u[2] = (prefactors[level] * mode[3] + 0.5 * f[2]) / rho;
 #endif // 0
 
   C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
-         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) *
-             scalar(u, f);
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
   C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
-         1. / 3. * (gamma_bulk[level] -
-                    gamma_shear[level]) *
-             scalar(u, f);
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
   C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
-         1. / 3. * (gamma_bulk[level] -
-                    gamma_shear[level]) *
-             scalar(u, f);
-  C[1] = 0.5 * (1. + gamma_shear[level]) *
-         (u[0] * f[1] + u[1] * f[0]);
-  C[3] = 0.5 * (1. + gamma_shear[level]) *
-         (u[0] * f[2] + u[2] * f[0]);
-  C[4] = 0.5 * (1. + gamma_shear[level]) *
-         (u[1] * f[2] + u[2] * f[1]);
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[1] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
 
   /* update momentum modes */
   mode[1] += f[0];
@@ -980,13 +1006,19 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
-  // unit conversion: force density
+// unit conversion: force density
+#if 1
   lbfields->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[1] =
       prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#else  // 0
+  lbfields->force[0] = lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  lbfields->force[1] = lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  lbfields->force[2] = lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#endif // 0
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1127,6 +1159,57 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
   return 0;
 }
 
+void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
+  // clang-format off
+  int inv[] = {0,
+               2,  1,  4,  3,  6,  5,
+               8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  // clang-format on
+  lbadapt_payload_t *data, *currCellData;
+  currCellData =
+      &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+                         [p8est_meshiter_get_current_storage_id(mesh_iter)];
+  double ghost_m[19];
+  for (int dir = 1; dir < 19; ++dir) {
+    // convert direction
+    int direction = ci_to_p4est[(dir - 1)];
+    // set neighboring cell information in iterator
+    p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
+
+    if (mesh_iter->neighbor_qid != -1) {
+      // if the neighboring cell is a ghost cell:
+      // do not stream information into the ghost cell but perform the inverse
+      // streaming step and stream information into the current cell
+      if (mesh_iter->neighbor_is_ghost) {
+        /* obtain and normalize ghost modes */
+        data =
+            &lbadapt_ghost_data[mesh_iter->current_level - coarsest_level_ghost]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
+        if (mesh_iter->neighbor_vid == -1) {
+          // if interacting with a real quadrant: do inverse streaming operation
+          for (int i = 0; i < lbmodel.n_veloc; ++i) {
+            ghost_m[i] = data->modes[i];
+            ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+          }
+          currCellData->lbfluid[1][inv[dir]] =
+              lbadapt_backTransformation(ghost_m, inv[dir]) *
+              lbmodel.w[inv[dir]];
+        } else {
+          // else act as if neighboring virtual quadrant was a local one
+          data->lbfluid[1][dir] = currCellData->lbfluid[0][dir];
+        }
+      } else {
+        data =
+            &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
+        data->lbfluid[1][dir] = currCellData->lbfluid[0][dir];
+      }
+    }
+  }
+}
+
 void lbadapt_collide(int level) {
   int status = 0;
   double h;
@@ -1140,9 +1223,15 @@ void lbadapt_collide(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
-      data =
-          &lbadapt_local_data[level - coarsest_level_local]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+      if (mesh_iter->current_is_ghost) {
+        data = &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+      } else {
+        data = &lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+      }
 #ifdef LB_BOUNDARIES
       if (!data->boundary)
 #endif // LB_BOUNDARIES
@@ -1169,32 +1258,6 @@ void lbadapt_collide(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
-
-#if 0
-  /** this will be needed if the modes overwrite populations */
-  mesh_iter = p8est_meshiter_new_ext(
-      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL, P8EST_TRAVERSE_PARBOUNDINNER);
-  while (status != P8EST_MESHITER_DONE) {
-    status = p8est_meshiter_next(mesh_iter);
-    if (status != P8EST_MESHITER_DONE) {
-      data =
-          &lbadapt_local_data[level - coarsest_level_local]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
-#ifdef LB_BOUNDARIES
-      if (!data->boundary)
-#endif // LB_BOUNDARIES
-      {
-        /* place for storing modes */
-        double *modes = data->modes;
-
-        /* calculate modes locally */
-        lbadapt_calc_modes(data->lbfluid, modes);
-      }
-    }
-  }
-  p8est_meshiter_destroy(mesh_iter);
-#endif /* 0 */
 }
 
 void lbadapt_populate_virtuals(int level) {
@@ -1232,6 +1295,16 @@ void lbadapt_populate_virtuals(int level) {
       // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
 
+      // calculate post_collision populations from cell
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        current_data->modes[i] *= (1. / d3q19_modebase[19][i]);
+      }
+
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        current_data->lbfluid[0][i] =
+            lbadapt_backTransformation(current_data->modes, i) * lbmodel.w[i];
+      }
+
       // synchronize pre- and post-collision values
       memcpy(current_data->lbfluid[1], current_data->lbfluid[0],
              lbmodel.n_veloc * sizeof(double));
@@ -1256,7 +1329,11 @@ void lbadapt_stream(int level) {
           &lbadapt_local_data[lvl]
                              [p8est_meshiter_get_current_storage_id(mesh_iter)];
       if (!data->boundary) {
-        lbadapt_calc_n_from_modes_push(mesh_iter);
+        if (mesh_iter->current_vid == -1) {
+          lbadapt_calc_n_from_modes_push(mesh_iter);
+        } else {
+          lbadapt_pass_populations(mesh_iter);
+        }
       }
     }
   }
@@ -1436,7 +1513,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
         if (mesh_iter->current_vid == 0) {
           parent_data->lbfluid[1][vel] = 0.;
         }
-        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[1][vel];
+        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
       }
     }
   }
@@ -1579,7 +1656,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 #if 0
         lbadapt_calc_local_rho(mesh_iter, &rho);
         lbadapt_calc_local_j(mesh_iter, j);
-#else // 0
+#else  // 0
         lbadapt_calc_local_fields(data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
@@ -1631,13 +1708,12 @@ void lbadapt_get_boundary_status() {
   }
 }
 
-void lbadapt_calc_local_rho (p8est_meshiter_t * mesh_iter, double *rho) {
+void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho) {
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   lbadapt_payload_t *data;
-  data =
-    &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
-    [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
+  data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+                            [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
 
   double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
@@ -1653,11 +1729,10 @@ void lbadapt_calc_local_rho (p8est_meshiter_t * mesh_iter, double *rho) {
   // clang-format on
 }
 
-void lbadapt_calc_local_j (p8est_meshiter_t * mesh_iter, double *j) {
+void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j) {
   lbadapt_payload_t *data;
-  data =
-    &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
-    [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
+  data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
+                            [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
 
   // clang-format off
   j[0] = data->lbfluid[0][ 1] - data->lbfluid[0][ 2] + data->lbfluid[0][ 7] -

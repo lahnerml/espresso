@@ -2257,7 +2257,7 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
   int i;
 #ifdef LB_ADAPTIVE
-#if 1
+#if 0
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   double dim_free_visc_shear[P8EST_MAXLEVEL] =
@@ -2267,24 +2267,25 @@ void lb_reinit_parameters() {
 #endif // 0
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
-#if 1
+#if 0
     dim_free_visc_shear[i] =
-      (lbpar.viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
-      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
+      (lbpar.viscosity[0] * lbpar.tau) /
+      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max) / SQR(lbpar.tau));
     dim_free_visc_bulk[i] =
       (lbpar.bulk_viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
       (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
+
     gamma_shear[i] =
       (2 * dim_free_visc_shear[i] - 1) /
       (2 * dim_free_visc_shear[i] + 1);
-    gamma_bulk[i] =
+
     gamma_bulk[i] =
       (3 * dim_free_visc_bulk[i] - 1) /
       (3 * dim_free_visc_bulk[i] + 1);
 #else // 0
+    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
     gamma_shear[i] = 1. -
-                  2. / (6. * lbpar.viscosity[0] * lbpar.tau /
-                        (prefactors[i] * SQR(lbpar.agrid)) +
+                  2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
                         1.);
 
     gamma_bulk[i] = 1. -
@@ -3209,7 +3210,6 @@ inline void lb_collide_stream() {
       lvl_diff = finest_level_global - level;
 
       if (n_lbsteps % (1 << lvl_diff) == 0) {
-
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform collision step on level " << level

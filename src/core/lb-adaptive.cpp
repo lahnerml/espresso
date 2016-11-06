@@ -1135,13 +1135,19 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
             &lbadapt_ghost_data[mesh_iter->current_level - coarsest_level_ghost]
                                [p8est_meshiter_get_neighbor_storage_id(
                                    mesh_iter)];
-        for (int i = 0; i < lbmodel.n_veloc; ++i) {
-          ghost_m[i] = data->modes[i];
-          ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        if (mesh_iter->neighbor_vid == -1) {
+          // if interacting with a real quadrant: do inverse streaming operation
+          for (int i = 0; i < lbmodel.n_veloc; ++i) {
+            ghost_m[i] = data->modes[i];
+            ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+          }
+          currCellData->lbfluid[1][inv[dir]] =
+              lbadapt_backTransformation(ghost_m, inv[dir]) *
+              lbmodel.w[inv[dir]];
+        } else {
+          // else act as if neighboring virtual quadrant was a local one
+          currCellData->lbfluid[1][inv[dir]] = data->lbfluid[0][inv[dir]];
         }
-
-        currCellData->lbfluid[1][inv[dir]] =
-            lbadapt_backTransformation(ghost_m, inv[dir]) * lbmodel.w[inv[dir]];
       } else {
         data =
             &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
@@ -1197,7 +1203,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
               lbmodel.w[inv[dir]];
         } else {
           // else act as if neighboring virtual quadrant was a local one
-          data->lbfluid[1][dir] = currCellData->lbfluid[0][dir];
+          currCellData->lbfluid[1][inv[dir]] = data->lbfluid[0][inv[dir]];
         }
       } else {
         data =

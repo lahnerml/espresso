@@ -117,6 +117,16 @@ void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
                            int num_outgoing, p8est_quadrant_t *outgoing[],
                            int num_incoming, p8est_quadrant_t *incoming[]);
 
+/*** LOAD BALANCING ***/
+/** Weighting function for p4est_partition
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ * @returns quadrants weight according to subcycling
+ */
+int lbadapt_partition_weight (p8est_t *p8est, p4est_topidx_t which_tree,
+                              p8est_quadrant_t *q);
 /*** REFINEMENT ***/
 /** Refinement function that refines all cells
  *

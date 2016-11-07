@@ -380,6 +380,12 @@ int lbadapt_get_global_maxlevel() {
   return global_res;
 }
 
+/*** Load Balance ***/
+int lbadapt_partition_weight (p8est_t *p8est, p4est_topidx_t which_tree,
+                              p8est_quadrant_t *q) {
+  return (prefactors[lbpar.base_level + (max_refinement_level - q->level)]);
+}
+
 /*** REFINEMENT ***/
 int refine_uniform(p8est_t *p8est, p4est_topidx_t which_tree,
                    p8est_quadrant_t *quadrant) {

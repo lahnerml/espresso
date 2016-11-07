@@ -2840,7 +2840,7 @@ void mpi_unif_refinement (int node, int level) {
 #ifdef LB_ADAPTIVE
   for (int i = 0; i < level; i++) {
     p8est_refine(p8est, 0, refine_uniform, NULL);
-    p8est_partition (p8est, 0, NULL);
+    p8est_partition (p8est, 0, lbadapt_partition_weight);
   }
 #endif //LB_ADAPTIVE
 }
@@ -2854,7 +2854,7 @@ void mpi_rand_refinement (int node, int maxLevel) {
   // refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
   for (int i = 0; i < maxLevel; i++) {
     p8est_refine(p8est, 0, refine_random, NULL);
-    p8est_partition (p8est, 0, NULL);
+    p8est_partition (p8est, 0, lbadapt_partition_weight);
   }
 #endif // LB_ADAPTIVE
 }

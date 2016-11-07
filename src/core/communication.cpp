@@ -2873,7 +2873,7 @@ void mpi_reg_refinement (int node, int param) {
                      NULL,                   // init data
                      NULL);                  // replace data
 
-  p8est_partition (p8est, 0, NULL);
+  p8est_partition (p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
@@ -2912,7 +2912,7 @@ void mpi_geometric_refinement (int node, int param) {
                      NULL,                   // init data
                      NULL);                  // replace data
 
-  p8est_partition (p8est, 0, NULL);
+  p8est_partition (p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);

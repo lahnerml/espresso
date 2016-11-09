@@ -339,12 +339,8 @@ void lbadapt_reinit_fluid_per_cell() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-// convert rho to lattice units
-#if 1
+        // convert rho to lattice units
         double rho = lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-        double rho = lbpar.rho[0] * h * h * h;
-#endif // 0
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
@@ -625,12 +621,8 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 #ifdef LB_BOUNDARIES
   if (boundary) {
-// set all to 0 on boundary
-#if 1
+    // set all to 0 on boundary
     *rho = lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-    *rho = lbpar.rho[0] * h * h * h;
-#endif // 0
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
@@ -652,20 +644,11 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
   }
   double modes_from_pi_eq[6];
 
-#if 1
   *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-  *rho = cpmode[0] + lbpar.rho[0] * h * h * h;
-#endif // 0
 
   j[0] = cpmode[1];
   j[1] = cpmode[2];
   j[2] = cpmode[3];
-#if 0
-  j[0] = prefactors[level] * cpmode[1];
-  j[1] = prefactors[level] * cpmode[2];
-  j[2] = prefactors[level] * cpmode[3];
-#endif // 0
 
 #ifndef EXTERNAL_FORCES
   if (has_force)
@@ -802,23 +785,14 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
-/* re-construct the real density
- * remember that the populations are stored as differences to their
- * equilibrium value */
-#if 1
+  /* re-construct the real density
+   * remember that the populations are stored as differences to their
+   * equilibrium value */
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-  rho = mode[0] + lbpar.rho[0] * h * h * h;
-#endif // 0
 
   j[0] = mode[1];
   j[1] = mode[2];
   j[2] = mode[3];
-#if 0
-  j[0] = prefactors[level] * mode[1];
-  j[1] = prefactors[level] * mode[2];
-  j[2] = prefactors[level] * mode[3];
-#endif // 0
 
 /* if forces are present, the momentum density is redefined to
  * include one half-step of the force action.  See the
@@ -962,30 +936,19 @@ int lbadapt_thermalize_modes(double *mode) {
 int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double rho, u[3], C[6], *f;
 
-  // scale tau and gamma values
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   f = lbfields->force;
 
-#if 1
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-  rho = mode[0] + lbpar.rho[0] * h * h * h_max;
-#endif // 0
 
 /* hydrodynamic momentum density is redefined when external forces present
  */
-#if 1
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
-#else  // 0
-  u[0] = (prefactors[level] * mode[1] + 0.5 * f[0]) / rho;
-  u[1] = (prefactors[level] * mode[2] + 0.5 * f[1]) / rho;
-  u[2] = (prefactors[level] * mode[3] + 0.5 * f[2]) / rho;
-#endif // 0
 
   C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
          1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);

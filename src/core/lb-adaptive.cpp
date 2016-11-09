@@ -1083,47 +1083,59 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
 
 #ifndef OLD_FLUCT
   /* cell itself cannot be ghost cell */
-  currCellData->lbfluid[1][0] = (m[0] - m[4] + m[16]) * lbmodel.w[0];
+  currCellData->lbfluid[1][0] = lbadapt_backTransformation(m, 0) * lbmodel.w[0];
 
   /*******************************/
   /* stream to surrounding cells */
   /*******************************/
-  for (int dir = 1; dir < 19; ++dir) {
+  for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR) {
     // convert direction
-    int direction = ci_to_p4est[(dir - 1)];
+    int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
     // set neighboring cell information in iterator
-    p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
+    p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
     if (mesh_iter->neighbor_qid != -1) {
+      int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+      int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+
+      assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+      assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
       // if the neighboring cell is a ghost cell:
       // do not stream information into the ghost cell but perform the inverse
       // streaming step and stream information into the current cell
+      // but do all this only if the neighboring cell is allowed to stream,
+      // i.e. is not a boundary cell.
       if (mesh_iter->neighbor_is_ghost) {
-        /* obtain and normalize ghost modes */
         data =
             &lbadapt_ghost_data[mesh_iter->current_level - coarsest_level_ghost]
                                [p8est_meshiter_get_neighbor_storage_id(
                                    mesh_iter)];
-        if (mesh_iter->neighbor_vid == -1) {
-          // if interacting with a real quadrant: do inverse streaming operation
-          for (int i = 0; i < lbmodel.n_veloc; ++i) {
-            ghost_m[i] = data->modes[i];
-            ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        if (!data->boundary) {
+          /* obtain and normalize ghost modes */
+          if (mesh_iter->neighbor_vid == -1) {
+            // if interacting with a real quadrant: do inverse streaming
+            // operation
+            for (int i = 0; i < lbmodel.n_veloc; ++i) {
+              ghost_m[i] = data->modes[i];
+              ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+            }
+            currCellData->lbfluid[1][inv[dir_ESPR]] =
+                lbadapt_backTransformation(ghost_m, inv_neigh_dir_ESPR) *
+                lbmodel.w[inv_neigh_dir_ESPR];
+          } else {
+            // else pass inverse population
+            currCellData->lbfluid[1][inv[dir_ESPR]] =
+                data->lbfluid[0][inv_neigh_dir_ESPR];
           }
-          currCellData->lbfluid[1][inv[dir]] =
-              lbadapt_backTransformation(ghost_m, inv[dir]) *
-              lbmodel.w[inv[dir]];
-        } else {
-          // else act as if neighboring virtual quadrant was a local one
-          currCellData->lbfluid[1][inv[dir]] = data->lbfluid[0][inv[dir]];
         }
       } else {
         data =
             &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                                [p8est_meshiter_get_neighbor_storage_id(
                                    mesh_iter)];
-        data->lbfluid[1][dir] =
-            lbadapt_backTransformation(m, dir) * lbmodel.w[dir];
+        data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
+            lbadapt_backTransformation(m, dir_ESPR) * lbmodel.w[dir_ESPR];
       }
     }
   }
@@ -1145,41 +1157,48 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
       &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                          [p8est_meshiter_get_current_storage_id(mesh_iter)];
   double ghost_m[19];
-  for (int dir = 1; dir < 19; ++dir) {
-    // convert direction
-    int direction = ci_to_p4est[(dir - 1)];
+  for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR) {
     // set neighboring cell information in iterator
-    p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
+    int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
+    p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
     if (mesh_iter->neighbor_qid != -1) {
-      // if the neighboring cell is a ghost cell:
-      // do not stream information into the ghost cell but perform the inverse
-      // streaming step and stream information into the current cell
+      int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+      int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+      assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+      assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
       if (mesh_iter->neighbor_is_ghost) {
-        /* obtain and normalize ghost modes */
+        // do the magic of inverting the streaming step only if the neighboring
+        // cell is not a boundary cell, i.e. it is allowed to stream.
         data =
             &lbadapt_ghost_data[mesh_iter->current_level - coarsest_level_ghost]
                                [p8est_meshiter_get_neighbor_storage_id(
                                    mesh_iter)];
-        if (mesh_iter->neighbor_vid == -1) {
-          // if interacting with a real quadrant: do inverse streaming operation
-          for (int i = 0; i < lbmodel.n_veloc; ++i) {
-            ghost_m[i] = data->modes[i];
-            ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+        if (!data->boundary) {
+          if (mesh_iter->neighbor_vid == -1) {
+            // neighbor is a real quadrant: do inverse streaming operation
+            for (int i = 0; i < lbmodel.n_veloc; ++i) {
+              ghost_m[i] = data->modes[i];
+              ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+            }
+            currCellData->lbfluid[1][inv[dir_ESPR]] =
+                lbadapt_backTransformation(ghost_m, inv_neigh_dir_ESPR) *
+                lbmodel.w[inv_neigh_dir_ESPR];
+          } else {
+            // neighbor is a virtual quadrant: pass population in the opposite
+            // direction to current quadrant
+            currCellData->lbfluid[1][inv[dir_ESPR]] =
+                data->lbfluid[0][inv_neigh_dir_ESPR];
           }
-          currCellData->lbfluid[1][inv[dir]] =
-              lbadapt_backTransformation(ghost_m, inv[dir]) *
-              lbmodel.w[inv[dir]];
-        } else {
-          // else act as if neighboring virtual quadrant was a local one
-          currCellData->lbfluid[1][inv[dir]] = data->lbfluid[0][inv[dir]];
         }
       } else {
         data =
             &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                                [p8est_meshiter_get_neighbor_storage_id(
                                    mesh_iter)];
-        data->lbfluid[1][dir] = currCellData->lbfluid[0][dir];
+        data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
+            currCellData->lbfluid[0][dir_ESPR];
       }
     }
   }
@@ -1318,16 +1337,15 @@ void lbadapt_stream(int level) {
 void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-  int lvl = level - coarsest_level_local;
   double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
-  const int reverse[] = {0,
-                         2,  1,  4,  3,  6,  5,
-                         8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  const int inv[] = {0,
+                     2,  1,  4,  3,  6,  5,
+                     8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
   // clang-format on
 
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1339,12 +1357,18 @@ void lbadapt_bounce_back(int level) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
       currCellData =
-          &lbadapt_local_data[lvl]
+          &lbadapt_local_data[level - coarsest_level_local]
                              [p8est_meshiter_get_current_storage_id(mesh_iter)];
 
 #ifdef D3Q19
 #ifndef PULL
       double population_shift;
+      double local_post_collision_populations[19] = {-1, -1, -1, -1, -1, -1, -1,
+                                                     -1, -1, -1, -1, -1, -1, -1,
+                                                     -1, -1, -1, -1, -1};
+      if (currCellData->boundary) {
+        currCellData->lbfluid[1][0] = 0.0;
+      }
 
       // We cannot copy this with minimal invasiveness, because boundary cells
       // can end in the ghost layer and p4est_iterate does not visit ghost
@@ -1355,29 +1379,32 @@ void lbadapt_bounce_back(int level) {
       //    In this case we perform the same algorithm as in the regular grid
       // 2. Current cell is fluid cell and has ghost neighbors that are
       //    boundary cells.
-      //    In this case we do the opposite of the above algorithm:
-      //    Instead of bouncing back from the current to the neighboring cell
-      //    we bounce back from the neighboring ghost cell into the current
-      //    cell.
-      for (int i = 0; i < 19; ++i) {
-        // fetch neighboring quadrant's payload
-        if (i == 0) {
-          data = currCellData;
-          if (data->boundary) {
-            data->lbfluid[1][0] = 0.0;
-          }
-        } else {
-          // convert direction
-          int direction = ci_to_p4est[i - 1];
+      //    In this case we we have to do something different:
+      //    The neighboring cell was not allowed to stream, because it is a
+      //    boundary cell and in addition, we did not stream to it.
+      //    So instead we have to perform the back-transformation for the
+      //    populations of this cell and write our population in search
+      //    direction to our inverse position.
+      for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR) {
+        // set neighboring cell information in iterator
+        int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
+        p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
+
+        if (mesh_iter->neighbor_qid != -1) {
+          int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+          int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+          assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
           // get neighboring cells
-          p8est_meshiter_set_neighbor_quad_info(mesh_iter, direction);
+          p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
           if (mesh_iter->neighbor_qid != -1) {
             if (mesh_iter->neighbor_is_ghost) {
               data = &lbadapt_ghost_data[level - coarsest_level_ghost]
                                         [p8est_meshiter_get_neighbor_storage_id(
                                             mesh_iter)];
             } else {
-              data = &lbadapt_local_data[lvl]
+              data = &lbadapt_local_data[level - coarsest_level_local]
                                         [p8est_meshiter_get_neighbor_storage_id(
                                             mesh_iter)];
             }
@@ -1389,57 +1416,68 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h * h * h * h * h * 1. /
-                      (prefactors[level] * prefactors[level] *
+                      h_max * h_max * h_max * h_max * h_max *
+#if 0
+                    1. / (prefactors[level] * prefactors[level] *
                        prefactors[level] * prefactors[level] *
                        prefactors[level]) *
-                      lbpar.rho[0] * 2 * lbmodel.c[i][l] * lbmodel.w[i] *
+#endif // 0
+                      lbpar.rho[0] * 2 * lbmodel.c[dir_ESPR][l] *
+                      lbmodel.w[dir_ESPR] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
 
                 for (int l = 0; l < 3; ++l) {
                   lb_boundaries[currCellData->boundary - 1].force[l] +=
-                      (2 * currCellData->lbfluid[1][i] + population_shift) *
-                      lbmodel.c[i][l];
+                      (2 * currCellData->lbfluid[1][dir_ESPR] +
+                       population_shift) *
+                      lbmodel.c[dir_ESPR][l];
                 }
-                data->lbfluid[1][reverse[i]] =
-                    currCellData->lbfluid[1][i] + population_shift;
+                data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
+                    currCellData->lbfluid[1][inv[dir_ESPR]] + population_shift;
               } else {
-                // else bounce back
-                data->lbfluid[1][reverse[i]] = currCellData->lbfluid[1][i] =
-                    0.0;
+                data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
+                    currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
               }
             }
 
             // case 2
             else if (mesh_iter->neighbor_is_ghost == 1 && data->boundary) {
               if (!currCellData->boundary) {
+                if (-1. == local_post_collision_populations[0]) {
+                  for (int i = 0; i < lbmodel.n_veloc; ++i) {
+                    local_post_collision_populations[i] =
+                        lbadapt_backTransformation(currCellData->modes, i) *
+                        lbmodel.w[i];
+                  }
+                }
                 // calculate population shift (moving boundary)
-                population_shift = 0;
+                population_shift = 0.;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h * h * h * h * h * 1. /
-                      (prefactors[level] * prefactors[level] *
+                      h_max * h_max * h_max * h_max * h_max *
+#if 0
+                       1. / (prefactors[level] * prefactors[level] *
                        prefactors[level] * prefactors[level] *
                        prefactors[level]) *
-                      lbpar.rho[0] * 2 * lbmodel.c[reverse[i]][l] *
-                      lbmodel.w[reverse[i]] *
+#endif // 0
+                      lbpar.rho[0] * 2 * lbmodel.c[inv[dir_ESPR]][l] *
+                      lbmodel.w[inv[dir_ESPR]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
 
                 for (int l = 0; l < 3; ++l) {
                   lb_boundaries[data->boundary - 1].force[l] +=
-                      (2 * data->lbfluid[1][reverse[i]] + population_shift) *
-                      lbmodel.c[reverse[i]][l];
+                      (2 * data->lbfluid[1][inv[dir_ESPR]] + population_shift) *
+                      lbmodel.c[inv[dir_ESPR]][l];
                 }
-                currCellData->lbfluid[1][i] =
-                    data->lbfluid[1][reverse[i]] + population_shift;
+                currCellData->lbfluid[1][inv[dir_ESPR]] =
+                    local_post_collision_populations[dir_ESPR] +
+                    population_shift;
               } else {
-                // else bounce back
-                currCellData->lbfluid[1][i] = data->lbfluid[1][reverse[i]] =
-                    0.0;
+                currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
               }
             }
           }

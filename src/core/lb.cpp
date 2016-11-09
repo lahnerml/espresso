@@ -3283,6 +3283,16 @@ inline void lb_collide_stream() {
                   << std::endl;
 
         std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " Perform bounce back step on " << level
+                  << std::endl;
+#endif // 0
+        lbadapt_bounce_back(level);
+#if 0
+        std::cout << "[p4est " << p8est->mpirank << "]"
+                  << " [Done] Perform bounce back step on " << level
+                  << std::endl;
+
+        std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
@@ -3292,16 +3302,6 @@ inline void lb_collide_stream() {
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
-                  << std::endl;
-
-        std::cout << "[p4est " << p8est->mpirank << "]"
-                  << " Perform bounce back step on " << level
-                  << std::endl;
-#endif // 0
-        lbadapt_bounce_back(level);
-#if 0
-        std::cout << "[p4est " << p8est->mpirank << "]"
-                  << " [Done] Perform bounce back step on " << level
                   << std::endl;
 
         std::cout << "[p4est " << p8est->mpirank << "]"

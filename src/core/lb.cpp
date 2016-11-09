@@ -2284,14 +2284,18 @@ void lb_reinit_parameters() {
       (3 * dim_free_visc_bulk[i] + 1);
 #else // 0
     double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
-    gamma_shear[i] = 1. -
-                  2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
-                        1.);
+    if (lbpar.viscosity[0] > 0.0) {
+      gamma_shear[i] = 1. -
+        2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
+              1.);
+    }
 
-    gamma_bulk[i] = 1. -
-                 2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-                       (prefactors[i] * SQR(lbpar.agrid)) +
-                       1.);
+    if (lbpar.bulk_viscosity[0] > 0.0) {
+      gamma_bulk[i] = 1. -
+        2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
+              (prefactors[i] * SQR(lbpar.agrid)) +
+              1.);
+    }
 #endif // 0
   }
 #else

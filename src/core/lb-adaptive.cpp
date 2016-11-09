@@ -377,8 +377,8 @@ int lbadapt_get_global_maxlevel() {
 }
 
 /*** Load Balance ***/
-int lbadapt_partition_weight (p8est_t *p8est, p4est_topidx_t which_tree,
-                              p8est_quadrant_t *q) {
+int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
+                             p8est_quadrant_t *q) {
   return (prefactors[lbpar.base_level + (max_refinement_level - q->level)]);
 }
 
@@ -944,8 +944,8 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
-/* hydrodynamic momentum density is redefined when external forces present
- */
+  /* hydrodynamic momentum density is redefined when external forces present
+   */
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
@@ -1320,6 +1320,8 @@ void lbadapt_bounce_back(int level) {
   lbadapt_payload_t *data, *currCellData;
   int lvl = level - coarsest_level_local;
   double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
@@ -1628,14 +1630,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         /* calculate values to write */
         double rho;
         double j[3];
-#if 0
-        lbadapt_calc_local_rho(mesh_iter, &rho);
-        lbadapt_calc_local_j(mesh_iter, j);
-#else  // 0
+
         lbadapt_calc_local_fields(data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
-#endif // 0
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;

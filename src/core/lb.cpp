@@ -967,7 +967,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
-  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+  p8est_vtk_context_set_scale(context, 1);
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);

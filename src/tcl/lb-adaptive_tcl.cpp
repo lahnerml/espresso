@@ -18,27 +18,30 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
    */
-#include "lb-adaptive_tcl.hpp"
 #include "communication.hpp"
+#include "lb-adaptive_tcl.hpp"
+#include "lb-boundaries.hpp"
 
 #include <stdio.h>
 
 #ifdef LB_ADAPTIVE
-int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
+                          char **argv) {
   /* container for parameters */
   int level = 0;
 
   /* verify input */
-  if (argc != 2)
-  {
-    Tcl_AppendResult(interp,
-        "Setting uniform refinement requires one parameter, specifying refinement level.",
-        (char *)NULL);
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Setting uniform refinement requires one "
+                             "parameter, specifying refinement level.",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
-  if(! ARG_IS_I(1, level)) {
-    Tcl_AppendResult(interp, "uniform refinement needs 1 parameter of type and meaning:\n", (char *)NULL);
+  if (!ARG_IS_I(1, level)) {
+    Tcl_AppendResult(
+        interp, "uniform refinement needs 1 parameter of type and meaning:\n",
+        (char *)NULL);
     Tcl_AppendResult(interp, "INT\n", (char *)NULL);
     Tcl_AppendResult(interp, "<refinement_level>\n", (char *)NULL);
     return TCL_ERROR;
@@ -189,4 +192,39 @@ int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
 
   return TCL_OK;
 }
-#endif //LB_ADAPTIVE
+
+int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
+                                     int argc, char **argv) {
+  int bnd_index;
+
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Excluding a boundary from geometric refinement "
+                             "requires exactly one parameter, that is the "
+                             "index of the boundary to exclude.",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  if (!ARG_IS_I(1, bnd_index)) {
+    Tcl_AppendResult(interp, "lbadapt-exclude-bnd-from-geom-ref needs 1 "
+                             "parameter of type and meaning\n",
+                     (char *)NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *)NULL);
+    Tcl_AppendResult(interp, "<bnd_idx_to_ignore>\n", (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  /* check input for semantic correctness */
+  if ((bnd_index < 0) && (n_lb_boundaries <= bnd_index)) {
+    Tcl_AppendResult(interp, "boundary index to ignore must be smaller than"
+                             " number of defined boundaries\n",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_exclude_boundary, -1, bnd_index);
+  mpi_exclude_boundary(0, bnd_index);
+
+  return TCL_OK;
+}
+#endif // LB_ADAPTIVE

@@ -96,6 +96,10 @@ typedef struct {
 extern int n_lb_boundaries;
 extern LB_Boundary *lb_boundaries;
 
+#ifdef LB_ADAPTIVE
+extern std::vector<int> *exclude_in_geom_ref;
+#endif // LB_ADAPTIVE
+
 /*@}*/
 
 /** Initializes the constrains in the system. 

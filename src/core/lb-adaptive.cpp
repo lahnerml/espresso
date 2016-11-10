@@ -393,8 +393,14 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
   int the_boundary = -1;
+  std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
+    it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(), n);
+    if (it != exclude_in_geom_ref->end()) {
+      continue;
+    }
+
     switch (lb_boundaries[n].type) {
     case LB_BOUNDARY_WAL:
       calculate_wall_dist((Particle *)NULL, midpoint, (Particle *)NULL,

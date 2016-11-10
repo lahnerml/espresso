@@ -40,6 +40,10 @@
 int n_lb_boundaries = 0;
 LB_Boundary *lb_boundaries = NULL;
 
+#ifdef LB_ADAPTIVE
+std::vector<int> *exclude_in_geom_ref = NULL;
+#endif // LB_ADAPTIVE
+
 void lbboundary_mindist_position(double pos[3], double *mindist,
                                  double distvec[3], int *no) {
   double vec[3] = {1e100, 1e100, 1e100};

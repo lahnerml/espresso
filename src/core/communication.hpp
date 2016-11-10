@@ -570,6 +570,8 @@ void mpi_rand_refinement (int node, int maxLevel);
 void mpi_reg_refinement (int node, int param=0);
 
 void mpi_geometric_refinement (int node, int param);
+
+void mpi_exclude_boundary (int node, int param);
 #endif // LB_ADAPTIVE
 
 

@@ -2951,6 +2951,22 @@ void mpi_geometric_refinement(int node, int param) {
 #endif // LB_ADAPTIVE
 }
 
+void mpi_exclude_boundary(int node, int param) {
+#ifdef LB_ADAPTIVE
+  if (exclude_in_geom_ref == NULL) {
+    exclude_in_geom_ref = new std::vector<int>();
+    exclude_in_geom_ref->reserve(n_lb_boundaries);
+  }
+
+  // ensure to only push each boundary index once
+  std::vector<int>::iterator it;
+  it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(),
+                 param);
+  if (it == exclude_in_geom_ref->end()) {
+    exclude_in_geom_ref->push_back(param);
+  }
+#endif // LB_ADAPTIVE
+}
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES

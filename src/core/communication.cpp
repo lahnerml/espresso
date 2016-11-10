@@ -18,6 +18,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -27,8 +29,8 @@
 #endif
 
 #include <boost/mpi.hpp>
-#include <boost/serialization/string.hpp>
 #include <boost/serialization/array.hpp>
+#include <boost/serialization/string.hpp>
 
 #include "communication.hpp"
 
@@ -44,8 +46,8 @@
 #include "elc.hpp"
 #include "energy.hpp"
 #include "external_potential.hpp"
-#include "forces.hpp"
 #include "forcecap.hpp"
+#include "forces.hpp"
 #include "galilei.hpp"
 #include "gb.hpp"
 #include "global.hpp"
@@ -190,6 +192,7 @@ static int terminated = 0;
   CB(mpi_rand_refinement)                                                      \
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
+  CB(mpi_exclude_boundary)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -325,8 +328,8 @@ void mpi_stop() {
   mpi_call(mpi_stop_slave, -1, 0);
 
   lb_release();
-  // shutdown p4est if it was used
 #ifdef LB_ADAPTIVE
+  // shutdown p4est if it was used
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   }
@@ -2689,23 +2692,26 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 #endif
 }
 
-void mpi_lbadapt_grid_init (int node, int level) {
+void mpi_lbadapt_grid_init(int node, int level) {
 #ifdef LB_ADAPTIVE
   /* create connectivity and octree */
-  conn = p8est_connectivity_new_brick (box_l[0], box_l[1], box_l[2],
-                                       periodic & 1, periodic & 2, periodic & 4);
-  p8est = p8est_new_ext (comm_cart,                  /* mpi communicator */
-                         conn,                       /* connectivity */
-                         0,                          /* min octants per process */
-                         level,                      /* min level */
-                         1,                          /* fill uniform */
-                         0,                          /* data size */
-                         NULL,                       /* init function */
-                         NULL                        /* user pointer */);
+  conn = p8est_connectivity_new_brick(box_l[0], box_l[1], box_l[2],
+                                      periodic & 1, periodic & 2, periodic & 4);
+  // clang-format off
+  p8est = p8est_new_ext(comm_cart, /* mpi communicator */
+                        conn,      /* connectivity */
+                        0,         /* min octants per process */
+                        level,     /* min level */
+                        1,         /* fill uniform */
+                        0,         /* data size */
+                        NULL,      /* init function */
+                        NULL       /* user pointer */);
+  // clang-format on
 
   // build initial versions of ghost, mesh and allocate payload
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
-  lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
@@ -2716,7 +2722,7 @@ void mpi_lbadapt_grid_init (int node, int level) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_vtk_print_boundary (int node, int len) {
+void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
@@ -2753,7 +2759,7 @@ void mpi_lbadapt_vtk_print_boundary (int node, int len) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_vtk_print_density (int node, int len) {
+void mpi_lbadapt_vtk_print_density(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
@@ -2790,7 +2796,7 @@ void mpi_lbadapt_vtk_print_density (int node, int len) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_vtk_print_velocity (int node, int len) {
+void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
@@ -2809,6 +2815,7 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
@@ -2818,6 +2825,7 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
                                        1, /* write velocity as vector cell
                                              data */
                                        "velocity", velocity, context);
+  // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
@@ -2828,7 +2836,7 @@ void mpi_lbadapt_vtk_print_velocity (int node, int len) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_set_max_level (int node, int l_max) {
+void mpi_lbadapt_set_max_level(int node, int l_max) {
 #ifdef LB_ADAPTIVE
   max_refinement_level = l_max;
 
@@ -2836,57 +2844,61 @@ void mpi_lbadapt_set_max_level (int node, int l_max) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_unif_refinement (int node, int level) {
+void mpi_unif_refinement(int node, int level) {
 #ifdef LB_ADAPTIVE
   for (int i = 0; i < level; i++) {
     p8est_refine(p8est, 0, refine_uniform, NULL);
-    p8est_partition (p8est, 0, lbadapt_partition_weight);
+    p8est_partition(p8est, 0, lbadapt_partition_weight);
   }
-#endif //LB_ADAPTIVE
+#endif // LB_ADAPTIVE
 }
 
-void mpi_rand_refinement (int node, int maxLevel) {
+void mpi_rand_refinement(int node, int maxLevel) {
 #ifdef LB_ADAPTIVE
   // assert level 0 is refined
-  p8est_refine (p8est, 0, refine_uniform, NULL);
+  p8est_refine(p8est, 0, refine_uniform, NULL);
 
   // for remaining levels 50% chance they will be refined
   // refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
   for (int i = 0; i < maxLevel; i++) {
     p8est_refine(p8est, 0, refine_random, NULL);
-    p8est_partition (p8est, 0, lbadapt_partition_weight);
+    p8est_partition(p8est, 0, lbadapt_partition_weight);
   }
 #endif // LB_ADAPTIVE
 }
 
-void mpi_reg_refinement (int node, int param) {
+void mpi_reg_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
-  p8est_refine_ext (p8est,                  // forest
-                    0,                      // no recursive refinement
-                    P8EST_MAXLEVEL - 1,
-                    refine_regional,        // return true to refine cell
-                    NULL,                   // init data
-                    NULL);                  // replace data
+  // clang-format off
+  p8est_refine_ext(p8est,               // forest
+                   0,                   // no recursive refinement
+                   P8EST_MAXLEVEL - 1,
+                   refine_regional,     // return true to refine cell
+                   NULL,                // init data
+                   NULL);               // replace data
 
-  p8est_balance_ext (p8est,                  // forest
-                     P8EST_CONNECT_EDGE,     // connection type
-                     NULL,                   // init data
-                     NULL);                  // replace data
+  p8est_balance_ext(p8est,              // forest
+                    P8EST_CONNECT_EDGE, // connection type
+                    NULL,               // init data
+                    NULL);              // replace data
+  // clang-format on
 
-  p8est_partition (p8est, 0, lbadapt_partition_weight);
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
-  lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
   // due to non-recursive refinement only 2 cases can occur: finest level
   // increases or not.
-  lb_step_factor = lb_step_factor / (double)(1 << (finest_level_global - old_flg));
+  lb_step_factor =
+      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
@@ -2898,32 +2910,36 @@ void mpi_reg_refinement (int node, int param) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_geometric_refinement (int node, int param) {
+void mpi_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
-  p8est_refine_ext (p8est,                  // forest
-                    1,                      // no recursive refinement
-                    max_refinement_level,   // maximum refinement level
-                    refine_geometric,       // return true to refine cell
-                    NULL,                   // init data
-                    NULL);                  // replace data
+  // clang-format off
+  p8est_refine_ext(p8est,                // forest
+                   1,                    // no recursive refinement
+                   max_refinement_level, // maximum refinement level
+                   refine_geometric,     // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
 
-  p8est_balance_ext (p8est,                  // forest
-                     P8EST_CONNECT_EDGE,     // connection type
-                     NULL,                   // init data
-                     NULL);                  // replace data
+  p8est_balance_ext(p8est,               // forest
+                    P8EST_CONNECT_EDGE,  // connection type
+                    NULL,                // init data
+                    NULL);               // replace data
+  // clang-format on
 
-  p8est_partition (p8est, 0, lbadapt_partition_weight);
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
-  lbadapt_mesh = p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
 
-  lb_step_factor = lb_step_factor / (double)(1 << (finest_level_global - old_flg));
+  lb_step_factor =
+      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
@@ -3151,12 +3167,13 @@ void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3])
 
   if (pnode == this_node) {
     Particle *p = local_particles[part];
+#ifndef ROTATIONAL_INERTIA
     /* here the setting actually happens, if the particle belongs to the local
      * node */
-#ifndef ROTATIONAL_INERTIA
     p->p.gamma_rot = gamma_rot;
 #else
-    for ( j = 0 ; j < 3 ; j++) p->p.gamma_rot[j] = gamma_rot[j];
+    for (j = 0; j < 3; j++)
+      p->p.gamma_rot[j] = gamma_rot[j];
 #endif
   } else {
 #ifndef ROTATIONAL_INERTIA
@@ -3177,12 +3194,12 @@ void mpi_set_particle_gamma_rot_slave(int pnode, int part) {
   if (pnode == this_node) {
     Particle *p = local_particles[part];
     MPI_Status status;
-    /* here the setting happens for nonlocal nodes */
 #ifndef ROTATIONAL_INERTIA
+    /* here the setting happens for nonlocal nodes */
     MPI_Recv(&s_buf, 1, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
     p->p.gamma_rot = s_buf;
 #else
-  	MPI_Recv(p->p.gamma_rot, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
+    MPI_Recv(p->p.gamma_rot, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
 #endif
   }
   on_particle_change();

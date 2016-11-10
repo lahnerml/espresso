@@ -46,7 +46,8 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **
 
   /* check input for semantic correctness */
   if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n", (char *)NULL);
+    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
@@ -57,17 +58,20 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc, char **
   return TCL_OK;
 }
 
-int tclcommand_set_max_level(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
+                             char **argv) {
   int level;
   if (argc != 2) {
-    Tcl_AppendResult(interp,
-        "Setting a maximum refinement level requires one parameter, specifying that level.",
-        (char *)NULL);
+    Tcl_AppendResult(interp, "Setting a maximum refinement level requires one "
+                             "parameter, specifying that level.",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
-  if(! ARG_IS_I(1, level)) {
-    Tcl_AppendResult(interp, "Setting l_max needs 1 parameter of type and meaning:\n", (char *)NULL);
+  if (!ARG_IS_I(1, level)) {
+    Tcl_AppendResult(interp,
+                     "Setting l_max needs 1 parameter of type and meaning:\n",
+                     (char *)NULL);
     Tcl_AppendResult(interp, "INT\n", (char *)NULL);
     Tcl_AppendResult(interp, "<max_refinement_level>\n", (char *)NULL);
     return TCL_ERROR;
@@ -75,30 +79,34 @@ int tclcommand_set_max_level(ClientData data,Tcl_Interp *interp, int argc, char 
 
   /* check input for semantic correctness */
   if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n", (char *)NULL);
+    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
   mpi_call(mpi_lbadapt_set_max_level, -1, level);
-  mpi_lbadapt_set_max_level (0, level);
+  mpi_lbadapt_set_max_level(0, level);
 
   return TCL_OK;
 }
 
-int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv) {
   /* container for parameters */
   int level = 0;
 
   /* check input for syntactic correctness */
   if (argc != 2) {
-    Tcl_AppendResult(interp,
-        "Setting uniform refinement requires one parameter, specifying refinement level.",
-        (char *)NULL);
+    Tcl_AppendResult(interp, "Setting uniform refinement requires one "
+                             "parameter, specifying refinement level.",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
-  if(! ARG_IS_I(1, level)) {
-    Tcl_AppendResult(interp, "uniform refinement needs 1 parameter of type and meaning:\n", (char *)NULL);
+  if (!ARG_IS_I(1, level)) {
+    Tcl_AppendResult(
+        interp, "uniform refinement needs 1 parameter of type and meaning:\n",
+        (char *)NULL);
     Tcl_AppendResult(interp, "INT\n", (char *)NULL);
     Tcl_AppendResult(interp, "<refinement_level>\n", (char *)NULL);
     return TCL_ERROR;
@@ -106,7 +114,8 @@ int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char 
 
   /* check input for semantic correctness */
   if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n", (char *)NULL);
+    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
@@ -116,19 +125,21 @@ int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc, char 
   return TCL_OK;
 }
 
-
-int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_set_rand_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv) {
   int level;
 
   if (argc != 2) {
-    Tcl_AppendResult(interp,
-        "Setting random refinement requires one parameter, specifying maximum refinement level.",
-        (char *)NULL);
+    Tcl_AppendResult(interp, "Setting random refinement requires one "
+                             "parameter, specifying maximum refinement level.",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
-  if(! ARG_IS_I(1, level)) {
-    Tcl_AppendResult(interp, "random refinement needs 1 parameter of type and meaning:\n", (char *)NULL);
+  if (!ARG_IS_I(1, level)) {
+    Tcl_AppendResult(
+        interp, "random refinement needs 1 parameter of type and meaning:\n",
+        (char *)NULL);
     Tcl_AppendResult(interp, "INT\n", (char *)NULL);
     Tcl_AppendResult(interp, "<max_ref_level>\n", (char *)NULL);
     return TCL_ERROR;
@@ -136,7 +147,8 @@ int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char *
 
   /* check input for semantic correctness */
   if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n", (char *)NULL);
+    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+                     (char *)NULL);
     return TCL_ERROR;
   }
 
@@ -146,10 +158,11 @@ int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char *
   return TCL_OK;
 }
 
-
-int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
+                           char **argv) {
   if (argc != 1) {
-    Tcl_AppendResult(interp,
+    Tcl_AppendResult(
+        interp,
         "Setting regional refinement does not allow setting parameters.",
         (char *)NULL);
     return TCL_ERROR;
@@ -161,9 +174,11 @@ int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **
   return TCL_OK;
 }
 
-int tclcommand_set_geom_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv) {
+int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv) {
   if (argc != 1) {
-    Tcl_AppendResult(interp,
+    Tcl_AppendResult(
+        interp,
         "Setting geometric refinement does not allow setting parameters.",
         (char *)NULL);
     return TCL_ERROR;

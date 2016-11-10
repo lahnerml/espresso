@@ -19,21 +19,28 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "parser.hpp"
 #include "lb-adaptive.hpp"
+#include "parser.hpp"
 
 #ifndef LB_ADAPTIVE_TCL
 #define LB_ADAPTIVE_TCL
 
-int tclcommand_setup_grid(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
+                          char **argv);
 
-int tclcommand_set_max_level(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
+                             char **argv);
 
-int tclcommand_set_unif_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv);
 
-int tclcommand_set_rand_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_set_rand_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv);
 
-int tclcommand_set_reg_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
+                           char **argv);
 
-int tclcommand_set_geom_ref(ClientData data,Tcl_Interp *interp, int argc, char **argv);
+int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
+                            char **argv);
+
 #endif // LB_ADAPTIVE_TCL

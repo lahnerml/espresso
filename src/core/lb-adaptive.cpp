@@ -111,21 +111,20 @@ void lbadapt_allocate_data() {
       coarsest_level_local = level;
     }
     if ((coarsest_level_local != -1) &&
-        (((lbadapt_mesh->quad_level + level)->elem_count == 0) &&
-         ((lbadapt_mesh->virtual_qlevels + level)->elem_count == 0))) {
+        (((lbadapt_mesh->quad_level + level)->elem_count > 0) ||
+         ((lbadapt_mesh->virtual_qlevels + level)->elem_count > 0))) {
       finest_level_local = level;
-      break;
     }
   }
-  if (finest_level_local - coarsest_level_local > 0) {
-    lbadapt_local_data = P4EST_ALLOC(lbadapt_payload_t *,
-                                     finest_level_local - coarsest_level_local);
-    for (level = coarsest_level_local; level < finest_level_local; ++level) {
-      lbadapt_local_data[level - coarsest_level_local] = P4EST_ALLOC(
-          lbadapt_payload_t,
-          (lbadapt_mesh->quad_level + level)->elem_count +
-              P8EST_CHILDREN *
-                  (lbadapt_mesh->virtual_qlevels + level)->elem_count);
+
+  lbadapt_local_data = P4EST_ALLOC(
+      lbadapt_payload_t *, 1 + finest_level_local - coarsest_level_local);
+  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+    lbadapt_local_data[level - coarsest_level_local] = P4EST_ALLOC(
+        lbadapt_payload_t,
+        (lbadapt_mesh->quad_level + level)->elem_count +
+            P8EST_CHILDREN *
+                (lbadapt_mesh->virtual_qlevels + level)->elem_count);
 #if 0
       std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
                 << (lbadapt_mesh->quad_level + level)->elem_count
@@ -134,10 +133,9 @@ void lbadapt_allocate_data() {
                        (lbadapt_mesh->virtual_qlevels + level)->elem_count
                 << " virtual local quadrants of level " << level << std::endl;
 #endif // 0
-    }
   }
 
-/** ghost */
+  /** ghost */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
          ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0)) &&
@@ -145,21 +143,19 @@ void lbadapt_allocate_data() {
       coarsest_level_ghost = level;
     }
     if ((coarsest_level_ghost != -1) &&
-        (((lbadapt_mesh->ghost_level + level)->elem_count == 0) &&
-         ((lbadapt_mesh->virtual_glevels + level)->elem_count == 0))) {
+        (((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
+         ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0))) {
       finest_level_ghost = level;
-      break;
     }
   }
-  if (finest_level_ghost - coarsest_level_ghost > 0) {
-    lbadapt_ghost_data = P4EST_ALLOC(lbadapt_payload_t *,
-                                     finest_level_ghost - coarsest_level_ghost);
-    for (level = coarsest_level_ghost; level < finest_level_ghost; ++level) {
-      lbadapt_ghost_data[level - coarsest_level_ghost] = P4EST_ALLOC(
-          lbadapt_payload_t,
-          (lbadapt_mesh->ghost_level + level)->elem_count +
-              P8EST_CHILDREN *
-                  (lbadapt_mesh->virtual_glevels + level)->elem_count);
+  lbadapt_ghost_data = P4EST_ALLOC(
+      lbadapt_payload_t *, 1 + finest_level_ghost - coarsest_level_ghost);
+  for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
+    lbadapt_ghost_data[level - coarsest_level_ghost] = P4EST_ALLOC(
+        lbadapt_payload_t,
+        (lbadapt_mesh->ghost_level + level)->elem_count +
+            P8EST_CHILDREN *
+                (lbadapt_mesh->virtual_glevels + level)->elem_count);
 #if 0
       std::cout << "[p4est " << p8est->mpirank << "] Allocated space for "
                 << (lbadapt_mesh->ghost_level + level)->elem_count
@@ -168,11 +164,7 @@ void lbadapt_allocate_data() {
                        (lbadapt_mesh->virtual_glevels + level)->elem_count
                 << " virtual ghost quadrants of level " << level << std::endl;
 #endif // 0
-    }
   }
-  // correct finest level values
-  --finest_level_local;
-  --finest_level_ghost;
 } // lbadapt_allocate_data();
 
 void lbadapt_init() {
@@ -267,7 +259,7 @@ void lbadapt_reinit_force_per_cell() {
               mesh_iter)];
         }
 #ifdef EXTERNAL_FORCES
-// unit conversion: force density
+        // unit conversion: force density
         data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
                                   SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
@@ -958,7 +950,7 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
-// unit conversion: force density
+  // unit conversion: force density
   lbfields->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[1] =

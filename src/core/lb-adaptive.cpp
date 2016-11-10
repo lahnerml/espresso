@@ -24,13 +24,6 @@
  * Adaptive Lattice Boltzmann Scheme using CPU.
  * Implementation file for \ref lb-adaptive.hpp.
  */
-
-#include <algorithm>
-#include <assert.h>
-#include <fstream>
-#include <iostream>
-#include <stdlib.h>
-
 #include "communication.hpp"
 #include "constraint.hpp"
 #include "lb-adaptive.hpp"
@@ -40,6 +33,12 @@
 #include "random.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
+
+#include <algorithm>
+#include <assert.h>
+#include <fstream>
+#include <iostream>
+#include <stdlib.h>
 
 #ifdef LB_ADAPTIVE
 
@@ -139,17 +138,6 @@ void lbadapt_allocate_data() {
   }
 
 /** ghost */
-#if 0
-  if (p8est->mpirank == 0) {
-    for (int temp = 0; temp < lbadapt_mesh->ghost_num_quadrants; ++temp) {
-      p8est_quadrant_t *g =
-          p8est_quadrant_array_index(&lbadapt_ghost->ghosts, temp);
-      std::cout << "ghost " << temp << " (level " << (int)g->level
-                << ") contains virtuals: "
-                << (int)lbadapt_mesh->virtual_gflags[temp] << std::endl;
-    }
-  }
-#endif // 0
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
          ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0)) &&
@@ -182,11 +170,10 @@ void lbadapt_allocate_data() {
 #endif // 0
     }
   }
-  // set finest level values from one level greater than the finest cell to the
-  // actual value
+  // correct finest level values
   --finest_level_local;
   --finest_level_ghost;
-}
+} // lbadapt_allocate_data();
 
 void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
@@ -216,7 +203,6 @@ void lbadapt_init() {
         }
 
         data->boundary = 0;
-        // data->lbfields = (LB_FluidNode) malloc(sizeof(LB_FluidNode));
         for (int i = 0; i < lbmodel.n_veloc; i++) {
           data->lbfluid[0][i] = 0.;
           data->lbfluid[1][i] = 0.;
@@ -247,7 +233,7 @@ void lbadapt_init() {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
-}
+} // lbadapt_init();
 
 void lbadapt_reinit_force_per_cell() {
   if (lbadapt_local_data == NULL) {
@@ -282,21 +268,12 @@ void lbadapt_reinit_force_per_cell() {
         }
 #ifdef EXTERNAL_FORCES
 // unit conversion: force density
-#if 1
         data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
                                   SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
                                   SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[2] = prefactors[level] * lbpar.ext_force[2] *
                                   SQR(h_max) * SQR(lbpar.tau);
-#else  // 0
-        data->lbfields.force[0] =
-            lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[1] =
-            lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[2] =
-            lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-#endif // 0
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -976,18 +953,12 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
 // unit conversion: force density
-#if 1
   lbfields->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[1] =
       prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-#else  // 0
-  lbfields->force[0] = lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
-  lbfields->force[1] = lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
-  lbfields->force[2] = lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-#endif // 0
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;

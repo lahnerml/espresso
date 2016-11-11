@@ -263,12 +263,12 @@ void lbadapt_reinit_force_per_cell() {
         }
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
-        data->lbfields.force[0] = prefactors[level] * lbpar.ext_force[0] *
-                                  SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[1] = prefactors[level] * lbpar.ext_force[1] *
-                                  SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[2] = prefactors[level] * lbpar.ext_force[2] *
-                                  SQR(h_max) * SQR(lbpar.tau);
+        data->lbfields.force[0] =
+            lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+        data->lbfields.force[1] =
+            lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+        data->lbfields.force[2] =
+            lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -958,11 +958,11 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   lbfields->force[0] =
-      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+      lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
   lbfields->force[1] =
-      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+      lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
   lbfields->force[2] =
-      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+      lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1391,12 +1391,7 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max *
-#if 0
-                    1. / (prefactors[level] * prefactors[level] *
-                       prefactors[level] * prefactors[level] *
-                       prefactors[level]) *
-#endif // 0
+                      h_max * h_max * h_max * h * h *
                       lbpar.rho[0] * 2 * lbmodel.c[dir_ESPR][l] *
                       lbmodel.w[dir_ESPR] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
@@ -1431,12 +1426,7 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0.;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max *
-#if 0
-                       1. / (prefactors[level] * prefactors[level] *
-                       prefactors[level] * prefactors[level] *
-                       prefactors[level]) *
-#endif // 0
+                      h_max * h_max * h_max * h * h *
                       lbpar.rho[0] * 2 * lbmodel.c[inv[dir_ESPR]][l] *
                       lbmodel.w[inv[dir_ESPR]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /

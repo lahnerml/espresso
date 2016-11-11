@@ -148,6 +148,9 @@ void lbadapt_allocate_data() {
       finest_level_ghost = level;
     }
   }
+  if (coarsest_level_ghost == -1) {
+    return;
+  }
   lbadapt_ghost_data = P4EST_ALLOC(
       lbadapt_payload_t *, 1 + finest_level_ghost - coarsest_level_ghost);
   for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
@@ -388,9 +391,12 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
-    it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(), n);
-    if (it != exclude_in_geom_ref->end()) {
-      continue;
+    if (exclude_in_geom_ref) {
+      it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(),
+                     n);
+      if (it != exclude_in_geom_ref->end()) {
+        continue;
+      }
     }
 
     switch (lb_boundaries[n].type) {

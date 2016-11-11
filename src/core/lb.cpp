@@ -2521,10 +2521,12 @@ void lb_release_fluid() {
     P4EST_FREE(lbadapt_local_data);
     lbadapt_local_data = NULL;
 
-    for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
-      P4EST_FREE(lbadapt_ghost_data[level - coarsest_level_ghost]);
+    if (coarsest_level_ghost != -1) {
+      for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
+        P4EST_FREE(lbadapt_ghost_data[level - coarsest_level_ghost]);
+      }
+      P4EST_FREE(lbadapt_ghost_data);
     }
-    P4EST_FREE(lbadapt_ghost_data);
     lbadapt_ghost_data = NULL;
   }
 #else  // LB_ADAPTIVE

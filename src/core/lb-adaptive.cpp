@@ -264,11 +264,11 @@ void lbadapt_reinit_force_per_cell() {
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
         data->lbfields.force[0] =
-            lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[1] =
-            lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
         data->lbfields.force[2] =
-            lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+            prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
@@ -958,11 +958,11 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   lbfields->force[0] =
-      lbpar.ext_force[0] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+    prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[1] =
-      lbpar.ext_force[1] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+    prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[2] =
-      lbpar.ext_force[2] * SQR(h) * SQR(prefactors[level] * lbpar.tau);
+    prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;

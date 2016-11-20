@@ -449,7 +449,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
     }
   }
 
-  if ((abs(dist) <= half_length) && n_lb_boundaries > 0) {
+  if ((std::abs(dist) <= half_length) && n_lb_boundaries > 0) {
     return 1;
   } else {
     return 0;

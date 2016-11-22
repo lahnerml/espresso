@@ -3979,14 +3979,13 @@ void lb_calc_average_rho() {
 
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
-  double *rho;
-  *rho = 0.0;
-  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL,
+  p8est_iterate(p8est, NULL, (void *)local_rho, lbadapt_calc_local_rho, NULL, NULL,
                 NULL);
+  MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   index_t index;
   int x, y, z;
-  double rho, local_rho, sum_rho;
+  double rho;
 
   rho = 0.0;
   local_rho = 0.0;
@@ -4005,8 +4004,8 @@ void lb_calc_average_rho() {
     // skip halo region
     index += 2 * lblattice.halo_grid[0];
   }
+  MPI_Allreduce(&local_rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #endif // LB_ADAPTIVE
-  MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 
   /* calculate average density in MD units */
   // TODO!!!

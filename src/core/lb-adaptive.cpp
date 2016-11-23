@@ -1391,7 +1391,7 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h_max * h_max * h_max * h * h *
+                      h_max * h_max * h_max * h_max * h_max *
                       lbpar.rho[0] * 2 * lbmodel.c[dir_ESPR][l] *
                       lbmodel.w[dir_ESPR] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
@@ -1426,7 +1426,7 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0.;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h_max * h_max * h_max * h * h *
+                      h_max * h_max * h_max * h_max * h_max *
                       lbpar.rho[0] * 2 * lbmodel.c[inv[dir_ESPR]][l] *
                       lbmodel.w[inv[dir_ESPR]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /

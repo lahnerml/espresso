@@ -327,8 +327,8 @@ void mpi_stop() {
 
   mpi_call(mpi_stop_slave, -1, 0);
 
-  lb_release();
 #ifdef LB_ADAPTIVE
+  lb_release();
   // shutdown p4est if it was used
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);
@@ -357,8 +357,8 @@ void mpi_stop() {
 void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
-  lb_release();
 #ifdef LB_ADAPTIVE
+  lb_release();
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   }

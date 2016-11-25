@@ -3979,8 +3979,9 @@ void lb_calc_average_rho() {
 
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
-  p8est_iterate(p8est, NULL, (void *)local_rho, lbadapt_calc_local_rho, NULL, NULL,
-                NULL);
+  double *rho;
+  *rho = 0.0;
+  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL, NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   index_t index;

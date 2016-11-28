@@ -21,6 +21,9 @@
 #include "utils.hpp"
 #include "cuda_init.hpp"
 #include "cuda_utils.hpp"
+#ifdef LB_ADAPTIVE_GPU
+#include "lb-adaptive.hpp"
+#endif // LB_ADAPTIVE_GPU
 
 
 #ifdef CUDA
@@ -152,5 +155,13 @@ int cuda_test_device_access() {
     return ES_ERROR;
   }
 }
+
+#ifdef LB_ADAPTIVE_GPU
+  int cuda_init_lbadapt() {
+    int nGPUs;
+    CUDA_CALL( cudaGetDeviceCount(&nGPUs));
+    CUDA_CALL( cudaSetDevice(p8est->mpirank));
+  }
+#endif // LB_ADAPTIVE_GPU
 
 #endif /* defined(CUDA) */

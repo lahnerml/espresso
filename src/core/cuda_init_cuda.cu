@@ -153,10 +153,10 @@ int cuda_test_device_access() {
 }
 
 #ifdef LB_ADAPTIVE_GPU
-  int cuda_init_lbadapt() {
+  int cuda_init_adapt() {
     int nGPUs;
-    CUDA_CALL( cudaGetDeviceCount(&nGPUs));
-    CUDA_CALL( cudaSetDevice(this_node));
+    cudaGetDeviceCount(&nGPUs);
+    cudaSetDevice(this_node);
     return 0;
   }
 #endif // LB_ADAPTIVE_GPU

@@ -43,6 +43,7 @@
 #include "buckingham.hpp"
 #include "cells.hpp"
 #include "cuda_interface.hpp"
+#include "cuda_init.hpp"
 #include "elc.hpp"
 #include "energy.hpp"
 #include "external_potential.hpp"

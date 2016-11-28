@@ -16,6 +16,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#if 0
 #include "config.hpp"
 #ifdef CUDA /* Terminates at end of file */
 
@@ -4057,3 +4058,5 @@ int ek_tag_reaction_nodes( LB_Boundary *boundary, char reaction_type )
 #endif /* ELECTROKINETICS */
 
 #endif /* CUDA */
+
+#endif // 0

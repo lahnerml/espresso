@@ -32,10 +32,6 @@
 #include <boost/serialization/array.hpp>
 #include <boost/serialization/string.hpp>
 
-#ifdef LB_ADAPTIVE_GPU
-#include <cuda_runtime.h>
-#endif // LB_ADAPTIVE_GPU
-
 #include "communication.hpp"
 
 #include "errorhandling.hpp"
@@ -2725,7 +2721,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   max_refinement_level = level;
 
 #ifdef LB_ADAPTIVE_GPU
-  cudaSetDevice (p8est->rank);
+  cuda_init_adapt();
 #endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
 }

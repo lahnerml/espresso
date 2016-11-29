@@ -206,6 +206,9 @@ static void tcl_register_commands(Tcl_Interp* interp) {
 #ifdef LB_ADAPTIVE
   REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);
   REGISTER_COMMAND("lbadapt_set_max_level", tclcommand_set_max_level);
+#ifdef LB_ADAPTIVE_GPU
+  REGISTER_COMMAND("lbadapt-set-patch-size", tclcommand_set_patch_size);
+#endif // LB_ADAPTIVE_GPU
   REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
   REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
   REGISTER_COMMAND("lbadapt-regref", tclcommand_set_reg_ref);

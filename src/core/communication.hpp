@@ -563,6 +563,15 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len);
  */
 void mpi_lbadapt_set_max_level (int node, int l_max);
 
+#ifdef LB_ADAPTIVE_GPU
+/** Set patch size for offloading
+ *
+ * @param [in] node        MPI rank where to set the patch_size
+ * @param [in] patch_size  Number of cells per patch.
+*/
+void mpi_lbadapt_set_patch_size (int node, int patch_size);
+#endif // LB_ADAPTIVE_GPU
+
 void mpi_unif_refinement (int node, int level);
 
 void mpi_rand_refinement (int node, int maxLevel);

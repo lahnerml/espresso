@@ -169,6 +169,8 @@ static int n_lbsteps = 0;
 double lb_step_factor = 1.;
 
 int max_refinement_level = P8EST_QMAXLEVEL;
+
+int lb_patchsize = 1;
 #endif // LB_ADAPTIVE
 
 #ifdef ADDITIONAL_CHECKS
@@ -2199,46 +2201,25 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
   int i;
 #ifdef LB_ADAPTIVE
-#if 0
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
-  double dim_free_visc_shear[P8EST_MAXLEVEL] =
-    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-  double dim_free_visc_bulk[P8EST_MAXLEVEL] =
-    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#endif // 0
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
-#if 0
-    dim_free_visc_shear[i] =
-      (lbpar.viscosity[0] * lbpar.tau) /
-      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max) / SQR(lbpar.tau));
-    dim_free_visc_bulk[i] =
-      (lbpar.bulk_viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
-      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
 
-    gamma_shear[i] =
-      (2 * dim_free_visc_shear[i] - 1) /
-      (2 * dim_free_visc_shear[i] + 1);
+    double h = (double)P8EST_QUADRANT_LEN(i) /
+               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
-    gamma_bulk[i] =
-      (3 * dim_free_visc_bulk[i] - 1) /
-      (3 * dim_free_visc_bulk[i] + 1);
-#else // 0
-    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
     if (lbpar.viscosity[0] > 0.0) {
-      gamma_shear[i] = 1. -
-        2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
-              1.);
+      gamma_shear[i] =
+          1. -
+          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
+                1.);
     }
 
     if (lbpar.bulk_viscosity[0] > 0.0) {
       gamma_bulk[i] = 1. -
-        2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-              (prefactors[i] * SQR(lbpar.agrid)) +
-              1.);
+                      2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
+                                (prefactors[i] * SQR(lbpar.agrid)) +
+                            1.);
     }
-#endif // 0
   }
 #else
   if (lbpar.viscosity[0] > 0.0) {
@@ -3923,7 +3904,8 @@ void lb_calc_average_rho() {
 #ifdef LB_ADAPTIVE
   double *rho;
   *rho = 0.0;
-  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL, NULL);
+  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL,
+                NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   index_t index;
@@ -4165,393 +4147,5 @@ static void lb_check_halo_regions() {
   // else fprintf(stderr,"halo check successful\n");
 }
 #endif /* ADDITIONAL_CHECKS */
-
-#if 0 /* These debug functions are used nowhere. If you need it, here they     \
-         are.                                                                  \
-         Remove this comment line and the matching #endif.                     \
-         The functions in question are:                                        \
-         lb_lattice_sum                                                        \
-         lb_check_mode_transformation                                          \
-         lb_init_mode_transformation                                           \
-         lb_check_negative_n                                                   \
-      */
-#ifdef ADDITIONAL_CHECKS
-static void lb_lattice_sum() {
-
-    double *w   = lbmodel.w;
-    double (*v)[3]  = lbmodel.c;
-
-    //int n_veloc = 14;
-    //double w[14]    = { 7./18.,
-    //                    1./12., 1./12., 1./12., 1./12., 1./18.,
-    //                    1./36., 1./36., 1./36., 1./36.,
-    //                    1./36., 1./36., 1./36., 1./36. };
-    //double v[14][3] = { { 0., 0., 0. },
-    //                    { 1., 0., 0. },
-    //                    {-1., 0., 0. },
-    //                    { 0., 1., 0. },
-    //		        { 0.,-1., 0. },
-    //                    { 0., 0., 1. },
-    //                    { 1., 1., 0. },
-    //                    {-1.,-1., 0. },
-    //                    { 1.,-1., 0. },
-    //                    {-1., 1., 0. },
-    //                    { 1., 0., 1. },
-    //                    {-1., 0., 1. },
-    //                    { 0., 1., 1. },
-    //                    { 0.,-1., 1. } };
-
-    int i,a,b,c,d,e;
-    double sum1,sum2,sum3,sum4,sum5;
-    int count=0;
-
-    for (a = 0; a < 3; a++)
-    {
-        sum1 = 0.0;
-        for (i = 0; i < lbmodel.n_veloc; ++i) {
-            if (v[i][2] < 0) sum1 += w[i]*v[i][a];
-        }
-        if (fabs(sum1) > ROUND_ERROR_PREC) {
-            count++; fprintf(stderr,"(%d) %f\n",a,sum1);
-        }
-    }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-        {
-            sum2 = 0.0;
-            for (i=0; i<lbmodel.n_veloc; ++i) {
-                if (v[i][2] < 0) sum2 += w[i]*v[i][a]*v[i][b];
-            }
-            if (sum2!=0.0) {
-                count++; fprintf(stderr,"(%d,%d) %f\n",a,b,sum2);
-            }
-        }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-            {
-                sum3 = 0.0;
-                for (i=0; i<lbmodel.n_veloc; ++i) {
-                    if (v[i][2] < 0) sum3 += w[i]*v[i][a]*v[i][b]*v[i][c];
-                }
-                if (sum3!=0.0) {
-                    count++; fprintf(stderr,"(%d,%d,%d) %f\n",a,b,c,sum3);
-                }
-            }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-                for (d=0; d<3; d++)
-                {
-                    sum4 = 0.0;
-                    for (i=0; i<lbmodel.n_veloc; ++i) {
-                        if (v[i][2] < 0) sum4 += w[i]*v[i][a]*v[i][b]*v[i][c]*v[i][d];
-                    }
-                    if (fabs(sum4) > ROUND_ERROR_PREC) {
-                        count++; fprintf(stderr,"(%d,%d,%d,%d) %f\n",a,b,c,d,sum4);
-                    }
-                }
-
-    for (a=0; a<3; a++)
-        for (b=0; b<3; b++)
-            for (c=0; c<3; c++)
-                for (d=0; d<3; d++)
-                    for (e=0; e<3; e++)
-                    {
-                        sum5 = 0.0;
-                        for (i=0; i<lbmodel.n_veloc; ++i) {
-                            if (v[i][2] < 0) sum5 += w[i]*v[i][a]*v[i][b]*v[i][c]*v[i][d]*v[i][e];
-                        }
-                        if (fabs(sum5) > ROUND_ERROR_PREC) {
-                            count++; fprintf(stderr,"(%d,%d,%d,%d,%d) %f\n",a,b,c,d,e,sum5);
-                        }
-                    }
-
-    fprintf(stderr,"%d non-null entries\n",count);
-
-}
-#endif /* #ifdef ADDITIONAL_CHECKS */
-
-#ifdef ADDITIONAL_CHECKS
-static void lb_check_mode_transformation(index_t index, double *mode) {
-    /* check if what I think is right */
-    int i;
-    double *w = lbmodel.w;
-    double (*e)[19] = d3q19_modebase;
-    double sum_n=0.0, sum_m=0.0;
-    double n_eq[19];
-    double m_eq[19];
-    // unit conversion: mass density
-    double avg_rho = lbpar.rho*lbpar.agrid*lbpar.agrid*lbpar.agrid;
-    double (*c)[3] = lbmodel.c;
-
-    m_eq[0] = mode[0];
-    m_eq[1] = mode[1];
-    m_eq[2] = mode[2];
-    m_eq[3] = mode[3];
-
-    double rho = mode[0] + avg_rho;
-    double *j  = mode+1;
-
-    /* equilibrium part of the stress modes */
-    /* remember that the modes have (\todo not?) been normalized! */
-    m_eq[4] = /*1./6.*/scalar(j,j)/rho;
-    m_eq[5] = /*1./4.*/(SQR(j[0])-SQR(j[1]))/rho;
-    m_eq[6] = /*1./12.*/(scalar(j,j) - 3.0*SQR(j[2]))/rho;
-    m_eq[7] = j[0]*j[1]/rho;
-    m_eq[8] = j[0]*j[2]/rho;
-    m_eq[9] = j[1]*j[2]/rho;
-
-    for (i=10;i<lbmodel.n_veloc;i++) {
-        m_eq[i] = 0.0;
-    }
-
-    for (i=0;i<lbmodel.n_veloc;i++) {
-        n_eq[i] = w[i]*((rho-avg_rho) + 3.*scalar(j,c[i]) + 9./2.*SQR(scalar(j,c[i]))/rho - 3./2.*scalar(j,j)/rho);
-    }
-
-    for (i=0;i<lbmodel.n_veloc;i++) {
-        sum_n += SQR(lbfluid[1][i][index]-n_eq[i])/w[i];
-        sum_m += SQR(mode[i]-m_eq[i])/e[19][i];
-    }
-
-    if (fabs(sum_n-sum_m)>ROUND_ERROR_PREC) {
-        fprintf(stderr,"Attention: sum_n=%f sum_m=%f %e\n",sum_n,sum_m,fabs(sum_n-sum_m));
-    }
-}
-
-static void lb_init_mode_transformation() {
-#ifdef D3Q19
-    int i, j, k, l;
-    int n_veloc = 14;
-    double w[14]    = { 7./18.,
-                        1./12., 1./12., 1./12., 1./12., 1./18.,
-                        1./36., 1./36., 1./36., 1./36.,
-                        1./36., 1./36., 1./36., 1./36. };
-    double c[14][3] = { { 0., 0., 0. },
-                        { 1., 0., 0. },
-                        {-1., 0., 0. },
-                        { 0., 1., 0. },
-                        { 0.,-1., 0. },
-                        { 0., 0., 1. },
-                        { 1., 1., 0. },
-                        {-1.,-1., 0. },
-                        { 1.,-1., 0. },
-                        {-1., 1., 0. },
-                        { 1., 0., 1. },
-                        {-1., 0., 1. },
-                        { 0., 1., 1. },
-                        { 0.,-1., 1. } };
-
-    double b[19][14];
-    double e[14][14];
-    double proj, norm[14];
-
-    /* construct polynomials from the discrete velocity vectors */
-    for (i=0;i<n_veloc;i++) {
-        b[0][i]  = 1;
-        b[1][i]  = c[i][0];
-        b[2][i]  = c[i][1];
-        b[3][i]  = c[i][2];
-        b[4][i]  = scalar(c[i],c[i]);
-        b[5][i]  = c[i][0]*c[i][0]-c[i][1]*c[i][1];
-        b[6][i]  = scalar(c[i],c[i])-3*c[i][2]*c[i][2];
-        //b[5][i]  = 3*c[i][0]*c[i][0]-scalar(c[i],c[i]);
-        //b[6][i]  = c[i][1]*c[i][1]-c[i][2]*c[i][2];
-        b[7][i]  = c[i][0]*c[i][1];
-        b[8][i]  = c[i][0]*c[i][2];
-        b[9][i]  = c[i][1]*c[i][2];
-        b[10][i] = 3*scalar(c[i],c[i])*c[i][0];
-        b[11][i] = 3*scalar(c[i],c[i])*c[i][1];
-        b[12][i] = 3*scalar(c[i],c[i])*c[i][2];
-        b[13][i] = (c[i][1]*c[i][1]-c[i][2]*c[i][2])*c[i][0];
-        b[14][i] = (c[i][0]*c[i][0]-c[i][2]*c[i][2])*c[i][1];
-        b[15][i] = (c[i][0]*c[i][0]-c[i][1]*c[i][1])*c[i][2];
-        b[16][i] = 3*scalar(c[i],c[i])*scalar(c[i],c[i]);
-        b[17][i] = 2*scalar(c[i],c[i])*b[5][i];
-        b[18][i] = 2*scalar(c[i],c[i])*b[6][i];
-    }
-
-    for (i=0;i<n_veloc;i++) {
-        b[0][i]  = 1;
-        b[1][i]  = c[i][0];
-        b[2][i]  = c[i][1];
-        b[3][i]  = c[i][2];
-        b[4][i]  = scalar(c[i],c[i]);
-        b[5][i]  = SQR(c[i][0])-SQR(c[i][1]);
-        b[6][i]  = c[i][0]*c[i][1];
-        b[7][i]  = c[i][0]*c[i][2];
-        b[8][i]  = c[i][1]*c[i][2];
-        b[9][i]  = scalar(c[i],c[i])*c[i][0];
-        b[10][i] = scalar(c[i],c[i])*c[i][1];
-        b[11][i] = scalar(c[i],c[i])*c[i][2];
-        b[12][i] = (c[i][0]*c[i][0]-c[i][1]*c[i][1])*c[i][2];
-        b[13][i] = scalar(c[i],c[i])*scalar(c[i],c[i]);
-    }
-
-    /* Gram-Schmidt orthogonalization procedure */
-    for (j=0;j<n_veloc;j++) {
-        for (i=0;i<n_veloc;i++) e[j][i] = b[j][i];
-        for (k=0;k<j;k++) {
-            proj = 0.0;
-            for (l=0;l<n_veloc;l++) {
-                proj += w[l]*e[k][l]*b[j][l];
-            }
-            if (j==13) fprintf(stderr,"%d %f\n",k,proj/norm[k]);
-            for (i=0;i<n_veloc;i++) e[j][i] -= proj/norm[k]*e[k][i];
-        }
-        norm[j] = 0.0;
-        for (i=0;i<n_veloc;i++) norm[j] += w[i]*SQR(e[j][i]);
-    }
-
-    fprintf(stderr,"e[%d][%d] = {\n",n_veloc,n_veloc);
-    for (i=0;i<n_veloc;i++) {
-        fprintf(stderr,"{ % .3f",e[i][0]);
-        for (j=1;j<n_veloc;j++) {
-            fprintf(stderr,", % .3f",e[i][j]);
-        }
-        fprintf(stderr," } %.9f\n",norm[i]);
-    }
-    fprintf(stderr,"};\n");
-
-    /* projections on lattice tensors */
-    for (i=0;i<n_veloc;i++) {
-        proj = 0.0;
-        for (k=0;k<n_veloc;k++) {
-            proj += e[i][k] * w[k] * 1;
-        }
-        fprintf(stderr, "%.6f",proj);
-
-        for (j=0;j<3;j++) {
-            proj = 0.0;
-            for (k=0;k<n_veloc;k++) {
-                proj += e[i][k] * w[k] * c[k][j];
-            }
-            fprintf(stderr, " %.6f",proj);
-        }
-
-        for (j=0;j<3;j++) {
-            for (k=0;k<3;k++) {
-                proj=0.0;
-                for (l=0;l<n_veloc;l++) {
-                    proj += e[i][l] * w[l] * c[l][j] * c[l][k];
-                }
-                fprintf(stderr, " %.6f",proj);
-            }
-        }
-
-        fprintf(stderr,"\n");
-
-    }
-
-    //proj = 0.0;
-    //for (k=0;k<n_veloc;k++) {
-    //  proj += c[k][2] * w[k] * 1;
-    //}
-    //fprintf(stderr,"%.6f",proj);
-    //
-    //proj = 0.0;
-    //for (k=0;k<n_veloc;k++) {
-    //  proj += c[k][2] * w[k] * c[k][2];
-    //}
-    //fprintf(stderr," %.6f",proj);
-    //
-    //proj = 0.0;
-    //for (k=0;k<n_veloc;k++) {
-    //  proj += c[k][2] * w[k] * c[k][2] * c[k][2];
-    //}
-    //fprintf(stderr," %.6f",proj);
-    //
-    //fprintf(stderr,"\n");
-
-#else /* not D3Q19 */
-    int i, j, k, l;
-    double b[9][9];
-    double e[9][9];
-    double proj, norm[9];
-
-    double c[9][2] = { { 0, 0 },
-                       { 1, 0 },
-                       {-1, 0 },
-                       { 0, 1 },
-                       { 0,-1 },
-                       { 1, 1 },
-                       {-1,-1 },
-                       { 1,-1 },
-                       {-1, 1 } };
-
-    double w[9] = { 4./9, 1./9, 1./9, 1./9, 1./9, 1./36, 1./36, 1./36, 1./36 };
-
-    n_veloc = 9;
-
-    /* construct polynomials from the discrete velocity vectors */
-    for (i=0;i<n_veloc;i++) {
-        b[0][i] = 1;
-        b[1][i] = c[i][0];
-        b[2][i] = c[i][1];
-        b[3][i] = 3*(SQR(c[i][0]) + SQR(c[i][1]));
-        b[4][i] = c[i][0]*c[i][0]-c[i][1]*c[i][1];
-        b[5][i] = c[i][0]*c[i][1];
-        b[6][i] = 3*(SQR(c[i][0])+SQR(c[i][1]))*c[i][0];
-        b[7][i] = 3*(SQR(c[i][0])+SQR(c[i][1]))*c[i][1];
-        b[8][i] = (b[3][i]-5)*b[3][i]/2;
-    }
-
-    /* Gram-Schmidt orthogonalization procedure */
-    for (j=0;j<n_veloc;j++) {
-        for (i=0;i<n_veloc;i++) e[j][i] = b[j][i];
-        for (k=0;k<j;k++) {
-            proj = 0.0;
-            for (l=0;l<n_veloc;l++) {
-                proj += w[l]*e[k][l]*b[j][l];
-            }
-            for (i=0;i<n_veloc;i++) e[j][i] -= proj/norm[k]*e[k][i];
-        }
-        norm[j] = 0.0;
-        for (i=0;i<n_veloc;i++) norm[j] += w[i]*SQR(e[j][i]);
-    }
-
-    fprintf(stderr,"e[%d][%d] = {\n",n_veloc,n_veloc);
-    for (i=0;i<n_veloc;i++) {
-        fprintf(stderr,"{ % .1f",e[i][0]);
-        for (j=1;j<n_veloc;j++) {
-            fprintf(stderr,", % .1f",e[i][j]);
-        }
-        fprintf(stderr," } %.2f\n",norm[i]);
-    }
-    fprintf(stderr,"};\n");
-
-#endif // D3Q19
-}
-#endif /* ADDITIONAL_CHECKS */
-
-#ifdef ADDITIONAL_CHECKS
-/** Check for negative populations.
-
-    Checks for negative populations and increases failcounter for each
-    occurence.
-
-    @param  index Index of the local lattice site (Input).
-    @return Number of negative populations on the local lattice site. */
-static int lb_check_negative_n(index_t index)
-{
-    int i, localfails=0;
-
-    for (i=0; i<n_veloc; i++) {
-        if (lbfluid[1][i][index]+lbmodel.coeff[i][0]*lbpar.rho < 0.0) {
-            ++localfails;
-            ++failcounter;
-            fprintf(stderr,"%d: Negative population n[%d]=%le (failcounter=%d, rancounter=%d).\n   Check your parameters if this occurs too often!\n",this_node,i,lbmodel.coeff[i][0]*lbpar.rho+lbfluid[1][i][index],failcounter,rancounter);
-            break;
-        }
-    }
-    return localfails;
-}
-#endif /* ADDITIONAL_CHECKS */
-#endif /* #if 0 */
-/* Here, the unused "ADDITIONAL_CHECKS functions end. */
 
 #endif // LB

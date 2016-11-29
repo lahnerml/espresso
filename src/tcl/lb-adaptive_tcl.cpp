@@ -93,6 +93,33 @@ int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
   return TCL_OK;
 }
 
+#ifdef LB_ADAPTIVE_GPU
+int tclcommand_set_patch_size (ClientData data, Tcl_Interp *interp, int argc,
+                               char **argv) {
+  int patchsize;
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Setting the patch size requires one parameter.\n",
+                     (char *) NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *) NULL);
+    Tcl_AppendResult(interp, "<number of cells per patch>", (char *) NULL);
+    return TCL_ERROR;
+  }
+
+  if (!ARG_IS_I(1, patchsize)) {
+    Tcl_AppendResult(interp, "Setting the patch size requires one parameter.\n",
+                     (char *) NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *) NULL);
+    Tcl_AppendResult(interp, "<number of cells per patch>", (char *) NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call (mpi_lbadapt_set_patch_size, -1, patchsize);
+  mpi_lbadapt_set_patch_size(0, patchsize);
+
+  return TCL_OK;
+}
+#endif // LB_ADAPTIVE_GPU
+
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv) {
   /* container for parameters */

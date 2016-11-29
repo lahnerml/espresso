@@ -215,6 +215,8 @@ typedef struct lbadapt_payload {
 extern double lb_step_factor;
 
 extern int max_refinement_level;
+
+extern int lb_patchsize;
 #endif // LB_ADAPTIVE
 
 /* int to indicate fluctuations */

@@ -237,12 +237,13 @@ void lbadapt_reinit_force_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -288,11 +289,12 @@ void lbadapt_reinit_fluid_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -490,13 +492,9 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
                                  double *pi, double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
-#if 1
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
   const double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
-#else  // 0
-  const double avg_rho = lbpar.rho[0] * h * h * h;
-#endif // 0
 
   local_rho = rho;
 
@@ -598,8 +596,8 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
                               int has_force, double h, double *rho, double *j,
                               double *pi) {
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
@@ -762,8 +760,8 @@ int lbadapt_calc_modes(double population[2][19], double *mode) {
 int lbadapt_relax_modes(double *mode, double *force, double h) {
   double rho, j[3], pi_eq[6];
 
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   /* re-construct the real density
@@ -825,8 +823,8 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 }
 
 int lbadapt_thermalize_modes(double *mode) {
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
   double fluct[6];
 #ifdef GAUSSRANDOM
@@ -917,8 +915,8 @@ int lbadapt_thermalize_modes(double *mode) {
 int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double rho, u[3], C[6], *f;
 
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   f = lbfields->force;
@@ -1182,7 +1180,8 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
 void lbadapt_collide(int level) {
   int status = 0;
   double h;
-  h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+  h = (double)P8EST_QUADRANT_LEN(level) /
+      ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
   lbadapt_payload_t *data;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1312,9 +1311,10 @@ void lbadapt_stream(int level) {
 void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-  double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h = (double)P8EST_QUADRANT_LEN(level) /
+             ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
@@ -1570,7 +1570,8 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+    h = (double)P8EST_QUADRANT_LEN(level) /
+        ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1622,7 +1623,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+    h = (double)P8EST_QUADRANT_LEN(level) /
+        ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1742,7 +1744,8 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
   lbadapt_payload_t *data =
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
   double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
+  h = (double)P8EST_QUADRANT_LEN(q->level) /
+      ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 

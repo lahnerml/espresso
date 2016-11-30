@@ -2203,8 +2203,12 @@ void lb_reinit_parameters() {
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
 
+#ifdef LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(i) /
-               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+      ((double) LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(i) / (double) P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
     if (lbpar.viscosity[0] > 0.0) {
       gamma_shear[i] =
@@ -3720,8 +3724,9 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   v[0] *= lbpar.agrid / lbpar.tau;
   v[1] *= lbpar.agrid / lbpar.tau;
   v[2] *= lbpar.agrid / lbpar.tau;
-  return 0;
 #endif // LB_ADAPTIVE
+
+  return 0;
 }
 
 /** Calculate particle lattice interactions.

@@ -20,13 +20,13 @@
 */
 /** \file lb-adaptive.hpp
  *
- * Adaptive Lattice Boltzmann Scheme using CPU.
+ * Adaptive Lattice Boltzmann Scheme.
  * Header file for \ref lb-adaptive.cpp.
  *
  */
 
-#ifndef LB_ADAPTIVE_H
-#define LB_ADAPTIVE_H
+#ifndef _LB_ADAPTIVE_H
+#define _LB_ADAPTIVE_H
 
 #ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
@@ -186,6 +186,15 @@ void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
 
+/** Get the coordinates of the front lower left corner of a quadrant
+ *
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the front lower left corner
+ *                         of the current quadrant that mesh_iter is pointing
+ *                         to.
+ */
+void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, double xyz[3]);
+
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *
@@ -318,5 +327,7 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data);
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
+
 #endif // LB_ADAPTIVE
-#endif // LB_ADAPTIVE_H
+
+#endif // _LB_ADAPTIVE_H

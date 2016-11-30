@@ -170,6 +170,69 @@ void lbadapt_allocate_data() {
   }
 } // lbadapt_allocate_data();
 
+#ifndef LB_ADAPTIVE_GPU
+void init_to_zero(lbadapt_payload_t *data) {
+#else  // LB_ADAPTIVE_GPU
+void init_to_zero(lbadapt_patch_cell_t *data) {
+#endif // LB_ADAPTIVE_GPU
+  for (int i = 0; i < lbmodel.n_veloc; i++) {
+    data->lbfluid[0][i] = 0.;
+    data->lbfluid[1][i] = 0.;
+    data->modes[i] = 0.;
+  }
+
+  // ints
+  data->lbfields.recalc_fields = 1;
+  data->lbfields.has_force = 0;
+
+  // 1D "array"
+  data->lbfields.rho[0] = 0.;
+
+  // 3D arrays
+  for (int i = 0; i < 3; i++) {
+    data->lbfields.j[i] = 0;
+    data->lbfields.force[i] = 0;
+#ifdef IMMERSED_BOUNDARY
+    data->lbfields.force_buf[i] = 0;
+#endif // IMMERSED_BOUNDARY
+  }
+
+  // 6D array
+  for (int i = 0; i < 6; i++) {
+    data->lbfields.pi[i] = 0;
+  }
+}
+
+#ifndef LB_ADAPTIVE_GPU
+void lbadapt_set_force(lbadapt_payload_t *data, int level)
+#else // LB_ADAPTIVE_GPU
+void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
+#endif // LB_ADAPTIVE_GPU
+{
+#ifdef LB_ADAPTIVE_GPU
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+
+#ifdef EXTERNAL_FORCES
+  // unit conversion: force density
+  data->lbfields.force[0] =
+      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  data->lbfields.force[1] =
+      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  data->lbfields.force[2] =
+      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#else  // EXTERNAL_FORCES
+  data->lbfields.force[0] = 0.0;
+  data->lbfields.force[1] = 0.0;
+  data->lbfields.force[2] = 0.0;
+  data->lbfields.has_force = 0;
+#endif // EXTERNAL_FORCES
+}
+
 void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
@@ -196,34 +259,18 @@ void lbadapt_init() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-
         data->boundary = 0;
-        for (int i = 0; i < lbmodel.n_veloc; i++) {
-          data->lbfluid[0][i] = 0.;
-          data->lbfluid[1][i] = 0.;
-          data->modes[i] = 0.;
+#ifndef LB_ADAPTIVE_GPU
+        init_to_zero(data);
+#else  // LB_ADAPTIVE_GPU
+        for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE_HALO; ++patch_x) {
+          for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE_HALO; ++patch_y) {
+            for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE_HALO; ++patch_z) {
+              init_to_zero(&data->patch[patch_x][patch_y][patch_z]);
+            }
+          }
         }
-
-        // ints
-        data->lbfields.recalc_fields = 1;
-        data->lbfields.has_force = 0;
-
-        // 1D "array"
-        data->lbfields.rho[0] = 0.;
-
-        // 3D arrays
-        for (int i = 0; i < 3; i++) {
-          data->lbfields.j[i] = 0;
-          data->lbfields.force[i] = 0;
-#ifdef IMMERSED_BOUNDARY
-          data->lbfields.force_buf[i] = 0;
-#endif // IMMERSED_BOUNDARY
-        }
-
-        // 6D array
-        for (int i = 0; i < 6; i++) {
-          data->lbfields.pi[i] = 0;
-        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
@@ -237,13 +284,9 @@ void lbadapt_reinit_force_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
-  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    double h = (double)P8EST_QUADRANT_LEN(level) /
-               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -262,20 +305,17 @@ void lbadapt_reinit_force_per_cell() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-#ifdef EXTERNAL_FORCES
-        // unit conversion: force density
-        data->lbfields.force[0] =
-            prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[1] =
-            prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
-        data->lbfields.force[2] =
-            prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-#else  // EXTERNAL_FORCES
-        data->lbfields.force[0] = 0.0;
-        data->lbfields.force[1] = 0.0;
-        data->lbfields.force[2] = 0.0;
-        data->lbfields.has_force = 0;
-#endif // EXTERNAL_FORCES
+#ifndef LB_ADAPTIVE_GPU
+        lbadapt_set_force(data, level);
+#else  // LB_ADAPTIVE_GPU
+        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+              lbadapt_set_force(&data->patch[patch_x][patch_y][patch_z], level);
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
@@ -289,12 +329,21 @@ void lbadapt_reinit_fluid_per_cell() {
   int status;
   int lvl;
   lbadapt_payload_t *data;
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
+#ifdef LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(level) /
-               ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -318,7 +367,19 @@ void lbadapt_reinit_fluid_per_cell() {
         // start with fluid at rest and no stress
         double j[3] = {0., 0., 0.};
         double pi[6] = {0., 0., 0., 0., 0., 0.};
+#ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
+#else  // LB_ADAPTIVE_GPU
+        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+              lbadapt_calc_n_from_rho_j_pi(
+                  data->patch[patch_x][patch_y][patch_z].lbfluid, rho, j, pi,
+                  h);
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
 
 #ifdef LB_BOUNDARIES
         data->boundary = 0;
@@ -488,12 +549,25 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   }
 }
 
+void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, double *xyz) {
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(p8est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+}
+
 int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
                                  double *pi, double h) {
   int i;
   double local_rho, local_j[3], local_pi[6], trace;
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
   const double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
   local_rho = rho;
@@ -596,8 +670,13 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
                               int has_force, double h, double *rho, double *j,
                               double *pi) {
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
@@ -689,6 +768,7 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 }
 
 int lbadapt_calc_modes(double population[2][19], double *mode) {
+#ifndef LB_ADAPTIVE_GPU
 #ifdef D3Q19
   double n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p,
       n7m, n8p, n8m, n9p, n9m;
@@ -754,14 +834,23 @@ int lbadapt_calc_modes(double population[2][19], double *mode) {
   }
 #endif // D3Q19
 
+#endif // LB_ADAPTIVE_GPU
+
   return 0;
 }
 
 int lbadapt_relax_modes(double *mode, double *force, double h) {
+#ifndef LB_ADAPTIVE_GPU
   double rho, j[3], pi_eq[6];
 
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   /* re-construct the real density
@@ -819,12 +908,19 @@ int lbadapt_relax_modes(double *mode, double *force, double h) {
 // clang-format on
 #endif // !OLD_FLUCT
 
+#endif // LB_ADAPTIVE_GPU
+
   return 0;
 }
 
 int lbadapt_thermalize_modes(double *mode) {
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
   double fluct[6];
 #ifdef GAUSSRANDOM
@@ -915,8 +1011,14 @@ int lbadapt_thermalize_modes(double *mode) {
 int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   double rho, u[3], C[6], *f;
 
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
   f = lbfields->force;
@@ -956,11 +1058,11 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   lbfields->force[0] =
-    prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[1] =
-    prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[2] =
-    prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1029,6 +1131,7 @@ double lbadapt_backTransformation(double *m, int dir) {
 }
 
 int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
+#ifndef LB_ADAPTIVE_GPU
 #ifdef D3Q19
   /* index of inverse velocity vector, 0 is inverse to itself. */
   // clang-format off
@@ -1116,10 +1219,13 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
 #error OLD_FLUCT not implemented
 #endif // !OLD_FLUCT
 #endif // D3Q19
+#endif // LB_ADAPTIVE_GPU
+
   return 0;
 }
 
 void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
+#ifndef LB_ADAPTIVE_GPU
   // clang-format off
   int inv[] = {0,
                2,  1,  4,  3,  6,  5,
@@ -1175,13 +1281,18 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
       }
     }
   }
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_collide(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
-  double h;
-  h = (double)P8EST_QUADRANT_LEN(level) /
-      ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+#ifdef LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
   lbadapt_payload_t *data;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1226,9 +1337,11 @@ void lbadapt_collide(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_populate_virtuals(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
   int current_sid;
   int parent_sid;
@@ -1279,9 +1392,11 @@ void lbadapt_populate_virtuals(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_stream(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
   int lvl = level - coarsest_level_local;
@@ -1306,15 +1421,29 @@ void lbadapt_stream(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_bounce_back(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-  double h = (double)P8EST_QUADRANT_LEN(level) /
-             ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+#if 0
+#ifdef LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+#endif // 0
+
+#ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
-                 ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+  double h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
@@ -1391,9 +1520,8 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max *
-                      lbpar.rho[0] * 2 * lbmodel.c[dir_ESPR][l] *
-                      lbmodel.w[dir_ESPR] *
+                      h_max * h_max * h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                      lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
@@ -1426,9 +1554,8 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0.;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max *
-                      lbpar.rho[0] * 2 * lbmodel.c[inv[dir_ESPR]][l] *
-                      lbmodel.w[inv[dir_ESPR]] *
+                      h_max * h_max * h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                      lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
@@ -1457,9 +1584,11 @@ void lbadapt_bounce_back(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_update_populations_from_virtuals(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
   int parent_sid;
   lbadapt_payload_t *data, *parent_data;
@@ -1499,9 +1628,11 @@ void lbadapt_update_populations_from_virtuals(int level) {
   }
 
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_swap_pointers(int level) {
+#ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
   int lvl = level - coarsest_level_local;
@@ -1520,9 +1651,11 @@ void lbadapt_swap_pointers(int level) {
     }
   }
   p8est_meshiter_destroy(mesh_iter);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
+#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
   double bnd, *bnd_ptr;
@@ -1551,16 +1684,23 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
+#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
   double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
+#ifdef LB_ADAPTIVE_GPU
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     status = 0;
@@ -1570,8 +1710,12 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) /
-        ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+#ifdef LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1605,16 +1749,23 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
+#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
   double *veloc_ptr, h;
   lbadapt_payload_t *data;
 
+#ifdef LB_ADAPTIVE_GPU
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1623,8 +1774,12 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) /
-        ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+#ifdef LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1653,6 +1808,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_boundary_status() {
@@ -1662,6 +1818,14 @@ void lbadapt_get_boundary_status() {
 
   /* set boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+#ifdef LB_ADAPTIVE_GPU
+    int base = P8EST_QUADRANT_LEN(level);
+    int root = P8EST_ROOT_LEN;
+    double patch_offset =
+        ((double)base / (LBADAPT_PATCHSIZE * (double)root)) * 0.5;
+    double xyz_quad[3], xyz_patch[3];
+#endif // LB_ADAPTIVE_GPU
+
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -1676,10 +1840,33 @@ void lbadapt_get_boundary_status() {
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
 
+#ifndef LB_ADAPTIVE_GPU
         double midpoint[3];
         lbadapt_get_midpoint(mesh_iter, midpoint);
 
         data->boundary = lbadapt_is_boundary(midpoint);
+#else  // LB_ADAPTIVE_GPU
+        lbadapt_get_front_lower_left(mesh_iter, xyz_quad);
+        bool all_boundary = true;
+
+        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+              xyz_patch[0] =
+                  xyz_quad[0] + 2 * patch_x * patch_offset + patch_offset;
+              xyz_patch[1] =
+                  xyz_quad[1] + 2 * patch_y * patch_offset + patch_offset;
+              xyz_patch[2] =
+                  xyz_quad[2] + 2 * patch_z * patch_offset + patch_offset;
+              data->patch[patch_x][patch_y][patch_z].lbfields.boundary =
+                  lbadapt_is_boundary(xyz_patch);
+              all_boundary =
+                  all_boundary &&
+                  data->patch[patch_x][patch_y][patch_z].lbfields.boundary;
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
@@ -1687,8 +1874,15 @@ void lbadapt_get_boundary_status() {
 }
 
 void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho) {
+#ifndef LB_ADAPTIVE_GPU
+#ifdef LB_ADAPTIVE_GPU
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+
   lbadapt_payload_t *data;
   data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                             [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
@@ -1704,10 +1898,12 @@ void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho) {
           data->lbfluid[0][12] + data->lbfluid[0][13] + data->lbfluid[0][14] +
           data->lbfluid[0][15] + data->lbfluid[0][16] + data->lbfluid[0][17] +
           data->lbfluid[0][18];
-  // clang-format on
+// clang-format on
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j) {
+#ifndef LB_ADAPTIVE_GPU
   lbadapt_payload_t *data;
   data = &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
                             [p8est_meshiter_get_neighbor_storage_id(mesh_iter)];
@@ -1725,29 +1921,41 @@ void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j) {
          data->lbfluid[0][12] - data->lbfluid[0][13] + data->lbfluid[0][14] +
          data->lbfluid[0][15] - data->lbfluid[0][16] - data->lbfluid[0][17] +
          data->lbfluid[0][18];
-  // clang-format on
+// clang-format on
+#endif // LB_ADAPTIVE_GPU
 }
 
 /*** ITERATOR CALLBACKS ***/
 /** should no longer be needed */
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info,
                                void *user_data) {
+#ifndef LB_ADAPTIVE_GPU
   p8est_quadrant_t *q = info->quad;
   lbadapt_payload_t *data = (lbadapt_payload_t *)q->p.user_data;
 
   data->lbfields.recalc_fields = 1;
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
+#ifndef LB_ADAPTIVE_GPU
   double *rho = (double *)user_data; /* passed double to fill */
   p8est_quadrant_t *q = info->quad;  /* get current global cell id */
   lbadapt_payload_t *data =
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-  double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) /
-      ((double)lb_patchsize * (double)P8EST_ROOT_LEN);
+#ifdef LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
+#ifdef LB_ADAPTIVE_GPU
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+#endif // LB_ADAPTIVE_GPU
 
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
@@ -1772,10 +1980,12 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
           data->lbfluid[0][12] + data->lbfluid[0][13] + data->lbfluid[0][14] +
           data->lbfluid[0][15] + data->lbfluid[0][16] + data->lbfluid[0][17] +
           data->lbfluid[0][18];
-  // clang-format on
+// clang-format on
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
+#ifndef LB_ADAPTIVE_GPU
   double *bnd_vals = (double *)user_data;   /* passed array to fill */
   p8est_quadrant_t *q = info->quad;         /* get current global cell id */
   p4est_topidx_t which_tree = info->treeid; /* get current tree id */
@@ -1798,9 +2008,11 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
    */
   bnd = data->boundary;
   bnd_vals[arrayoffset] = bnd;
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
+#ifndef LB_ADAPTIVE_GPU
   lbadapt_payload_t *data = (lbadapt_payload_t *)info->quad->p.user_data;
   p8est_quadrant_t *q = info->quad;
 
@@ -1828,6 +2040,7 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 
   myfile.flush();
   myfile.close();
+#endif // LB_ADAPTIVE_GPU
 }
 
 #endif // LB_ADAPTIVE

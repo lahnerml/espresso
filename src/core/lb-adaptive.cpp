@@ -1288,10 +1288,10 @@ void lbadapt_collide(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
 #ifdef LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) /
-               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+  double h = (double)P8EST_QUADRANT_LEN(level) /
+             ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+  double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
   lbadapt_payload_t *data;
@@ -1866,6 +1866,7 @@ void lbadapt_get_boundary_status() {
             }
           }
         }
+        data->boundary = all_boundary;
 #endif // LB_ADAPTIVE_GPU
       }
     }
@@ -1944,10 +1945,10 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
   lbadapt_payload_t *data =
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
 #ifdef LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) /
-               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+  double h = (double)P8EST_QUADRANT_LEN(level) /
+             ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
+  double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 #ifdef LB_ADAPTIVE_GPU
   double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /

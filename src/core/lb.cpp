@@ -170,7 +170,6 @@ double lb_step_factor = 1.;
 
 int max_refinement_level = P8EST_QMAXLEVEL;
 
-int lb_patchsize = 1;
 #endif // LB_ADAPTIVE
 
 #ifdef ADDITIONAL_CHECKS

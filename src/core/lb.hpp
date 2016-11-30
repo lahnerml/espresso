@@ -205,18 +205,35 @@ extern double **lbfluid[2];
 /** Pointer to the hydrodynamic fields of the fluid */
 extern LB_FluidNode *lbfields;
 #else // LB_ADAPTIVE
+
+#ifdef LB_ADAPTIVE_GPU
+#define LBADAPT_PATCHSIZE 8
+#define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
+
+typedef struct lbadapt_patch_cell {
+  double lbfluid[2][19];
+  double modes[19];
+  LB_FluidNode lbfields;
+} lbadapt_patch_cell_t;
+
+typedef struct lbadapt_payload {
+  int boundary;
+  lbadapt_patch_cell_t patch[LBADAPT_PATCHSIZE_HALO][LBADAPT_PATCHSIZE_HALO]
+                            [LBADAPT_PATCHSIZE_HALO];
+} lbadapt_payload_t;
+#else  // LB_ADAPTIVE_GPU
+#define LBADAPT_PATCHSIZE 1
 typedef struct lbadapt_payload {
   int boundary;
   double lbfluid[2][19];
   double modes[19];
   LB_FluidNode lbfields;
 } lbadapt_payload_t;
+#endif  // LB_ADAPTIVE_GPU
 
 extern double lb_step_factor;
 
 extern int max_refinement_level;
-
-extern int lb_patchsize;
 #endif // LB_ADAPTIVE
 
 /* int to indicate fluctuations */

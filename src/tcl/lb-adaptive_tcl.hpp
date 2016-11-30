@@ -31,11 +31,6 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
 int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
                              char **argv);
 
-#ifdef LB_ADAPTIVE_GPU
-int tclcommand_set_patch_size (ClientData data, Tcl_Interp *interp, int argc,
-                               char **argv);
-#endif // LB_ADAPTIVE_GPU
-
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv);
 

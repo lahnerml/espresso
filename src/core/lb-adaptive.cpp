@@ -439,6 +439,9 @@ void lbadapt_patches_populate_halos(int level) {
           int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
           int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
 
+          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+          assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
           if (mesh_iter->neighbor_is_ghost) {
             neighbor_data =
                 &lbadapt_ghost_data[level - coarsest_level_ghost]
@@ -451,9 +454,6 @@ void lbadapt_patches_populate_halos(int level) {
                                        mesh_iter)];
           }
 
-          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
-          assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
-
           // before reading or writing 2 tasks need to be performed:
           // a) set basic offsets for reading and writing data
           // b) decide for each direction the number of iterations that needs to
@@ -462,7 +462,110 @@ void lbadapt_patches_populate_halos(int level) {
           int w_offset_x, w_offset_y, w_offset_z;
           int iter_max_x, iter_max_y, iter_max_z;
 
-          if (dir_p4est < P8EST_FACES) {
+          if (0 <= dir_p4est && dir_p4est < P8EST_FACES) {
+            // for faces:
+            // The face is orthogonal to the direction it is associated with.
+            // That means for populating the halo of the patch we have to
+            // iterate over the other to indices, keeping the original direction
+            // constant.
+            iter_max_x = iter_max_y = iter_max_z = LBADAPT_PATCHSIZE;
+            r_offset_x = r_offset_y = r_offset_z = 1;
+            w_offset_x = w_offset_y = w_offset_z = 0;
+            if (4 == dir_p4est & 4) {
+              iter_max_z = 1;
+              r_offset_z = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
+              w_offset_z = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
+            } else {
+              if (2 == dir_p4est & 2) {
+                iter_max_y = 1;
+                r_offset_y = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
+                w_offset_y = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
+              } else {
+                iter_max_x = 1;
+                r_offset_x = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
+                w_offset_x = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
+              }
+            }
+
+          } else if (P8EST_FACES <= dir_p4est &&
+                     dir_p4est < (P8EST_FACES + P8EST_EDGES)) {
+            // for edges:
+            // The edge is parallel to the direction it is associated with. That
+            // means for populating the halo of the patch we have to iterate
+            // over this very direction while keeping both other directions
+            // constant.
+            iter_max_x = iter_max_y = iter_max_z = 1;
+            r_offset_x = r_offset_y = r_offset_z = 1;
+            w_offset_x = w_offset_y = w_offset_z = 0;
+            int tmp_dir = dir_p4est - P8EST_FACES;
+            int main_dir = tmp_dir / 4;
+            int fc = tmp_dir % 4;
+            if (0 == main_dir) {
+              iter_max_x = LBADAPT_PATCHSIZE;
+              r_offset_x = w_offset_x = 1;
+              switch (fc) {
+              case 0:
+                r_offset_y = r_offzet_z = LBADAPT_PATCHSIZE;
+                break;
+              case 1:
+                r_offset_z = LBADAPT_PATCHSIZE;
+                w_offset_y = LBADAPT_PATCHSIZE + 1;
+                break;
+              case 2:
+                r_offset_y = LBADAPT_PATCHSIZE;
+                w_offset_z = LBADAPT_PATCHSIZE + 1;
+                break;
+              case 3:
+                w_offset_y = w_offset_z = LBADAPT_PATCHSIZE + 1;
+                break;
+              default:
+                SC_ABORT_NOT_REACHED();
+              }
+            } else if (1 == main_dir) {
+              iter_max_y = LBADAPT_PATCHSIZE;
+              r_offset_y = w_offset_y = 1;
+              switch (fc) {
+              case 0:
+                r_offset_x = r_offset_z = LBADAPT_PATCHSIZE;
+                break;
+              case 1:
+                r_offset_z = LBADAPT_PATCHSIZE;
+                w_offset_x = LBADAPT_PATCHSIZE + 1;
+                break;
+              case 2:
+                r_offset_x = LBADAPT_PATCHSIZE;
+                w_offset_z = LBADAPT_PATCHSIZE + 1;
+              case 3:
+                w_offset_x = w_offset_z = LBADAPT_PATCHSIZE + 1;
+                break;
+              default:
+                SC_ABORT_NOT_REACHED();
+              }
+            } else if (2 == main_dir) {
+              iter_max_z = LBADAPT_PATCHSIZE;
+              r_offset_z = w_offset_z = 1;
+              switch (fc) {
+              case 0:
+                r_offset_x = r_offset_y = LBADAPT_PATCHSIZE;
+                break;
+              case 1:
+                r_offset_y = LBADAPT_PATCHSIZE;
+                w_offset_x = LBADAPT_PATCHSIZE + 1;
+                break;
+              case 2:
+                r_offset_x = LBADAPT_PATCHSIZE;
+                w_offset_y = LBADAPT_PATCHSIZE + 1;
+              case 3:
+                w_offset_x = w_offset_y = LBADAPT_PATCHSIZE + 1;
+                break;
+              default:
+                SC_ABORT_NOT_REACHED();
+              }
+            } else {
+              SC_ABORT_NOT_REACHED();
+            }
+          } else {
+            SC_ABORT_NOT_REACHED();
           }
 
           // for dealing with arbitrary orientations and arbitrary neighbor
@@ -471,10 +574,9 @@ void lbadapt_patches_populate_halos(int level) {
           // TODO: Implement that
 
           // perform the actual data replication
-          for (int patch_z = 0; patch_z <= iter_max_z; ++patch_z) {
-            for (int patch_y = 0; patch_y <= iter_max_y; ++patch_y) {
-              for (int patch_x = 0; patch_x <= iter_max_x; ++patch_x) {
-
+          for (int patch_z = 0; patch_z < iter_max_z; ++patch_z) {
+            for (int patch_y = 0; patch_y < iter_max_y; ++patch_y) {
+              for (int patch_x = 0; patch_x < iter_max_x; ++patch_x) {
                 memcpy(&data->patch[w_offset_x + patch_x][w_offset_y + patch_y]
                                    [w_offset_z + patch_z],
                        &neighbor_data
@@ -531,7 +633,6 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
-  int the_boundary = -1;
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
@@ -589,7 +690,6 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     if (dist_tmp < dist) {
       dist = dist_tmp;
-      the_boundary = n;
     }
   }
 

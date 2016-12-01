@@ -263,9 +263,9 @@ void lbadapt_init() {
 #ifndef LB_ADAPTIVE_GPU
         init_to_zero(data);
 #else  // LB_ADAPTIVE_GPU
-        for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE_HALO; ++patch_x) {
+        for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE_HALO; ++patch_z) {
           for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE_HALO; ++patch_y) {
-            for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE_HALO; ++patch_z) {
+            for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE_HALO; ++patch_x) {
               init_to_zero(&data->patch[patch_x][patch_y][patch_z]);
             }
           }
@@ -308,9 +308,9 @@ void lbadapt_reinit_force_per_cell() {
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_set_force(data, level);
 #else  // LB_ADAPTIVE_GPU
-        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
           for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
-            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
               lbadapt_set_force(&data->patch[patch_x][patch_y][patch_z], level);
             }
           }
@@ -370,9 +370,9 @@ void lbadapt_reinit_fluid_per_cell() {
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
 #else  // LB_ADAPTIVE_GPU
-        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
           for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
-            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
               lbadapt_calc_n_from_rho_j_pi(
                   data->patch[patch_x][patch_y][patch_z].lbfluid, rho, j, pi,
                   h);
@@ -1849,9 +1849,9 @@ void lbadapt_get_boundary_status() {
         lbadapt_get_front_lower_left(mesh_iter, xyz_quad);
         bool all_boundary = true;
 
-        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
           for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
-            for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
               xyz_patch[0] =
                   xyz_quad[0] + 2 * patch_x * patch_offset + patch_offset;
               xyz_patch[1] =

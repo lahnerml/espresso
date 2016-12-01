@@ -411,6 +411,87 @@ int lbadapt_get_global_maxlevel() {
   return global_res;
 }
 
+#ifdef LB_ADAPTIVE_GPU
+void lbadapt_patches_populate_halos(int level) {
+  lbadapt_payload_t *data, *neighbor_data;
+  int status = 0;
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
+
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      if (!mesh_iter->current_is_ghost) {
+        data = &lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+      } else {
+        SC_ABORT_NOT_REACHED();
+      }
+      for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR) {
+        // convert direction
+        int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
+        // set neighboring cell information in iterator
+        p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
+
+        if (mesh_iter->neighbor_qid != -1) {
+          int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+          int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+
+          if (mesh_iter->neighbor_is_ghost) {
+            neighbor_data =
+                &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                   [p8est_meshiter_get_neighbor_storage_id(
+                                       mesh_iter)];
+          } else {
+            neighbor_data =
+                &lbadapt_local_data[level - coarsest_level_local]
+                                   [p8est_meshiter_get_neighbor_storage_id(
+                                       mesh_iter)];
+          }
+
+          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+          assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
+          // before reading or writing 2 tasks need to be performed:
+          // a) set basic offsets for reading and writing data
+          // b) decide for each direction the number of iterations that needs to
+          //    be performed (1 or |cells per patch|)
+          int r_offset_x, r_offset_y, r_offset_z;
+          int w_offset_x, w_offset_y, w_offset_z;
+          int iter_max_x, iter_max_y, iter_max_z;
+
+          if (dir_p4est < P8EST_FACES) {
+          }
+
+          // for dealing with arbitrary orientations and arbitrary neighbor
+          // relations: copy first to intermediate array and fill halo in
+          // current patch from that temporary storage.
+          // TODO: Implement that
+
+          // perform the actual data replication
+          for (int patch_z = 0; patch_z <= iter_max_z; ++patch_z) {
+            for (int patch_y = 0; patch_y <= iter_max_y; ++patch_y) {
+              for (int patch_x = 0; patch_x <= iter_max_x; ++patch_x) {
+
+                memcpy(&data->patch[w_offset_x + patch_x][w_offset_y + patch_y]
+                                   [w_offset_z + patch_z],
+                       &neighbor_data
+                            ->patch[r_offset_x + patch_x][r_offset_y + patch_y]
+                                   [r_offset_z + patch_z],
+                       sizeof(lbadapt_patch_cell_t));
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  p8est_meshiter_destroy(mesh_iter);
+}
+#endif // LB_ADAPTIVE_GPU
+
 /*** Load Balance ***/
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
                              p8est_quadrant_t *q) {

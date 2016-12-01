@@ -99,6 +99,12 @@ void lbadapt_reinit_fluid_per_cell();
  */
 int lbadapt_get_global_maxlevel();
 
+#ifdef LB_ADAPTIVE_GPU
+/** Populate the halos of patches of a specific level
+ */
+void lbadapt_patches_populate_halos(int level);
+#endif // LB_ADAPTIVE_GPU
+
 /** interpolating function
  *
  * \param [in]      p8est        The forest

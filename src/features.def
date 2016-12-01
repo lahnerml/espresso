@@ -87,6 +87,7 @@ INTER_DPD
 /* Lattice-Boltzmann features */
 LB
 LB_GPU                          requires CUDA
+LB_ADAPTIVE                     implies LB
 LB_BOUNDARIES                   implies LB, CONSTRAINTS
 LB_BOUNDARIES_GPU               implies LB_GPU, CONSTRAINTS
 LB_ELECTROHYDRODYNAMICS         implies LB

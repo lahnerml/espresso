@@ -222,7 +222,6 @@ typedef struct lbadapt_payload {
                             [LBADAPT_PATCHSIZE_HALO];
 } lbadapt_payload_t;
 #else  // LB_ADAPTIVE_GPU
-#define LBADAPT_PATCHSIZE 1
 typedef struct lbadapt_payload {
   int boundary;
   double lbfluid[2][19];

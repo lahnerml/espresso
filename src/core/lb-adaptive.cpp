@@ -471,12 +471,12 @@ void lbadapt_patches_populate_halos(int level) {
             iter_max_x = iter_max_y = iter_max_z = LBADAPT_PATCHSIZE;
             r_offset_x = r_offset_y = r_offset_z = 1;
             w_offset_x = w_offset_y = w_offset_z = 0;
-            if (4 == dir_p4est & 4) {
+            if (4 == (dir_p4est & 4)) {
               iter_max_z = 1;
               r_offset_z = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
               w_offset_z = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
             } else {
-              if (2 == dir_p4est & 2) {
+              if (2 == (dir_p4est & 2)) {
                 iter_max_y = 1;
                 r_offset_y = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
                 w_offset_y = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
@@ -505,7 +505,7 @@ void lbadapt_patches_populate_halos(int level) {
               r_offset_x = w_offset_x = 1;
               switch (fc) {
               case 0:
-                r_offset_y = r_offzet_z = LBADAPT_PATCHSIZE;
+                r_offset_y = r_offset_z = LBADAPT_PATCHSIZE;
                 break;
               case 1:
                 r_offset_z = LBADAPT_PATCHSIZE;

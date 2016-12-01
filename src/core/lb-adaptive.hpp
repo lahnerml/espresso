@@ -330,6 +330,189 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 
+#ifdef LB_ADAPTIVE_GPU
+/** This is actually taken from p4est and extended to patches. :P */
+#define P4EST_VTK_CELL_TYPE     11      /* VTK_VOXEL */
+
+/** Opaque context type for writing VTK output with multiple function calls.
+ */
+typedef struct lbadapt_vtk_context
+{
+  /* data passed initially */
+  char               *filename;    /**< Original filename provided is copied. */
+  char                vtk_float_type[8];
+
+  /* internal context data */
+  int                 writing;     /**< True after p4est_vtk_write_header. */
+  p4est_locidx_t      num_corners; /**< Number of local element corners. */
+  p4est_locidx_t      num_points;  /**< Number of VTK points written. */
+  p4est_locidx_t     *node_to_corner;     /**< Map a node to an element corner. */
+  p8est_nodes_t      *nodes;       /**< NULL? depending on scale/continuous. */
+  char                vtufilename[BUFSIZ];   /**< Each process writes one. */
+  char                pvtufilename[BUFSIZ];  /**< Only root writes this one. */
+  char                visitfilename[BUFSIZ]; /**< Only root writes this one. */
+  FILE               *vtufile;     /**< File pointer for the VTU file. */
+  FILE               *pvtufile;    /**< Paraview meta file. */
+  FILE               *visitfile;   /**< Visit meta file. */
+} lbadapt_vtk_context_t;
+
+/** The first call to write a VTK file using individual functions.
+ *
+ * Writing a VTK file is split into multiple functions that keep a context.
+ * This is the first function that allocates the opaque context structure.
+ * After allocation, further parameters can be set for the context.
+ * Then, the header, possible data fields, and the footer must be written.
+ * The process can be aborted any time by destroying the context.  In this
+ * case, open files are closed cleanly with only partially written content.
+ *
+ * \param p4est     The p8est to be written.
+ *                  If no geometry is specified in
+ *                  \ref p8est_vtk_context_set_geom, we require
+ *                  \b p8est->connectivity to have valid vertex arrays.
+ * \param filename  The first part of the name which will have the processor
+ *                  number appended to it (i.e., the output file will be
+ *                  filename_rank.vtu).  The parallel meta-files for Paraview
+ *                  and Visit use this basename too.
+ *                  We copy this filename to internal storage, so it is not
+ *                  needed to remain alive after calling this function.
+ * \return          A VTK context fur further use.
+ */
+lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename);
+
+/** Cleanly destroy a \ref p8est_vtk_context_t structure.
+ *
+ * This function closes all the file pointers and frees the context.
+ * Tt can be called even if the VTK output
+ * has only been partially written, the files' content will be incomplete.
+ *
+ * \param[in] context     The VTK file context to be destroyed.
+ */
+void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context);
+
+/** Write the VTK header.
+ *
+ * Writing a VTK file is split into a few routines.
+ * This allows there to be an arbitrary number of
+ * fields.  The calling sequence would be something like
+ *
+ *     vtk_context = p8est_vtk_context_new (p8est, "output");
+ *     p8est_vtk_context_set_* (vtk_context, parameter);
+ *     vtk_context = p8est_vtk_write_header (vtk_context, ...);
+ *     if (vtk_context == NULL) { error; }
+ *     vtk_context = p8est_vtk_write_cell_data (vtk_context, ...);
+ *     if (vtk_context == NULL) { error; }
+ *     vtk_context = p8est_vtk_write_point_data (vtk_context, ...);
+ *     if (vtk_context == NULL) { error; }
+ *     retval = p8est_vtk_write_footer (vtk_context);
+ *     if (retval) { error; }
+ *
+ * \param [in,out] cont    A VTK context created by \ref p8est_vtk_context_new.
+ *                         None of the vtk_write functions must have been
+ * called.
+ *                         This context is the return value if no error occurs.
+ *
+ * \return          On success, an opaque context (p8est_vtk_context_t) pointer
+ *                  that must be passed to subsequent p8est_vtk calls.  It is
+ *                  required to call \ref p8est_vtk_write_footer eventually with
+ *                  this value.  Returns NULL on error.
+ */
+lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont);
+
+/** Write VTK cell data.
+ *
+ * There are options to have this function write
+ * the tree id, quadrant level, or MPI rank without explicit input data.
+ *
+ * Writing a VTK file is split into a few routines.
+ * This allows there to be an arbitrary number of
+ * fields.
+ *
+ * \param [in,out] cont    A VTK context created by \ref p8est_vtk_context_new.
+ * \param [in] write_tree  Boolean to determine if the tree id should be output.
+ * \param [in] write_level Boolean to determine if the tree levels should be
+ * output.
+ * \param [in] write_rank  Boolean to determine if the MPI rank should be
+ * output.
+ * \param [in] wrap_rank   Number to wrap around the rank with a modulo
+ * operation.
+ *                         Can be 0 for no wrapping.
+ * \param [in] num_cell_scalars Number of cell scalar datasets to output.
+ * \param [in] num_cell_vectors Number of cell vector datasets to output.
+ *
+ * The variable arguments need to be pairs of (fieldname, fieldvalues), followed
+ * by a final argument of the VTK context cont (same as the first argument).
+ * The cell scalar pairs come first, followed by the cell vector pairs, then
+ * cont.
+ * Each 'fieldname' argument shall be a char string containing the name of the
+ * data
+ * contained in the following 'fieldvalues'.  Each of the 'fieldvalues'
+ * arguments shall be an sc_array_t * holding lb_float variables.  The number of
+ * lb_floats in each sc_array must be exactly \a p4est->local_num_quadrants for
+ * scalar data and \a 3*p4est->local_num_quadrants for vector data.
+ *
+ * \note The current p8est_vtk_context_t structure, \a cont, must be the first
+ * and the last argument
+ * of any call to this function; this argument is used to validate that the
+ * correct number of variable arguments have been provided.
+ *
+ * \return          On success, the context that has been passed in.
+ *                  On failure, returns NULL and deallocates the context.
+ */
+lbadapt_vtk_context_t *
+lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
+                             int write_level, int write_rank, int wrap_rank,
+                             int num_cell_scalars, int num_cell_vectors, ...);
+
+/** Write VTK point data.
+ *
+ * Writing a VTK file is split into a few routines.
+ * This allows there to be an arbitrary number of
+ * fields.
+ *
+ * \param [in,out] cont    A VTK context created by \ref p8est_vtk_context_new.
+ * \param [in] num_point_scalars Number of point scalar datasets to output.
+ * \param [in] num_point_vectors Number of point vector datasets to output.
+ *
+ * The variable arguments need to be pairs of (fieldname, fieldvalues) where
+ * the point scalar pairs come first, followed by the point vector pairs.  Each
+ * 'fieldname' argument shall be a char string containing the name of the data
+ * contained in the following 'fieldvalues'. Each of the 'fieldvalues'
+ * arguments shall be an sc_array_t * holding lb_float variables. The number of
+ * lb_floats in each sc_array must be exactly the number of components (1 for
+ * scalar and 3 for vector) times 8 times number of elements.
+ *
+ * \note The current
+ * p8est_vtk_context_t structure, cont, must be the last argument of any call
+ * to this function; this argument is used to validate that the correct number
+ * of variable arguments have been provided.
+ *
+ * \note The number of point scalar data in each
+ * sc_array must be exactly \a P8EST_CHILDREN*local_num_quadrants, and the
+ * number of point vector data must be exactly \a
+ * 3*P8EST_CHILDREN*local_num_quadrants. I.e. there must be data for every
+ * corner of every quadrant in the \a p8est, even if the corner is shared by
+ * multiple quadrants.
+ *
+ * \return          On success, the context that has been passed in.
+ *                  On failure, returns NULL and deallocates the context.
+ */
+lbadapt_vtk_context_t *p8est_vtk_write_point_dataf(lbadapt_vtk_context_t *cont,
+                                                   int num_point_scalars,
+                                                   int num_point_vectors, ...);
+
+/** Write the VTU footer and clean up.
+ *
+ * Writing a VTK file is split into a few routines.
+ * This function writes the footer information to the VTK file and cleanly
+ * destroys the VTK context.
+ *
+ * \param [in] cont Context is deallocated before the function returns.
+ *
+ * \return          This returns 0 if no error and -1 if there is an error.
+ */
+int lbadapt_vtk_write_footer(lbadapt_vtk_context_t *cont);
+#endif // LB_ADAPTIVE_GPU
+
 #endif // LB_ADAPTIVE
 
 #endif // _LB_ADAPTIVE_H

@@ -446,7 +446,8 @@ inline void unit_vector(double v[3], double y[3]) {
 }
 
 /** calculates the scalar product of two vectors a nd b */
-inline double scalar(double a[3], double b[3]) {
+template <typename T>
+inline T scalar(T a[3], T b[3]) {
   double d2 = 0.0;
   int i;
   for (i = 0; i < 3; i++)

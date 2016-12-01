@@ -61,6 +61,16 @@ extern int lb_components ; // global variable holding the number of fluid compon
 #define LB_COUPLE_TWO_POINT   2
 #define LB_COUPLE_THREE_POINT 4
 
+#ifdef LB_ADAPTIVE_GPU
+#define LBADAPT_PATCHSIZE 8
+#define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
+
+typedef float lb_float;
+// typedef double lb_float;
+#else // LB_ADAPTIVE_GPU
+typedef double lb_float;
+#endif // LB_ADAPTIVE_GPU
+
 /*@}*/
   /** Some general remarks:
    * This file implements the LB D3Q19 method to Espresso. The LB_Model
@@ -79,6 +89,7 @@ extern int lb_components ; // global variable holding the number of fluid compon
    * which is constructed as 2 x (Nx x Ny x Nz) x 19 array.
    */
 
+#ifndef LB_ADAPTIVE
 /** Description of the LB Model in terms of the unit vectors of the 
  *  velocity sub-lattice and the corresponding coefficients 
  *  of the pseudo-equilibrium distribution */
@@ -186,6 +197,59 @@ typedef struct {
 
   int resend_halo;
 } LB_Parameters;
+#else // LB_ADAPTIVE
+#ifdef LB_ADAPTIVE_GPU
+typedef float lb_float;
+// typedef double lb_float;
+#else // LB_ADAPTIVE_GPU
+typedef double lb_float;
+#endif // LB_ADAPTIVE_GPU
+
+// define the very same structs, only use typedef for floating point numbers and
+// do not duplicate documentation
+typedef struct {
+  int n_veloc ;
+  lb_float (*c)[3];
+  lb_float (*coeff)[4];
+  lb_float (*w);
+  lb_float **e;
+  lb_float c_sound_sq;
+} LB_Model;
+
+typedef struct {
+  int recalc_fields;
+  lb_float rho[1];
+  lb_float j[3];
+  lb_float pi[6];
+  int has_force;
+  lb_float force[3];
+#ifdef IMMERSED_BOUNDARY
+  lb_float force_buf[3];
+#endif
+#ifdef LB_BOUNDARIES
+   int boundary;
+#endif // LB_BOUNDARIES
+} LB_FluidNode;
+
+typedef struct {
+  lb_float rho[LB_COMPONENTS];
+  lb_float viscosity[LB_COMPONENTS];
+  lb_float bulk_viscosity[LB_COMPONENTS];
+  lb_float agrid;
+  lb_float tau;
+
+  /** the initial level based on which the number of LB steps is defined */
+  int base_level;
+
+  lb_float friction[LB_COMPONENTS];
+  lb_float ext_force[3]; /* Open question: Do we want a local force or global force? */
+  lb_float rho_lb_units[LB_COMPONENTS];
+  lb_float gamma_odd[LB_COMPONENTS];
+  lb_float gamma_even[LB_COMPONENTS];
+  bool is_TRT;
+  int resend_halo;
+} LB_Parameters;
+#endif // LB_ADAPTIVE
 
 /** The DnQm model to be used. */
 extern LB_Model lbmodel;
@@ -209,8 +273,6 @@ extern LB_FluidNode *lbfields;
 #ifdef LB_ADAPTIVE_GPU
 #define LBADAPT_PATCHSIZE 8
 #define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
-typedef float lb_float;
-// typedef double lb_float;
 
 typedef struct lbadapt_patch_cell {
   lb_float lbfluid[2][19];
@@ -224,7 +286,6 @@ typedef struct lbadapt_payload {
                             [LBADAPT_PATCHSIZE_HALO];
 } lbadapt_payload_t;
 #else  // LB_ADAPTIVE_GPU
-typedef double lb_float;
 typedef struct lbadapt_payload {
   int boundary;
   lb_float lbfluid[2][19];
@@ -601,7 +662,7 @@ int lb_lbfluid_get_ext_force(double* p_f);
 #ifdef SHANCHEN
 int lb_lbfluid_set_shanchen_coupling(double * p_coupling);
 int lb_lbfluid_set_mobility(double * p_mobility);
-#endif 
+#endif // SHANCHEN
 int lb_set_lattice_switch(int py_switch);
 int lb_get_lattice_switch(int* py_switch);
 

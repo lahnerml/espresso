@@ -631,7 +631,12 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float midpoint[3];
   lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
 
-  lb_float dist, dist_tmp, dist_vec[3];
+  double mp[3];
+  mp[0] = midpoint[0];
+  mp[1] = midpoint[1];
+  mp[2] = midpoint[2];
+
+  double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
   std::vector<int>::iterator it;
 
@@ -646,39 +651,39 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     switch (lb_boundaries[n].type) {
     case LB_BOUNDARY_WAL:
-      calculate_wall_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_wall_dist((Particle *)NULL, mp, (Particle *)NULL,
                           &lb_boundaries[n].c.wal, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_SPH:
-      calculate_sphere_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_sphere_dist((Particle *)NULL, mp, (Particle *)NULL,
                             &lb_boundaries[n].c.sph, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_CYL:
-      calculate_cylinder_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_cylinder_dist((Particle *)NULL, mp, (Particle *)NULL,
                               &lb_boundaries[n].c.cyl, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_RHOMBOID:
-      calculate_rhomboid_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_rhomboid_dist((Particle *)NULL, mp, (Particle *)NULL,
                               &lb_boundaries[n].c.rhomboid, &dist_tmp,
                               dist_vec);
       break;
 
     case LB_BOUNDARY_POR:
-      calculate_pore_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_pore_dist((Particle *)NULL, mp, (Particle *)NULL,
                           &lb_boundaries[n].c.pore, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_STOMATOCYTE:
-      calculate_stomatocyte_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_stomatocyte_dist((Particle *)NULL, mp, (Particle *)NULL,
                                  &lb_boundaries[n].c.stomatocyte, &dist_tmp,
                                  dist_vec);
       break;
 
     case LB_BOUNDARY_HOLLOW_CONE:
-      calculate_hollow_cone_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_hollow_cone_dist((Particle *)NULL, mp, (Particle *)NULL,
                                  &lb_boundaries[n].c.hollow_cone, &dist_tmp,
                                  dist_vec);
       break;
@@ -706,11 +711,12 @@ void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
   int base = P8EST_QUADRANT_LEN(q->level);
   int root = P8EST_ROOT_LEN;
   lb_float half_length = ((lb_float)base / (lb_float)root) * 0.5;
+  double tmp[3];
 
   p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
+                         tmp);
   for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
+    xyz[i] = tmp[i] + half_length;
   }
 }
 
@@ -721,21 +727,26 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
 
   p8est_quadrant_t *q = p8est_mesh_get_quadrant(
       mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  double tmp[3];
   p8est_qcoord_to_vertex(p8est->connectivity,
                          mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
+                         q->x, q->y, q->z, tmp);
 
   for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
+    xyz[i] = tmp[i] + half_length;
   }
 }
 
 void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
   p8est_quadrant_t *q = p8est_mesh_get_quadrant(
       mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  double tmp[3];
   p8est_qcoord_to_vertex(p8est->connectivity,
                          mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
+                         q->x, q->y, q->z, tmp);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] = tmp[i];
+  }
 }
 
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
@@ -2002,9 +2013,10 @@ void lbadapt_get_boundary_status() {
 #ifdef LB_ADAPTIVE_GPU
     int base = P8EST_QUADRANT_LEN(level);
     int root = P8EST_ROOT_LEN;
-    lb_float patch_offset =
+    double patch_offset =
         ((lb_float)base / (LBADAPT_PATCHSIZE * (lb_float)root)) * 0.5;
-    lb_float xyz_quad[3], xyz_patch[3];
+    lb_float xyz_quad[3];
+    double xyz_patch[3];
 #endif // LB_ADAPTIVE_GPU
 
     status = 0;
@@ -2022,7 +2034,7 @@ void lbadapt_get_boundary_status() {
             mesh_iter)];
 
 #ifndef LB_ADAPTIVE_GPU
-        lb_float midpoint[3];
+        double midpoint[3];
         lbadapt_get_midpoint(mesh_iter, midpoint);
 
         data->boundary = lbadapt_is_boundary(midpoint);
@@ -2225,5 +2237,412 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
   myfile.close();
 #endif // LB_ADAPTIVE_GPU
 }
+
+#ifdef LB_ADAPTIVE_GPU
+lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
+  lbadapt_vtk_context_t *cont;
+
+  assert(filename != NULL);
+
+  /* Allocate, initialize the vtk context.  Important to zero all fields. */
+  cont = P4EST_ALLOC_ZERO(lbadapt_vtk_context_t, 1);
+
+  cont->filename = P4EST_STRDUP(filename);
+
+  if (sizeof(float) == sizeof(lb_float)) {
+    strcpy(cont->vtk_float_type, "Float32");
+  } else if (sizeof(double) == sizeof(lb_float)) {
+    strcpy(cont->vtk_float_type, "Float64");
+  } else {
+    SC_ABORT_NOT_REACHED();
+  }
+
+  return cont;
+}
+
+void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context) {
+  P4EST_ASSERT(context != NULL);
+
+  /* since this function is called inside write_header and write_footer,
+   * we cannot assume a consistent state of all member variables */
+
+  P4EST_ASSERT(context->filename != NULL);
+  P4EST_FREE(context->filename);
+
+  /* deallocate node storage */
+  if (context->nodes != NULL) {
+    p8est_nodes_destroy(context->nodes);
+  }
+  P4EST_FREE(context->node_to_corner);
+
+  /* Close all file pointers. */
+  if (context->vtufile != NULL) {
+    if (fclose(context->vtufile)) {
+      P4EST_LERRORF(P8EST_STRING "_vtk: Error closing <%s>.\n",
+                    context->vtufilename);
+    }
+    context->vtufile = NULL;
+  }
+
+  /* Close paraview master file */
+  if (context->pvtufile != NULL) {
+    /* Only the root process opens/closes these files. */
+    P4EST_ASSERT(p8est->mpirank == 0);
+    if (fclose(context->pvtufile)) {
+      P4EST_LERRORF(P8EST_STRING "_vtk: Error closing <%s>.\n",
+                    context->pvtufilename);
+    }
+    context->pvtufile = NULL;
+  }
+
+  /* Close visit master file */
+  if (context->visitfile != NULL) {
+    /* Only the root process opens/closes these files. */
+    P4EST_ASSERT(p8est->mpirank == 0);
+    if (fclose(context->visitfile)) {
+      P4EST_LERRORF(P8EST_STRING "_vtk: Error closing <%s>.\n",
+                    context->visitfilename);
+    }
+    context->visitfile = NULL;
+  }
+
+  /* Free context structure. */
+  P4EST_FREE(context);
+}
+
+lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
+  const lb_float intsize = 1.0 / P8EST_ROOT_LEN;
+  int mpirank;
+  const char *filename;
+  const lb_float *v;
+  const p4est_topidx_t *tree_to_vertex;
+  p4est_topidx_t first_local_tree, last_local_tree;
+  p4est_locidx_t Ncells, Ncorners;
+  p8est_t *p4est;
+  p8est_connectivity_t *connectivity;
+#ifdef P4EST_VTK_ASCII
+  lb_float wx, wy, wz;
+#else
+  int retval;
+  uint8_t *uint8_data;
+  p4est_locidx_t *locidx_data;
+#endif
+  int xi, yi, j, k;
+  int zi;
+  lb_float h2, eta_x, eta_y, eta_z = 0.;
+  lb_float xyz[3], XYZ[3]; /* 3 not P4EST_DIM */
+  size_t num_quads, zz;
+  p4est_topidx_t jt;
+  p4est_topidx_t vt[P8EST_CHILDREN];
+  p4est_locidx_t quad_count, Npoints;
+  p4est_locidx_t sk, il, ntcid, *ntc;
+  float *float_data;
+  sc_array_t *quadrants, *indeps;
+  sc_array_t *trees;
+  p8est_tree_t *tree;
+  p8est_quadrant_t *quad;
+  p8est_nodes_t *nodes;
+  p8est_indep_t *in;
+
+  /* check a whole bunch of assertions, here and below */
+  P4EST_ASSERT(cont != NULL);
+  P4EST_ASSERT(!cont->writing);
+
+  /* avoid uninitialized warning */
+  for (k = 0; k < P8EST_CHILDREN; ++k) {
+    vt[k] = -(k + 1);
+  }
+
+  /* from now on this context is officially in use for writing */
+  cont->writing = 1;
+
+  /* grab context variables */
+  p4est = p8est;
+  filename = cont->filename;
+  P4EST_ASSERT(filename != NULL);
+
+  /* grab details from the forest */
+  P4EST_ASSERT(p4est != NULL);
+  mpirank = p4est->mpirank;
+  connectivity = p4est->connectivity;
+  P4EST_ASSERT(connectivity != NULL);
+  v = (lb_float *)connectivity->vertices;
+  tree_to_vertex = connectivity->tree_to_vertex;
+
+  SC_CHECK_ABORT(connectivity->num_vertices > 0,
+                 "Must provide connectivity with vertex information");
+  P4EST_ASSERT(v != NULL && tree_to_vertex != NULL);
+
+  trees = p4est->trees;
+  first_local_tree = p4est->first_local_tree;
+  last_local_tree = p4est->last_local_tree;
+  Ncells = p4est->local_num_quadrants;
+
+  cont->num_corners = Ncorners = P8EST_CHILDREN * Ncells;
+  cont->nodes = nodes = p8est_nodes_new(p4est, NULL);
+  indeps = &nodes->indep_nodes;
+  cont->num_points = Npoints = nodes->num_owned_indeps;
+  P4EST_ASSERT((size_t)Npoints == indeps->elem_count);
+
+  /* Establish a reverse lookup table from a node to its first reference.
+   * It is slow to run twice through memory like this.  However, we also know
+   * that writing data to disk is slower still, so we do not optimize.
+   */
+  cont->node_to_corner = ntc = P4EST_ALLOC(p4est_locidx_t, Npoints);
+  memset(ntc, -1, Npoints * sizeof(p4est_locidx_t));
+  for (sk = 0, il = 0; il < Ncells; ++il) {
+    for (k = 0; k < P8EST_CHILDREN; ++sk, ++k) {
+      ntcid = nodes->local_nodes[sk];
+      P4EST_ASSERT(0 <= ntcid && ntcid < Npoints);
+      if (ntc[ntcid] < 0) {
+        ntc[ntcid] = sk;
+      }
+    }
+  }
+#ifdef P4EST_ENABLE_DEBUG
+  /* the particular version of nodes we call makes sure they are tight */
+  for (ntcid = 0; ntcid < Npoints; ++ntcid) {
+    P4EST_ASSERT(0 <= ntc[ntcid] && ntc[ntcid] < Ncorners);
+  }
+#endif
+
+  /* Have each proc write to its own file */
+  snprintf(cont->vtufilename, BUFSIZ, "%s_%04d.vtu", filename, mpirank);
+  /* Use "w" for writing the initial part of the file.
+   * For further parts, use "r+" and fseek so write_compressed succeeds.
+   */
+  cont->vtufile = fopen(cont->vtufilename, "wb");
+  if (cont->vtufile == NULL) {
+    P4EST_LERRORF("Could not open %s for output\n", cont->vtufilename);
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+
+  fprintf(cont->vtufile, "<?xml version=\"1.0\"?>\n");
+  fprintf(cont->vtufile, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\"");
+#if defined P4EST_VTK_BINARY && defined P4EST_VTK_COMPRESSION
+  fprintf(cont->vtufile, " compressor=\"vtkZLibDataCompressor\"");
+#endif
+#ifdef SC_IS_BIGENDIAN
+  fprintf(cont->vtufile, " byte_order=\"BigEndian\">\n");
+#else
+  fprintf(cont->vtufile, " byte_order=\"LittleEndian\">\n");
+#endif
+  fprintf(cont->vtufile, "  <UnstructuredGrid>\n");
+  fprintf(cont->vtufile,
+          "    <Piece NumberOfPoints=\"%lld\" NumberOfCells=\"%lld\">\n",
+          (long long)Npoints, (long long)Ncells);
+  fprintf(cont->vtufile, "      <Points>\n");
+
+  float_data = P4EST_ALLOC(lb_float, 3 * Npoints);
+
+  /* write point position data */
+  fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"Position\""
+                         " NumberOfComponents=\"3\" format=\"%s\">\n",
+          cont->vtk_float_type, "binary");
+
+  if (nodes == NULL) {
+    /* loop over the trees */
+    for (jt = first_local_tree, quad_count = 0; jt <= last_local_tree; ++jt) {
+      tree = p8est_tree_array_index(trees, jt);
+      quadrants = &tree->quadrants;
+      num_quads = quadrants->elem_count;
+
+      /* retrieve corners of the tree */
+      for (k = 0; k < P8EST_CHILDREN; ++k) {
+        vt[k] = tree_to_vertex[jt * P8EST_CHILDREN + k];
+      }
+
+      /* loop over the elements in tree and calculate vertex coordinates */
+      for (zz = 0; zz < num_quads; ++zz, ++quad_count) {
+        quad = p8est_quadrant_array_index(quadrants, zz);
+        h2 = .5 * intsize * P8EST_QUADRANT_LEN(quad->level);
+        k = 0;
+        for (zi = 0; zi < 2; ++zi) {
+          eta_z = intsize * quad->z + h2 * (1. + (zi * 2 - 1));
+          for (yi = 0; yi < 2; ++yi) {
+            eta_y = intsize * quad->y + h2 * (1. + (yi * 2 - 1));
+            for (xi = 0; xi < 2; ++xi) {
+              P4EST_ASSERT(0 <= k && k < P8EST_CHILDREN);
+              eta_x = intsize * quad->x + h2 * (1. + (xi * 2 - 1));
+                for (j = 0; j < 3; ++j) {
+                  xyz[j] =
+                      ((1. - eta_z) *
+                           ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[0] + j] +
+                                            eta_x * v[3 * vt[1] + j]) +
+                            eta_y * ((1. - eta_x) * v[3 * vt[2] + j] +
+                                     eta_x * v[3 * vt[3] + j]))
+                       +
+                       eta_z *
+                           ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[4] + j] +
+                                            eta_x * v[3 * vt[5] + j]) +
+                            eta_y * ((1. - eta_x) * v[3 * vt[6] + j] +
+                                     eta_x * v[3 * vt[7] + j]))
+                           );
+                  float_data[3 * (P8EST_CHILDREN * quad_count + k) + j] =
+                      (lb_float)xyz[j];
+                }
+              }
+              ++k;
+            }
+          }
+        }
+        P4EST_ASSERT(k == P8EST_CHILDREN);
+      }
+    }
+    P4EST_ASSERT(P8EST_CHILDREN * quad_count == Npoints);
+
+  fprintf(cont->vtufile, "          ");
+  /* TODO: Don't allocate the full size of the array, only allocate
+   * the chunk that will be passed to zlib and do this a chunk
+   * at a time.
+   */
+  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
+                               sizeof(*float_data) * 3 * Npoints);
+  fprintf(cont->vtufile, "\n");
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding points\n");
+    lbadapt_vtk_context_destroy(cont);
+    P4EST_FREE(float_data);
+    return NULL;
+  }
+  P4EST_FREE(float_data);
+
+  fprintf(cont->vtufile, "        </DataArray>\n");
+  fprintf(cont->vtufile, "      </Points>\n");
+  fprintf(cont->vtufile, "      <Cells>\n");
+
+  /* write connectivity data */
+  fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"connectivity\""
+                         " format=\"%s\">\n",
+          P4EST_VTK_LOCIDX, "binary");
+
+  fprintf(cont->vtufile, "          ");
+  if (nodes == NULL) {
+    locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncorners);
+    for (il = 0; il < Ncorners; ++il) {
+      locidx_data[il] = il;
+    }
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
+                                    sizeof(p4est_locidx_t) * Ncorners);
+    P4EST_FREE(locidx_data);
+  } else {
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)nodes->local_nodes,
+                                    sizeof(p4est_locidx_t) * Ncorners);
+  }
+  fprintf(cont->vtufile, "\n");
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding connectivity\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+  fprintf(cont->vtufile, "        </DataArray>\n");
+
+  /* write offset data */
+  fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"offsets\""
+                         " format=\"%s\">\n",
+          P4EST_VTK_LOCIDX, "binary");
+  locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncells);
+  for (il = 1; il <= Ncells; ++il)
+    locidx_data[il - 1] = P8EST_CHILDREN * il; /* same type */
+
+  fprintf(cont->vtufile, "          ");
+  retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
+                               sizeof(p4est_locidx_t) * Ncells);
+  fprintf(cont->vtufile, "\n");
+
+  P4EST_FREE(locidx_data);
+
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding offsets\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+  fprintf(cont->vtufile, "        </DataArray>\n");
+
+  /* write type data */
+  fprintf(cont->vtufile, "        <DataArray type=\"UInt8\" Name=\"types\""
+                         " format=\"%s\">\n",
+          "binary");
+  uint8_data = P4EST_ALLOC(uint8_t, Ncells);
+  for (il = 0; il < Ncells; ++il)
+    uint8_data[il] = P4EST_VTK_CELL_TYPE;
+
+  fprintf(cont->vtufile, "          ");
+  retval = sc_vtk_write_binary(cont->vtufile, (char *)uint8_data,
+                                  sizeof(*uint8_data) * Ncells);
+  fprintf(cont->vtufile, "\n");
+
+  P4EST_FREE(uint8_data);
+
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+  fprintf(cont->vtufile, "        </DataArray>\n");
+  fprintf(cont->vtufile, "      </Cells>\n");
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error writing header\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+
+  /* Only have the root write to the parallel vtk file */
+  if (mpirank == 0) {
+    snprintf(cont->pvtufilename, BUFSIZ, "%s.pvtu", filename);
+
+    cont->pvtufile = fopen(cont->pvtufilename, "wb");
+    if (!cont->pvtufile) {
+      P4EST_LERRORF("Could not open %s for output\n", cont->pvtufilename);
+      lbadapt_vtk_context_destroy(cont);
+      return NULL;
+    }
+
+    fprintf(cont->pvtufile, "<?xml version=\"1.0\"?>\n");
+    fprintf(cont->pvtufile,
+            "<VTKFile type=\"PUnstructuredGrid\" version=\"0.1\"");
+    fprintf(cont->pvtufile, " compressor=\"vtkZLibDataCompressor\"");
+#ifdef SC_IS_BIGENDIAN
+    fprintf(cont->pvtufile, " byte_order=\"BigEndian\">\n");
+#else
+    fprintf(cont->pvtufile, " byte_order=\"LittleEndian\">\n");
+#endif
+
+    fprintf(cont->pvtufile, "  <PUnstructuredGrid GhostLevel=\"0\">\n");
+    fprintf(cont->pvtufile, "    <PPoints>\n");
+    fprintf(cont->pvtufile, "      <PDataArray type=\"%s\" Name=\"Position\""
+                            " NumberOfComponents=\"3\" format=\"%s\"/>\n",
+            cont->vtk_float_type, "binary");
+    fprintf(cont->pvtufile, "    </PPoints>\n");
+
+    if (ferror(cont->pvtufile)) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error writing parallel header\n");
+      lbadapt_vtk_context_destroy(cont);
+      return NULL;
+    }
+
+    /* Create a master file for visualization in Visit; this will be used
+     * only in p4est_vtk_write_footer().
+     */
+    snprintf(cont->visitfilename, BUFSIZ, "%s.visit", filename);
+    cont->visitfile = fopen(cont->visitfilename, "wb");
+    if (!cont->visitfile) {
+      P4EST_LERRORF("Could not open %s for output\n", cont->visitfilename);
+      lbadapt_vtk_context_destroy(cont);
+      return NULL;
+    }
+  }
+
+  /* the nodes object is no longer needed */
+  if (nodes != NULL) {
+    p8est_nodes_destroy(cont->nodes);
+    cont->nodes = NULL;
+  }
+
+  return cont;
+}
+#endif // LB_ADAPTIVE_GPU
 
 #endif // LB_ADAPTIVE

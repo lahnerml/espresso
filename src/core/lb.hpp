@@ -209,10 +209,12 @@ extern LB_FluidNode *lbfields;
 #ifdef LB_ADAPTIVE_GPU
 #define LBADAPT_PATCHSIZE 8
 #define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
+typedef float lb_float;
+// typedef double lb_float;
 
 typedef struct lbadapt_patch_cell {
-  double lbfluid[2][19];
-  double modes[19];
+  lb_float lbfluid[2][19];
+  lb_float modes[19];
   LB_FluidNode lbfields;
 } lbadapt_patch_cell_t;
 
@@ -222,10 +224,11 @@ typedef struct lbadapt_payload {
                             [LBADAPT_PATCHSIZE_HALO];
 } lbadapt_payload_t;
 #else  // LB_ADAPTIVE_GPU
+typedef double lb_float;
 typedef struct lbadapt_payload {
   int boundary;
-  double lbfluid[2][19];
-  double modes[19];
+  lb_float lbfluid[2][19];
+  lb_float modes[19];
   LB_FluidNode lbfields;
 } lbadapt_payload_t;
 #endif  // LB_ADAPTIVE_GPU

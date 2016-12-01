@@ -127,8 +127,8 @@ void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
  * \param [in] quadrant    The Quadrant.
  * @returns quadrants weight according to subcycling
  */
-int lbadapt_partition_weight (p8est_t *p8est, p4est_topidx_t which_tree,
-                              p8est_quadrant_t *q);
+int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
+                             p8est_quadrant_t *q);
 /*** REFINEMENT ***/
 /** Refinement function that refines all cells
  *
@@ -178,7 +178,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, double xyz[3]);
+                          p8est_quadrant_t *q, lb_float xyz[3]);
 
 /** Get the coordinates of the midpoint of a quadrant
  *
@@ -186,7 +186,7 @@ void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  * \param [out] xyz        The coordinates of the the midpoint of the current
  *                         quadrant that mesh_iter is pointing to.
  */
-void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
+void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
 
 /** Get the coordinates of the front lower left corner of a quadrant
  *
@@ -195,7 +195,7 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
  *                         of the current quadrant that mesh_iter is pointing
  *                         to.
  */
-void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, double xyz[3]);
+void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
 
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
@@ -206,8 +206,8 @@ void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, double xyz[3]);
  * \param [in]      pi         The fluids stress tensor.
  * \param [in]      h          The local mesh-width.
  */
-int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
-                                 double *pi, double h);
+int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho, lb_float *j,
+                                 lb_float *pi, lb_float h);
 
 /** Calculate modes for MRT scheme
  *
@@ -215,7 +215,7 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
  * \param     [out] mode        The resulting modes to be relaxed in a later
  * step.
  */
-int lbadapt_calc_modes(double populations[2][19], double *mode);
+int lbadapt_calc_modes(lb_float populations[2][19], lb_float *mode);
 
 /** Perform MRT Relaxation step
  *
@@ -223,13 +223,13 @@ int lbadapt_calc_modes(double populations[2][19], double *mode);
  * \param [in]      force Force that is applied on the fluid.
  * \param [in]      h     Meshwidth of current cell
  */
-int lbadapt_relax_modes(double *mode, double *force, double h);
+int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h);
 
 /** Thermalize modes
  *
  * \param [in][out] mode  The modes to be thermalized.
  */
-int lbadapt_relax_modes(double *mode);
+int lbadapt_relax_modes(lb_float *mode);
 
 /** Apply force on fluid.
  *
@@ -237,14 +237,14 @@ int lbadapt_relax_modes(double *mode);
  * \param [in]      force The force that is applied.
  * \param [in]      h     The local mesh width.
  */
-int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h);
+int lbadapt_apply_forces(lb_float *mode, LB_FluidNode *lbfields, lb_float h);
 
 /** Transfer modes back to populations
  *
  * \param     [out] populations  The resulting particle densities.
  * \param [in]      m            The modes.
  */
-int lbadapt_calc_pop_from_modes(double *populations, double *m);
+int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m);
 
 /** collision
  * CAUTION: sync ghost data after collision
@@ -310,14 +310,14 @@ void lbadapt_get_boundary_status();
  * \param [in]  mesh_iter    mesh-based iterator
  * \param [out] rho          density
  */
-void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
+void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho);
 
 /** Calculate local fluid velocity from pre-collision moments
  *
  * \param [in]  mesh_iter    mesh-based iterator
  * \param [out] j            velocity
  */
-void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
+void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);

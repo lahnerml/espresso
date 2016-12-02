@@ -172,7 +172,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 /* Geometry */
 /** Get the coordinates of the midpoint of a quadrant.
  *
- * \param [in]  p4est    the forest
+ * \param [in]  p8est    the forest
  * \param [in]  which_tree the tree in the forest containing \a q
  * \param [in]  q      the quadrant
  * \param [out] xyz    the coordinates of the midpoint of \a q
@@ -187,6 +187,16 @@ void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  *                         quadrant that mesh_iter is pointing to.
  */
 void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
+
+/** Get the coordinates of the front lower left corner of a quadrant.
+ *
+ * \param [in]  p8est    the forest
+ * \param [in]  which_tree the tree in the forest containing \a q
+ * \param [in]  q      the quadrant
+ * \param [out] xyz    the coordinates of the midpoint of \a q
+ */
+void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
+                                  p8est_quadrant_t *q, lb_float xyz[3]);
 
 /** Get the coordinates of the front lower left corner of a quadrant
  *
@@ -206,8 +216,8 @@ void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
  * \param [in]      pi         The fluids stress tensor.
  * \param [in]      h          The local mesh-width.
  */
-int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho, lb_float *j,
-                                 lb_float *pi, lb_float h);
+int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
+                                 lb_float *j, lb_float *pi, lb_float h);
 
 /** Calculate modes for MRT scheme
  *
@@ -332,28 +342,27 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 
 #ifdef LB_ADAPTIVE_GPU
 /** This is actually taken from p4est and extended to patches. :P */
-#define P4EST_VTK_CELL_TYPE     11      /* VTK_VOXEL */
+#define P4EST_VTK_CELL_TYPE 11 /* VTK_VOXEL */
 
 /** Opaque context type for writing VTK output with multiple function calls.
  */
-typedef struct lbadapt_vtk_context
-{
+typedef struct lbadapt_vtk_context {
   /* data passed initially */
-  char               *filename;    /**< Original filename provided is copied. */
-  char                vtk_float_name[8];
+  char *filename; /**< Original filename provided is copied. */
+  char vtk_float_name[8];
 
   /* internal context data */
-  int                 writing;     /**< True after p4est_vtk_write_header. */
-  p4est_locidx_t      num_corners; /**< Number of local element corners. */
-  p4est_locidx_t      num_points;  /**< Number of VTK points written. */
-  p4est_locidx_t     *node_to_corner;     /**< Map a node to an element corner. */
-  p8est_nodes_t      *nodes;       /**< NULL? depending on scale/continuous. */
-  char                vtufilename[BUFSIZ];   /**< Each process writes one. */
-  char                pvtufilename[BUFSIZ];  /**< Only root writes this one. */
-  char                visitfilename[BUFSIZ]; /**< Only root writes this one. */
-  FILE               *vtufile;     /**< File pointer for the VTU file. */
-  FILE               *pvtufile;    /**< Paraview meta file. */
-  FILE               *visitfile;   /**< Visit meta file. */
+  int writing;                    /**< True after p4est_vtk_write_header. */
+  p4est_locidx_t num_corners;     /**< Number of local element corners. */
+  p4est_locidx_t num_points;      /**< Number of VTK points written. */
+  p4est_locidx_t *node_to_corner; /**< Map a node to an element corner. */
+  p8est_nodes_t *nodes;           /**< NULL? depending on scale/continuous. */
+  char vtufilename[BUFSIZ];       /**< Each process writes one. */
+  char pvtufilename[BUFSIZ];      /**< Only root writes this one. */
+  char visitfilename[BUFSIZ];     /**< Only root writes this one. */
+  FILE *vtufile;                  /**< File pointer for the VTU file. */
+  FILE *pvtufile;                 /**< Paraview meta file. */
+  FILE *visitfile;                /**< Visit meta file. */
 } lbadapt_vtk_context_t;
 
 /** The first call to write a VTK file using individual functions.
@@ -461,7 +470,8 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont);
 lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
                              int write_level, int write_rank, int wrap_rank,
-                             int num_cell_scalars, int num_cell_vectors, ...);
+                             int write_qid, int num_cell_scalars,
+                             int num_cell_vectors, ...);
 
 /** Write the VTU footer and clean up.
  *

@@ -749,6 +749,17 @@ void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
   }
 }
 
+void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
+                                  p8est_quadrant_t *q, lb_float *xyz) {
+  double tmp[3];
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         tmp);
+
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] = tmp[i];
+  }
+}
+
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
                                  lb_float *j, lb_float *pi, lb_float h) {
   int i;
@@ -2042,9 +2053,9 @@ void lbadapt_get_boundary_status() {
         lbadapt_get_front_lower_left(mesh_iter, xyz_quad);
         bool all_boundary = true;
 
-        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
-          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
-            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+        for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
+          for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE; ++patch_x) {
               xyz_patch[0] =
                   xyz_quad[0] + 2 * patch_x * patch_offset + patch_offset;
               xyz_patch[1] =
@@ -2317,6 +2328,8 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   const lb_float *v;
   const p4est_topidx_t *tree_to_vertex;
   p4est_topidx_t first_local_tree, last_local_tree;
+  const p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t Ncells, Ncorners;
   p8est_t *p4est;
   p8est_connectivity_t *connectivity;
@@ -2330,19 +2343,18 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   int xi, yi, j, k;
   int zi;
   lb_float h2, eta_x, eta_y, eta_z = 0.;
-  lb_float xyz[3], XYZ[3]; /* 3 not P4EST_DIM */
+  lb_float xyz[3]; /* 3 not P4EST_DIM */
   size_t num_quads, zz;
   p4est_topidx_t jt;
   p4est_topidx_t vt[P8EST_CHILDREN];
-  p4est_locidx_t quad_count, Npoints;
-  p4est_locidx_t sk, il, ntcid, *ntc;
+  p4est_locidx_t patch_count, quad_count, Npoints;
+  p4est_locidx_t il, *ntc;
   float *float_data;
   sc_array_t *quadrants, *indeps;
   sc_array_t *trees;
   p8est_tree_t *tree;
   p8est_quadrant_t *quad;
   p8est_nodes_t *nodes;
-  p8est_indep_t *in;
 
   /* check a whole bunch of assertions, here and below */
   P4EST_ASSERT(cont != NULL);
@@ -2376,38 +2388,17 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   trees = p4est->trees;
   first_local_tree = p4est->first_local_tree;
   last_local_tree = p4est->last_local_tree;
-  Ncells = p4est->local_num_quadrants;
+  Ncells = cells_per_patch * p4est->local_num_quadrants;
 
   cont->num_corners = Ncorners = P8EST_CHILDREN * Ncells;
-  cont->nodes = nodes = p8est_nodes_new(p4est, NULL);
-  indeps = &nodes->indep_nodes;
-  cont->num_points = Npoints = nodes->num_owned_indeps;
-  P4EST_ASSERT((size_t)Npoints == indeps->elem_count);
-
-  /* Establish a reverse lookup table from a node to its first reference.
-   * It is slow to run twice through memory like this.  However, we also know
-   * that writing data to disk is slower still, so we do not optimize.
-   */
-  cont->node_to_corner = ntc = P4EST_ALLOC(p4est_locidx_t, Npoints);
-  memset(ntc, -1, Npoints * sizeof(p4est_locidx_t));
-  for (sk = 0, il = 0; il < Ncells; ++il) {
-    for (k = 0; k < P8EST_CHILDREN; ++sk, ++k) {
-      ntcid = nodes->local_nodes[sk];
-      P4EST_ASSERT(0 <= ntcid && ntcid < Npoints);
-      if (ntc[ntcid] < 0) {
-        ntc[ntcid] = sk;
-      }
-    }
-  }
-#ifdef P4EST_ENABLE_DEBUG
-  /* the particular version of nodes we call makes sure they are tight */
-  for (ntcid = 0; ntcid < Npoints; ++ntcid) {
-    P4EST_ASSERT(0 <= ntc[ntcid] && ntc[ntcid] < Ncorners);
-  }
-#endif
+  cont->nodes = nodes = NULL;
+  cont->num_points = Npoints = Ncorners;
+  cont->node_to_corner = ntc = NULL;
+  indeps = NULL;
 
   /* Have each proc write to its own file */
   snprintf(cont->vtufilename, BUFSIZ, "%s_%04d.vtu", filename, mpirank);
+
   /* Use "w" for writing the initial part of the file.
    * For further parts, use "r+" and fseek so write_compressed succeeds.
    */
@@ -2420,9 +2411,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
 
   fprintf(cont->vtufile, "<?xml version=\"1.0\"?>\n");
   fprintf(cont->vtufile, "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\"");
-#if defined P4EST_VTK_BINARY && defined P4EST_VTK_COMPRESSION
   fprintf(cont->vtufile, " compressor=\"vtkZLibDataCompressor\"");
-#endif
 #ifdef SC_IS_BIGENDIAN
   fprintf(cont->vtufile, " byte_order=\"BigEndian\">\n");
 #else
@@ -2440,22 +2429,60 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"Position\""
                          " NumberOfComponents=\"3\" format=\"%s\">\n",
           cont->vtk_float_name, "binary");
-
+  int base;
+  int root = P8EST_ROOT_LEN;
   if (nodes == NULL) {
+    lb_float xyz_quad[3], xyz_patch[3];
+    lb_float patch_offset;
     /* loop over the trees */
     for (jt = first_local_tree, quad_count = 0; jt <= last_local_tree; ++jt) {
       tree = p8est_tree_array_index(trees, jt);
       quadrants = &tree->quadrants;
       num_quads = quadrants->elem_count;
 
-      /* retrieve corners of the tree */
-      for (k = 0; k < P8EST_CHILDREN; ++k) {
-        vt[k] = tree_to_vertex[jt * P8EST_CHILDREN + k];
-      }
-
       /* loop over the elements in tree and calculate vertex coordinates */
       for (zz = 0; zz < num_quads; ++zz, ++quad_count) {
         quad = p8est_quadrant_array_index(quadrants, zz);
+        base = P8EST_QUADRANT_LEN(quad->level);
+        patch_offset = ((lb_float)base / (LBADAPT_PATCHSIZE * (lb_float)root));
+
+        // lower left corner of quadrant
+        lbadapt_get_front_lower_left(p8est, jt, quad, xyz_quad);
+
+        patch_count = 0;
+        for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
+          for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE; ++patch_x) {
+              // lower left corner of patch
+              xyz_patch[0] = xyz_quad[0] + patch_x * patch_offset;
+              xyz_patch[1] = xyz_quad[1] + patch_y * patch_offset;
+              xyz_patch[2] = xyz_quad[2] + patch_z * patch_offset;
+              k = 0;
+              // calculate remaining coordinates
+              for (zi = 0; zi < 2; ++zi) {
+                for (yi = 0; yi < 2; ++yi) {
+                  for (xi = 0; xi < 2; ++xi) {
+                    xyz[0] = xyz_patch[0] + xi * patch_offset;
+                    xyz[1] = xyz_patch[1] + yi * patch_offset;
+                    xyz[2] = xyz_patch[2] + zi * patch_offset;
+
+                    for (j = 0; j < 3; ++j) {
+                      float_data[j +
+                                 3 * (k +
+                                      P8EST_CHILDREN *
+                                          (patch_count +
+                                           cells_per_patch * quad_count))] =
+                          (lb_float)xyz[j];
+                    }
+                    ++k;           // count coordinates written up to now
+                    ++patch_count; // count patches written up to now
+                  }
+                }
+              }
+            }
+          }
+        }
+
         h2 = .5 * intsize * P8EST_QUADRANT_LEN(quad->level);
         k = 0;
         for (zi = 0; zi < 2; ++zi) {
@@ -2644,7 +2671,9 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
 lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
                               const char *scalar_name, sc_array_t *values) {
-  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  const p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
   lb_float *float_data;
@@ -2691,7 +2720,9 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
 lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
                               const char *vector_name, sc_array_t *values) {
-  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  const p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
   lb_float *float_data;
@@ -2747,8 +2778,8 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
  * and does all of the work.
  *
  * \param [in,out] cont    A vtk context created by \ref p4est_vtk_context_new.
- * \param [in] num_point_scalars Number of point scalar datasets to output.
- * \param [in] num_point_vectors Number of point vector datasets to output.
+ * \param [in] num_cell_scalars Number of point scalar datasets to output.
+ * \param [in] num_cell_vectors Number of point vector datasets to output.
  * \param [in,out] ap      An initialized va_list used to access the
  *                         scalar/vector data.
  *
@@ -2758,8 +2789,8 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
 static lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
                              int write_level, int write_rank, int wrap_rank,
-                             int num_cell_scalars, int num_cell_vectors,
-                             va_list ap) {
+                             int write_qid, int num_cell_scalars,
+                             int num_cell_vectors, va_list ap) {
   /* This function needs to do nothing if there is no data. */
   if (!(write_tree || write_level || write_rank || wrap_rank ||
         num_cell_vectors || num_cell_vectors))
@@ -2773,7 +2804,9 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
   p8est_tree_t *tree;
   const p4est_topidx_t first_local_tree = p8est->first_local_tree;
   const p4est_topidx_t last_local_tree = p8est->last_local_tree;
-  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  const p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
   char cell_scalars[BUFSIZ], cell_vectors[BUFSIZ];
   const char *name, **names;
   sc_array_t **values;
@@ -2804,14 +2837,13 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     values[all] = va_arg(ap, sc_array_t *);
 
     /* Validate input. */
-    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(lb_float),
                    P8EST_STRING "_vtk: Error: incorrect cell scalar data type; "
-                                "scalar data must contain doubles.");
-    SC_CHECK_ABORT(values[all]->elem_count ==
-                       (size_t)p8est->local_num_quadrants,
+                                "scalar data must contain lb_floats.");
+    SC_CHECK_ABORT(values[all]->elem_count == (size_t)Ncells,
                    P8EST_STRING "_vtk: Error: incorrect cell scalar data "
                                 "count; scalar data must contain exactly "
-                                "p4est->local_num_quadrants doubles.");
+                                "p4est->local_num_quadrants lb_floats.");
   }
 
   vector_strlen = 0;
@@ -2826,14 +2858,13 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     values[all] = va_arg(ap, sc_array_t *);
 
     /* Validate input. */
-    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(lb_float),
                    P8EST_STRING "_vtk: Error: incorrect cell vector data type; "
-                                "vector data must contain doubles.");
-    SC_CHECK_ABORT(values[all]->elem_count ==
-                       3 * (size_t)p8est->local_num_quadrants,
+                                "vector data must contain lb_floats.");
+    SC_CHECK_ABORT(values[all]->elem_count == (size_t)Ncells * 3,
                    P8EST_STRING "_vtk: Error: incorrect cell vector data "
                                 "count; vector data must contain exactly "
-                                "3*p4est->local_num_quadrants doubles.");
+                                "3*p4est->local_num_quadrants lb_floats.");
   }
 
   /* Check for pointer variable marking the end of variable data input. */
@@ -2859,6 +2890,10 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
                         printed > 0 ? ",mpirank" : "mpirank");
 
+  if (write_qid)
+    printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
+                        printed > 0 ? ",qid" : "qid");
+
   if (num_cell_scalars)
     printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
                         printed > 0 ? ",%s" : "%s", cell_scalars);
@@ -2880,8 +2915,10 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
       tree = p8est_tree_array_index(trees, jt);
       num_quads = tree->quadrants.elem_count;
-      for (zz = 0; zz < num_quads; ++zz, ++il) {
-        locidx_data[il] = (p4est_locidx_t)jt;
+      for (zz = 0; zz < num_quads; ++zz) {
+        for (int p = 0; p < cells_per_patch; ++p, ++il) {
+          locidx_data[il] = (p4est_locidx_t)jt;
+        }
       }
     }
     fprintf(cont->vtufile, "          ");
@@ -2911,9 +2948,11 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       tree = p8est_tree_array_index(trees, jt);
       quadrants = &tree->quadrants;
       num_quads = quadrants->elem_count;
-      for (zz = 0; zz < num_quads; ++zz, ++il) {
+      for (zz = 0; zz < num_quads; ++zz) {
         quad = p8est_quadrant_array_index(quadrants, zz);
-        uint8_data[il] = (uint8_t)quad->level;
+        for (int p = 0; p < cells_per_patch; ++p, ++il) {
+          uint8_data[il] = (uint8_t)quad->level;
+        }
       }
     }
 
@@ -2963,6 +3002,39 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       return NULL;
     }
     fprintf(cont->vtufile, "        </DataArray>\n");
+  }
+
+  if (write_qid) {
+    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"treeid\""
+                           " format=\"%s\">\n",
+            P4EST_VTK_LOCIDX, "binary");
+    for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
+      tree = p8est_tree_array_index(trees, jt);
+      num_quads = tree->quadrants.elem_count;
+      for (zz = 0; zz < num_quads; ++zz) {
+        quad = p8est_quadrant_array_index(quadrants, zz);
+        for (int p = 0; p < cells_per_patch; ++p, ++il) {
+          locidx_data[il] = (p4est_locidx_t)zz + tree->quadrants_offset;
+        }
+      }
+    }
+    fprintf(cont->vtufile, "          ");
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
+                                 sizeof(*locidx_data) * Ncells);
+    fprintf(cont->vtufile, "\n");
+    if (retval) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
+      lbadapt_vtk_context_destroy(cont);
+
+      P4EST_FREE(values);
+      P4EST_FREE(names);
+      P4EST_FREE(locidx_data);
+      P4EST_FREE(uint8_data);
+
+      return NULL;
+    }
+    fprintf(cont->vtufile, "        </DataArray>\n");
+    P4EST_ASSERT(il == Ncells);
   }
 
   if (ferror(cont->vtufile)) {
@@ -3024,6 +3096,12 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
               "<PDataArray type=\"%s\" Name=\"mpirank\" format=\"%s\"/>\n",
               P4EST_VTK_LOCIDX, "binary");
 
+    if (write_qid)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"qid\" format=\"%s\"/>\n",
+              P4EST_VTK_LOCIDX, "binary");
+
     all = 0;
     for (i = 0; i < num_cell_scalars; ++all, i++)
       fprintf(cont->pvtufile,
@@ -3058,7 +3136,8 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
 lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
                              int write_level, int write_rank, int wrap_rank,
-                             int num_cell_scalars, int num_cell_vectors, ...) {
+                             int write_qid, int num_cell_scalars,
+                             int num_cell_vectors, ...) {
   va_list ap;
 
   P4EST_ASSERT(cont != NULL && cont->writing);
@@ -3066,7 +3145,7 @@ lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
 
   va_start(ap, num_cell_vectors);
   cont = lbadapt_vtk_write_cell_datav(cont, write_tree, write_level, write_rank,
-                                      wrap_rank, num_cell_scalars,
+                                      wrap_rank, write_qid, num_cell_scalars,
                                       num_cell_vectors, ap);
   va_end(ap);
 

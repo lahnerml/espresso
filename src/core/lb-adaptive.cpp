@@ -2250,9 +2250,9 @@ lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
   cont->filename = P4EST_STRDUP(filename);
 
   if (sizeof(float) == sizeof(lb_float)) {
-    strcpy(cont->vtk_float_type, "Float32");
+    strcpy(cont->vtk_float_name, "Float32");
   } else if (sizeof(double) == sizeof(lb_float)) {
-    strcpy(cont->vtk_float_type, "Float64");
+    strcpy(cont->vtk_float_name, "Float64");
   } else {
     SC_ABORT_NOT_REACHED();
   }
@@ -2439,7 +2439,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   /* write point position data */
   fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"Position\""
                          " NumberOfComponents=\"3\" format=\"%s\">\n",
-          cont->vtk_float_type, "binary");
+          cont->vtk_float_name, "binary");
 
   if (nodes == NULL) {
     /* loop over the trees */
@@ -2465,32 +2465,29 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
             for (xi = 0; xi < 2; ++xi) {
               P4EST_ASSERT(0 <= k && k < P8EST_CHILDREN);
               eta_x = intsize * quad->x + h2 * (1. + (xi * 2 - 1));
-                for (j = 0; j < 3; ++j) {
-                  xyz[j] =
-                      ((1. - eta_z) *
-                           ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[0] + j] +
-                                            eta_x * v[3 * vt[1] + j]) +
-                            eta_y * ((1. - eta_x) * v[3 * vt[2] + j] +
-                                     eta_x * v[3 * vt[3] + j]))
-                       +
-                       eta_z *
-                           ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[4] + j] +
-                                            eta_x * v[3 * vt[5] + j]) +
-                            eta_y * ((1. - eta_x) * v[3 * vt[6] + j] +
-                                     eta_x * v[3 * vt[7] + j]))
-                           );
-                  float_data[3 * (P8EST_CHILDREN * quad_count + k) + j] =
-                      (lb_float)xyz[j];
-                }
+              for (j = 0; j < 3; ++j) {
+                xyz[j] =
+                    ((1. - eta_z) *
+                         ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[0] + j] +
+                                          eta_x * v[3 * vt[1] + j]) +
+                          eta_y * ((1. - eta_x) * v[3 * vt[2] + j] +
+                                   eta_x * v[3 * vt[3] + j])) +
+                     eta_z * ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[4] + j] +
+                                              eta_x * v[3 * vt[5] + j]) +
+                              eta_y * ((1. - eta_x) * v[3 * vt[6] + j] +
+                                       eta_x * v[3 * vt[7] + j])));
+                float_data[3 * (P8EST_CHILDREN * quad_count + k) + j] =
+                    (lb_float)xyz[j];
               }
-              ++k;
             }
+            ++k;
           }
         }
-        P4EST_ASSERT(k == P8EST_CHILDREN);
       }
+      P4EST_ASSERT(k == P8EST_CHILDREN);
     }
-    P4EST_ASSERT(P8EST_CHILDREN * quad_count == Npoints);
+  }
+  P4EST_ASSERT(P8EST_CHILDREN * quad_count == Npoints);
 
   fprintf(cont->vtufile, "          ");
   /* TODO: Don't allocate the full size of the array, only allocate
@@ -2524,11 +2521,11 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
       locidx_data[il] = il;
     }
     retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                                    sizeof(p4est_locidx_t) * Ncorners);
+                                 sizeof(p4est_locidx_t) * Ncorners);
     P4EST_FREE(locidx_data);
   } else {
     retval = sc_vtk_write_binary(cont->vtufile, (char *)nodes->local_nodes,
-                                    sizeof(p4est_locidx_t) * Ncorners);
+                                 sizeof(p4est_locidx_t) * Ncorners);
   }
   fprintf(cont->vtufile, "\n");
   if (retval) {
@@ -2570,7 +2567,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
 
   fprintf(cont->vtufile, "          ");
   retval = sc_vtk_write_binary(cont->vtufile, (char *)uint8_data,
-                                  sizeof(*uint8_data) * Ncells);
+                               sizeof(*uint8_data) * Ncells);
   fprintf(cont->vtufile, "\n");
 
   P4EST_FREE(uint8_data);
@@ -2614,7 +2611,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
     fprintf(cont->pvtufile, "    <PPoints>\n");
     fprintf(cont->pvtufile, "      <PDataArray type=\"%s\" Name=\"Position\""
                             " NumberOfComponents=\"3\" format=\"%s\"/>\n",
-            cont->vtk_float_type, "binary");
+            cont->vtk_float_name, "binary");
     fprintf(cont->pvtufile, "    </PPoints>\n");
 
     if (ferror(cont->pvtufile)) {
@@ -2643,6 +2640,498 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
 
   return cont;
 }
+
+lbadapt_vtk_context_t *
+lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
+                              const char *scalar_name, sc_array_t *values) {
+  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  p4est_locidx_t il;
+  int retval;
+  lb_float *float_data;
+
+  P4EST_ASSERT(cont != NULL && cont->writing);
+
+  /* Write cell data. */
+  fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"%s\""
+                         " format=\"%s\">\n",
+          cont->vtk_float_name, scalar_name, "binary");
+
+  float_data = P4EST_ALLOC(lb_float, Ncells);
+  for (il = 0; il < Ncells; ++il) {
+    float_data[il] = (lb_float) * ((double *)sc_array_index(values, il));
+  }
+
+  fprintf(cont->vtufile, "          ");
+  /* TODO: Don't allocate the full size of the array, only allocate
+   * the chunk that will be passed to zlib and do this a chunk
+   * at a time.
+   */
+  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
+                               sizeof(*float_data) * Ncells);
+  fprintf(cont->vtufile, "\n");
+
+  P4EST_FREE(float_data);
+
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding scalar cell data\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+  fprintf(cont->vtufile, "        </DataArray>\n");
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error writing cell scalar file\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+
+  return cont;
+}
+
+lbadapt_vtk_context_t *
+lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
+                              const char *vector_name, sc_array_t *values) {
+  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  p4est_locidx_t il;
+  int retval;
+  lb_float *float_data;
+
+  P4EST_ASSERT(cont != NULL && cont->writing);
+
+  /* Write cell data. */
+  fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"%s\""
+                         " NumberOfComponents=\"3\" format=\"%s\">\n",
+          cont->vtk_float_name, vector_name, "binary");
+
+  float_data = P4EST_ALLOC(lb_float, 3 * Ncells);
+  for (il = 0; il < (3 * Ncells); ++il) {
+    float_data[il] = (lb_float) * ((double *)sc_array_index(values, il));
+  }
+
+  fprintf(cont->vtufile, "          ");
+  /* TODO: Don't allocate the full size of the array, only allocate
+   * the chunk that will be passed to zlib and do this a chunk
+   * at a time.
+   */
+  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
+                               sizeof(*float_data) * 3 * Ncells);
+  fprintf(cont->vtufile, "\n");
+
+  P4EST_FREE(float_data);
+
+  if (retval) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error encoding scalar cell data\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+  fprintf(cont->vtufile, "        </DataArray>\n");
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error writing cell scalar file\n");
+    lbadapt_vtk_context_destroy(cont);
+    return NULL;
+  }
+
+  return cont;
+}
+
+/** Write VTK cell data.
+ *
+ * This function exports custom cell data to the vtk file; it is functionally
+ * the same as \b p4est_vtk_write_cell_dataf with the only difference being
+ * that instead of a variable argument list, an initialized \a va_list is
+ * passed as the last argument. The \a va_list is initialized from the variable
+ * argument list of the calling function.
+ *
+ * \note This function is actually called from \b p4est_vtk_write_cell_dataf
+ * and does all of the work.
+ *
+ * \param [in,out] cont    A vtk context created by \ref p4est_vtk_context_new.
+ * \param [in] num_point_scalars Number of point scalar datasets to output.
+ * \param [in] num_point_vectors Number of point vector datasets to output.
+ * \param [in,out] ap      An initialized va_list used to access the
+ *                         scalar/vector data.
+ *
+ * \return          On success, the context that has been passed in.
+ *                  On failure, returns NULL and deallocates the context.
+ */
+static lbadapt_vtk_context_t *
+lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
+                             int write_level, int write_rank, int wrap_rank,
+                             int num_cell_scalars, int num_cell_vectors,
+                             va_list ap) {
+  /* This function needs to do nothing if there is no data. */
+  if (!(write_tree || write_level || write_rank || wrap_rank ||
+        num_cell_vectors || num_cell_vectors))
+    return cont;
+
+  const int mpirank = p8est->mpirank;
+  int retval;
+  int i, all = 0;
+  int scalar_strlen, vector_strlen;
+  sc_array_t *trees = p8est->trees;
+  p8est_tree_t *tree;
+  const p4est_topidx_t first_local_tree = p8est->first_local_tree;
+  const p4est_topidx_t last_local_tree = p8est->last_local_tree;
+  const p4est_locidx_t Ncells = p8est->local_num_quadrants;
+  char cell_scalars[BUFSIZ], cell_vectors[BUFSIZ];
+  const char *name, **names;
+  sc_array_t **values;
+  size_t num_quads, zz;
+  sc_array_t *quadrants;
+  p8est_quadrant_t *quad;
+  uint8_t *uint8_data;
+  p4est_locidx_t *locidx_data;
+  p4est_topidx_t jt;
+  p4est_locidx_t il;
+
+  P4EST_ASSERT(cont != NULL && cont->writing);
+  P4EST_ASSERT(wrap_rank >= 0);
+
+  values = P4EST_ALLOC(sc_array_t *, num_cell_scalars + num_cell_vectors);
+  names = P4EST_ALLOC(const char *, num_cell_scalars + num_cell_vectors);
+
+  /* Gather cell data. */
+  scalar_strlen = 0;
+  cell_scalars[0] = '\0';
+  for (i = 0; i < num_cell_scalars; ++all, ++i) {
+    name = names[all] = va_arg(ap, const char *);
+    retval = snprintf(cell_scalars + scalar_strlen, BUFSIZ - scalar_strlen,
+                      "%s%s", i == 0 ? "" : ",", name);
+    SC_CHECK_ABORT(retval > 0,
+                   P8EST_STRING "_vtk: Error collecting cell scalars");
+    scalar_strlen += retval;
+    values[all] = va_arg(ap, sc_array_t *);
+
+    /* Validate input. */
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
+                   P8EST_STRING "_vtk: Error: incorrect cell scalar data type; "
+                                "scalar data must contain doubles.");
+    SC_CHECK_ABORT(values[all]->elem_count ==
+                       (size_t)p8est->local_num_quadrants,
+                   P8EST_STRING "_vtk: Error: incorrect cell scalar data "
+                                "count; scalar data must contain exactly "
+                                "p4est->local_num_quadrants doubles.");
+  }
+
+  vector_strlen = 0;
+  cell_vectors[0] = '\0';
+  for (i = 0; i < num_cell_vectors; ++all, ++i) {
+    name = names[all] = va_arg(ap, const char *);
+    retval = snprintf(cell_vectors + vector_strlen, BUFSIZ - vector_strlen,
+                      "%s%s", i == 0 ? "" : ",", name);
+    SC_CHECK_ABORT(retval > 0,
+                   P8EST_STRING "_vtk: Error collecting cell vectors");
+    vector_strlen += retval;
+    values[all] = va_arg(ap, sc_array_t *);
+
+    /* Validate input. */
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
+                   P8EST_STRING "_vtk: Error: incorrect cell vector data type; "
+                                "vector data must contain doubles.");
+    SC_CHECK_ABORT(values[all]->elem_count ==
+                       3 * (size_t)p8est->local_num_quadrants,
+                   P8EST_STRING "_vtk: Error: incorrect cell vector data "
+                                "count; vector data must contain exactly "
+                                "3*p4est->local_num_quadrants doubles.");
+  }
+
+  /* Check for pointer variable marking the end of variable data input. */
+  lbadapt_vtk_context_t *end = va_arg(ap, lbadapt_vtk_context_t *);
+  SC_CHECK_ABORT(
+      end == cont, P8EST_STRING
+      "_vtk Error: the end of variable "
+      "data must be specified by passing, as the last argument, the current "
+      "lbadapt_vtk_context_t struct.");
+
+  char vtkCellDataString[BUFSIZ] = "";
+  int printed = 0;
+
+  if (write_tree)
+    printed +=
+        snprintf(vtkCellDataString + printed, BUFSIZ - printed, "treeid");
+
+  if (write_level)
+    printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
+                        printed > 0 ? ",level" : "level");
+
+  if (write_rank)
+    printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
+                        printed > 0 ? ",mpirank" : "mpirank");
+
+  if (num_cell_scalars)
+    printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
+                        printed > 0 ? ",%s" : "%s", cell_scalars);
+
+  if (num_cell_vectors)
+    printed += snprintf(vtkCellDataString + printed, BUFSIZ - printed,
+                        printed > 0 ? ",%s" : "%s", cell_vectors);
+
+  fprintf(cont->vtufile, "      <CellData Scalars=\"%s\">\n",
+          vtkCellDataString);
+
+  locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncells);
+  uint8_data = P4EST_ALLOC(uint8_t, Ncells);
+
+  if (write_tree) {
+    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"treeid\""
+                           " format=\"%s\">\n",
+            P4EST_VTK_LOCIDX, "binary");
+    for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
+      tree = p8est_tree_array_index(trees, jt);
+      num_quads = tree->quadrants.elem_count;
+      for (zz = 0; zz < num_quads; ++zz, ++il) {
+        locidx_data[il] = (p4est_locidx_t)jt;
+      }
+    }
+    fprintf(cont->vtufile, "          ");
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
+                                 sizeof(*locidx_data) * Ncells);
+    fprintf(cont->vtufile, "\n");
+    if (retval) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
+      lbadapt_vtk_context_destroy(cont);
+
+      P4EST_FREE(values);
+      P4EST_FREE(names);
+      P4EST_FREE(locidx_data);
+      P4EST_FREE(uint8_data);
+
+      return NULL;
+    }
+    fprintf(cont->vtufile, "        </DataArray>\n");
+    P4EST_ASSERT(il == Ncells);
+  }
+
+  if (write_level) {
+    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"level\""
+                           " format=\"%s\">\n",
+            "UInt8", "binary");
+    for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
+      tree = p8est_tree_array_index(trees, jt);
+      quadrants = &tree->quadrants;
+      num_quads = quadrants->elem_count;
+      for (zz = 0; zz < num_quads; ++zz, ++il) {
+        quad = p8est_quadrant_array_index(quadrants, zz);
+        uint8_data[il] = (uint8_t)quad->level;
+      }
+    }
+
+    fprintf(cont->vtufile, "          ");
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)uint8_data,
+                                 sizeof(*uint8_data) * Ncells);
+    fprintf(cont->vtufile, "\n");
+
+    P4EST_FREE(uint8_data);
+
+    if (retval) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
+      lbadapt_vtk_context_destroy(cont);
+
+      P4EST_FREE(values);
+      P4EST_FREE(names);
+      P4EST_FREE(locidx_data);
+
+      return NULL;
+    }
+    fprintf(cont->vtufile, "        </DataArray>\n");
+  }
+
+  if (write_rank) {
+    const int wrapped_rank = wrap_rank > 0 ? mpirank % wrap_rank : mpirank;
+
+    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"mpirank\""
+                           " format=\"%s\">\n",
+            P4EST_VTK_LOCIDX, "binary");
+    for (il = 0; il < Ncells; ++il)
+      locidx_data[il] = (p4est_locidx_t)wrapped_rank;
+
+    fprintf(cont->vtufile, "          ");
+    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
+                                 sizeof(*locidx_data) * Ncells);
+    fprintf(cont->vtufile, "\n");
+
+    P4EST_FREE(locidx_data);
+
+    if (retval) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
+      lbadapt_vtk_context_destroy(cont);
+
+      P4EST_FREE(values);
+      P4EST_FREE(names);
+
+      return NULL;
+    }
+    fprintf(cont->vtufile, "        </DataArray>\n");
+  }
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERRORF(P8EST_STRING "_vtk: Error writing %s\n", cont->vtufilename);
+    lbadapt_vtk_context_destroy(cont);
+
+    P4EST_FREE(values);
+    P4EST_FREE(names);
+
+    return NULL;
+  }
+
+  all = 0;
+  for (i = 0; i < num_cell_scalars; ++all, ++i) {
+    cont = lbadapt_vtk_write_cell_scalar(cont, names[all], values[all]);
+    SC_CHECK_ABORT(cont != NULL,
+                   P8EST_STRING "_vtk: Error writing cell scalars");
+  }
+
+  for (i = 0; i < num_cell_vectors; ++all, ++i) {
+    cont = lbadapt_vtk_write_cell_vector(cont, names[all], values[all]);
+    SC_CHECK_ABORT(cont != NULL,
+                   P8EST_STRING "_vtk: Error writing cell vectors");
+  }
+
+  fprintf(cont->vtufile, "      </CellData>\n");
+
+  P4EST_FREE(values);
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERRORF(P8EST_STRING "_vtk: Error writing %s\n", cont->vtufilename);
+    lbadapt_vtk_context_destroy(cont);
+
+    P4EST_FREE(names);
+
+    return NULL;
+  }
+
+  /* Only have the root write to the parallel vtk file */
+  if (mpirank == 0) {
+    fprintf(cont->pvtufile, "    <PCellData Scalars=\"%s\">\n",
+            vtkCellDataString);
+
+    if (write_tree)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"treeid\" format=\"%s\"/>\n",
+              P4EST_VTK_LOCIDX, "binary");
+
+    if (write_level)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"level\" format=\"%s\"/>\n",
+              "UInt8", "binary");
+
+    if (write_rank)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"mpirank\" format=\"%s\"/>\n",
+              P4EST_VTK_LOCIDX, "binary");
+
+    all = 0;
+    for (i = 0; i < num_cell_scalars; ++all, i++)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"%s\" format=\"%s\"/>\n",
+              cont->vtk_float_name, names[all], "binary");
+
+    for (i = 0; i < num_cell_vectors; ++all, i++)
+      fprintf(cont->pvtufile,
+              "      "
+              "<PDataArray type=\"%s\" Name=\"%s\" NumberOfComponents=\"3\""
+              " format=\"%s\"/>\n",
+              cont->vtk_float_name, names[all], "binary");
+
+    fprintf(cont->pvtufile, "    </PCellData>\n");
+
+    if (ferror(cont->pvtufile)) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error writing parallel header\n");
+      lbadapt_vtk_context_destroy(cont);
+
+      P4EST_FREE(names);
+
+      return NULL;
+    }
+  }
+
+  P4EST_FREE(names);
+
+  return cont;
+}
+
+lbadapt_vtk_context_t *
+lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
+                             int write_level, int write_rank, int wrap_rank,
+                             int num_cell_scalars, int num_cell_vectors, ...) {
+  va_list ap;
+
+  P4EST_ASSERT(cont != NULL && cont->writing);
+  P4EST_ASSERT(num_cell_scalars >= 0 && num_cell_vectors >= 0);
+
+  va_start(ap, num_cell_vectors);
+  cont = lbadapt_vtk_write_cell_datav(cont, write_tree, write_level, write_rank,
+                                      wrap_rank, num_cell_scalars,
+                                      num_cell_vectors, ap);
+  va_end(ap);
+
+  return cont;
+}
+
+int lbadapt_vtk_write_footer(lbadapt_vtk_context_t *cont) {
+  int p;
+  int procRank = p8est->mpirank;
+  int numProcs = p8est->mpisize;
+
+  P4EST_ASSERT(cont != NULL && cont->writing);
+
+  fprintf(cont->vtufile, "    </Piece>\n");
+  fprintf(cont->vtufile, "  </UnstructuredGrid>\n");
+  fprintf(cont->vtufile, "</VTKFile>\n");
+
+  if (ferror(cont->vtufile)) {
+    P4EST_LERROR(P8EST_STRING "_vtk: Error writing footer\n");
+    lbadapt_vtk_context_destroy(cont);
+    return -1;
+  }
+
+  /* Only have the root write to the parallel vtk file */
+  if (procRank == 0) {
+    fprintf(cont->visitfile, "!NBLOCKS %d\n", numProcs);
+
+    /* Do not write paths to parallel vtk file, because they will be in the same
+     * directory as the vtk files written by each process */
+    char *file_basename;
+    file_basename = strrchr(cont->filename, '/');
+    if (file_basename != NULL) {
+      ++file_basename;
+    } else {
+      file_basename = cont->filename;
+    }
+
+    /* Write data about the parallel pieces into both files */
+    for (p = 0; p < numProcs; ++p) {
+      fprintf(cont->pvtufile, "    <Piece Source=\"%s_%04d.vtu\"/>\n",
+              file_basename, p);
+      fprintf(cont->visitfile, "%s_%04d.vtu\n", file_basename, p);
+    }
+    fprintf(cont->pvtufile, "  </PUnstructuredGrid>\n");
+    fprintf(cont->pvtufile, "</VTKFile>\n");
+
+    if (ferror(cont->pvtufile)) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error writing parallel footer\n");
+      lbadapt_vtk_context_destroy(cont);
+      return -1;
+    }
+
+    if (ferror(cont->visitfile)) {
+      P4EST_LERROR(P8EST_STRING "_vtk: Error writing parallel footer\n");
+      lbadapt_vtk_context_destroy(cont);
+      return -1;
+    }
+  }
+
+  /* Destroy context structure. */
+  lbadapt_vtk_context_destroy(cont);
+
+  return 0;
+}
+
 #endif // LB_ADAPTIVE_GPU
 
 #endif // LB_ADAPTIVE

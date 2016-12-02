@@ -340,7 +340,7 @@ typedef struct lbadapt_vtk_context
 {
   /* data passed initially */
   char               *filename;    /**< Original filename provided is copied. */
-  char                vtk_float_type[8];
+  char                vtk_float_name[8];
 
   /* internal context data */
   int                 writing;     /**< True after p4est_vtk_write_header. */
@@ -462,43 +462,6 @@ lbadapt_vtk_context_t *
 lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
                              int write_level, int write_rank, int wrap_rank,
                              int num_cell_scalars, int num_cell_vectors, ...);
-
-/** Write VTK point data.
- *
- * Writing a VTK file is split into a few routines.
- * This allows there to be an arbitrary number of
- * fields.
- *
- * \param [in,out] cont    A VTK context created by \ref p8est_vtk_context_new.
- * \param [in] num_point_scalars Number of point scalar datasets to output.
- * \param [in] num_point_vectors Number of point vector datasets to output.
- *
- * The variable arguments need to be pairs of (fieldname, fieldvalues) where
- * the point scalar pairs come first, followed by the point vector pairs.  Each
- * 'fieldname' argument shall be a char string containing the name of the data
- * contained in the following 'fieldvalues'. Each of the 'fieldvalues'
- * arguments shall be an sc_array_t * holding lb_float variables. The number of
- * lb_floats in each sc_array must be exactly the number of components (1 for
- * scalar and 3 for vector) times 8 times number of elements.
- *
- * \note The current
- * p8est_vtk_context_t structure, cont, must be the last argument of any call
- * to this function; this argument is used to validate that the correct number
- * of variable arguments have been provided.
- *
- * \note The number of point scalar data in each
- * sc_array must be exactly \a P8EST_CHILDREN*local_num_quadrants, and the
- * number of point vector data must be exactly \a
- * 3*P8EST_CHILDREN*local_num_quadrants. I.e. there must be data for every
- * corner of every quadrant in the \a p8est, even if the corner is shared by
- * multiple quadrants.
- *
- * \return          On success, the context that has been passed in.
- *                  On failure, returns NULL and deallocates the context.
- */
-lbadapt_vtk_context_t *p8est_vtk_write_point_dataf(lbadapt_vtk_context_t *cont,
-                                                   int num_point_scalars,
-                                                   int num_point_vectors, ...);
 
 /** Write the VTU footer and clean up.
  *

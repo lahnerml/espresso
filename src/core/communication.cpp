@@ -2727,11 +2727,18 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   sc_array_t *boundary;
+#ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
   boundary = sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_boundary_values(boundary);
 
+#ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
@@ -2740,8 +2747,8 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context, 1,
-                                       /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
@@ -2754,7 +2761,31 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#else  // LB_ADAPTIVE_GPU
+  /* create VTK output context and set its parameters */
+  lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
 
+  /* begin writing the output files */
+  context = lbadapt_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  context =
+      lbadapt_vtk_write_cell_dataf(context,
+                                   1, /* write tree indices */
+                                   1, /* write the refinement level */
+                                   1, /* write the mpi process id */
+                                   0, /* do not wrap the mpi rank */
+                                   1, /* write qid */
+                                   1, /* write boundary index as scalar cell
+                                         data */
+                                   0, /* no custom cell vector data */
+                                   "boundary", boundary, context);
+
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = lbadapt_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#endif // LB_ADAPTIVE_GPU
   sc_array_destroy(boundary);
 #endif // LB_ADAPTIVE
 }
@@ -2765,11 +2796,18 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   sc_array_t *density;
+#ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
   density = sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_density_values(density);
 
+#ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
@@ -2778,8 +2816,8 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context, 1,
-                                       /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
@@ -2791,6 +2829,29 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#else  // LB_ADAPTIVE_GPU
+  /* create VTK output context and set its parameters */
+  lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
+
+  /* begin writing the output files */
+  context = lbadapt_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  context = lbadapt_vtk_write_cell_dataf(context,
+                                         1, /* write tree indices */
+                                         1, /* write the refinement level */
+                                         1, /* write the mpi process id */
+                                         0, /* do not wrap the mpi rank */
+                                         1, /* write qid */
+                                         1, /* write density as scalar cell
+                                               data */
+                                         0, /* no custom cell vector data */
+                                         "density", density, context);
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = lbadapt_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#endif // LB_ADAPTIVE_GPU
 
   sc_array_destroy(density);
 #endif // LB_ADAPTIVE
@@ -2802,11 +2863,18 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   sc_array_t *velocity;
+#ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
   velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
 
+#ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
@@ -2830,6 +2898,31 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#else // LB_ADAPTIVE_GPU
+  /* create VTK output context and set its parameters */
+  lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
+
+  /* begin writing the output files */
+  context = lbadapt_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
+  context = lbadapt_vtk_write_cell_dataf(context,
+                                         1, /* write tree indices */
+                                         1, /* write the refinement level */
+                                         1, /* write the mpi process id */
+                                         0, /* do not wrap the mpi rank */
+                                         1, /* write qid */
+                                         0, /* no custom cell scalar data */
+                                         1, /* write velocity as vector cell
+                                               data */
+                                         "velocity", velocity, context);
+  // clang-format on
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = lbadapt_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+#endif // LB_ADAPTIVE_GPU
 
   /* free memory */
   sc_array_destroy(velocity);

@@ -343,6 +343,8 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 #ifdef LB_ADAPTIVE_GPU
 /** This is actually taken from p4est and extended to patches. :P */
 #define P4EST_VTK_CELL_TYPE 11 /* VTK_VOXEL */
+#define P4EST_ENABLE_VTK_BINARY 1
+#define P4EST_ENABLE_VTK_COMPRESSION 1
 
 /** Opaque context type for writing VTK output with multiple function calls.
  */

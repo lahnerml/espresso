@@ -413,6 +413,11 @@ int lbadapt_get_global_maxlevel() {
 
 #ifdef LB_ADAPTIVE_GPU
 void lbadapt_patches_populate_halos(int level) {
+  // clang-format off
+  const int inv[] = {0,
+                     2,  1,  4,  3,  6,  5,
+                     8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  // clang-format on
   lbadapt_payload_t *data, *neighbor_data;
   int status = 0;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
@@ -1858,11 +1863,13 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
-#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
-  lb_float bnd, *bnd_ptr;
+  double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
+#ifdef LB_ADAPTIVE_GPU
+  int cells_per_patch = LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+#endif // LB_ADAPTIVE_GPU
 
   /* get boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
@@ -1877,17 +1884,28 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
       if (status != P8EST_MESHITER_DONE) {
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
-
+#ifndef LB_ADAPTIVE_GPU
         /* just grab the value of each cell and pass it into solution vector */
         bnd = data->boundary;
         bnd_ptr =
-            (lb_float *)sc_array_index(boundary_values, mesh_iter->current_qid);
+            (double *)sc_array_index(boundary_values, mesh_iter->current_qid);
         *bnd_ptr = bnd;
+#else // LB_ADAPTIVE_GPU
+        bnd_ptr = (double *) sc_array_index (boundary_values, cells_per_patch * mesh_iter->current_qid);
+        int patch_count = 0;
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+              bnd_ptr[patch_count] = data->patch[patch_x][patch_y][patch_z].lbfields.boundary;
+              ++patch_count;
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
   }
-#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
@@ -2062,11 +2080,11 @@ void lbadapt_get_boundary_status() {
                   xyz_quad[1] + 2 * patch_y * patch_offset + patch_offset;
               xyz_patch[2] =
                   xyz_quad[2] + 2 * patch_z * patch_offset + patch_offset;
-              data->patch[patch_x][patch_y][patch_z].lbfields.boundary =
+              data->patch[1 + patch_x][1 + patch_y][1 + patch_z].lbfields.boundary =
                   lbadapt_is_boundary(xyz_patch);
               all_boundary =
                   all_boundary &&
-                  data->patch[patch_x][patch_y][patch_z].lbfields.boundary;
+                  data->patch[1 + patch_x][1 + patch_y][1 + patch_z].lbfields.boundary;
             }
           }
         }
@@ -2333,13 +2351,9 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   p4est_locidx_t Ncells, Ncorners;
   p8est_t *p4est;
   p8est_connectivity_t *connectivity;
-#ifdef P4EST_VTK_ASCII
-  lb_float wx, wy, wz;
-#else
   int retval;
   uint8_t *uint8_data;
   p4est_locidx_t *locidx_data;
-#endif
   int xi, yi, j, k;
   int zi;
   lb_float h2, eta_x, eta_y, eta_z = 0.;
@@ -2676,7 +2690,7 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
   const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
-  lb_float *float_data;
+  double *float_data;
 
   P4EST_ASSERT(cont != NULL && cont->writing);
 
@@ -2685,9 +2699,9 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
                          " format=\"%s\">\n",
           cont->vtk_float_name, scalar_name, "binary");
 
-  float_data = P4EST_ALLOC(lb_float, Ncells);
+  float_data = P4EST_ALLOC(double, Ncells);
   for (il = 0; il < Ncells; ++il) {
-    float_data[il] = (lb_float) * ((double *)sc_array_index(values, il));
+    float_data[il] = (double) * ((double *)sc_array_index(values, il));
   }
 
   fprintf(cont->vtufile, "          ");
@@ -2725,7 +2739,7 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
   const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
-  lb_float *float_data;
+  double *float_data;
 
   P4EST_ASSERT(cont != NULL && cont->writing);
 
@@ -2734,9 +2748,9 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
                          " NumberOfComponents=\"3\" format=\"%s\">\n",
           cont->vtk_float_name, vector_name, "binary");
 
-  float_data = P4EST_ALLOC(lb_float, 3 * Ncells);
+  float_data = P4EST_ALLOC(double, 3 * Ncells);
   for (il = 0; il < (3 * Ncells); ++il) {
-    float_data[il] = (lb_float) * ((double *)sc_array_index(values, il));
+    float_data[il] = (double) * ((double *)sc_array_index(values, il));
   }
 
   fprintf(cont->vtufile, "          ");
@@ -2837,7 +2851,7 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     values[all] = va_arg(ap, sc_array_t *);
 
     /* Validate input. */
-    SC_CHECK_ABORT(values[all]->elem_size == sizeof(lb_float),
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
                    P8EST_STRING "_vtk: Error: incorrect cell scalar data type; "
                                 "scalar data must contain lb_floats.");
     SC_CHECK_ABORT(values[all]->elem_count == (size_t)Ncells,
@@ -2858,7 +2872,7 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     values[all] = va_arg(ap, sc_array_t *);
 
     /* Validate input. */
-    SC_CHECK_ABORT(values[all]->elem_size == sizeof(lb_float),
+    SC_CHECK_ABORT(values[all]->elem_size == sizeof(double),
                    P8EST_STRING "_vtk: Error: incorrect cell vector data type; "
                                 "vector data must contain lb_floats.");
     SC_CHECK_ABORT(values[all]->elem_count == (size_t)Ncells * 3,

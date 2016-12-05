@@ -22,10 +22,16 @@
 #include "config.hpp"
 #include <vector>
 
+void checkCUDAError(const char* action);
+#define CUDA_CALL( call )   \
+{                           \
+  call;                     \
+  checkCUDAError( #call );  \
+}
+
 /** Struct to hold information relevant to Espresso
    about GPUs. Should contain only fixed length plain
    old datatypes, as it is intended for MPI communication */
-
 struct EspressoGpuDevice {
   /* Local CUDA device id */
   int id;
@@ -106,7 +112,11 @@ std::vector<EspressoGpuDevice> cuda_gather_gpus(void);
  */
 int cuda_get_device_props(const int dev, EspressoGpuDevice &d);
 
+#ifdef LB_ADAPTIVE_GPU
+int cuda_init_adapt();
+#endif // LB_ADAPTIVE_GPU
+
 /** current error message of CUDA. */
 extern const char *cuda_error;
 
-#endif
+#endif // CUDA_INIT_H

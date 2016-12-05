@@ -2719,6 +2719,10 @@ void mpi_lbadapt_grid_init(int node, int level) {
 
   lbpar.base_level = level;
   max_refinement_level = level;
+
+#ifdef LB_ADAPTIVE_GPU
+  cuda_init_adapt();
+#endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
 }
 

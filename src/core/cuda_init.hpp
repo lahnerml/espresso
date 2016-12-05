@@ -22,13 +22,6 @@
 #include "config.hpp"
 #include <vector>
 
-void checkCUDAError(const char* action);
-#define CUDA_CALL( call )   \
-{                           \
-  call;                     \
-  checkCUDAError( #call );  \
-}
-
 /** Struct to hold information relevant to Espresso
    about GPUs. Should contain only fixed length plain
    old datatypes, as it is intended for MPI communication */
@@ -49,6 +42,14 @@ struct EspressoGpuDevice {
   /* Number of cores */
   int n_cores;
 };
+
+// Simple error checking function for CUDA actions
+void checkCUDAError(const char* action);
+#define CUDA_CALL( call )     \
+{                             \
+    call;                     \
+    checkCUDAError( #call );  \
+}
 
 /** Initializes the CUDA stream.
 */

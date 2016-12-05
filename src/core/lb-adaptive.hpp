@@ -196,7 +196,7 @@ void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, lb_float xyz[3]);
+                                  p8est_quadrant_t *q, double xyz[3]);
 
 /** Get the coordinates of the front lower left corner of a quadrant
  *

@@ -271,9 +271,6 @@ extern LB_FluidNode *lbfields;
 #else // LB_ADAPTIVE
 
 #ifdef LB_ADAPTIVE_GPU
-#define LBADAPT_PATCHSIZE 8
-#define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
-
 typedef struct lbadapt_patch_cell {
   lb_float lbfluid[2][19];
   lb_float modes[19];

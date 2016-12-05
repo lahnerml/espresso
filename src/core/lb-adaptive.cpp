@@ -755,14 +755,9 @@ void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
 }
 
 void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, lb_float *xyz) {
-  double tmp[3];
+                                  p8est_quadrant_t *q, double *xyz) {
   p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         tmp);
-
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] = tmp[i];
-  }
+                         xyz);
 }
 
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
@@ -1868,7 +1863,8 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
   double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
 #ifdef LB_ADAPTIVE_GPU
-  int cells_per_patch = LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  int cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
 #endif // LB_ADAPTIVE_GPU
 
   /* get boundary status */
@@ -1890,13 +1886,15 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
         bnd_ptr =
             (double *)sc_array_index(boundary_values, mesh_iter->current_qid);
         *bnd_ptr = bnd;
-#else // LB_ADAPTIVE_GPU
-        bnd_ptr = (double *) sc_array_index (boundary_values, cells_per_patch * mesh_iter->current_qid);
+#else  // LB_ADAPTIVE_GPU
+        bnd_ptr = (double *)sc_array_index(
+            boundary_values, cells_per_patch * mesh_iter->current_qid);
         int patch_count = 0;
         for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
           for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
             for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
-              bnd_ptr[patch_count] = data->patch[patch_x][patch_y][patch_z].lbfields.boundary;
+              bnd_ptr[patch_count] =
+                  data->patch[patch_x][patch_y][patch_z].lbfields.boundary;
               ++patch_count;
             }
           }
@@ -1909,18 +1907,20 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
-#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
-  lb_float dens, *dens_ptr, h;
+  double dens, *dens_ptr, h;
   lbadapt_payload_t *data;
 
 #ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+  int cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
+  lb_float h_max =
+      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
@@ -1932,10 +1932,10 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 
     int lvl = level - coarsest_level_local;
 #ifdef LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
-                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
     while (status != P8EST_MESHITER_DONE) {
@@ -1944,8 +1944,9 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
 
-        lb_float avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
+        double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
+#ifndef LB_ADAPTIVE_GPU
         if (data->boundary) {
           dens = 0;
         } else {
@@ -1966,23 +1967,63 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         dens_ptr =
             (lb_float *)sc_array_index(density_values, mesh_iter->current_qid);
         *dens_ptr = dens;
+#else  // LB_ADAPTIVE_GPU
+        int patch_count = 0;
+        dens_ptr = (double *)sc_array_index(
+            density_values, cells_per_patch * mesh_iter->current_qid);
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+              if (data->patch[patch_x][patch_y][patch_z].lbfields.boundary) {
+                dens = 0;
+              } else {
+                // clang-format off
+                dens = avg_rho
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 0]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 1]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 2]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 3]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 4]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 5]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 6]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 7]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 8]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][ 9]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][10]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][11]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][12]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][13]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][14]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][15]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][16]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][17]
+                     + data->patch[patch_x][patch_y][patch_z].lbfluid[0][18];
+                // clang-format on
+              }
+              dens_ptr[patch_count] = dens;
+              ++patch_count;
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
   }
-#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
-#ifndef LB_ADAPTIVE_GPU
   int status;
   int level;
-  lb_float *veloc_ptr, h;
+  double *veloc_ptr, h;
   lbadapt_payload_t *data;
 
 #ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+  int cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) /
+                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
@@ -1996,10 +2037,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 
     int lvl = level - coarsest_level_local;
 #ifdef LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
-                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+    double h = (double)P8EST_QUADRANT_LEN(level) /
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
+    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
     while (status != P8EST_MESHITER_DONE) {
@@ -2009,9 +2050,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
             mesh_iter)];
 
         /* calculate values to write */
-        lb_float rho;
-        lb_float j[3];
+        double rho;
+        double j[3];
 
+#ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_local_fields(data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
@@ -2025,11 +2067,41 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 
         /* pass it into solution vector */
         std::memcpy(veloc_ptr, j, P8EST_DIM * sizeof(lb_float));
+#else  // LB_ADAPTIVE_GPU
+        int patch_count = 0;
+        for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+          for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+            for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+              lb_float tmp_rho, tmp_j[3];
+              lbadapt_calc_local_fields(
+                  data->patch[patch_x][patch_y][patch_z].modes,
+                  data->patch[patch_x][patch_y][patch_z].lbfields.force,
+                  data->patch[patch_x][patch_y][patch_z].lbfields.boundary,
+                  data->patch[patch_x][patch_y][patch_z].lbfields.has_force, h,
+                  &tmp_rho, tmp_j, NULL);
+
+              rho = tmp_rho;
+              j[0] = tmp_j[0] / rho * h_max / lbpar.tau;
+              j[1] = tmp_j[1] / rho * h_max / lbpar.tau;
+              j[2] = tmp_j[2] / rho * h_max / lbpar.tau;
+
+              veloc_ptr = (double *)sc_array_index(
+                  velocity_values,
+                  P8EST_DIM *
+                      (patch_count + cells_per_patch * mesh_iter->current_qid));
+
+              /* pass it into solution vector */
+              std::memcpy(veloc_ptr, j, P8EST_DIM * sizeof(double));
+
+              ++patch_count;
+            }
+          }
+        }
+#endif // LB_ADAPTIVE_GPU
       }
     }
     p8est_meshiter_destroy(mesh_iter);
   }
-#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_boundary_status() {
@@ -2080,11 +2152,11 @@ void lbadapt_get_boundary_status() {
                   xyz_quad[1] + 2 * patch_y * patch_offset + patch_offset;
               xyz_patch[2] =
                   xyz_quad[2] + 2 * patch_z * patch_offset + patch_offset;
-              data->patch[1 + patch_x][1 + patch_y][1 + patch_z].lbfields.boundary =
-                  lbadapt_is_boundary(xyz_patch);
-              all_boundary =
-                  all_boundary &&
-                  data->patch[1 + patch_x][1 + patch_y][1 + patch_z].lbfields.boundary;
+              data->patch[1 + patch_x][1 + patch_y][1 + patch_z]
+                  .lbfields.boundary = lbadapt_is_boundary(xyz_patch);
+              all_boundary = all_boundary &&
+                             data->patch[1 + patch_x][1 + patch_y][1 + patch_z]
+                                 .lbfields.boundary;
             }
           }
         }
@@ -2278,6 +2350,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
 
   cont->filename = P4EST_STRDUP(filename);
 
+#if 0
   if (sizeof(float) == sizeof(lb_float)) {
     strcpy(cont->vtk_float_name, "Float32");
   } else if (sizeof(double) == sizeof(lb_float)) {
@@ -2285,6 +2358,9 @@ lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
   } else {
     SC_ABORT_NOT_REACHED();
   }
+#else  // 0
+  strcpy(cont->vtk_float_name, "Float64");
+#endif // 0
 
   return cont;
 }
@@ -2356,14 +2432,13 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   p4est_locidx_t *locidx_data;
   int xi, yi, j, k;
   int zi;
-  lb_float h2, eta_x, eta_y, eta_z = 0.;
-  lb_float xyz[3]; /* 3 not P4EST_DIM */
+  double xyz[3]; /* 3 not P4EST_DIM */
   size_t num_quads, zz;
   p4est_topidx_t jt;
   p4est_topidx_t vt[P8EST_CHILDREN];
   p4est_locidx_t patch_count, quad_count, Npoints;
   p4est_locidx_t il, *ntc;
-  float *float_data;
+  double *float_data;
   sc_array_t *quadrants, *indeps;
   sc_array_t *trees;
   p8est_tree_t *tree;
@@ -2437,7 +2512,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
           (long long)Npoints, (long long)Ncells);
   fprintf(cont->vtufile, "      <Points>\n");
 
-  float_data = P4EST_ALLOC(lb_float, 3 * Npoints);
+  float_data = P4EST_ALLOC(double, 3 * Npoints);
 
   /* write point position data */
   fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"Position\""
@@ -2445,98 +2520,70 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
           cont->vtk_float_name, "binary");
   int base;
   int root = P8EST_ROOT_LEN;
-  if (nodes == NULL) {
-    lb_float xyz_quad[3], xyz_patch[3];
-    lb_float patch_offset;
-    /* loop over the trees */
-    for (jt = first_local_tree, quad_count = 0; jt <= last_local_tree; ++jt) {
-      tree = p8est_tree_array_index(trees, jt);
-      quadrants = &tree->quadrants;
-      num_quads = quadrants->elem_count;
 
-      /* loop over the elements in tree and calculate vertex coordinates */
-      for (zz = 0; zz < num_quads; ++zz, ++quad_count) {
-        quad = p8est_quadrant_array_index(quadrants, zz);
-        base = P8EST_QUADRANT_LEN(quad->level);
-        patch_offset = ((lb_float)base / (LBADAPT_PATCHSIZE * (lb_float)root));
+  double xyz_quad[3], xyz_patch[3];
+  double patch_offset;
+  /* loop over the trees */
+  for (jt = first_local_tree, quad_count = 0; jt <= last_local_tree; ++jt) {
+    tree = p8est_tree_array_index(trees, jt);
+    quadrants = &tree->quadrants;
+    num_quads = quadrants->elem_count;
 
-        // lower left corner of quadrant
-        lbadapt_get_front_lower_left(p8est, jt, quad, xyz_quad);
+    /* loop over the elements in tree and calculate vertex coordinates */
+    for (zz = 0; zz < num_quads; ++zz, ++quad_count) {
+      quad = p8est_quadrant_array_index(quadrants, zz);
+      base = P8EST_QUADRANT_LEN(quad->level);
+      patch_offset = ((double)base / (LBADAPT_PATCHSIZE * (double)root));
 
-        patch_count = 0;
-        for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
-          for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE; ++patch_y) {
-            for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE; ++patch_x) {
-              // lower left corner of patch
-              xyz_patch[0] = xyz_quad[0] + patch_x * patch_offset;
-              xyz_patch[1] = xyz_quad[1] + patch_y * patch_offset;
-              xyz_patch[2] = xyz_quad[2] + patch_z * patch_offset;
-              k = 0;
-              // calculate remaining coordinates
-              for (zi = 0; zi < 2; ++zi) {
-                for (yi = 0; yi < 2; ++yi) {
-                  for (xi = 0; xi < 2; ++xi) {
-                    xyz[0] = xyz_patch[0] + xi * patch_offset;
-                    xyz[1] = xyz_patch[1] + yi * patch_offset;
-                    xyz[2] = xyz_patch[2] + zi * patch_offset;
+      // lower left corner of quadrant
+      lbadapt_get_front_lower_left(p8est, jt, quad, xyz_quad);
 
-                    for (j = 0; j < 3; ++j) {
-                      float_data[j +
-                                 3 * (k +
-                                      P8EST_CHILDREN *
-                                          (patch_count +
-                                           cells_per_patch * quad_count))] =
-                          (lb_float)xyz[j];
-                    }
-                    ++k;           // count coordinates written up to now
-                    ++patch_count; // count patches written up to now
+      patch_count = 0;
+      for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
+        for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE; ++patch_y) {
+          for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE; ++patch_x) {
+            // lower left corner of patch
+            xyz_patch[0] = xyz_quad[0] + patch_x * patch_offset;
+            xyz_patch[1] = xyz_quad[1] + patch_y * patch_offset;
+            xyz_patch[2] = xyz_quad[2] + patch_z * patch_offset;
+            k = 0;
+            // calculate remaining coordinates
+            for (zi = 0; zi < 2; ++zi) {
+              for (yi = 0; yi < 2; ++yi) {
+                for (xi = 0; xi < 2; ++xi) {
+                  xyz[0] = xyz_patch[0] + xi * patch_offset;
+                  xyz[1] = xyz_patch[1] + yi * patch_offset;
+                  xyz[2] = xyz_patch[2] + zi * patch_offset;
+
+                  for (j = 0; j < 3; ++j) {
+                    float_data[j +
+                               3 * (k +
+                                    P8EST_CHILDREN *
+                                        (patch_count +
+                                         cells_per_patch * quad_count))] =
+                        xyz[j];
                   }
+                  ++k; // count coordinates written up to now
                 }
               }
             }
-          }
-        }
-
-        h2 = .5 * intsize * P8EST_QUADRANT_LEN(quad->level);
-        k = 0;
-        for (zi = 0; zi < 2; ++zi) {
-          eta_z = intsize * quad->z + h2 * (1. + (zi * 2 - 1));
-          for (yi = 0; yi < 2; ++yi) {
-            eta_y = intsize * quad->y + h2 * (1. + (yi * 2 - 1));
-            for (xi = 0; xi < 2; ++xi) {
-              P4EST_ASSERT(0 <= k && k < P8EST_CHILDREN);
-              eta_x = intsize * quad->x + h2 * (1. + (xi * 2 - 1));
-              for (j = 0; j < 3; ++j) {
-                xyz[j] =
-                    ((1. - eta_z) *
-                         ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[0] + j] +
-                                          eta_x * v[3 * vt[1] + j]) +
-                          eta_y * ((1. - eta_x) * v[3 * vt[2] + j] +
-                                   eta_x * v[3 * vt[3] + j])) +
-                     eta_z * ((1. - eta_y) * ((1. - eta_x) * v[3 * vt[4] + j] +
-                                              eta_x * v[3 * vt[5] + j]) +
-                              eta_y * ((1. - eta_x) * v[3 * vt[6] + j] +
-                                       eta_x * v[3 * vt[7] + j])));
-                float_data[3 * (P8EST_CHILDREN * quad_count + k) + j] =
-                    (lb_float)xyz[j];
-              }
-            }
-            ++k;
+            ++patch_count; // count patches written up to now
           }
         }
       }
-      P4EST_ASSERT(k == P8EST_CHILDREN);
     }
+    assert(k == P8EST_CHILDREN);
+    assert(patch_count == cells_per_patch);
   }
-  P4EST_ASSERT(P8EST_CHILDREN * quad_count == Npoints);
+  assert(P8EST_CHILDREN * cells_per_patch * quad_count == Npoints);
 
   fprintf(cont->vtufile, "          ");
   /* TODO: Don't allocate the full size of the array, only allocate
    * the chunk that will be passed to zlib and do this a chunk
    * at a time.
    */
-  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
-                               sizeof(*float_data) * 3 * Npoints);
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)float_data,
+                                   sizeof(*float_data) * 3 * Npoints);
   fprintf(cont->vtufile, "\n");
   if (retval) {
     P4EST_LERROR(P8EST_STRING "_vtk: Error encoding points\n");
@@ -2556,18 +2603,15 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
           P4EST_VTK_LOCIDX, "binary");
 
   fprintf(cont->vtufile, "          ");
-  if (nodes == NULL) {
-    locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncorners);
-    for (il = 0; il < Ncorners; ++il) {
-      locidx_data[il] = il;
-    }
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                                 sizeof(p4est_locidx_t) * Ncorners);
-    P4EST_FREE(locidx_data);
-  } else {
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)nodes->local_nodes,
-                                 sizeof(p4est_locidx_t) * Ncorners);
+
+  locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncorners);
+  for (il = 0; il < Ncorners; ++il) {
+    locidx_data[il] = il;
   }
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)locidx_data,
+                                   sizeof(p4est_locidx_t) * Ncorners);
+  P4EST_FREE(locidx_data);
+
   fprintf(cont->vtufile, "\n");
   if (retval) {
     P4EST_LERROR(P8EST_STRING "_vtk: Error encoding connectivity\n");
@@ -2581,12 +2625,13 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
                          " format=\"%s\">\n",
           P4EST_VTK_LOCIDX, "binary");
   locidx_data = P4EST_ALLOC(p4est_locidx_t, Ncells);
-  for (il = 1; il <= Ncells; ++il)
-    locidx_data[il - 1] = P8EST_CHILDREN * il; /* same type */
+  for (il = 1; il <= Ncells; ++il) {
+    locidx_data[il - 1] = P8EST_CHILDREN * il;
+  }
 
   fprintf(cont->vtufile, "          ");
-  retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                               sizeof(p4est_locidx_t) * Ncells);
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)locidx_data,
+                                   sizeof(p4est_locidx_t) * Ncells);
   fprintf(cont->vtufile, "\n");
 
   P4EST_FREE(locidx_data);
@@ -2603,12 +2648,13 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
                          " format=\"%s\">\n",
           "binary");
   uint8_data = P4EST_ALLOC(uint8_t, Ncells);
-  for (il = 0; il < Ncells; ++il)
+  for (il = 0; il < Ncells; ++il) {
     uint8_data[il] = P4EST_VTK_CELL_TYPE;
+  }
 
   fprintf(cont->vtufile, "          ");
-  retval = sc_vtk_write_binary(cont->vtufile, (char *)uint8_data,
-                               sizeof(*uint8_data) * Ncells);
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)uint8_data,
+                                   sizeof(*uint8_data) * Ncells);
   fprintf(cont->vtufile, "\n");
 
   P4EST_FREE(uint8_data);
@@ -2701,7 +2747,7 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
 
   float_data = P4EST_ALLOC(double, Ncells);
   for (il = 0; il < Ncells; ++il) {
-    float_data[il] = (double) * ((double *)sc_array_index(values, il));
+    float_data[il] = (double)*((double *)sc_array_index(values, il));
   }
 
   fprintf(cont->vtufile, "          ");
@@ -2709,8 +2755,8 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
    * the chunk that will be passed to zlib and do this a chunk
    * at a time.
    */
-  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
-                               sizeof(*float_data) * Ncells);
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)float_data,
+                                   sizeof(*float_data) * Ncells);
   fprintf(cont->vtufile, "\n");
 
   P4EST_FREE(float_data);
@@ -2750,7 +2796,7 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
 
   float_data = P4EST_ALLOC(double, 3 * Ncells);
   for (il = 0; il < (3 * Ncells); ++il) {
-    float_data[il] = (double) * ((double *)sc_array_index(values, il));
+    float_data[il] = (double)*((double *)sc_array_index(values, il));
   }
 
   fprintf(cont->vtufile, "          ");
@@ -2758,8 +2804,8 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
    * the chunk that will be passed to zlib and do this a chunk
    * at a time.
    */
-  retval = sc_vtk_write_binary(cont->vtufile, (char *)float_data,
-                               sizeof(*float_data) * 3 * Ncells);
+  retval = sc_vtk_write_compressed(cont->vtufile, (char *)float_data,
+                                   sizeof(*float_data) * 3 * Ncells);
   fprintf(cont->vtufile, "\n");
 
   P4EST_FREE(float_data);
@@ -2814,13 +2860,16 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
   int retval;
   int i, all = 0;
   int scalar_strlen, vector_strlen;
+
   sc_array_t *trees = p8est->trees;
   p8est_tree_t *tree;
   const p4est_topidx_t first_local_tree = p8est->first_local_tree;
   const p4est_topidx_t last_local_tree = p8est->last_local_tree;
+
   const p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
+
   char cell_scalars[BUFSIZ], cell_vectors[BUFSIZ];
   const char *name, **names;
   sc_array_t **values;
@@ -2936,8 +2985,8 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       }
     }
     fprintf(cont->vtufile, "          ");
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                                 sizeof(*locidx_data) * Ncells);
+    retval = sc_vtk_write_compressed(cont->vtufile, (char *)locidx_data,
+                                     sizeof(*locidx_data) * Ncells);
     fprintf(cont->vtufile, "\n");
     if (retval) {
       P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
@@ -2971,8 +3020,8 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     }
 
     fprintf(cont->vtufile, "          ");
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)uint8_data,
-                                 sizeof(*uint8_data) * Ncells);
+    retval = sc_vtk_write_compressed(cont->vtufile, (char *)uint8_data,
+                                     sizeof(*uint8_data) * Ncells);
     fprintf(cont->vtufile, "\n");
 
     P4EST_FREE(uint8_data);
@@ -3000,11 +3049,9 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       locidx_data[il] = (p4est_locidx_t)wrapped_rank;
 
     fprintf(cont->vtufile, "          ");
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                                 sizeof(*locidx_data) * Ncells);
+    retval = sc_vtk_write_compressed(cont->vtufile, (char *)locidx_data,
+                                     sizeof(*locidx_data) * Ncells);
     fprintf(cont->vtufile, "\n");
-
-    P4EST_FREE(locidx_data);
 
     if (retval) {
       P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
@@ -3019,7 +3066,7 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
   }
 
   if (write_qid) {
-    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"treeid\""
+    fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"qid\""
                            " format=\"%s\">\n",
             P4EST_VTK_LOCIDX, "binary");
     for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
@@ -3033,9 +3080,12 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       }
     }
     fprintf(cont->vtufile, "          ");
-    retval = sc_vtk_write_binary(cont->vtufile, (char *)locidx_data,
-                                 sizeof(*locidx_data) * Ncells);
+    retval = sc_vtk_write_compressed(cont->vtufile, (char *)locidx_data,
+                                     sizeof(*locidx_data) * Ncells);
     fprintf(cont->vtufile, "\n");
+
+    P4EST_FREE(locidx_data);
+
     if (retval) {
       P4EST_LERROR(P8EST_STRING "_vtk: Error encoding types\n");
       lbadapt_vtk_context_destroy(cont);

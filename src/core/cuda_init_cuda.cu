@@ -156,7 +156,8 @@ int cuda_test_device_access() {
   int cuda_init_adapt() {
     int nGPUs;
     CUDA_CALL (cudaGetDeviceCount(&nGPUs));
-    CUDA_CALL (cudaSetDevice(this_node));
+    // assume we're on a homogeneous system
+    CUDA_CALL (cudaSetDevice(this_node % nGPUs));
     return 0;
   }
 #endif // LB_ADAPTIVE_GPU

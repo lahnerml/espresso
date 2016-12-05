@@ -135,13 +135,13 @@ HaloCommunicator update_halo_comm = {0, NULL};
 int fluct;
 
 #ifdef LB_ADAPTIVE
-double prefactors[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_shear[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_bulk[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#else // LB_ADAPTIVE
+double prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+#else  // LB_ADAPTIVE
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
@@ -169,6 +169,7 @@ static int n_lbsteps = 0;
 double lb_step_factor = 1.;
 
 int max_refinement_level = P8EST_QMAXLEVEL;
+
 #endif // LB_ADAPTIVE
 
 #ifdef ADDITIONAL_CHECKS
@@ -2199,32 +2200,9 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
   int i;
 #ifdef LB_ADAPTIVE
-#if 0
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
-  double dim_free_visc_shear[P8EST_MAXLEVEL] =
-    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-  double dim_free_visc_bulk[P8EST_MAXLEVEL] =
-    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#endif // 0
   for (i = max_refinement_level; lbpar.base_level <= i; --i) {
     prefactors[i] = 1 << (max_refinement_level - i);
-#if 0
-    dim_free_visc_shear[i] =
-      (lbpar.viscosity[0] * lbpar.tau) /
-      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max) / SQR(lbpar.tau));
-    dim_free_visc_bulk[i] =
-      (lbpar.bulk_viscosity[0] * SQR(lbpar.tau) * lbpar.tau) /
-      (prefactors[i] / 3. * lbpar.rho[0] * SQR(h_max) * SQR(h_max));
 
-    gamma_shear[i] =
-      (2 * dim_free_visc_shear[i] - 1) /
-      (2 * dim_free_visc_shear[i] + 1);
-
-    gamma_bulk[i] =
-      (3 * dim_free_visc_bulk[i] - 1) /
-      (3 * dim_free_visc_bulk[i] + 1);
-#else // 0
     double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
     if (lbpar.viscosity[0] > 0.0) {
       gamma_shear[i] = 1. -
@@ -2238,7 +2216,6 @@ void lb_reinit_parameters() {
               (prefactors[i] * SQR(lbpar.agrid)) +
               1.);
     }
-#endif // 0
   }
 #else
   if (lbpar.viscosity[0] > 0.0) {
@@ -2263,17 +2240,17 @@ void lb_reinit_parameters() {
   gamma_odd = lbpar.gamma_odd[0];
   gamma_even = lbpar.gamma_even[0];
 
-  //if (lbpar.is_TRT) {
+  // if (lbpar.is_TRT) {
   //  gamma_bulk = gamma_shear;
   //  gamma_even = gamma_shear;
   //  gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
   //  // gamma_odd = gamma_shear; //uncomment for BGK
   //}
 
-  //gamma_shear = 0.0; //uncomment for special case of BGK
-  //gamma_bulk = 0.0;
-  //gamma_odd = 0.0;
-  //gamma_even = 0.0;
+  // gamma_shear = 0.0; //uncomment for special case of BGK
+  // gamma_bulk = 0.0;
+  // gamma_odd = 0.0;
+  // gamma_even = 0.0;
 
   // printf("gamma_shear=%e\n", gamma_shear);
   // printf("gamma_bulk=%e\n", gamma_bulk);
@@ -2435,7 +2412,7 @@ void lb_init() {
 
   /* prepare the halo communication */
   lb_prepare_communication();
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
   lbadapt_init();
 #endif // !LB_ADAPTIVE
 
@@ -3152,18 +3129,16 @@ inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
   // perform 1st half of subcycling here (process coarse before fine)
   int lvl_diff, level;
-  double step = 0.0;
-  do {
-    for (level = lbpar.base_level; level <= finest_level_global; ++level) {
-      lvl_diff = finest_level_global - level;
+  for (level = lbpar.base_level; level <= finest_level_global; ++level) {
+    lvl_diff = finest_level_global - level;
 
-      if (n_lbsteps % (1 << lvl_diff) == 0) {
+    if (n_lbsteps % (1 << lvl_diff) == 0) {
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform collision step on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_collide(level);
+      lbadapt_collide(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "] "
                   << "[Done] Perform collision step on level " << level
@@ -3173,7 +3148,7 @@ inline void lb_collide_stream() {
                   << " Populate virtual quadrants on level " << level + 1
                   << std::endl;
 #endif // 0
-        lbadapt_populate_virtuals(level);
+      lbadapt_populate_virtuals(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Populate virtual quadrants on level " << level + 1
@@ -3183,33 +3158,33 @@ inline void lb_collide_stream() {
                   << " Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-        p8est_ghostvirt_exchange_data(
-            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+      p8est_ghostvirt_exchange_data(
+          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-      }
     }
+  }
 
-    // increment counter half way to keep coarse quadrants from streaming early
-    ++n_lbsteps;
+  // increment counter half way to keep coarse quadrants from streaming early
+  ++n_lbsteps;
 
-    // perform second half of subcycling here (process fine before coarse)
+  // perform second half of subcycling here (process fine before coarse)
 
-    for (level = finest_level_global; lbpar.base_level <= level; --level) {
-      lvl_diff = finest_level_global - level;
+  for (level = finest_level_global; lbpar.base_level <= level; --level) {
+    lvl_diff = finest_level_global - level;
 
-      if (n_lbsteps % (1 << lvl_diff) == 0) {
+    if (n_lbsteps % (1 << lvl_diff) == 0) {
 
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Updating populations from virtuals on level " << level + 1
                   << std::endl;
 #endif // 0
-        lbadapt_update_populations_from_virtuals(level);
+      lbadapt_update_populations_from_virtuals(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Updating populations from virtuals on level "
@@ -3220,7 +3195,7 @@ inline void lb_collide_stream() {
                   << " Perform streaming step on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_stream(level);
+      lbadapt_stream(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform streaming step on level " << level
@@ -3230,7 +3205,7 @@ inline void lb_collide_stream() {
                   << " Perform bounce back step on " << level
                   << std::endl;
 #endif // 0
-        lbadapt_bounce_back(level);
+      lbadapt_bounce_back(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform bounce back step on " << level
@@ -3240,9 +3215,9 @@ inline void lb_collide_stream() {
                   << " Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-        p8est_ghostvirt_exchange_data(
-            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+      p8est_ghostvirt_exchange_data(
+          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
@@ -3252,16 +3227,14 @@ inline void lb_collide_stream() {
                   << " swap pointers on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_swap_pointers(level);
+      lbadapt_swap_pointers(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] swap pointers on level " << level
                   << std::endl;
 #endif // 0
-      }
     }
-    step += lb_step_factor;
-  } while (step < 1);
+  }
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;
@@ -3740,8 +3713,9 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   v[0] *= lbpar.agrid / lbpar.tau;
   v[1] *= lbpar.agrid / lbpar.tau;
   v[2] *= lbpar.agrid / lbpar.tau;
-  return 0;
 #endif // LB_ADAPTIVE
+
+  return 0;
 }
 
 /** Calculate particle lattice interactions.
@@ -3923,7 +3897,8 @@ void lb_calc_average_rho() {
 #ifdef LB_ADAPTIVE
   double *rho;
   *rho = 0.0;
-  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL, NULL);
+  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL,
+                NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   index_t index;

@@ -135,13 +135,13 @@ HaloCommunicator update_halo_comm = {0, NULL};
 int fluct;
 
 #ifdef LB_ADAPTIVE
-double prefactors[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_shear[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_bulk[P8EST_MAXLEVEL] =
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.};
-#else // LB_ADAPTIVE
+double prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
+double gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+#else  // LB_ADAPTIVE
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
 /** relaxation rate of bulk modes */
@@ -687,8 +687,9 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
-#else // LB_ADAPTIVE_GPU
-  p4est_locidx_t cells_per_patch = LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   boundary = sc_array_new_size(sizeof(double), num_cells);
@@ -704,8 +705,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context,
-                                       1, /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
@@ -718,7 +718,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
 
@@ -726,16 +726,17 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   context = lbadapt_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = lbadapt_vtk_write_cell_dataf(context, 1,
-                                         /* write tree indices */
-                                         1, /* write the refinement level */
-                                         1, /* write the mpi process id */
-                                         0, /* do not wrap the mpi rank */
-                                         1, /* write qid */
-                                         1, /* write boundary index as scalar cell
-                                               data */
-                                         0, /* no custom cell vector data */
-                                         "boundary", boundary, context);
+  context =
+      lbadapt_vtk_write_cell_dataf(context, 1,
+                                   /* write tree indices */
+                                   1, /* write the refinement level */
+                                   1, /* write the mpi process id */
+                                   0, /* do not wrap the mpi rank */
+                                   1, /* write qid */
+                                   1, /* write boundary index as scalar cell
+                                         data */
+                                   0, /* no custom cell vector data */
+                                   "boundary", boundary, context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -833,8 +834,9 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
-#else // LB_ADAPTIVE_GPU
-  p4est_locidx_t cells_per_patch = LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   density = sc_array_new_size(sizeof(double), num_cells);
@@ -850,8 +852,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = p8est_vtk_write_cell_dataf(context,
-                                       1, /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
@@ -864,7 +865,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(*filename);
 
@@ -872,8 +873,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   context = lbadapt_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context = lbadapt_vtk_write_cell_dataf(context,
-                                         1, /* write tree indices */
+  context = lbadapt_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                          1, /* write the refinement level */
                                          1, /* write the mpi process id */
                                          0, /* do not wrap the mpi rank */
@@ -965,8 +965,9 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
-#else // LB_ADAPTIVE_GPU
-  p4est_locidx_t cells_per_patch = LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+#else  // LB_ADAPTIVE_GPU
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
@@ -983,8 +984,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
 
-  context = p8est_vtk_write_cell_dataf(context,
-                                       1, /* write tree indices */
+  context = p8est_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
@@ -997,7 +997,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
 
@@ -1006,8 +1006,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
 
-  context = lbadapt_vtk_write_cell_dataf(context,
-                                         1, /* write tree indices */
+  context = lbadapt_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                          1, /* write the refinement level */
                                          1, /* write the mpi process id */
                                          0, /* do not wrap the mpi rank */
@@ -2190,9 +2189,9 @@ int lb_sanity_checks() {
 void lb_pre_init() {
 #ifdef LB_ADAPTIVE
   // one can define the verbosity of p4est and libsc here.
-  //sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
+  // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
   sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  //p4est_init(NULL, SC_LP_VERBOSE);
+  // p4est_init(NULL, SC_LP_VERBOSE);
   p4est_init(NULL, SC_LP_PRODUCTION);
 
 #else  // LB_ADAPTIVE
@@ -2295,9 +2294,9 @@ void lb_reinit_parameters() {
 
 #ifdef LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(i) /
-      ((double) LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
-#else // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(i) / (double) P8EST_ROOT_LEN;
+               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+#else  // LB_ADAPTIVE_GPU
+    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
     if (lbpar.viscosity[0] > 0.0) {
@@ -2337,17 +2336,17 @@ void lb_reinit_parameters() {
   gamma_odd = lbpar.gamma_odd[0];
   gamma_even = lbpar.gamma_even[0];
 
-  //if (lbpar.is_TRT) {
+  // if (lbpar.is_TRT) {
   //  gamma_bulk = gamma_shear;
   //  gamma_even = gamma_shear;
   //  gamma_odd = -(7.0 * gamma_even + 1.0) / (gamma_even + 7.0);
   //  // gamma_odd = gamma_shear; //uncomment for BGK
   //}
 
-  //gamma_shear = 0.0; //uncomment for special case of BGK
-  //gamma_bulk = 0.0;
-  //gamma_odd = 0.0;
-  //gamma_even = 0.0;
+  // gamma_shear = 0.0; //uncomment for special case of BGK
+  // gamma_bulk = 0.0;
+  // gamma_odd = 0.0;
+  // gamma_even = 0.0;
 
   // printf("gamma_shear=%e\n", gamma_shear);
   // printf("gamma_bulk=%e\n", gamma_bulk);
@@ -2509,7 +2508,7 @@ void lb_init() {
 
   /* prepare the halo communication */
   lb_prepare_communication();
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
   lbadapt_init();
 #endif // !LB_ADAPTIVE
 
@@ -3226,18 +3225,16 @@ inline void lb_collide_stream() {
 #ifdef LB_ADAPTIVE
   // perform 1st half of subcycling here (process coarse before fine)
   int lvl_diff, level;
-  double step = 0.0;
-  do {
-    for (level = lbpar.base_level; level <= finest_level_global; ++level) {
-      lvl_diff = finest_level_global - level;
+  for (level = lbpar.base_level; level <= finest_level_global; ++level) {
+    lvl_diff = finest_level_global - level;
 
-      if (n_lbsteps % (1 << lvl_diff) == 0) {
+    if (n_lbsteps % (1 << lvl_diff) == 0) {
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Perform collision step on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_collide(level);
+      lbadapt_collide(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "] "
                   << "[Done] Perform collision step on level " << level
@@ -3247,7 +3244,7 @@ inline void lb_collide_stream() {
                   << " Populate virtual quadrants on level " << level + 1
                   << std::endl;
 #endif // 0
-        lbadapt_populate_virtuals(level);
+      lbadapt_populate_virtuals(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Populate virtual quadrants on level " << level + 1
@@ -3257,33 +3254,33 @@ inline void lb_collide_stream() {
                   << " Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-        p8est_ghostvirt_exchange_data(
-            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+      p8est_ghostvirt_exchange_data(
+          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-      }
     }
+  }
 
-    // increment counter half way to keep coarse quadrants from streaming early
-    ++n_lbsteps;
+  // increment counter half way to keep coarse quadrants from streaming early
+  ++n_lbsteps;
 
-    // perform second half of subcycling here (process fine before coarse)
+  // perform second half of subcycling here (process fine before coarse)
 
-    for (level = finest_level_global; lbpar.base_level <= level; --level) {
-      lvl_diff = finest_level_global - level;
+  for (level = finest_level_global; lbpar.base_level <= level; --level) {
+    lvl_diff = finest_level_global - level;
 
-      if (n_lbsteps % (1 << lvl_diff) == 0) {
+    if (n_lbsteps % (1 << lvl_diff) == 0) {
 
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " Updating populations from virtuals on level " << level + 1
                   << std::endl;
 #endif // 0
-        lbadapt_update_populations_from_virtuals(level);
+      lbadapt_update_populations_from_virtuals(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Updating populations from virtuals on level "
@@ -3294,7 +3291,7 @@ inline void lb_collide_stream() {
                   << " Perform streaming step on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_stream(level);
+      lbadapt_stream(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform streaming step on level " << level
@@ -3304,7 +3301,7 @@ inline void lb_collide_stream() {
                   << " Perform bounce back step on " << level
                   << std::endl;
 #endif // 0
-        lbadapt_bounce_back(level);
+      lbadapt_bounce_back(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform bounce back step on " << level
@@ -3314,9 +3311,9 @@ inline void lb_collide_stream() {
                   << " Perform ghost exchange on level " << level
                   << std::endl;
 #endif // 0
-        p8est_ghostvirt_exchange_data(
-            p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-            (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+      p8est_ghostvirt_exchange_data(
+          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] Perform ghost exchange on level " << level
@@ -3326,16 +3323,14 @@ inline void lb_collide_stream() {
                   << " swap pointers on level " << level
                   << std::endl;
 #endif // 0
-        lbadapt_swap_pointers(level);
+      lbadapt_swap_pointers(level);
 #if 0
         std::cout << "[p4est " << p8est->mpirank << "]"
                   << " [Done] swap pointers on level " << level
                   << std::endl;
 #endif // 0
-      }
     }
-    step += lb_step_factor;
-  } while (step < 1);
+  }
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;

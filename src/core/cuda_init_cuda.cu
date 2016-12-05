@@ -155,10 +155,22 @@ int cuda_test_device_access() {
 #ifdef LB_ADAPTIVE_GPU
   int cuda_init_adapt() {
     int nGPUs;
-    cudaGetDeviceCount(&nGPUs);
-    cudaSetDevice(this_node);
+    CUDA_CALL (cudaGetDeviceCount(&nGPUs));
+    CUDA_CALL (cudaSetDevice(this_node));
     return 0;
   }
 #endif // LB_ADAPTIVE_GPU
+
+void checkCUDAError(const char* action)
+{
+  cudaError_t error;
+  error = cudaGetLastError(); 
+
+  if (error != cudaSuccess)
+  {
+    printf ("\nError while '%s': %s\nprogram terminated ...\n\n", action, cudaGetErrorString(error));
+    exit (-1);
+  }
+}
 
 #endif /* defined(CUDA) */

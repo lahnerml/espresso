@@ -43,6 +43,14 @@ struct EspressoGpuDevice {
   int n_cores;
 };
 
+// Simple error checking function for CUDA actions
+void checkCUDAError(const char* action);
+#define CUDA_CALL( call )     \
+{                             \
+    call;                     \
+    checkCUDAError( #call );  \
+}
+
 /** Initializes the CUDA stream.
 */
 void cuda_init();

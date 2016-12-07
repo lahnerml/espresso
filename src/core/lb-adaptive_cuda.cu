@@ -2,22 +2,26 @@
 
 #ifdef LB_ADAPTIVE_GPU
 #include <cuda.h>
+#include <stdio.h>
 
 #include "cuda_interface.hpp"
 #include "cuda_utils.hpp"
 #include "lb-adaptive-gpu.hpp"
 
 __global__ void simple_kernel(test_grid_t *a) {
-  a->thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
-      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)LBADAPT_PATCHSIZE_HALO *
-          (lb_float)threadIdx.z +
-      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)threadIdx.y +
-      (lb_float)threadIdx.x;
-  a->block_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
-      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)LBADAPT_PATCHSIZE_HALO *
-          (lb_float)blockIdx.z +
-      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)blockIdx.y +
-      (lb_float)blockIdx.x;
+  a[blockIdx.x].thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
+      LBADAPT_PATCHSIZE_HALO * LBADAPT_PATCHSIZE_HALO * threadIdx.z +
+      LBADAPT_PATCHSIZE_HALO * threadIdx.y +
+      threadIdx.x;
+  a[blockIdx.x].block_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
+      LBADAPT_PATCHSIZE_HALO * LBADAPT_PATCHSIZE_HALO * blockIdx.z +
+      LBADAPT_PATCHSIZE_HALO * blockIdx.y +
+      blockIdx.x;
+  printf("block: %i, %i, %i => %f; thread %i, %i, %i => %f\n",
+         blockIdx.x, blockIdx.y, blockIdx.z,
+         a[blockIdx.x].block_idx[threadIdx.x][threadIdx.y][threadIdx.z],
+         threadIdx.x, threadIdx.y, threadIdx.z,
+         a[blockIdx.x].thread_idx[threadIdx.x][threadIdx.y][threadIdx.z]);
 }
 
 void test(test_grid_t *data_host) {
@@ -30,6 +34,8 @@ void test(test_grid_t *data_host) {
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
                          LBADAPT_PATCHSIZE_HALO);
 
+  printf ("blocks: %i, %i, %i\n", blocks_per_grid.x, blocks_per_grid.y, blocks_per_grid.z);
+  printf ("threads: %i, %i, %i\n", threads_per_block.x, threads_per_block.y, threads_per_block.z);
   simple_kernel<<<blocks_per_grid, threads_per_block>>>(data_dev);
 
   cudaMemcpy(data_host, data_dev, data_size, cudaMemcpyDeviceToHost);

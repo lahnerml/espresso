@@ -16,9 +16,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#if 0
 #include "config.hpp"
 #ifdef CUDA /* Terminates at end of file */
+
+#ifndef LB_ADAPTIVE_GPU
 
 #include <cuda.h>
 #include <cufft.h>
@@ -3820,7 +3821,7 @@ ekfloat ek_get_particle_charge () {
       thrust::plus<ekfloat>());
   return particle_charge;
 }
-#endif
+#endif // EK_ELECTROSTATIC_COUPLING
 
 ekfloat ek_calculate_net_charge() {
   ekfloat charge = 0.0f;
@@ -3867,7 +3868,7 @@ int ek_neutralize_system(int species) {
   compensating_species_density -= particle_charge / ek_parameters.valency[species_index]  / (ek_parameters.agrid*ek_parameters.agrid*ek_parameters.agrid) / double(ek_parameters.number_of_nodes);
 #endif // EK_ELECTROSTATIC_COUPLING
 
-#else
+#else // EK_BOUNDARIES
   ekfloat charge = ek_calculate_net_charge();
 
   compensating_species_density = ek_parameters.density[species_index] - (charge / ek_parameters.valency[species_index]) / (ek_parameters.agrid * ek_parameters.agrid * ek_parameters.agrid * double(ek_parameters.number_of_nodes-ek_parameters.number_of_boundary_nodes));
@@ -4046,17 +4047,16 @@ int ek_tag_reaction_nodes( LB_Boundary *boundary, char reaction_type )
                );
 
   return 0;
-#else 
+#else // EK_BOUNDARIES
   printf("ERROR: Need boundaries (EK_BOUNDARIES) for the catalytic reaction tagging.\n");
   return 1;
-#endif
+#endif // EK_BOUNDARIES
 
 }
-#endif
-
+#endif // EK_REACTION
 
 #endif /* ELECTROKINETICS */
 
-#endif /* CUDA */
+#endif //!LB_ADAPTIVE_GPU
 
-#endif // 0
+#endif /* CUDA */

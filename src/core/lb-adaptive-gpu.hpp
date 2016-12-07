@@ -247,6 +247,8 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont);
  * \param [in] wrap_rank   Number to wrap around the rank with a modulo
  * operation.
  *                         Can be 0 for no wrapping.
+ * \param [in] write_qid   Boolean to determine if the quadrant id should be
+ *                         written to vtk file.
  * \param [in] num_cell_scalars Number of cell scalar datasets to output.
  * \param [in] num_cell_vectors Number of cell vector datasets to output.
  *

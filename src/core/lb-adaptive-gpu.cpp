@@ -932,7 +932,7 @@ lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
 
 int lbadapt_vtk_write_footer(lbadapt_vtk_context_t *cont) {
   int p;
-  int procRank = this_node;
+  int procRank = p8est->mpirank;
   int numProcs = p8est->mpisize;
 
   P4EST_ASSERT(cont != NULL && cont->writing);

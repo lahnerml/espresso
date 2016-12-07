@@ -42,8 +42,8 @@
 #include "actor/EwaldGPU.hpp"
 #include "buckingham.hpp"
 #include "cells.hpp"
-#include "cuda_interface.hpp"
 #include "cuda_init.hpp"
+#include "cuda_interface.hpp"
 #include "elc.hpp"
 #include "energy.hpp"
 #include "external_potential.hpp"
@@ -57,8 +57,8 @@
 #include "initialize.hpp"
 #include "integrate.hpp"
 #include "interaction_data.hpp"
-#include "lb-adaptive.hpp"
 #include "lb-adaptive-gpu.hpp"
+#include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "lj.hpp"
@@ -293,14 +293,14 @@ void mpi_init(int *argc, char ***argv) {
   }
 
   ErrorHandling::init_error_handling(mpiCallbacks());
-  
+
 #ifdef LB_ADAPTIVE
   // one can define the verbosity of p4est and libsc here.
   // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
   sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
   // p4est_init(NULL, SC_LP_VERBOSE);
   p4est_init(NULL, SC_LP_PRODUCTION);
-#endif  // LB_ADAPTIVE
+#endif // LB_ADAPTIVE
 }
 
 void mpi_reshape_communicator(std::array<int, 3> const &node_grid,
@@ -2742,6 +2742,45 @@ void mpi_lbadapt_grid_init(int node, int level) {
 
 #ifdef LB_ADAPTIVE_GPU
   cuda_init_adapt();
+  test_grid_t *a;
+  local_num_quadrants = p8est->local_num_quadrants;
+  a = P4EST_ALLOC(test_grid_t, local_num_quadrants);
+  test(a);
+  lbadapt_vtk_context_t *c;
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  sc_array_t *values_thread, *values_block;
+  values_thread = sc_array_new_size(sizeof(double), num_cells);
+  values_block = sc_array_new_size(sizeof(double), num_cells);
+
+  p8est_meshiter_t *m;
+  int status;
+  double *block_ptr, block, *thread_ptr, thread;
+  for (int i = 0; i < local_num_quadrants; ++i) {
+    block_ptr = (double *)sc_array_index(values_block, cells_per_patch * i);
+    thread_ptr = (double *)sc_array_index(values_thread, cells_per_patch * i);
+    int patch_count = 0;
+    for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+      for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+          block_ptr[patch_count] = a[i].block_idx[patch_x][patch_y][patch_z];
+          thread_ptr[patch_count] = a[i].thread_idx[patch_x][patch_y][patch_z];
+          ++patch_count;
+        }
+      }
+    }
+  }
+
+  c = lbadapt_vtk_context_new("test");
+  c = lbadapt_vtk_write_header(c);
+  c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0, "block",
+                                   values_block, "thread", values_thread, c);
+  lbadapt_vtk_write_footer(c);
+
+  sc_array_destroy(values_thread);
+  sc_array_destroy(values_block);
+  P4EST_FREE(a);
 #endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
 }
@@ -2922,7 +2961,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
   lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
 

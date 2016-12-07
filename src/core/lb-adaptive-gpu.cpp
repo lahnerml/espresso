@@ -103,7 +103,7 @@ int lbadapt_print_gpu_utilization(char *filename) {
   len = pos_file_ending - filename + 1;
 
   /* call mpi printing routine on all slaves and communicate the filename */
-  mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
+  mpi_call(mpi_lbadapt_vtk_print_gpu_utilization, -1, len);
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   thread_block_container_t *a;
@@ -842,13 +842,8 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"qid\""
                            " format=\"%s\">\n",
             P4EST_VTK_LOCIDX, "binary");
-    int offset;
+    int offset = p8est->global_first_quadrant[mpirank];
     for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
-      if (0 == il) {
-        offset = p8est->global_first_quadrant[mpirank];
-      } else {
-        offset = 0;
-      }
       tree = p8est_tree_array_index(trees, jt);
       num_quads = tree->quadrants.elem_count;
       for (zz = 0; zz < num_quads; ++zz) {

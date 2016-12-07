@@ -3,17 +3,21 @@
 #ifdef LB_ADAPTIVE_GPU
 #include <cuda.h>
 
-#include "lb-adaptive-gpu.hpp"
 #include "cuda_interface.hpp"
 #include "cuda_utils.hpp"
+#include "lb-adaptive-gpu.hpp"
 
 __global__ void simple_kernel(test_grid_t *a) {
   a->thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
-      LBADAPT_PATCHSIZE_HALO * LBADAPT_PATCHSIZE_HALO * threadIdx.z +
-      LBADAPT_PATCHSIZE_HALO * threadIdx.y + threadIdx.x;
+      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)LBADAPT_PATCHSIZE_HALO *
+          (lb_float)threadIdx.z +
+      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)threadIdx.y +
+      (lb_float)threadIdx.x;
   a->block_idx[blockIdx.x][blockIdx.y][blockIdx.z] =
-      LBADAPT_PATCHSIZE_HALO * LBADAPT_PATCHSIZE_HALO * blockIdx.z +
-      LBADAPT_PATCHSIZE_HALO * blockIdx.y + blockIdx.x;
+      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)LBADAPT_PATCHSIZE_HALO *
+          (lb_float)blockIdx.z +
+      (lb_float)LBADAPT_PATCHSIZE_HALO * (lb_float)blockIdx.y +
+      (lb_float)blockIdx.x;
 }
 
 void test(test_grid_t *data_host) {

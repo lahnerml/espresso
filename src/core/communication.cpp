@@ -2764,8 +2764,8 @@ void mpi_lbadapt_grid_init(int node, int level) {
     for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
       for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
         for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
-          block_ptr[patch_count] = a[i].block_idx[patch_x][patch_y][patch_z];
-          thread_ptr[patch_count] = a[i].thread_idx[patch_x][patch_y][patch_z];
+          block_ptr[patch_count] = (double)a[i].block_idx[patch_x][patch_y][patch_z];
+          thread_ptr[patch_count] = (double)a[i].thread_idx[patch_x][patch_y][patch_z];
           ++patch_count;
         }
       }

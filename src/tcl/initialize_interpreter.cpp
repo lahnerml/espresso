@@ -212,7 +212,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt-geom-ref", tclcommand_set_geom_ref);
   REGISTER_COMMAND("lbadapt-exclude-bnd-from-geom-ref", tclcommand_excl_bnd_idx_geom_ref);
 #ifdef LB_ADAPTIVE_GPU
-  REGISTER_COMMAND("lbadaptgpu-show-gpu-util", tclcommand_gpu_show_utilization);
+  REGISTER_COMMAND("lbadapt-show-gpu-util", tclcommand_gpu_show_utilization);
 #endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
   /* here */

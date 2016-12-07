@@ -89,7 +89,21 @@ lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
 }
 
 int lbadapt_print_gpu_utilization(char *filename) {
-  int len = strlen(filename);
+  int len;
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending = strpbrk(filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk(filename, "\0");
+  }
+
+  /* this is parallel io, i.e. we have to communicate the filename to all
+   * other processes. */
+  len = pos_file_ending - filename + 1;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   thread_block_container_t *a;

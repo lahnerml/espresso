@@ -231,9 +231,7 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 #ifdef LB_ADAPTIVE_GPU
 int tclcommand_gpu_show_utilization(ClientData data, Tcl_Interp *interp,
                                      int argc, char **argv) {
-  int len = strlen (argv[1]);
   int res;
-  mpi_lbadapt_vtk_print_gpu_utilization(-1, len);
   res = lbadapt_print_gpu_utilization(argv[1]);
 
   if (res == 0) {

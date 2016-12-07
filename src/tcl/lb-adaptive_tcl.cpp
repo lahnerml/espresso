@@ -227,4 +227,20 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 
   return TCL_OK;
 }
+
+#ifdef LB_ADAPTIVE_GPU
+int tclcommand_gpu_show_utilization(ClientData data, Tcl_Interp *interp,
+                                     int argc, char **argv) {
+  int len = strlen (argv[1]);
+  int res;
+  mpi_lbadapt_vtk_print_gpu_utilization(-1, len);
+  res = lbadapt_print_gpu_utilization(argv[1]);
+
+  if (res == 0) {
+    return TCL_OK;
+  } else {
+    return TCL_ERROR;
+  }
+}
+#endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE

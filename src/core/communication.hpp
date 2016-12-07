@@ -557,6 +557,12 @@ void mpi_lbadapt_vtk_print_density (int node, int len);
  */
 void mpi_lbadapt_vtk_print_velocity(int node, int len);
 
+#ifdef LB_ADAPTIVE_GPU
+/** Visualize how threads and blocks are distributed in patches
+ */
+void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len);
+#endif // LB_ADAPTIVE_GPU
+
 /** Set maximum refinement level
  * 
  * @param [in] node   The node on which this function is called (all)

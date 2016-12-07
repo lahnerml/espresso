@@ -8,7 +8,7 @@
 #include "cuda_utils.hpp"
 #include "lb-adaptive-gpu.hpp"
 
-__global__ void simple_kernel(test_grid_t *a) {
+__global__ void simple_kernel(thread_block_container_t *a) {
   a[blockIdx.x].thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
       LBADAPT_PATCHSIZE_HALO * LBADAPT_PATCHSIZE_HALO * threadIdx.z +
       LBADAPT_PATCHSIZE_HALO * threadIdx.y + threadIdx.x;
@@ -17,9 +17,9 @@ __global__ void simple_kernel(test_grid_t *a) {
       LBADAPT_PATCHSIZE_HALO * blockIdx.y + blockIdx.x;
 }
 
-void test(test_grid_t *data_host) {
-  test_grid_t *data_dev;
-  size_t data_size = sizeof(test_grid_t) * local_num_quadrants;
+void show_blocks_threads(thread_block_container_t *data_host) {
+  thread_block_container_t *data_dev;
+  size_t data_size = sizeof(thread_block_container_t) * local_num_quadrants;
 
   cudaMalloc(&data_dev, data_size);
 

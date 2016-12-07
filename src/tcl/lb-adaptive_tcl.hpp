@@ -46,4 +46,8 @@ int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
 
 int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
                                      int argc, char **argv);
+
+int tclcommand_gpu_show_utilization(ClientData data, Tcl_Interp *interp,
+                                     int argc, char **argv);
+
 #endif // LB_ADAPTIVE_TCL

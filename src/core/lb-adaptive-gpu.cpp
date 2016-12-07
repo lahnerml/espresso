@@ -2,9 +2,14 @@
 #include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-d3q19.hpp"
-#include <assert.h>
 
-int local_num_quadrants;
+#include <assert.h>
+#include <mpi.h>
+
+int local_num_quadrants = 0;
+
+int local_num_quadrants_level[P8EST_MAXLEVEL] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                                 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
 LB_Parameters lbpar = {
     // rho
@@ -81,6 +86,53 @@ lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
   strcpy(cont->vtk_float_name, "Float64");
 
   return cont;
+}
+
+int lbadapt_print_gpu_utilization(char *filename) {
+  int len = strlen(filename);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  thread_block_container_t *a;
+  a = P4EST_ALLOC(thread_block_container_t, p8est->local_num_quadrants);
+
+  show_blocks_threads(a);
+  lbadapt_vtk_context_t *c;
+  p4est_locidx_t cells_per_patch =
+      LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
+  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  sc_array_t *values_thread, *values_block;
+  values_thread = sc_array_new_size(sizeof(double), num_cells);
+  values_block = sc_array_new_size(sizeof(double), num_cells);
+
+  double *block_ptr, *thread_ptr;
+  for (int i = 0; i < p8est->local_num_quadrants; ++i) {
+    block_ptr = (double *)sc_array_index(values_block, cells_per_patch * i);
+    thread_ptr = (double *)sc_array_index(values_thread, cells_per_patch * i);
+    int patch_count = 0;
+    for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
+      for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
+        for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
+          block_ptr[patch_count] =
+              (double)a[i].block_idx[patch_x][patch_y][patch_z];
+          thread_ptr[patch_count] =
+              (double)a[i].thread_idx[patch_x][patch_y][patch_z];
+          ++patch_count;
+        }
+      }
+    }
+  }
+
+  c = lbadapt_vtk_context_new(filename);
+  c = lbadapt_vtk_write_header(c);
+  c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0, "block",
+                                   values_block, "thread", values_thread, c);
+  lbadapt_vtk_write_footer(c);
+
+  sc_array_destroy(values_thread);
+  sc_array_destroy(values_block);
+  P4EST_FREE(a);
+
+  return 0;
 }
 
 void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context) {
@@ -780,8 +832,7 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
       if (0 == il) {
         offset = p8est->global_first_quadrant[mpirank];
-      }
-      else {
+      } else {
         offset = 0;
       }
       tree = p8est_tree_array_index(trees, jt);
@@ -789,7 +840,8 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
       for (zz = 0; zz < num_quads; ++zz) {
         quad = p8est_quadrant_array_index(quadrants, zz);
         for (int p = 0; p < cells_per_patch; ++p, ++il) {
-          locidx_data[il] = offset + (p4est_locidx_t)zz + tree->quadrants_offset;
+          locidx_data[il] =
+              offset + (p4est_locidx_t)zz + tree->quadrants_offset;
         }
       }
     }

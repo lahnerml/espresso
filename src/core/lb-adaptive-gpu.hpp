@@ -70,7 +70,7 @@ typedef struct {
                      [LBADAPT_PATCHSIZE_HALO];
   lb_float block_idx[LBADAPT_PATCHSIZE_HALO][LBADAPT_PATCHSIZE_HALO]
                     [LBADAPT_PATCHSIZE_HALO];
-} test_grid_t;
+} thread_block_container_t;
 
 typedef struct {
   lb_float rho[LB_COMPONENTS];
@@ -137,6 +137,8 @@ typedef struct lbadapt_vtk_context {
 
 extern int local_num_quadrants;
 
+extern int local_num_quadrants_level[P8EST_MAXLEVEL];
+
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;
 
@@ -164,7 +166,9 @@ extern double lb_phi[19];
 extern double lb_coupl_pref;
 extern double lb_coupl_pref2;
 
-void test (test_grid_t *data_host);
+void show_blocks_threads (thread_block_container_t *data_host);
+
+int lbadapt_print_gpu_utilization(char *filename);
 
 /** This is actually taken from p4est and extended to patches. :P */
 /** The first call to write a VTK file using individual functions.

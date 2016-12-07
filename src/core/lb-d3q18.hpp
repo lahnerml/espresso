@@ -28,7 +28,11 @@
 #define D3Q18_H
 
 #ifdef LB
+#ifdef LB_ADAPTIVE_GPU
+#include "lb-adaptive-gpu.hpp"
+#else // LB_ADAPTIVE_GPU
 #include "lb.hpp"
+#endif // LB_ADAPTIVE_GPU
 
 /** Velocity sub-lattice of the D3Q18 model */
 // clang-format off

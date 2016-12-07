@@ -58,6 +58,7 @@
 #include "integrate.hpp"
 #include "interaction_data.hpp"
 #include "lb-adaptive.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "lj.hpp"
@@ -292,6 +293,14 @@ void mpi_init(int *argc, char ***argv) {
   }
 
   ErrorHandling::init_error_handling(mpiCallbacks());
+  
+#ifdef LB_ADAPTIVE
+  // one can define the verbosity of p4est and libsc here.
+  // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
+  sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
+  // p4est_init(NULL, SC_LP_VERBOSE);
+  p4est_init(NULL, SC_LP_PRODUCTION);
+#endif  // LB_ADAPTIVE
 }
 
 void mpi_reshape_communicator(std::array<int, 3> const &node_grid,
@@ -329,7 +338,7 @@ void mpi_stop() {
   mpi_call(mpi_stop_slave, -1, 0);
 
 #ifdef LB_ADAPTIVE
-  lb_release();
+  lbadapt_release();
   // shutdown p4est if it was used
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);
@@ -359,7 +368,7 @@ void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
 #ifdef LB_ADAPTIVE
-  lb_release();
+  lbadapt_release();
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   }
@@ -2623,6 +2632,7 @@ void mpi_send_exclusion_slave(int part1, int part2) {
 /************** REQ_SET_FLUID **************/
 void mpi_send_fluid(int node, int index, double rho, double *j, double *pi) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_calc_n_from_rho_j_pi(index, rho, j, pi);
   } else {
@@ -2631,23 +2641,27 @@ void mpi_send_fluid(int node, int index, double rho, double *j, double *pi) {
     mpi_call(mpi_send_fluid_slave, node, index);
     MPI_Send(data, 10, MPI_DOUBLE, node, SOME_TAG, comm_cart);
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_send_fluid_slave(int node, int index) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     double data[10];
     MPI_Recv(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
 
     lb_calc_n_from_rho_j_pi(index, data[0], &data[1], &data[4]);
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 /************** REQ_GET_FLUID **************/
 void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_calc_local_fields(index, rho, j, pi);
   } else {
@@ -2666,22 +2680,26 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
     pi[4] = data[8];
     pi[5] = data[9];
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_recv_fluid_slave(int node, int index) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     double data[10];
     lb_calc_local_fields(index, &data[0], &data[1], &data[4]);
     MPI_Send(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 /************** REQ_LB_GET_BOUNDARY_FLAG **************/
 void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 #ifdef LB_BOUNDARIES
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_local_fields_get_boundary_flag(index, boundary);
   } else {
@@ -2690,7 +2708,8 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
     MPI_Recv(&data, 1, MPI_INT, node, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
     *boundary = data;
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_lbadapt_grid_init(int node, int level) {
@@ -2719,7 +2738,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   finest_level_global = level;
 
   lbpar.base_level = level;
-  max_refinement_level = level;
+  lbpar.max_refinement_level = level;
 
 #ifdef LB_ADAPTIVE_GPU
   cuda_init_adapt();
@@ -2936,9 +2955,9 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
 void mpi_lbadapt_set_max_level(int node, int l_max) {
 #ifdef LB_ADAPTIVE
-  max_refinement_level = l_max;
+  lbpar.max_refinement_level = l_max;
 
-  lb_reinit_parameters();
+  lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
 
@@ -2993,15 +3012,11 @@ void mpi_reg_refinement(int node, int param) {
 
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
-  // due to non-recursive refinement only 2 cases can occur: finest level
-  // increases or not.
-  lb_step_factor =
-      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
 
   // FIXME: Implement mapping between two trees
-  lb_release_fluid();
-  lb_reinit_fluid();
-  lb_reinit_forces();
+  lbadapt_release();
+  lbadapt_reinit_fluid_per_cell();
+  lbadapt_reinit_force_per_cell();
 
   // reinitialize boundary
   lbadapt_get_boundary_status();
@@ -3013,7 +3028,7 @@ void mpi_geometric_refinement(int node, int param) {
   // clang-format off
   p8est_refine_ext(p8est,                // forest
                    1,                    // no recursive refinement
-                   max_refinement_level, // maximum refinement level
+                   lbpar.max_refinement_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
@@ -3033,16 +3048,12 @@ void mpi_geometric_refinement(int node, int param) {
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
-  int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
 
-  lb_step_factor =
-      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
-
   // FIXME: Implement mapping between two trees
-  lb_release_fluid();
-  lb_reinit_fluid();
-  lb_reinit_forces();
+  lbadapt_release();
+  lbadapt_reinit_fluid_per_cell();
+  lbadapt_reinit_fluid_per_cell();
 
   // reinitialize boundary
   lbadapt_get_boundary_status();
@@ -3068,12 +3079,14 @@ void mpi_exclude_boundary(int node, int param) {
 
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     int data;
     lb_local_fields_get_boundary_flag(index, &data);
     MPI_Send(&data, 1, MPI_INT, 0, SOME_TAG, comm_cart);
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 /********************* REQ_ICCP3M_ITERATION ********/
@@ -3140,6 +3153,7 @@ void mpi_iccp3m_init_slave(int node, int dummy) {
 
 void mpi_recv_fluid_populations(int node, int index, double *pop) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_get_populations(index, pop);
   } else {
@@ -3148,40 +3162,47 @@ void mpi_recv_fluid_populations(int node, int index, double *pop) {
              MPI_STATUS_IGNORE);
   }
   lbpar.resend_halo = 1;
-#endif
+#endif // LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_recv_fluid_populations_slave(int node, int index) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     double data[19 * LB_COMPONENTS];
     lb_get_populations(index, data);
     MPI_Send(data, 19 * LB_COMPONENTS, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
   lbpar.resend_halo = 1;
-#endif
+#endif // LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_send_fluid_populations(int node, int index, double *pop) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_set_populations(index, pop);
   } else {
     mpi_call(mpi_send_fluid_populations_slave, node, index);
     MPI_Send(pop, 19 * LB_COMPONENTS, MPI_DOUBLE, node, SOME_TAG, comm_cart);
   }
-#endif
+#endif // LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 void mpi_send_fluid_populations_slave(int node, int index) {
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     double data[19 * LB_COMPONENTS];
     MPI_Recv(data, 19 * LB_COMPONENTS, MPI_DOUBLE, 0, SOME_TAG, comm_cart,
              MPI_STATUS_IGNORE);
     lb_set_populations(index, data);
   }
-#endif
+#endif // LB_ADAPTIVE_GPU
+#endif // LB
 }
 
 /****************************************************/

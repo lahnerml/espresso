@@ -57,6 +57,7 @@
 int lb_components = LB_COMPONENTS;
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
 
 #ifdef ADDITIONAL_CHECKS
 static void lb_check_halo_regions();
@@ -83,6 +84,8 @@ LB_Parameters lbpar = {
 #ifdef LB_ADAPTIVE
     // base level for calculation of tau
     -1,
+    // max level
+    P8EST_MAXLEVEL,
 #endif // LB_ADAPTIVE
     // friction
     {0.0},
@@ -160,18 +163,6 @@ double lb_coupl_pref = 0.0;
 double lb_coupl_pref2 = 0.0;
 /*@}*/
 
-/** measures the MD time since the last fluid update */
-static int fluidstep = 0;
-
-#ifdef LB_ADAPTIVE
-static int n_lbsteps = 0;
-
-double lb_step_factor = 1.;
-
-int max_refinement_level = P8EST_QMAXLEVEL;
-
-#endif // LB_ADAPTIVE
-
 #ifdef ADDITIONAL_CHECKS
 /** counts the random numbers drawn for fluctuating LB and the coupling */
 static int rancounter = 0;
@@ -180,6 +171,13 @@ static int failcounter = 0;
 #endif // ADDITIONAL_CHECKS
 
 /***********************************************************************/
+#endif // !LB_ADAPTIVE_GPU
+/** measures the MD time since the last fluid update */
+static int fluidstep = 0;
+
+#ifdef LB_ADAPTIVE
+static int n_lbsteps = 0;
+#endif // LB_ADAPTIVE
 #endif // LB
 
 #if defined(LB) || defined(LB_GPU)
@@ -2187,14 +2185,7 @@ int lb_sanity_checks() {
 
 /** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
-#ifdef LB_ADAPTIVE
-  // one can define the verbosity of p4est and libsc here.
-  // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
-  sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  // p4est_init(NULL, SC_LP_VERBOSE);
-  p4est_init(NULL, SC_LP_PRODUCTION);
-
-#else  // LB_ADAPTIVE
+#ifndef LB_ADAPTIVE
   lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
                                           lbmodel.n_veloc * sizeof(double));
@@ -2287,32 +2278,8 @@ static void lb_prepare_communication() {
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_parameters() {
-  int i;
 #ifdef LB_ADAPTIVE
-  for (i = max_refinement_level; lbpar.base_level <= i; --i) {
-    prefactors[i] = 1 << (max_refinement_level - i);
-
-#ifdef LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(i) /
-               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
-
-    if (lbpar.viscosity[0] > 0.0) {
-      gamma_shear[i] =
-          1. -
-          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
-                1.);
-    }
-
-    if (lbpar.bulk_viscosity[0] > 0.0) {
-      gamma_bulk[i] = 1. -
-                      2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-                                (prefactors[i] * SQR(lbpar.agrid)) +
-                            1.);
-    }
-  }
+  lbadapt_reinit_parameters();
 #else
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
@@ -2394,7 +2361,7 @@ void lb_reinit_parameters() {
   } else {
     /* no fluctuations at zero temperature */
     fluct = 0;
-    for (i = 0; i < lbmodel.n_veloc; i++)
+    for (int i = 0; i < lbmodel.n_veloc; i++)
       lb_phi[i] = 0.0;
     lb_coupl_pref = 0.0;
     lb_coupl_pref2 = 0.0;
@@ -2527,23 +2494,7 @@ void lb_init() {
 /** Release the fluid. */
 void lb_release_fluid() {
 #ifdef LB_ADAPTIVE
-  int level;
-  /** cleanup custom managed payload */
-  if (lbadapt_local_data != NULL) {
-    for (level = coarsest_level_local; level <= finest_level_local; ++level) {
-      P4EST_FREE(lbadapt_local_data[level - coarsest_level_local]);
-    }
-    P4EST_FREE(lbadapt_local_data);
-    lbadapt_local_data = NULL;
-
-    if (coarsest_level_ghost != -1) {
-      for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
-        P4EST_FREE(lbadapt_ghost_data[level - coarsest_level_ghost]);
-      }
-      P4EST_FREE(lbadapt_ghost_data);
-    }
-    lbadapt_ghost_data = NULL;
-  }
+  lbadapt_release();
 #else  // LB_ADAPTIVE
   free(lbfluid[0][0]);
   free(lbfluid[0]);

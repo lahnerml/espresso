@@ -29,6 +29,7 @@
 #include "lb_tcl.hpp"
 #include "lb.hpp"
 #include "lbgpu.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include "parser.hpp"
 #include "electrokinetics.hpp"
 

@@ -21,6 +21,7 @@
 #include "particle_data.hpp"
 #include "integrate.hpp"
 #include "lb.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include "pressure.hpp"
 #include "rotation.hpp"
 
@@ -568,6 +569,7 @@ int observable_calc_force_density_profile(observable* self) {
 
 #ifdef LB
 int observable_calc_lb_velocity_profile(observable* self) {
+#ifndef LB_ADAPTIVE_GPU
   double* A= self->last_value;
   void* pdata_ = self->container;
   unsigned int n_A = self->n;
@@ -583,7 +585,7 @@ int observable_calc_lb_velocity_profile(observable* self) {
 #ifdef LB_GPU
   if (lattice_switch & LATTICE_LB_GPU)
     return statistics_observable_lbgpu_velocity_profile((profile_data*) pdata_, A, n_A);
-#endif
+#endif // LB_GPU
   if (lattice_switch & LATTICE_LB) {
     for ( int i = 0; i<self->n; i++ ) {
       A[i]=0;
@@ -649,9 +651,10 @@ int observable_calc_lb_velocity_profile(observable* self) {
 
   
   }
+#endif // !LB_ADAPTIVE_GPU
   return 0;
 }
-#endif
+#endif // LB
 
 #ifdef LB
 int observable_calc_lb_radial_velocity_profile(observable* self) {
@@ -662,7 +665,7 @@ int observable_calc_lb_radial_velocity_profile(observable* self) {
 #ifdef LB_GPU
   if (lattice_switch & LATTICE_LB_GPU)
     return statistics_observable_lbgpu_radial_velocity_profile((radial_profile_data*) pdata, A, n_A);
-#endif
+#endif // LB_GPU
   
   if (!(lattice_switch & LATTICE_LB))
     return ES_ERROR;
@@ -693,6 +696,7 @@ void mpi_observable_lb_radial_velocity_profile_slave_implementation() {
 }
 
 int mpi_observable_lb_radial_velocity_profile_parallel(void* pdata_, double* A, unsigned int n_A) {
+#ifndef LB_ADAPTIVE_GPU
   unsigned int i, j, k;
   unsigned int maxi, maxj, maxk;
   double roffset, phioffset, zoffset;
@@ -780,10 +784,10 @@ int mpi_observable_lb_radial_velocity_profile_parallel(void* pdata_, double* A, 
     A[i]*=normalization_factor;
   }
 
-  
+#endif // LB_ADAPTIVE_GPU
   return 0;
 }
-#endif
+#endif // LB
 
 void transform_to_cylinder_coordinates(double x, double y, double z_, double* r, double* phi, double* z) {
   *z =  z_;

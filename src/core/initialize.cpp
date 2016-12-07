@@ -151,7 +151,7 @@ void on_integration_start()
 {
   EVENT_TRACE(fprintf(stderr, "%d: on_integration_start\n", this_node));
   INTEG_TRACE(fprintf(stderr,"%d: on_integration_start: reinit_thermo = %d, resort_particles=%d\n",
-		      this_node,reinit_thermo,resort_particles));
+		      this_node, reinit_thermo, resort_particles));
 
   /********************************************/
   /* sanity checks                            */

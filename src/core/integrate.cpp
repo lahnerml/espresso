@@ -288,13 +288,15 @@ void integrate_vv(int n_steps, int reuse_forces) {
     thermo_heat_up();
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
     transfer_momentum = 0;
     if (lattice_switch & LATTICE_LB && this_node == 0)
       runtimeWarning("Recalculating forces, so the LB coupling forces are not "
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
                      "sampling.\n");
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 0;
     if (lattice_switch & LATTICE_LB_GPU && this_node == 0)
@@ -302,7 +304,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
                      "sampling.\n");
-#endif
+#endif // LB_GPU
 
     force_calc();
 
@@ -454,11 +456,13 @@ void integrate_vv(int n_steps, int reuse_forces) {
    v(t+0.5*dt) ) */
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
     transfer_momentum = 1;
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 1;
-#endif
+#endif // LB_GPU
 
     force_calc();
 
@@ -470,8 +474,8 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #ifdef LB_GPU
     if (lattice_switch & LATTICE_LB_GPU)
       IBM_ForcesIntoFluid_GPU();
-#endif
-#endif
+#endif // LB_GPU
+#endif // IMMERSED_BOUNDARY
 
 #ifdef CATALYTIC_REACTIONS
     integrate_reaction();
@@ -523,12 +527,12 @@ void integrate_vv(int n_steps, int reuse_forces) {
       if (ek_initialized) {
         ek_integrate();
       } else {
-#endif
+#endif // ELECTROKINETICS
         if (lattice_switch & LATTICE_LB_GPU)
           lattice_boltzmann_update_gpu();
 #ifdef ELECTROKINETICS
       }
-#endif
+#endif // ELECTROKINETICS
     }
 #endif // LB_GPU
 

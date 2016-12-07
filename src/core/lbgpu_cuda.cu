@@ -3664,7 +3664,7 @@ void lb_integrate_GPU() {
 
   /**call of fluid step*/
   /* NOTE: if pi is needed at every integration step, one should call an extended version 
-           of the integrate kernel, or pass also device_rho_v_pi and make sure that either 
+           of the in kernel, or pass also device_rho_v_pi and make sure that either 
            it or device_rho_v are NULL depending on extended_values_flag */ 
   if (intflag == 1)
   {

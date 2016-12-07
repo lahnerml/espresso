@@ -43,6 +43,7 @@ extern int lb_components ; // global variable holding the number of fluid compon
  * thus making the code more efficient. */
 #define D3Q19
 
+#ifndef LB_ADAPTIVE_GPU
 /** \name Parameter fields for Lattice Boltzmann
  * The numbers are referenced in \ref mpi_bcast_lb_params
  * to determine what actions have to take place upon change
@@ -61,15 +62,7 @@ extern int lb_components ; // global variable holding the number of fluid compon
 #define LB_COUPLE_TWO_POINT   2
 #define LB_COUPLE_THREE_POINT 4
 
-#ifdef LB_ADAPTIVE_GPU
-#define LBADAPT_PATCHSIZE 8
-#define LBADAPT_PATCHSIZE_HALO 2 + LBADAPT_PATCHSIZE
-
-typedef float lb_float;
-// typedef double lb_float;
-#else // LB_ADAPTIVE_GPU
 typedef double lb_float;
-#endif // LB_ADAPTIVE_GPU
 
 /*@}*/
   /** Some general remarks:
@@ -175,8 +168,11 @@ typedef struct {
   double tau;
 
 #ifdef LB_ADAPTIVE
-  /** the initial level based on which the number of LB steps is defined */
+  /** the initial level */
   int base_level;
+  
+  /** the maximum level up to which the forest may be refined */
+  int max_refinement_level;
 #endif // LB_ADAPTIVE
 
   /** friction coefficient for viscous coupling (LJ units)
@@ -198,13 +194,6 @@ typedef struct {
   int resend_halo;
 } LB_Parameters;
 #else // LB_ADAPTIVE
-#ifdef LB_ADAPTIVE_GPU
-typedef float lb_float;
-// typedef double lb_float;
-#else // LB_ADAPTIVE_GPU
-typedef double lb_float;
-#endif // LB_ADAPTIVE_GPU
-
 // define the very same structs, only use typedef for floating point numbers and
 // do not duplicate documentation
 typedef struct {
@@ -240,6 +229,8 @@ typedef struct {
 
   /** the initial level based on which the number of LB steps is defined */
   int base_level;
+  /** the maximum refinement level */
+  int max_refinement_level;
 
   lb_float friction[LB_COMPONENTS];
   lb_float ext_force[3]; /* Open question: Do we want a local force or global force? */
@@ -269,31 +260,13 @@ extern double **lbfluid[2];
 /** Pointer to the hydrodynamic fields of the fluid */
 extern LB_FluidNode *lbfields;
 #else // LB_ADAPTIVE
-
-#ifdef LB_ADAPTIVE_GPU
-typedef struct lbadapt_patch_cell {
-  lb_float lbfluid[2][19];
-  lb_float modes[19];
-  LB_FluidNode lbfields;
-} lbadapt_patch_cell_t;
-
-typedef struct lbadapt_payload {
-  int boundary;
-  lbadapt_patch_cell_t patch[LBADAPT_PATCHSIZE_HALO][LBADAPT_PATCHSIZE_HALO]
-                            [LBADAPT_PATCHSIZE_HALO];
-} lbadapt_payload_t;
-#else  // LB_ADAPTIVE_GPU
+/** adaptive payload cpu */
 typedef struct lbadapt_payload {
   int boundary;
   lb_float lbfluid[2][19];
   lb_float modes[19];
   LB_FluidNode lbfields;
 } lbadapt_payload_t;
-#endif  // LB_ADAPTIVE_GPU
-
-extern double lb_step_factor;
-
-extern int max_refinement_level;
 #endif // LB_ADAPTIVE
 
 /* int to indicate fluctuations */
@@ -325,6 +298,7 @@ extern double gamma_even;
 extern double lb_phi[19];
 extern double lb_coupl_pref;
 extern double lb_coupl_pref2;
+#endif // !LB_ADAPTIVE_GPU
 
 /************************************************************/
 /** \name Exported Functions */
@@ -354,10 +328,6 @@ void lb_reinit_parameters();
 /** (Re-)initializes the fluid. */
 void lb_reinit_fluid();
 
-#ifdef LB_ADAPTIVE
-void lb_release_fluid();
-#endif // LB_ADAPTIVE
-
 /** deallocate lb fluid */
 void lb_release();
 
@@ -367,6 +337,7 @@ void lb_reinit_forces();
 /** Checks if all LB parameters are meaningful */
 int lb_sanity_checks();
 
+#ifndef LB_ADAPTIVE_GPU
 /** Sets the density and momentum on a local lattice site.
  * @param node  Pointer to the Node of the lattice site within the local domain (Input)
  * @param rho   Local density of the fluid (Input)
@@ -696,7 +667,8 @@ int lb_lbnode_set_pop(int* ind, double* pop);
  * can be called without the position needing to be on the local processor */
 int lb_lbfluid_get_interpolated_velocity_global(double* p, double* v); 
 
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 
 #endif /* _LB_H */
 

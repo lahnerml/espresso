@@ -28,7 +28,12 @@
 #define D3Q19_H
 
 #ifdef LB
+#ifdef LB_ADAPTIVE_GPU
+#include "lb-adaptive-gpu.hpp"
+#else // LB_ADAPTIVE_GPU
 #include "lb.hpp"
+#endif // LB_ADAPTIVE_GPU
+
 /** Velocity sub-lattice of the D3Q19 model */
 // clang-format off
 #ifndef LB_ADAPTIVE

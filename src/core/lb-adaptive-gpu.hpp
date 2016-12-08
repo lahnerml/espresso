@@ -60,8 +60,6 @@
 #define LBADAPT_PATCHSIZE 6
 #define LBADAPT_PATCHSIZE_HALO (2 + LBADAPT_PATCHSIZE)
 
-#define LBADAPT_THEORETICAL_MAXLEVEL P8EST_MAXLEVEL
-
 #define P4EST_VTK_CELL_TYPE 11 /* VTK_VOXEL */
 #define P4EST_ENABLE_VTK_BINARY 1
 #define P4EST_ENABLE_VTK_COMPRESSION 1
@@ -149,8 +147,8 @@ extern int local_num_real_quadrants_level[P8EST_MAXLEVEL];
 /** number of virtual local quadrants per level */
 extern int local_num_virt_quadrants_level[P8EST_MAXLEVEL];
 
-extern lbadapt_payload_t **dev_local_real_quadrants;
-extern lbadapt_payload_t **dev_local_virt_quadrants;
+extern lbadapt_payload_t *dev_local_real_quadrants[P8EST_MAXLEVEL];
+extern lbadapt_payload_t *dev_local_virt_quadrants[P8EST_MAXLEVEL];
 
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;

@@ -48,8 +48,8 @@ LB_Parameters lbpar = {
 LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
                     d3q19_w, NULL,          1. / 3.};
 
-lbadapt_payload_t **dev_local_real_quadrants;
-lbadapt_payload_t **dev_local_virt_quadrants;
+lbadapt_payload_t *dev_local_real_quadrants[P8EST_MAXLEVEL];
+lbadapt_payload_t *dev_local_virt_quadrants[P8EST_MAXLEVEL];
 
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE

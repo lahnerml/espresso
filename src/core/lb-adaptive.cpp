@@ -26,6 +26,7 @@
  */
 #include "communication.hpp"
 #include "constraint.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb-d3q19.hpp"
@@ -105,6 +106,13 @@ void lbadapt_allocate_data() {
 
   /** local cells */
   for (level = 0; level < P8EST_MAXLEVEL; ++level) {
+#ifdef LB_ADAPTIVE_GPU
+    local_num_real_quadrants_level[level] =
+        (lbadapt_mesh->quad_level + level)->elem_count;
+    local_num_virt_quadrants_level[level] =
+        (lbadapt_mesh->virtual_qlevels + level)->elem_count;
+#endif // LB_ADAPTIVE_GPU
+
     if ((((lbadapt_mesh->quad_level + level)->elem_count > 0) ||
          ((lbadapt_mesh->virtual_qlevels + level)->elem_count > 0)) &&
         coarsest_level_local == -1) {
@@ -168,6 +176,11 @@ void lbadapt_allocate_data() {
                 << " virtual ghost quadrants of level " << level << std::endl;
 #endif // 0
   }
+
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = p8est->local_num_quadrants;
+  allocate_device_memory_gpu();
+#endif // LB_ADAPTIVE_GPU
 } // lbadapt_allocate_data();
 
 void lbadapt_release() {
@@ -188,6 +201,9 @@ void lbadapt_release() {
     }
     lbadapt_ghost_data = NULL;
   }
+#ifdef LB_ADAPTIVE_GPU
+  deallocate_device_memory_gpu();
+#endif // LB_ADAPTIVE_GPU
 }
 
 #ifndef LB_ADAPTIVE_GPU
@@ -1295,12 +1311,9 @@ int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  f[0] =
-      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
-  f[1] =
-      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
-  f[2] =
-      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+  f[0] = prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  f[1] = prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  f[2] = prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // EXTERNAL_FORCES
   f[0] = 0.0;
   f[1] = 0.0;
@@ -2110,8 +2123,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
               lbadapt_calc_local_fields(
                   data->patch[patch_x][patch_y][patch_z].modes,
                   data->patch[patch_x][patch_y][patch_z].force,
-                  data->patch[patch_x][patch_y][patch_z].boundary,
-                  1, h, &tmp_rho, tmp_j, NULL);
+                  data->patch[patch_x][patch_y][patch_z].boundary, 1, h,
+                  &tmp_rho, tmp_j, NULL);
 
               rho = tmp_rho;
               j[0] = tmp_j[0] / rho * h_max / lbpar.tau;
@@ -2185,11 +2198,11 @@ void lbadapt_get_boundary_status() {
                   xyz_quad[1] + 2 * patch_y * patch_offset + patch_offset;
               xyz_patch[2] =
                   xyz_quad[2] + 2 * patch_z * patch_offset + patch_offset;
-              data->patch[1 + patch_x][1 + patch_y][1 + patch_z]
-                  .boundary = lbadapt_is_boundary(xyz_patch);
-              all_boundary = all_boundary &&
-                             data->patch[1 + patch_x][1 + patch_y][1 + patch_z]
-                                 .boundary;
+              data->patch[1 + patch_x][1 + patch_y][1 + patch_z].boundary =
+                  lbadapt_is_boundary(xyz_patch);
+              all_boundary =
+                  all_boundary &&
+                  data->patch[1 + patch_x][1 + patch_y][1 + patch_z].boundary;
             }
           }
         }

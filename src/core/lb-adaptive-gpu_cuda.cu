@@ -48,7 +48,7 @@ void allocate_device_memory_gpu() {
                          local_num_virt_quadrants_level[l] * sizeof(lbadapt_payload_t)));
   }
 }
-lbadapt_payload_t
+
 void deallocate_device_memory_gpu() {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));

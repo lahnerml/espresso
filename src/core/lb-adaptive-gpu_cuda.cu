@@ -54,16 +54,9 @@ void allocate_device_memory_gpu() {
 }
 
 void deallocate_device_memory_gpu() {
-  if (0 == dev_local_real_quadrants) {
-    return;
-  }
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
-    if (dev_local_real_quadrants[l] && local_num_real_quadrants_level[l]) {
-      CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
-    }
-    if (dev_local_virt_quadrants[l] && local_num_virt_quadrants_level[l]) {
-      CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
-    }
+    CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
+    CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
   }
   P4EST_FREE(dev_local_real_quadrants);
   P4EST_FREE(dev_local_virt_quadrants);

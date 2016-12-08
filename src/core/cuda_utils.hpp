@@ -32,6 +32,14 @@ extern cudaStream_t stream[1];
 extern cudaError_t CU_err;
 extern cudaError_t _err;
 
+// Simple error checking function for CUDA actions
+void checkCUDAError(const char* action);
+#define CUDA_CALL( call )     \
+{                             \
+  call;                     \
+  checkCUDAError( #call );  \
+}
+
 /**erroroutput for memory allocation and memory copy 
  * @param err cuda error code
  * @param *file .cu file were the error took place

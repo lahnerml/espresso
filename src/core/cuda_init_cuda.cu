@@ -161,17 +161,4 @@ int cuda_test_device_access() {
     return 0;
   }
 #endif // LB_ADAPTIVE_GPU
-
-void checkCUDAError(const char* action)
-{
-  cudaError_t error;
-  error = cudaGetLastError(); 
-
-  if (error != cudaSuccess)
-  {
-    printf ("\nError while '%s': %s\nprogram terminated ...\n\n", action, cudaGetErrorString(error));
-    exit (-1);
-  }
-}
-
 #endif /* defined(CUDA) */

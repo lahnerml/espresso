@@ -402,3 +402,14 @@ void cuda_copy_to_host(void *host_device, void *device_host, size_t n) {
   cuda_safe_mem( cudaMemcpy(host_device, device_host, n, cudaMemcpyDeviceToHost) );
 }
 
+void checkCUDAError(const char* action)
+{
+  cudaError_t error;
+  error = cudaGetLastError();
+
+  if (error != cudaSuccess)
+  {
+    printf ("\nError while '%s': %s\nprogram terminated ...\n\n", action, cudaGetErrorString(error));
+    exit (-1);
+  }
+}

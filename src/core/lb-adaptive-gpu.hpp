@@ -147,8 +147,8 @@ extern int local_num_real_quadrants_level[P8EST_MAXLEVEL];
 /** number of virtual local quadrants per level */
 extern int local_num_virt_quadrants_level[P8EST_MAXLEVEL];
 
-extern lbadapt_payload_t *dev_local_real_quadrants[P8EST_MAXLEVEL];
-extern lbadapt_payload_t *dev_local_virt_quadrants[P8EST_MAXLEVEL];
+extern lbadapt_payload_t **dev_local_real_quadrants;
+extern lbadapt_payload_t **dev_local_virt_quadrants;
 
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;

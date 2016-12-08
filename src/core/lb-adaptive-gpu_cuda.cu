@@ -41,6 +41,8 @@ void show_blocks_threads(thread_block_container_t *data_host) {
 }
 
 void allocate_device_memory_gpu() {
+  dev_local_real_quadrants = P4EST_ALLOC (lbadapt_payload_t*, P8EST_MAXLEVEL);
+  dev_local_virt_quadrants = P4EST_ALLOC (lbadapt_payload_t*, P8EST_MAXLEVEL);
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     CUDA_CALL(cudaMalloc(&dev_local_real_quadrants[l],
                          local_num_real_quadrants_level[l] *
@@ -60,6 +62,8 @@ void deallocate_device_memory_gpu() {
       CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
     }
   }
+  P4EST_FREE (dev_local_real_quadrants);
+  P4EST_FREE (dev_local_virt_quadrants);
 }
 
 void copy_data_to_device(lbadapt_payload_t *source_real,

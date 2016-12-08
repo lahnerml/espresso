@@ -178,7 +178,7 @@ void lbadapt_allocate_data() {
   }
 
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = p8est->local_num_quadrants;
+  local_num_quadrants = lbadapt_mesh->local_num_quadrants;
   allocate_device_memory_gpu();
 #endif // LB_ADAPTIVE_GPU
 } // lbadapt_allocate_data();

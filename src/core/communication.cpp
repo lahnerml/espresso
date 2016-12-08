@@ -2743,6 +2743,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   lbadapt_ghost_data = NULL;
 
   // regular grid
+  local_num_quadrants = p8est->local_num_quadrants;
   finest_level_global = level;
   lbpar.base_level = level;
 #endif // LB_ADAPTIVE
@@ -3067,7 +3068,7 @@ void mpi_reg_refinement(int node, int param) {
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
-  int old_flg = finest_level_global;
+  local_num_quadrants = p8est->local_num_quadrants;
   finest_level_global = lbadapt_get_global_maxlevel();
 
   // FIXME: Implement mapping between two trees
@@ -3105,6 +3106,8 @@ void mpi_geometric_refinement(int node, int param) {
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+
+  local_num_quadrants = p8est->local_num_quadrants;
   finest_level_global = lbadapt_get_global_maxlevel();
 
   // FIXME: Implement mapping between two trees

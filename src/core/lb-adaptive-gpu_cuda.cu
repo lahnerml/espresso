@@ -53,10 +53,10 @@ void allocate_device_memory_gpu() {
 
 void deallocate_device_memory_gpu() {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
-    if (local_num_real_quadrants_level[l]) {
+    if (dev_local_real_quadrants[l] && local_num_real_quadrants_level[l]) {
       CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
     }
-    if (local_num_virt_quadrants_level[l]) {
+    if (dev_local_virt_quadrants[l] && local_num_virt_quadrants_level[l]) {
       CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
     }
   }

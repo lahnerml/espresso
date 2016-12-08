@@ -43,16 +43,22 @@ void show_blocks_threads(thread_block_container_t *data_host) {
 void allocate_device_memory_gpu() {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     CUDA_CALL(cudaMalloc(&dev_local_real_quadrants[l],
-                         local_num_real_quadrants_level[l] * sizeof(lbadapt_payload_t)));
+                         local_num_real_quadrants_level[l] *
+                             sizeof(lbadapt_payload_t)));
     CUDA_CALL(cudaMalloc(&dev_local_virt_quadrants[l],
-                         local_num_virt_quadrants_level[l] * sizeof(lbadapt_payload_t)));
+                         local_num_virt_quadrants_level[l] *
+                             sizeof(lbadapt_payload_t)));
   }
 }
 
 void deallocate_device_memory_gpu() {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
-    CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
-    CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
+    if (local_num_real_quadrants_level[l]) {
+      CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
+    }
+    if (local_num_virt_quadrants_level[l]) {
+      CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
+    }
   }
 }
 

@@ -2729,24 +2729,22 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         NULL       /* user pointer */);
   // clang-format on
 
-  // build initial versions of ghost, mesh and allocate payload
+#ifdef LB_ADAPTIVE_GPU
+  cuda_init_adapt();
+#endif // LB_ADAPTIVE_GPU
+
+  // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
+
+  // regular grid
   finest_level_global = level;
-
   lbpar.base_level = level;
-  lbpar.max_refinement_level = level;
-
-#ifdef LB_ADAPTIVE_GPU
-  cuda_init_adapt();
-
-  local_num_quadrants = p8est->local_num_quadrants;
-  local_num_quadrants_level[level] = p8est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
 }
 
@@ -2775,6 +2773,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
@@ -2784,6 +2783,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                              data */
                                        0, /* no custom cell vector data */
                                        "boundary", boundary, context);
+  // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -2797,6 +2797,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   context = lbadapt_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
   context =
       lbadapt_vtk_write_cell_dataf(context,
                                    1, /* write tree indices */
@@ -2808,6 +2809,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                          data */
                                    0, /* no custom cell vector data */
                                    "boundary", boundary, context);
+  // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -2844,6 +2846,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   context = p8est_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
@@ -2853,6 +2856,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                              data */
                                        0, /* no custom cell vector data */
                                        "density", density, context);
+  // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
@@ -2865,6 +2869,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   context = lbadapt_vtk_write_header(context);
   SC_CHECK_ABORT(context != NULL,
                  P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
   context = lbadapt_vtk_write_cell_dataf(context,
                                          1, /* write tree indices */
                                          1, /* write the refinement level */
@@ -2875,6 +2880,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                                data */
                                          0, /* no custom cell vector data */
                                          "density", density, context);
+  // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);

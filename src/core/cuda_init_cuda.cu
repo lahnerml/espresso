@@ -158,6 +158,8 @@ int cuda_test_device_access() {
     CUDA_CALL (cudaGetDeviceCount(&nGPUs));
     // assume we're on a homogeneous system
     CUDA_CALL (cudaSetDevice(this_node % nGPUs));
+    CUDA_CALL (cudaStreamDestroy(stream[0]));
+    CUDA_CALL (cudaStreamCreate(&stream[0]));
     return 0;
   }
 #endif // LB_ADAPTIVE_GPU

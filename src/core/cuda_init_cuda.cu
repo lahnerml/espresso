@@ -36,7 +36,13 @@ const char *cuda_error;
 
 void cuda_init()
 {
+#ifndef LB_ADAPTIVE_GPU
   cudaStreamCreate(&stream[0]);
+#else // LB_ADAPTIVE_GPU
+  int nGPUs;
+  CUDA_CALL (cudaGetDeviceCount(&nGPUs));
+  CUDA_CALL (cudaSetDevice(this_node % nGPUs));
+#endif // LB_ADAPTIVE_GPU
 }
 
 /// get the number of CUDA devices.
@@ -152,15 +158,4 @@ int cuda_test_device_access() {
   }
 }
 
-#ifdef LB_ADAPTIVE_GPU
-  int cuda_init_adapt() {
-    int nGPUs;
-    CUDA_CALL (cudaGetDeviceCount(&nGPUs));
-    // assume we're on a homogeneous system
-    CUDA_CALL (cudaSetDevice(this_node % nGPUs));
-    CUDA_CALL (cudaStreamDestroy(stream[0]));
-    CUDA_CALL (cudaStreamCreate(&stream[0]));
-    return 0;
-  }
-#endif // LB_ADAPTIVE_GPU
 #endif /* defined(CUDA) */

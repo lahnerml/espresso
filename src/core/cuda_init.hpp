@@ -105,10 +105,6 @@ std::vector<EspressoGpuDevice> cuda_gather_gpus(void);
  */
 int cuda_get_device_props(const int dev, EspressoGpuDevice &d);
 
-#ifdef LB_ADAPTIVE_GPU
-int cuda_init_adapt();
-#endif // LB_ADAPTIVE_GPU
-
 /** current error message of CUDA. */
 extern const char *cuda_error;
 

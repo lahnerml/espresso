@@ -2729,10 +2729,6 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         NULL       /* user pointer */);
   // clang-format on
 
-#ifdef LB_ADAPTIVE_GPU
-  cuda_init_adapt();
-#endif // LB_ADAPTIVE_GPU
-
   // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
   lbadapt_mesh =

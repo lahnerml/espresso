@@ -42,21 +42,25 @@
  * to determine what actions have to take place upon change
  * of the respective parameter. */
 /*@{*/
-#define LBPAR_DENSITY   0 /**< fluid density */
+#define LBPAR_DENSITY 0   /**< fluid density */
 #define LBPAR_VISCOSITY 1 /**< fluid kinematic viscosity */
-#define LBPAR_AGRID     2 /**< grid constant for fluid lattice */
-#define LBPAR_TAU       3 /**< time step for fluid propagation */
-#define LBPAR_FRICTION  4 /**< friction coefficient for viscous coupling between particles and fluid */
-#define LBPAR_EXTFORCE  5 /**< external force acting on the fluid */
-#define LBPAR_BULKVISC  6 /**< fluid bulk viscosity */
+#define LBPAR_AGRID 2     /**< grid constant for fluid lattice */
+#define LBPAR_TAU 3       /**< time step for fluid propagation */
+#define LBPAR_FRICTION                                                         \
+  4 /**< friction coefficient for viscous coupling between particles and fluid \
+       */
+#define LBPAR_EXTFORCE 5 /**< external force acting on the fluid */
+#define LBPAR_BULKVISC 6 /**< fluid bulk viscosity */
 
 /** Note these are used for binary logic so should be powers of 2 */
-#define LB_COUPLE_NULL        1
-#define LB_COUPLE_TWO_POINT   2
+#define LB_COUPLE_NULL 1
+#define LB_COUPLE_TWO_POINT 2
 #define LB_COUPLE_THREE_POINT 4
 
 #define LBADAPT_PATCHSIZE 6
 #define LBADAPT_PATCHSIZE_HALO (2 + LBADAPT_PATCHSIZE)
+
+#define LBADAPT_THEORETICAL_MAXLEVEL P8EST_MAXLEVEL
 
 #define P4EST_VTK_CELL_TYPE 11 /* VTK_VOXEL */
 #define P4EST_ENABLE_VTK_BINARY 1
@@ -78,14 +82,15 @@ typedef struct {
   lb_float bulk_viscosity[LB_COMPONENTS];
   lb_float agrid;
   lb_float tau;
-  
+
   /** the initial level based on which the number of LB steps is defined */
   int base_level;
   /** the maximum refinement level */
   int max_refinement_level;
-  
+
   lb_float friction[LB_COMPONENTS];
-  lb_float ext_force[3]; /* Open question: Do we want a local force or global force? */
+  lb_float ext_force[3]; /* Open question: Do we want a local force or global
+                            force? */
   lb_float rho_lb_units[LB_COMPONENTS];
   lb_float gamma_odd[LB_COMPONENTS];
   lb_float gamma_even[LB_COMPONENTS];
@@ -94,10 +99,10 @@ typedef struct {
 } LB_Parameters;
 
 typedef struct {
-  int n_veloc ;
+  int n_veloc;
   lb_float (*c)[3];
   lb_float (*coeff)[4];
-  lb_float (*w);
+  lb_float(*w);
   lb_float **e;
   lb_float c_sound_sq;
 } LB_Model;
@@ -121,23 +126,31 @@ typedef struct lbadapt_vtk_context {
   /* data passed initially */
   char *filename; /**< Original filename provided is copied. */
   char vtk_float_name[8];
-  
+
   /* internal context data */
-  int writing;                    /**< True after p4est_vtk_write_header. */
-  int num_corners;     /**< Number of local element corners. */
-  int num_points;      /**< Number of VTK points written. */
-  int *node_to_corner; /**< Map a node to an element corner. */
-  char vtufilename[BUFSIZ];       /**< Each process writes one. */
-  char pvtufilename[BUFSIZ];      /**< Only root writes this one. */
-  char visitfilename[BUFSIZ];     /**< Only root writes this one. */
-  FILE *vtufile;                  /**< File pointer for the VTU file. */
-  FILE *pvtufile;                 /**< Paraview meta file. */
-  FILE *visitfile;                /**< Visit meta file. */
+  int writing;                /**< True after p4est_vtk_write_header. */
+  int num_corners;            /**< Number of local element corners. */
+  int num_points;             /**< Number of VTK points written. */
+  int *node_to_corner;        /**< Map a node to an element corner. */
+  char vtufilename[BUFSIZ];   /**< Each process writes one. */
+  char pvtufilename[BUFSIZ];  /**< Only root writes this one. */
+  char visitfilename[BUFSIZ]; /**< Only root writes this one. */
+  FILE *vtufile;              /**< File pointer for the VTU file. */
+  FILE *pvtufile;             /**< Paraview meta file. */
+  FILE *visitfile;            /**< Visit meta file. */
 } lbadapt_vtk_context_t;
 
+/** number of quadrants */
+/** total real quadrants */
 extern int local_num_quadrants;
 
-extern int local_num_quadrants_level[P8EST_MAXLEVEL];
+/** number of real local quadrants per level */
+extern int local_num_real_quadrants_level[P8EST_MAXLEVEL];
+/** number of virtual local quadrants per level */
+extern int local_num_virt_quadrants_level[P8EST_MAXLEVEL];
+
+extern lbadapt_payload_t **dev_local_real_quadrants;
+extern lbadapt_payload_t **dev_local_virt_quadrants;
 
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;
@@ -166,9 +179,45 @@ extern double lb_phi[19];
 extern double lb_coupl_pref;
 extern double lb_coupl_pref2;
 
-void show_blocks_threads (thread_block_container_t *data_host);
+/** Helper-function to invoke the kernel that writes into each patch cell its
+ * respective blockIdx and threadIdx.
+ * @param [out] data_host   Array into which the result is copied
+ */
+void show_blocks_threads(thread_block_container_t *data_host);
 
+/** Create vtk output of \r show_blocks_threads in parallel
+ *
+ * @param [in] filename     Base name of vtu files.
+ */
 int lbadapt_print_gpu_utilization(char *filename);
+
+/** Allocate device memory for real and virtual local quadrants
+ */
+void allocate_device_memory_gpu();
+
+/** Deallocate device memory for real and virtual local quadrants
+ */
+void deallocate_device_memory_gpu();
+
+/** Copy data from host to device. At least one vector may be NULL.
+ * 
+ * @param [in] source_real    Patches from real quadrants.
+ * @param [in] source_virt    Patches from virtual quadrants.
+ * @param [in] level          The level of the quadrants to copy
+ */
+void copy_data_to_device(lbadapt_payload_t *source_real,
+                         lbadapt_payload_t *source_virt,
+                         int level);
+
+/** Copy data from device to host. At least one vector may be NULL.
+ * 
+ * @param [in] dest_real      Patches from real quadrants.
+ * @param [in] dest_virt      Patches from virtual quadrants.
+ * @param [in] level          The level of the quadrants to copy
+ */
+void copy_data_from_device(lbadapt_payload_t *dest_real,
+                           lbadapt_payload_t *dest_virt,
+                           int level);
 
 /** This is actually taken from p4est and extended to patches. :P */
 /** The first call to write a VTK file using individual functions.

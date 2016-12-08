@@ -8,8 +8,12 @@
 
 int local_num_quadrants = 0;
 
-int local_num_quadrants_level[P8EST_MAXLEVEL] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                                 0, 0, 0, 0, 0, 0, 0, 0, 0};
+// clang-format off
+int local_num_real_quadrants_level[P8EST_MAXLEVEL] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+int local_num_virt_quadrants_level[P8EST_MAXLEVEL] =
+  {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+// clang-format on
 
 LB_Parameters lbpar = {
     // rho
@@ -44,6 +48,9 @@ LB_Parameters lbpar = {
 LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
                     d3q19_w, NULL,          1. / 3.};
 
+lbadapt_payload_t **dev_local_real_quadrants;
+lbadapt_payload_t **dev_local_virt_quadrants;
+
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE
 #endif // (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) &&
@@ -72,21 +79,6 @@ double lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random
  * numbers */
 double lb_coupl_pref2 = 0.0;
-
-lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
-  lbadapt_vtk_context_t *cont;
-
-  assert(filename != NULL);
-
-  /* Allocate, initialize the vtk context.  Important to zero all fields. */
-  cont = P4EST_ALLOC_ZERO(lbadapt_vtk_context_t, 1);
-
-  cont->filename = P4EST_STRDUP(filename);
-
-  strcpy(cont->vtk_float_name, "Float64");
-
-  return cont;
-}
 
 int lbadapt_print_gpu_utilization(char *filename) {
   int len;
@@ -147,6 +139,21 @@ int lbadapt_print_gpu_utilization(char *filename) {
   P4EST_FREE(a);
 
   return 0;
+}
+
+lbadapt_vtk_context_t *lbadapt_vtk_context_new(const char *filename) {
+  lbadapt_vtk_context_t *cont;
+
+  assert(filename != NULL);
+
+  /* Allocate, initialize the vtk context.  Important to zero all fields. */
+  cont = P4EST_ALLOC_ZERO(lbadapt_vtk_context_t, 1);
+
+  cont->filename = P4EST_STRDUP(filename);
+
+  strcpy(cont->vtk_float_name, "Float64");
+
+  return cont;
 }
 
 void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context) {

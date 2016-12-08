@@ -21,7 +21,7 @@ void show_blocks_threads(thread_block_container_t *data_host) {
   thread_block_container_t *data_dev;
   size_t data_size = sizeof(thread_block_container_t) * local_num_quadrants;
 
-  cudaMalloc(&data_dev, data_size);
+  CUDA_CALL(cudaMalloc(&data_dev, data_size));
 
   dim3 blocks_per_grid(local_num_quadrants);
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
@@ -35,8 +35,56 @@ void show_blocks_threads(thread_block_container_t *data_host) {
 #endif // 0
   simple_kernel<<<blocks_per_grid, threads_per_block>>>(data_dev);
 
-  cudaMemcpy(data_host, data_dev, data_size, cudaMemcpyDeviceToHost);
+  CUDA_CALL(cudaMemcpy(data_host, data_dev, data_size, cudaMemcpyDeviceToHost));
 
-  cudaFree(data_dev);
+  CUDA_CALL(cudaFree(data_dev));
+}
+
+void allocate_device_memory_gpu() {
+  for (int l = 0; l < LBADAPT_THEORETICAL_MAXLEVEL; ++l) {
+    CUDA_CALL(cudaMalloc(&dev_local_real_quadrants[l],
+                         local_num_real_quadrants_level[l]));
+    CUDA_CALL(cudaMalloc(&dev_local_virt_quadrants[l],
+                         local_num_virt_quadrants_level[l]));
+  }
+}
+
+void deallocate_device_memory_gpu() {
+  for (int l = 0; l < LBADAPT_THEORETICAL_MAXLEVEL; ++l) {
+    CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
+    CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
+  }
+}
+
+void copy_data_to_device(lbadapt_payload_t *source_real,
+                         lbadapt_payload_t *source_virt, int level) {
+  if (source_real) {
+    CUDA_CALL(cudaMemcpy(dev_local_real_quadrants[level], source_real,
+                         sizeof(lbadapt_payload_t) *
+                             local_num_real_quadrants_level[level],
+                         cudaMemcpyHostToDevice));
+  }
+  if (source_virt) {
+    CUDA_CALL(cudaMemcpy(dev_local_virt_quadrants[level], source_virt,
+                         sizeof(lbadapt_payload_t) *
+                             local_num_virt_quadrants_level[level],
+                         cudaMemcpyHostToDevice));
+  }
+}
+
+void copy_data_from_device(lbadapt_payload_t *dest_real,
+                           lbadapt_payload_t *dest_virt, int level) {
+  if (dest_real) {
+    CUDA_CALL(cudaMemcpy(dest_real, dev_local_real_quadrants[level],
+                         sizeof(lbadapt_payload_t) *
+                             local_num_real_quadrants_level[level],
+                         cudaMemcpyDeviceToHost));
+  }
+  if (dest_virt) {
+    CUDA_CALL(cudaMemcpy(dest_virt, dev_local_virt_quadrants[level],
+                         sizeof(lbadapt_payload_t) *
+                             local_num_virt_quadrants_level[level],
+                         cudaMemcpyDeviceToHost));
+  }
 }
 #endif // LB_ADAPTIVE_GPU

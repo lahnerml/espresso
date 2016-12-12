@@ -50,6 +50,7 @@
 
 #ifdef LB_ADAPTIVE
 #include "lb-adaptive.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include <sc.h>
 #endif // LB_ADAPTIVE
 
@@ -3174,6 +3175,8 @@ inline void lb_collide_stream() {
 #endif // LB_BOUNDARIES
 
 #ifdef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE_GPU
+#else // LB_ADAPTIVE_GPU
   // perform 1st half of subcycling here (process coarse before fine)
   int lvl_diff, level;
   for (level = lbpar.base_level; level <= finest_level_global; ++level) {
@@ -3215,12 +3218,10 @@ inline void lb_collide_stream() {
 #endif // 0
     }
   }
-
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
 
   // perform second half of subcycling here (process fine before coarse)
-
   for (level = finest_level_global; lbpar.base_level <= level; --level) {
     lvl_diff = finest_level_global - level;
 
@@ -3282,6 +3283,7 @@ inline void lb_collide_stream() {
 #endif // 0
     }
   }
+#endif // LB_ADAPTIVE_GPU
 #else // LB_ADAPTIVE
   index_t index;
   int x, y, z;

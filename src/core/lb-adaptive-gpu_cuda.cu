@@ -7,6 +7,7 @@
 #include "cuda_interface.hpp"
 #include "cuda_utils.hpp"
 #include "lb-adaptive-gpu.hpp"
+#include "utils.hpp"
 
 __global__ void simple_kernel(thread_block_container_t *a) {
   a[blockIdx.x].thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =
@@ -54,6 +55,9 @@ void allocate_device_memory_gpu() {
 }
 
 void deallocate_device_memory_gpu() {
+  int device;
+  CUDA_CALL(cudaGetDevice(&device));
+  printf ("[rank %i] free memory on device %i\n", this_node, device);
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
     CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));

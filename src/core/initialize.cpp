@@ -79,6 +79,7 @@ static int lb_reinit_particles_gpu = 1;
 static int reinit_particle_comm_gpu = 1;
 #endif
 
+/** Function is executed by all processes */
 void on_program_start()
 {
   EVENT_TRACE(fprintf(stderr, "%d: on_program_start\n", this_node));
@@ -91,10 +92,12 @@ void on_program_start()
 
   ErrorHandling::register_sigint_handler();
 
+  /* register exit function that is called when program terminates */
   if (this_node == 0) {
     /* master node */
     atexit(mpi_stop);
   }
+
 #ifdef CUDA
   cuda_init();
 #endif

@@ -90,7 +90,7 @@ void lbadapt_init();
 
 /** function to deallocate fluid storage
  */
-void lbadapt_release();
+void lbadapt_release(bool release_GPU_memory = true);
 
 /** reinitialize lb-parameters from user input
  */

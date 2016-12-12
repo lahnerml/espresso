@@ -1,6 +1,8 @@
 #include "config.hpp"
 
 #ifdef LB_ADAPTIVE_GPU
+
+#include <assert.h>
 #include <cuda.h>
 #include <stdio.h>
 
@@ -42,6 +44,8 @@ void show_blocks_threads(thread_block_container_t *data_host) {
 }
 
 void allocate_device_memory_gpu() {
+  assert (dev_local_real_quadrants == NULL);
+  assert (dev_local_virt_quadrants == NULL);
   dev_local_real_quadrants = (lbadapt_payload_t**) malloc (sizeof(lbadapt_payload_t*) * P8EST_MAXLEVEL);
   dev_local_virt_quadrants = (lbadapt_payload_t**) malloc (sizeof(lbadapt_payload_t*) * P8EST_MAXLEVEL);
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
@@ -55,15 +59,25 @@ void allocate_device_memory_gpu() {
 }
 
 void deallocate_device_memory_gpu() {
+  if (dev_local_real_quadrants == NULL) {
+    return;
+  }
   int device;
   CUDA_CALL(cudaGetDevice(&device));
   printf ("[rank %i] free memory on device %i\n", this_node, device);
+  //CUDA_CALL(cudaThreadSynchronize());
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    //printf("[rank %i] free real of level %i (%i)\n", this_node, l, dev_local_real_quadrants[l]);
     CUDA_CALL(cudaFree(dev_local_real_quadrants[l]));
+    //printf("[rank %i] success\n", this_node);
+    //printf("[rank %i] free virt of level %i\n", this_node, l);
     CUDA_CALL(cudaFree(dev_local_virt_quadrants[l]));
+    //printf("[rank %i] success\n", this_node);
   }
   free (dev_local_real_quadrants);
   free (dev_local_virt_quadrants);
+  dev_local_real_quadrants = NULL;
+  dev_local_virt_quadrants = NULL;
 }
 
 void copy_data_to_device(lbadapt_payload_t *source_real,

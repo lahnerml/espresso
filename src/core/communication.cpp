@@ -333,8 +333,8 @@ void mpi_call(SlaveCallback cb, int node, int param) {
 /**************** REQ_TERM ************/
 
 void mpi_stop() {
-  if (terminated)
-    return;
+  //if (terminated)
+  //  return;
 
   mpi_call(mpi_stop_slave, -1, 0);
 
@@ -358,7 +358,7 @@ void mpi_stop() {
   }
 
   sc_finalize();
-#endif
+#endif // LB_ADAPTIVE
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -387,7 +387,7 @@ void mpi_stop_slave(int node, int param) {
   }
 
   sc_finalize();
-#endif
+#endif // LB_ADAPTIVE
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -2728,6 +2728,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         NULL,      /* init function */
                         NULL       /* user pointer */);
   // clang-format on
+  cuda_init();
 
   // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);

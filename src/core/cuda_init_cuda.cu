@@ -36,13 +36,12 @@ const char *cuda_error;
 
 void cuda_init()
 {
-#ifndef LB_ADAPTIVE_GPU
-  cudaStreamCreate(&stream[0]);
-#else // LB_ADAPTIVE_GPU
+#ifdef LB_ADAPTIVE_GPU
   int nGPUs;
   CUDA_CALL (cudaGetDeviceCount(&nGPUs));
   CUDA_CALL (cudaSetDevice(this_node % nGPUs));
 #endif // LB_ADAPTIVE_GPU
+  cudaStreamCreate(&stream[0]);
 }
 
 /// get the number of CUDA devices.

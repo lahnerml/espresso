@@ -99,9 +99,7 @@ void on_program_start()
   cuda_init();
 #endif
 
-  /*
-    call the initialization of the modules here
-  */
+  /* call the initialization of the modules here */
   Random::init_random();
 
   init_node_grid();
@@ -137,9 +135,7 @@ void on_program_start()
   reaction.swap=0;
 #endif
 
-  /*
-    call all initializations to do only on the master node here.
-  */
+  /* call all initializations to do only on the master node here.  */
   if (this_node == 0) {
     /* interaction_data.c: make sure 0<->0 ia always exists */
     make_particle_type_exist(0);

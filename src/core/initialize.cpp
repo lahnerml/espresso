@@ -92,15 +92,15 @@ void on_program_start()
 
   ErrorHandling::register_sigint_handler();
 
+#ifdef CUDA
+  cuda_init();
+#endif
+
   /* register exit function that is called when program terminates */
   if (this_node == 0) {
     /* master node */
     atexit(mpi_stop);
   }
-
-#ifdef CUDA
-  cuda_init();
-#endif
 
   /* call the initialization of the modules here */
   Random::init_random();

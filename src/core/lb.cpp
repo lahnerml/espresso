@@ -3190,12 +3190,14 @@ inline void lb_collide_stream() {
 
     // populate virtual quadrants
     // TODO: implement; nop in regular case
+    call_populate_virtuals_kernel(level);
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
   for (level = finest_level_global; lbpar.base_level <= level; --level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
+    call_update_from_virtuals_kernel(level);
 
     // stream in complete patch, halo included. Avoid leaving the patch
     call_streaming_kernel(level);

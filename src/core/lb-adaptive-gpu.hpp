@@ -216,6 +216,24 @@ void retrieve_data(int level);
  */
 void call_collision_kernel(int level);
 
+/** Call kernel for populating virtual quadrants
+ *
+ * TODO: Make virtual quadrants obsolete by increasing the halo size to 2.
+ *       Then this will be part of the populate_halo function
+ *
+ * @param [in] level          The level of quadrants that collide.
+ */
+void call_populate_virtuals_kernel(int level);
+
+/** Call kernel for updating populations from virtual quadrants
+ *
+ * TODO: Make virtual quadrants obsolete by increasing the halo size to 2.
+ *       Then this will be part of the populate_halo function
+ *
+ * @param [in] level          The level of quadrants that collide.
+ */
+void call_update_from_virtuals_kernel (int level);
+
 /** Call the streaming kernel on the device
  *
  * @param [in] level          The level of quadrants that perform streaming

@@ -154,6 +154,12 @@ void call_collision_kernel(int level)
 {
 }
 
+void call_populate_virtuals_kernel(int level) {
+}
+
+void call_update_from_virtuals_kernel(int level) {
+}
+
 void call_bounce_back_kernel(int level)
 {
 }

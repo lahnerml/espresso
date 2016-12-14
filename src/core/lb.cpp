@@ -49,8 +49,8 @@
 #include "cuda_interface.hpp"
 
 #ifdef LB_ADAPTIVE
-#include "lb-adaptive.hpp"
 #include "lb-adaptive-gpu.hpp"
+#include "lb-adaptive.hpp"
 #include <sc.h>
 #endif // LB_ADAPTIVE
 
@@ -3175,11 +3175,37 @@ inline void lb_collide_stream() {
 #endif // LB_BOUNDARIES
 
 #ifdef LB_ADAPTIVE
+  int lvl_diff, level;
 #ifdef LB_ADAPTIVE_GPU
+  // first part of subcycling; coarse to fine
+  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+    // populate halos on that level
+    lbadapt_patches_populate_halos(level);
+
+    // offload patches to GPU
+    copy_data_to_device(lbadapt_local_data[level], NULL, level);
+
+    // collide in complete patch, halo included
+
+    // populate virtual quadrants
+  }
+  ++n_lbsteps;
+  // second part of subcycling; fine to coarse
+  for (level = finest_level_global; lbpar.base_level <= level; --level) {
+    // update from virtual quadrants
+
+    // stream in complete patch, halo included. Avoid leaving the patch
+
+    // bounce back in complete patch, halo included. Avoid leaving the patch.
+
+    // retrieve patches
+    copy_data_from_device(lbadapt_local_data[level],
+                          dev_local_real_quadrants[level], level);
+    // ghost exchange
+  }
 #else // LB_ADAPTIVE_GPU
   // perform 1st half of subcycling here (process coarse before fine)
-  int lvl_diff, level;
-  for (level = lbpar.base_level; level <= finest_level_global; ++level) {
+  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
     lvl_diff = finest_level_global - level;
 
     if (n_lbsteps % (1 << lvl_diff) == 0) {
@@ -3284,7 +3310,7 @@ inline void lb_collide_stream() {
     }
   }
 #endif // LB_ADAPTIVE_GPU
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   index_t index;
   int x, y, z;
   double modes[19];

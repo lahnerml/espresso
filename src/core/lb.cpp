@@ -3175,7 +3175,7 @@ inline void lb_collide_stream() {
 #endif // LB_BOUNDARIES
 
 #ifdef LB_ADAPTIVE
-  int lvl_diff, level;
+  int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
   for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
@@ -3183,27 +3183,36 @@ inline void lb_collide_stream() {
     lbadapt_patches_populate_halos(level);
 
     // offload patches to GPU
-    copy_data_to_device(lbadapt_local_data[level], NULL, level);
+    offload_data(level);
 
     // collide in complete patch, halo included
+    call_collision_kernel(level);
 
     // populate virtual quadrants
+    // TODO: implement; nop in regular case
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
   for (level = finest_level_global; lbpar.base_level <= level; --level) {
     // update from virtual quadrants
+    // TODO: implement; nop in regular case
 
     // stream in complete patch, halo included. Avoid leaving the patch
+    call_streaming_kernel(level);
 
     // bounce back in complete patch, halo included. Avoid leaving the patch.
+    call_bounce_back_kernel(level);
 
     // retrieve patches
-    copy_data_from_device(lbadapt_local_data[level],
-                          dev_local_real_quadrants[level], level);
+    retrieve_data(level);
+
     // ghost exchange
+    p8est_ghostvirt_exchange_data(
+        p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+        (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
   }
 #else // LB_ADAPTIVE_GPU
+  int lvl_diff;
   // perform 1st half of subcycling here (process coarse before fine)
   for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
     lvl_diff = finest_level_global - level;

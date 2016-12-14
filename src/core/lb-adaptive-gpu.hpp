@@ -197,25 +197,56 @@ void allocate_device_memory_gpu();
  */
 void deallocate_device_memory_gpu();
 
+/** Prepare data for offloading on a GPU
+ *
+ * @param [in] level          The level for which to offload data to the device.
+ */
+void offload_data(int level);
+
+/** Retrieve data from GPU after the kernel operations have been completed.
+ *
+ * @param [in] level          The level for which to retrieve data from the
+ *                            device.
+ */
+void retrieve_data(int level);
+
+/** Call the collision kernel on the device
+ *
+ * @param [in] level          The level of quadrants that collide.
+ */
+void call_collision_kernel(int level);
+
+/** Call the streaming kernel on the device
+ *
+ * @param [in] level          The level of quadrants that perform streaming
+ *                            step.
+ */
+void call_streaming_kernel(int level);
+
+/** Call the bounce back kernel on the device
+ *
+ * @param [in] level          The level of quadrants that perform bounce back
+ *                            step.
+ */
+void call_bounce_back_kernel(int level);
+
 /** Copy data from host to device. At least one vector may be NULL.
- * 
+ *
  * @param [in] source_real    Patches from real quadrants.
  * @param [in] source_virt    Patches from virtual quadrants.
  * @param [in] level          The level of the quadrants to copy
  */
 void copy_data_to_device(lbadapt_payload_t *source_real,
-                         lbadapt_payload_t *source_virt,
-                         int level);
+                         lbadapt_payload_t *source_virt, int level);
 
 /** Copy data from device to host. At least one vector may be NULL.
- * 
+ *
  * @param [in] dest_real      Patches from real quadrants.
  * @param [in] dest_virt      Patches from virtual quadrants.
  * @param [in] level          The level of the quadrants to copy
  */
 void copy_data_from_device(lbadapt_payload_t *dest_real,
-                           lbadapt_payload_t *dest_virt,
-                           int level);
+                           lbadapt_payload_t *dest_virt, int level);
 
 /** This is actually taken from p4est and extended to patches. :P */
 /** The first call to write a VTK file using individual functions.

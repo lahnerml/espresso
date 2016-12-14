@@ -80,6 +80,7 @@ void deallocate_device_memory_gpu() {
   dev_local_virt_quadrants = NULL;
 }
 
+// TODO: Use asynchronous memcpy
 void copy_data_to_device(lbadapt_payload_t *source_real,
                          lbadapt_payload_t *source_virt, int level) {
   if (source_real) {
@@ -96,6 +97,7 @@ void copy_data_to_device(lbadapt_payload_t *source_real,
   }
 }
 
+// TODO: Use asynchronous memcpy
 void copy_data_from_device(lbadapt_payload_t *dest_real,
                            lbadapt_payload_t *dest_virt, int level) {
   if (dest_real) {

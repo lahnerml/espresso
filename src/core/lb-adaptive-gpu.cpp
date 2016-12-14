@@ -5,6 +5,7 @@
 
 #include <assert.h>
 #include <mpi.h>
+#include <p8est_extended.h>
 
 int local_num_quadrants = 0;
 
@@ -79,6 +80,88 @@ double lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random
  * numbers */
 double lb_coupl_pref2 = 0.0;
+
+void offload_data(int level) {
+  lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
+  tmp_real = P4EST_ALLOC(lbadapt_payload_t,
+                         (lbadapt_mesh->quad_level + level)->elem_count);
+  tmp_virt = P4EST_ALLOC(lbadapt_payload_t,
+                         (lbadapt_mesh->quad_level + level)->elem_count);
+  next_real = tmp_real;
+  next_virt = tmp_virt;
+  p8est_meshiter_t *m = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+  int status = 0;
+  while (status != P8EST_MESHITER_DONE) {
+    p8est_meshiter_next(m);
+    if (m->current_qid != -1) {
+      if (m->current_vid == -1) {
+        memcpy(next_real,
+               &lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(m)],
+               sizeof(lbadapt_payload_t));
+        ++next_real;
+      } else if (0 == m->current_vid) {
+        memcpy(next_virt,
+               &lbadapt_local_data[level - coarsest_level_local][p8est_meshiter_get_current_storage_id(m)], P8EST_CHILDREN * sizeof(lbadapt_payload_t));
+        next_virt += P8EST_CHILDREN;
+      }
+    }
+  }
+  copy_data_to_device(tmp_real, tmp_virt, level);
+  P4EST_FREE(tmp_real);
+  P4EST_FREE(tmp_virt);
+  p8est_meshiter_destroy(m);
+}
+
+void retrieve_data(int level) {
+  lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
+  tmp_real = P4EST_ALLOC(lbadapt_payload_t,
+                         (lbadapt_mesh->quad_level + level)->elem_count);
+  tmp_virt = P4EST_ALLOC(lbadapt_payload_t,
+                         (lbadapt_mesh->quad_level + level)->elem_count);
+  next_real = tmp_real;
+  next_virt = tmp_virt;
+  copy_data_from_device(tmp_real, tmp_virt, level);
+  p8est_meshiter_t *m = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
+      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+  int status = 0;
+  while (status != P8EST_MESHITER_DONE) {
+    p8est_meshiter_next(m);
+    if (m->current_qid != -1) {
+      if (m->current_vid == -1) {
+        memcpy(&lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(m)],
+               next_real, sizeof(lbadapt_payload_t));
+        ++next_real;
+      } else if (0 == m->current_vid) {
+        memcpy(&lbadapt_local_data[level - coarsest_level_local][p8est_meshiter_get_current_storage_id(m)],
+               next_virt, P8EST_CHILDREN * sizeof(lbadapt_payload_t));
+        next_virt += P8EST_CHILDREN;
+      }
+    }
+  }
+  P4EST_FREE(tmp_real);
+  P4EST_FREE(tmp_virt);
+  p8est_meshiter_destroy(m);
+}
+
+void call_collision_kernel(int level)
+{
+}
+
+void call_bounce_back_kernel(int level)
+{
+}
+
+void call_streaming_kernel(int level)
+{
+}
+
 
 int lbadapt_print_gpu_utilization(char *filename) {
   int len;

@@ -75,6 +75,35 @@ void copy_data_from_device(lbadapt_payload_t *dest_real,
                          cudaMemcpyDeviceToHost));
   }
 }
+
+__global__ void lbadapt_gpu_collide_calc_modes(lbadapt_payload_t *quad_data) {}
+
+__global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data) {}
+
+__global__ void
+lbadapt_gpu_collide_thermalize_modes(lbadapt_payload_t *quad_data) {}
+
+__global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data) {
+
+}
+
+void execute_collision_kernel(int level) {
+  dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
+  dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
+                         LBADAPT_PATCHSIZE_HALO);
+
+  // call kernels: calc modes, relax modes, thermalize modes, apply forces
+  // TODO: smarter to put into a single kernel?
+  lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+  lbadapt_gpu_collide_relax_modes<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+  lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]); // stub only
+  lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+}
+
 // NOT LB-specific; visualize utilization of thread and block ids in vtk format
 __global__ void visualize_threads_blocks(thread_block_container_t *a) {
   a[blockIdx.x].thread_idx[threadIdx.x][threadIdx.y][threadIdx.z] =

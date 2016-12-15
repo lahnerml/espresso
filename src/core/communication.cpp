@@ -339,7 +339,7 @@ void mpi_stop() {
   mpi_call(mpi_stop_slave, -1, 0);
 
 #ifdef LB_ADAPTIVE
-  lbadapt_release(false);
+  lbadapt_release();
   // shutdown p4est if it was used
   if (lbadapt_ghost_virt) {
     p8est_ghostvirt_destroy(lbadapt_ghost_virt);

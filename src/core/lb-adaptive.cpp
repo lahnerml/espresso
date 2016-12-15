@@ -325,7 +325,22 @@ void lbadapt_reinit_parameters() {
 #else  // LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+    if (lbpar.viscosity[0] > 0.0) {
+      gamma_shear[i] =
+          1. -
+          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
+                1.);
+    }
+    if (lbpar.bulk_viscosity[0] > 0.0) {
+      gamma_bulk[i] = 1. -
+                      2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
+                                (prefactors[i] * SQR(lbpar.agrid)) +
+                            1.);
+    }
   }
+#ifdef LB_ADAPTIVE_GPU
+  lbadapt_gpu_init();
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_reinit_force_per_cell() {

@@ -333,9 +333,7 @@ void mpi_call(SlaveCallback cb, int node, int param) {
 /**************** REQ_TERM ************/
 
 void mpi_stop() {
-  //if (terminated)
-  //  return;
-
+  // stop worker nodes
   mpi_call(mpi_stop_slave, -1, 0);
 
 #ifdef LB_ADAPTIVE
@@ -2728,7 +2726,6 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         NULL,      /* init function */
                         NULL       /* user pointer */);
   // clang-format on
-  cuda_init();
 
   // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);

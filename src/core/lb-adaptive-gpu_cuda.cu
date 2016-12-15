@@ -11,7 +11,7 @@
 #include "lb-adaptive-gpu.hpp"
 #include "utils.hpp"
 
-void allocate_device_memory_gpu() {
+void lbadapt_gpu_allocate_device_memory() {
   assert(dev_local_real_quadrants == NULL);
   assert(dev_local_virt_quadrants == NULL);
   dev_local_real_quadrants = (lbadapt_payload_t **)malloc(
@@ -28,7 +28,7 @@ void allocate_device_memory_gpu() {
   }
 }
 
-void deallocate_device_memory_gpu() {
+void lbadapt_gpu_deallocate_device_memory() {
   if (dev_local_real_quadrants == NULL) {
     return;
   }
@@ -43,7 +43,7 @@ void deallocate_device_memory_gpu() {
 }
 
 // TODO: Use asynchronous memcpy
-void copy_data_to_device(lbadapt_payload_t *source_real,
+void lbadapt_gpu_copy_data_to_device(lbadapt_payload_t *source_real,
                          lbadapt_payload_t *source_virt, int level) {
   if (source_real) {
     CUDA_CALL(cudaMemcpy(dev_local_real_quadrants[level], source_real,
@@ -60,7 +60,7 @@ void copy_data_to_device(lbadapt_payload_t *source_real,
 }
 
 // TODO: Use asynchronous memcpy
-void copy_data_from_device(lbadapt_payload_t *dest_real,
+void lbadapt_gpu_copy_data_from_device(lbadapt_payload_t *dest_real,
                            lbadapt_payload_t *dest_virt, int level) {
   if (dest_real) {
     CUDA_CALL(cudaMemcpy(dest_real, dev_local_real_quadrants[level],

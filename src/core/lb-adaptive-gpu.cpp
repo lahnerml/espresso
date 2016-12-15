@@ -81,7 +81,7 @@ double lb_coupl_pref = 0.0;
  * numbers */
 double lb_coupl_pref2 = 0.0;
 
-void offload_data(int level) {
+void lbadapt_gpu_offload_data(int level) {
   lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
   tmp_real = P4EST_ALLOC(lbadapt_payload_t,
                          (lbadapt_mesh->quad_level + level)->elem_count);
@@ -105,18 +105,20 @@ void offload_data(int level) {
         ++next_real;
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
-               &lbadapt_local_data[level - coarsest_level_local][p8est_meshiter_get_current_storage_id(m)], P8EST_CHILDREN * sizeof(lbadapt_payload_t));
+               &lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(m)],
+               P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
       }
     }
   }
-  copy_data_to_device(tmp_real, tmp_virt, level);
+  lbadapt_gpu_copy_data_to_device(tmp_real, tmp_virt, level);
   P4EST_FREE(tmp_real);
   P4EST_FREE(tmp_virt);
   p8est_meshiter_destroy(m);
 }
 
-void retrieve_data(int level) {
+void lbadapt_gpu_retrieve_data(int level) {
   lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
   tmp_real = P4EST_ALLOC(lbadapt_payload_t,
                          (lbadapt_mesh->quad_level + level)->elem_count);
@@ -124,7 +126,7 @@ void retrieve_data(int level) {
                          (lbadapt_mesh->quad_level + level)->elem_count);
   next_real = tmp_real;
   next_virt = tmp_virt;
-  copy_data_from_device(tmp_real, tmp_virt, level);
+  lbadapt_gpu_copy_data_from_device(tmp_real, tmp_virt, level);
   p8est_meshiter_t *m = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
@@ -139,7 +141,8 @@ void retrieve_data(int level) {
                next_real, sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
-        memcpy(&lbadapt_local_data[level - coarsest_level_local][p8est_meshiter_get_current_storage_id(m)],
+        memcpy(&lbadapt_local_data[level - coarsest_level_local]
+                                  [p8est_meshiter_get_current_storage_id(m)],
                next_virt, P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
       }
@@ -150,24 +153,15 @@ void retrieve_data(int level) {
   p8est_meshiter_destroy(m);
 }
 
-void call_collision_kernel(int level)
-{
-}
+void lbadapt_gpu_call_collision_kernel(int level) {}
 
-void call_populate_virtuals_kernel(int level) {
-}
+void lbadapt_gpu_call_populate_virtuals_kernel(int level) {}
 
-void call_update_from_virtuals_kernel(int level) {
-}
+void lbadapt_gpu_call_update_from_virtuals_kernel(int level) {}
 
-void call_bounce_back_kernel(int level)
-{
-}
+void lbadapt_gpu_call_bounce_back_kernel(int level) {}
 
-void call_streaming_kernel(int level)
-{
-}
-
+void lbadapt_gpu_call_streaming_kernel(int level) {}
 
 int lbadapt_print_gpu_utilization(char *filename) {
   int len;

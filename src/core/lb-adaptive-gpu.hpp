@@ -191,30 +191,32 @@ int lbadapt_print_gpu_utilization(char *filename);
 
 /** Allocate device memory for real and virtual local quadrants
  */
-void allocate_device_memory_gpu();
+void lbadapt_gpu_allocate_device_memory();
 
 /** Deallocate device memory for real and virtual local quadrants
  */
-void deallocate_device_memory_gpu();
+void lbadapt_gpu_deallocate_device_memory();
+
+void lbadapt_gpu_preinit();
 
 /** Prepare data for offloading on a GPU
  *
  * @param [in] level          The level for which to offload data to the device.
  */
-void offload_data(int level);
+void lbadapt_gpu_offload_data(int level);
 
 /** Retrieve data from GPU after the kernel operations have been completed.
  *
  * @param [in] level          The level for which to retrieve data from the
  *                            device.
  */
-void retrieve_data(int level);
+void lbadapt_gpu_retrieve_data(int level);
 
 /** Call the collision kernel on the device
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void call_collision_kernel(int level);
+void lbadapt_gpu_call_collision_kernel(int level);
 
 /** Call kernel for populating virtual quadrants
  *
@@ -223,7 +225,7 @@ void call_collision_kernel(int level);
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void call_populate_virtuals_kernel(int level);
+void lbadapt_gpu_call_populate_virtuals_kernel(int level);
 
 /** Call kernel for updating populations from virtual quadrants
  *
@@ -232,21 +234,21 @@ void call_populate_virtuals_kernel(int level);
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void call_update_from_virtuals_kernel (int level);
+void lbadapt_gpu_call_update_from_virtuals_kernel(int level);
 
 /** Call the streaming kernel on the device
  *
  * @param [in] level          The level of quadrants that perform streaming
  *                            step.
  */
-void call_streaming_kernel(int level);
+void lbadapt_gpu_call_streaming_kernel(int level);
 
 /** Call the bounce back kernel on the device
  *
  * @param [in] level          The level of quadrants that perform bounce back
  *                            step.
  */
-void call_bounce_back_kernel(int level);
+void lbadapt_gpu_call_bounce_back_kernel(int level);
 
 /** Copy data from host to device. At least one vector may be NULL.
  *
@@ -254,8 +256,8 @@ void call_bounce_back_kernel(int level);
  * @param [in] source_virt    Patches from virtual quadrants.
  * @param [in] level          The level of the quadrants to copy
  */
-void copy_data_to_device(lbadapt_payload_t *source_real,
-                         lbadapt_payload_t *source_virt, int level);
+void lbadapt_gpu_copy_data_to_device(lbadapt_payload_t *source_real,
+                                     lbadapt_payload_t *source_virt, int level);
 
 /** Copy data from device to host. At least one vector may be NULL.
  *
@@ -263,8 +265,8 @@ void copy_data_to_device(lbadapt_payload_t *source_real,
  * @param [in] dest_virt      Patches from virtual quadrants.
  * @param [in] level          The level of the quadrants to copy
  */
-void copy_data_from_device(lbadapt_payload_t *dest_real,
-                           lbadapt_payload_t *dest_virt, int level);
+void lbadapt_gpu_copy_data_from_device(lbadapt_payload_t *dest_real,
+                                       lbadapt_payload_t *dest_virt, int level);
 
 /** This is actually taken from p4est and extended to patches. :P */
 /** The first call to write a VTK file using individual functions.

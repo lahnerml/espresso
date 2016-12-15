@@ -9,7 +9,17 @@
 #include "cuda_interface.hpp"
 #include "cuda_utils.hpp"
 #include "lb-adaptive-gpu.hpp"
+#include "lb-d3q19.hpp"
 #include "utils.hpp"
+
+LB_Parameters d_lbpar;
+LB_Model d_lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
+                      d3q19_w, NULL,          1. / 3.};
+
+void lbadapt_gpu_init() {
+  CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
+                       cudaMemcpyHostToDevice));
+}
 
 void lbadapt_gpu_allocate_device_memory() {
   assert(dev_local_real_quadrants == NULL);

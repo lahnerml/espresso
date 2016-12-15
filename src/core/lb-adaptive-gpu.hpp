@@ -147,11 +147,15 @@ extern int local_num_real_quadrants_level[P8EST_MAXLEVEL];
 /** number of virtual local quadrants per level */
 extern int local_num_virt_quadrants_level[P8EST_MAXLEVEL];
 
+/** pointers to device memory */
 extern lbadapt_payload_t **dev_local_real_quadrants;
 extern lbadapt_payload_t **dev_local_virt_quadrants;
 
+/** generic LB information on host and device */
 extern LB_Parameters lbpar;
+extern LB_Parameters d_lbpar;
 extern LB_Model lbmodel;
+extern LB_Model d_lbmodel;
 
 /* int to indicate fluctuations */
 extern int fluct;
@@ -197,7 +201,9 @@ void lbadapt_gpu_allocate_device_memory();
  */
 void lbadapt_gpu_deallocate_device_memory();
 
-void lbadapt_gpu_preinit();
+/** Copy model and parameter structs from host to device.
+ */
+void lbadapt_gpu_init();
 
 /** Prepare data for offloading on a GPU
  *

@@ -54,7 +54,8 @@ void lbadapt_gpu_deallocate_device_memory() {
 
 // TODO: Use asynchronous memcpy
 void lbadapt_gpu_copy_data_to_device(lbadapt_payload_t *source_real,
-                         lbadapt_payload_t *source_virt, int level) {
+                                     lbadapt_payload_t *source_virt,
+                                     int level) {
   if (source_real) {
     CUDA_CALL(cudaMemcpy(dev_local_real_quadrants[level], source_real,
                          sizeof(lbadapt_payload_t) *
@@ -71,7 +72,8 @@ void lbadapt_gpu_copy_data_to_device(lbadapt_payload_t *source_real,
 
 // TODO: Use asynchronous memcpy
 void lbadapt_gpu_copy_data_from_device(lbadapt_payload_t *dest_real,
-                           lbadapt_payload_t *dest_virt, int level) {
+                                       lbadapt_payload_t *dest_virt,
+                                       int level) {
   if (dest_real) {
     CUDA_CALL(cudaMemcpy(dest_real, dev_local_real_quadrants[level],
                          sizeof(lbadapt_payload_t) *

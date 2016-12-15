@@ -201,7 +201,7 @@ void lbadapt_gpu_allocate_device_memory();
  */
 void lbadapt_gpu_deallocate_device_memory();
 
-/** Copy model and parameter structs from host to device.
+/** Copy parameter struct from host to device.
  */
 void lbadapt_gpu_init();
 

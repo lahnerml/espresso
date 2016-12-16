@@ -222,7 +222,7 @@ void lbadapt_gpu_retrieve_data(int level);
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void lbadapt_gpu_call_collision_kernel(int level);
+void lbadapt_gpu_execute_collision_kernel(int level);
 
 /** Call kernel for populating virtual quadrants
  *
@@ -231,7 +231,7 @@ void lbadapt_gpu_call_collision_kernel(int level);
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void lbadapt_gpu_call_populate_virtuals_kernel(int level);
+void lbadapt_gpu_execute_populate_virtuals_kernel(int level);
 
 /** Call kernel for updating populations from virtual quadrants
  *
@@ -240,21 +240,21 @@ void lbadapt_gpu_call_populate_virtuals_kernel(int level);
  *
  * @param [in] level          The level of quadrants that collide.
  */
-void lbadapt_gpu_call_update_from_virtuals_kernel(int level);
+void lbadapt_gpu_execute_update_from_virtuals_kernel(int level);
 
 /** Call the streaming kernel on the device
  *
  * @param [in] level          The level of quadrants that perform streaming
  *                            step.
  */
-void lbadapt_gpu_call_streaming_kernel(int level);
+void lbadapt_gpu_execute_streaming_kernel(int level);
 
 /** Call the bounce back kernel on the device
  *
  * @param [in] level          The level of quadrants that perform bounce back
  *                            step.
  */
-void lbadapt_gpu_call_bounce_back_kernel(int level);
+void lbadapt_gpu_execute_bounce_back_kernel(int level);
 
 /** Copy data from host to device. At least one vector may be NULL.
  *

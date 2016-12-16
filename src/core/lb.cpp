@@ -3186,24 +3186,26 @@ inline void lb_collide_stream() {
     lbadapt_gpu_offload_data(level);
 
     // collide in complete patch, halo included
-    lbadapt_gpu_call_collision_kernel(level);
+    lbadapt_gpu_execute_collision_kernel(level);
 
     // populate virtual quadrants
     // TODO: implement; nop in regular case
-    lbadapt_gpu_call_populate_virtuals_kernel(level);
+    lbadapt_gpu_execute_populate_virtuals_kernel(level);
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
   for (level = finest_level_global; lbpar.base_level <= level; --level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
-    lbadapt_gpu_call_update_from_virtuals_kernel(level);
+    lbadapt_gpu_execute_update_from_virtuals_kernel(level);
 
     // stream in complete patch, halo included. Avoid leaving the patch
-    lbadapt_gpu_call_streaming_kernel(level);
+    lbadapt_gpu_execute_streaming_kernel(level);
 
+#ifdef LB_BOUNDARIES
     // bounce back in complete patch, halo included. Avoid leaving the patch.
-    lbadapt_gpu_call_bounce_back_kernel(level);
+    lbadapt_gpu_execute_bounce_back_kernel(level);
+#endif // LB_BOUNDARIES
 
     // retrieve patches
     lbadapt_gpu_retrieve_data(level);

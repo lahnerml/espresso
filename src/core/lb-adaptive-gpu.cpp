@@ -153,16 +153,6 @@ void lbadapt_gpu_retrieve_data(int level) {
   p8est_meshiter_destroy(m);
 }
 
-void lbadapt_gpu_call_collision_kernel(int level) {}
-
-void lbadapt_gpu_call_populate_virtuals_kernel(int level) {}
-
-void lbadapt_gpu_call_update_from_virtuals_kernel(int level) {}
-
-void lbadapt_gpu_call_bounce_back_kernel(int level) {}
-
-void lbadapt_gpu_call_streaming_kernel(int level) {}
-
 int lbadapt_print_gpu_utilization(char *filename) {
   int len;
   /* strip file ending from filename (if given) */

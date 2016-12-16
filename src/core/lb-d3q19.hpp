@@ -37,18 +37,18 @@
 /** Velocity sub-lattice of the D3Q19 model */
 // clang-format off
 #ifndef LB_ADAPTIVE
-static double d3q19_lattice[19][3] = 
+static double d3q19_lattice[19][3] =
 #else // LB_ADAPTIVE
-static lb_float d3q19_lattice[19][3] = 
+static lb_float d3q19_lattice[19][3] =
 #endif // LB_ADAPTIVE
   {{  0.,  0.,  0. },
    {  1.,  0.,  0. },
    { -1.,  0.,  0. },
-   {  0.,  1.,  0. }, 
+   {  0.,  1.,  0. },
    {  0., -1.,  0. },
-   {  0.,  0.,  1. }, 
+   {  0.,  0.,  1. },
    {  0.,  0., -1. },
-   {  1.,  1.,  0. }, 
+   {  1.,  1.,  0. },
    { -1., -1.,  0. },
    {  1., -1.,  0. },
    { -1.,  1.,  0. },
@@ -65,7 +65,7 @@ static lb_float d3q19_lattice[19][3] =
 /** Coefficients for pseudo-equilibrium distribution of the D3Q19 model */
 // clang-format off
 #ifndef LB_ADAPTIVE
-static double d3q19_coefficients[19][4] = {
+static double d3q19_coefficients[19][4] =
 #else // LB_ADAPTIVE
 static lb_float d3q19_coefficients[19][4] =
 #endif // LB_ADAPTIVE

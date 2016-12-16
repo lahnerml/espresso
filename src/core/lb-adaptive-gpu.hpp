@@ -78,7 +78,7 @@ typedef struct {
   lb_float rho[LB_COMPONENTS];
   lb_float viscosity[LB_COMPONENTS];
   lb_float bulk_viscosity[LB_COMPONENTS];
-  lb_float agrid;
+  lb_float agrid; /** mesh width of maximum refinement level */
   lb_float tau;
 
   /** the initial level based on which the number of LB steps is defined */

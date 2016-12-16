@@ -17,6 +17,8 @@ LB_Model d_lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
                       d3q19_w, NULL,          1. / 3.};
 
 void lbadapt_gpu_init() {
+  lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
   CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
 }

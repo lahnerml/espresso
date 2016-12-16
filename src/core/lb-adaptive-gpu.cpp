@@ -1,4 +1,7 @@
 #include "config.hpp"
+
+#ifdef LB_ADAPTIVE_GPU
+
 #include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-d3q19.hpp"
@@ -1129,3 +1132,5 @@ int lbadapt_vtk_write_footer(lbadapt_vtk_context_t *cont) {
 
   return 0;
 }
+
+#endif // LB_ADAPTIVE_GPU

@@ -251,7 +251,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
@@ -1115,10 +1115,10 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
   lb_float rho, j[3], pi_eq[6];
 
 #ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
@@ -1286,7 +1286,7 @@ int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float h) {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
@@ -1693,20 +1693,12 @@ void lbadapt_bounce_back(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-#if 0
-#ifdef LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
-               ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
-#endif // 0
 
 #ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 

@@ -30,6 +30,7 @@
 #include "electrokinetics.hpp"
 #include "electrokinetics_pdb_parse.hpp"
 #include "interaction_data.hpp"
+#include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "lbgpu.hpp"

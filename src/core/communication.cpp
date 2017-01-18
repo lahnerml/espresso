@@ -3113,7 +3113,7 @@ void mpi_geometric_refinement(int node, int param) {
   // FIXME: Implement mapping between two trees
   lbadapt_release();
   lbadapt_reinit_fluid_per_cell();
-  lbadapt_reinit_fluid_per_cell();
+  lbadapt_reinit_force_per_cell();
 
   // reinitialize boundary
   lbadapt_get_boundary_status();

@@ -128,7 +128,7 @@ void lbadapt_allocate_data() {
   lbadapt_local_data = P4EST_ALLOC(
       lbadapt_payload_t *, 1 + finest_level_local - coarsest_level_local);
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
-    lbadapt_local_data[level - coarsest_level_local] = P4EST_ALLOC(
+    lbadapt_local_data[level - coarsest_level_local] = P4EST_ALLOC_ZERO(
         lbadapt_payload_t,
         (lbadapt_mesh->quad_level + level)->elem_count +
             P8EST_CHILDREN *
@@ -162,7 +162,7 @@ void lbadapt_allocate_data() {
   lbadapt_ghost_data = P4EST_ALLOC(
       lbadapt_payload_t *, 1 + finest_level_ghost - coarsest_level_ghost);
   for (level = coarsest_level_ghost; level <= finest_level_ghost; ++level) {
-    lbadapt_ghost_data[level - coarsest_level_ghost] = P4EST_ALLOC(
+    lbadapt_ghost_data[level - coarsest_level_ghost] = P4EST_ALLOC_ZERO(
         lbadapt_payload_t,
         (lbadapt_mesh->ghost_level + level)->elem_count +
             P8EST_CHILDREN *

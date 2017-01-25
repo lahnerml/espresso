@@ -73,10 +73,10 @@
 /*************************************************************/
 /*@{*/
 /** we are only interested in c1 .. c18 */
-static int ci_to_p4est[18] =
+const int ci_to_p4est[18] =
   {1, 0, 3, 2, 5, 4, 17, 14, 15, 16, 13, 10, 11, 12, 9, 6, 7, 8};
 
-static int p4est_to_ci[18] =
+const int p4est_to_ci[18] =
   {2, 1, 4, 3, 6, 5, 16, 17, 18, 15, 12, 13, 14, 11, 8, 9, 10, 7};
 /*@}*/
 #endif // LB_ADAPTIVE

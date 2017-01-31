@@ -952,9 +952,10 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   return 0;
 }
 
-int lbadapt_calc_local_fields(lb_float mode[19], lb_float force[3],
-                              int boundary, int has_force, lb_float h,
-                              lb_float *rho, lb_float *j, lb_float *pi) {
+int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float mode[19],
+                              lb_float force[3], int boundary, int has_force,
+                              lb_float h, lb_float *rho, lb_float *j,
+                              lb_float *pi) {
   int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 #ifdef LB_ADAPTIVE_GPU
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
@@ -983,9 +984,8 @@ int lbadapt_calc_local_fields(lb_float mode[19], lb_float force[3],
 #endif // LB_BOUNDARIES
 
   lb_float cpmode[19];
-  for (int i = 0; i < 19; ++i) {
-    cpmode[i] = mode[i];
-  }
+  lbadapt_calc_modes(populations, cpmode);
+
   lb_float modes_from_pi_eq[6];
 
   *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
@@ -1792,18 +1792,22 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0;
                 for (int l = 0; l < 3; ++l) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                      h_max * h_max * h_max * lbpar.rho[0] * 2 *
                       lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
                       lb_boundaries[currCellData->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
 
+                // sum up the force that is applied by the fluid
                 for (int l = 0; l < 3; ++l) {
                   lb_boundaries[currCellData->boundary - 1].force[l] +=
                       (2 * currCellData->lbfluid[1][dir_ESPR] +
                        population_shift) *
                       lbmodel.c[dir_ESPR][l];
                 }
+
+                // perform bounce back, corrected by the impact resulting from
+                // velocity boundary condition
                 data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
                     currCellData->lbfluid[1][inv[dir_ESPR]] + population_shift;
               } else {
@@ -1813,7 +1817,7 @@ void lbadapt_bounce_back(int level) {
             }
 
             // case 2
-            else if (mesh_iter->neighbor_is_ghost == 1 && data->boundary) {
+            else if (mesh_iter->neighbor_is_ghost && data->boundary) {
               if (!currCellData->boundary) {
                 if (-1. == local_post_collision_populations[0]) {
                   for (int i = 0; i < lbmodel.n_veloc; ++i) {
@@ -1826,12 +1830,11 @@ void lbadapt_bounce_back(int level) {
                 population_shift = 0.;
                 for (int l = 0; l < 3; l++) {
                   population_shift -=
-                      h_max * h_max * h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                      h_max * h_max * h_max * lbpar.rho[0] * 2 *
                       lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
                       lb_boundaries[data->boundary - 1].velocity[l] /
                       lbmodel.c_sound_sq;
                 }
-
                 for (int l = 0; l < 3; ++l) {
                   lb_boundaries[data->boundary - 1].force[l] +=
                       (2 * data->lbfluid[1][inv[dir_ESPR]] + population_shift) *
@@ -2117,13 +2120,19 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_local_fields(data->modes, data->lbfields.force,
+        lbadapt_calc_local_fields(data->lbfluid, data->modes, data->lbfields.force,
                                   data->boundary, data->lbfields.has_force, h,
                                   &rho, j, NULL);
 
+#if 1
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
         j[2] = j[2] / rho * h_max / lbpar.tau;
+#else // 0
+        j[0] = j[0] / rho * h / lbpar.tau;
+        j[1] = j[1] / rho * h / lbpar.tau;
+        j[2] = j[2] / rho * h / lbpar.tau;
+#endif // 0
 
         veloc_ptr = (lb_float *)sc_array_index(
             velocity_values, P8EST_DIM * mesh_iter->current_qid);

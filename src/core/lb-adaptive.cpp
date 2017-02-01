@@ -471,6 +471,69 @@ void lbadapt_reinit_fluid_per_cell() {
   }
 }
 
+int lbadapt_is_boundary(double *pos) {
+  double dist, dist_tmp, dist_vec[3];
+  dist = DBL_MAX;
+  int the_boundary = -1;
+
+  for (int n = 0; n < n_lb_boundaries; ++n) {
+    switch (lb_boundaries[n].type) {
+    case LB_BOUNDARY_WAL:
+      calculate_wall_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.wal, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_SPH:
+      calculate_sphere_dist((Particle *)NULL, pos, (Particle *)NULL,
+                            &lb_boundaries[n].c.sph, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_CYL:
+      calculate_cylinder_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.cyl, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_RHOMBOID:
+      calculate_rhomboid_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.rhomboid, &dist_tmp,
+                              dist_vec);
+      break;
+
+    case LB_BOUNDARY_POR:
+      calculate_pore_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.pore, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_STOMATOCYTE:
+      calculate_stomatocyte_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.stomatocyte, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    case LB_BOUNDARY_HOLLOW_CONE:
+      calculate_hollow_cone_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.hollow_cone, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    default:
+      runtimeErrorMsg() << "lbboundary type " << lb_boundaries[n].type
+                        << " not implemented in lb_init_boundaries()\n";
+    }
+
+    if (dist_tmp < dist) {
+      dist = dist_tmp;
+      the_boundary = n;
+    }
+  }
+
+  if (dist <= 0 && n_lb_boundaries > 0) {
+    return the_boundary + 1;
+  } else {
+    return 0;
+  }
+}
+
 int lbadapt_get_global_maxlevel() {
   int i;
   int local_res = -1;

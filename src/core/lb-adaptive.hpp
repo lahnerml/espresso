@@ -104,6 +104,12 @@ void lbadapt_reinit_force_per_cell();
  */
 void lbadapt_reinit_fluid_per_cell();
 
+#ifdef LB_BOUNDARIES
+/** Check if current midpoint is part of the boundary
+ */
+int lbadapt_is_boundary(double pos[3]);
+#endif // LB_BOUNDARIES
+
 /** Get maxlevel of p4est
  */
 int lbadapt_get_global_maxlevel();

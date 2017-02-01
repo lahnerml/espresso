@@ -1657,20 +1657,14 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
                              lblattice.halo_grid);
 
     mpi_recv_fluid(node, index, &rho, j, pi);
-    // unit conversion // TODO: Check Unit Conversion!
-    p_pi[0] =
-        pi[0] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-    p_pi[1] =
-        pi[1] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-    p_pi[2] =
-        pi[2] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-    p_pi[3] =
-        pi[3] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-    p_pi[4] =
-        pi[4] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-    p_pi[5] =
-        pi[5] / lbpar.tau / lbpar.tau / lbpar.agrid / lbpar.agrid / lbpar.agrid;
-#endif // LB_ADAPTIVE
+        // unit conversion
+        p_pi[0] = pi[0]/lbpar.tau/lbpar.tau/lbpar.agrid;
+        p_pi[1] = pi[1]/lbpar.tau/lbpar.tau/lbpar.agrid;
+        p_pi[2] = pi[2]/lbpar.tau/lbpar.tau/lbpar.agrid;
+        p_pi[3] = pi[3]/lbpar.tau/lbpar.tau/lbpar.agrid;
+        p_pi[4] = pi[4]/lbpar.tau/lbpar.tau/lbpar.agrid;
+        p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/lbpar.agrid;
+#endif //!LB_ADAPTIVE
 #endif // LB
   }
   return 0;
@@ -2281,7 +2275,7 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
-#else
+#else // LB_ADAPTIVE
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -2629,7 +2623,7 @@ void lb_calc_n_from_rho_j_pi(const index_t index, const double rho,
     lbfluid[0][i][index] += coeff[i][3] * trace;
   }
 #endif // D3Q19
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 }
 
 /*@}*/
@@ -3160,8 +3154,8 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
       lbfluid[1][i][next[i]] += mode[j] * e[j][i] / e[19][j];
     lbfluid[1][i][index] *= w[i];
   }
-#endif // LB_ADAPTIVE
 #endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 /* Collisions and streaming (push scheme) */
@@ -3338,7 +3332,7 @@ inline void lb_collide_stream() {
     lbfields[i].force_buf[1] = lbfields[i].force[1];
     lbfields[i].force_buf[2] = lbfields[i].force[2];
   }
-#endif
+#endif // IMMERSED_BOUNDARY
 
   index = lblattice.halo_offset;
   for (z = 1; z <= lblattice.grid[2]; z++) {

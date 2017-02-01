@@ -112,11 +112,6 @@ void lbboundary_mindist_position(double pos[3], double *mindist,
                                  double distvec[3], int *no);
 
 int lbboundary_get_force(int no, double *f);
-
-#ifdef LB_ADAPTIVE
-int lbadapt_is_boundary(double pos[3]);
-#endif // LB_ADAPTIVE
-
 #endif // (LB_BOUNDARIES) || (LB_BOUNDARIES_GPU)
 
 #ifdef LB_BOUNDARIES

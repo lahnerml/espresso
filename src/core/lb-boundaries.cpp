@@ -477,6 +477,8 @@ void lb_init_boundaries() {
       }
     }
 
+#elif defined (LB_ADAPTIVE)
+    lbadapt_get_boundary_status();
 #endif
   }
 }

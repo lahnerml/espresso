@@ -2742,6 +2742,15 @@ void mpi_lbadapt_grid_init(int node, int level) {
 #endif // LB_ADAPTIVE_GPU
   finest_level_global = level;
   lbpar.base_level = level;
+  lbpar.max_refinement_level = level;
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_set_max_level(int node, int l_max) {
+#ifdef LB_ADAPTIVE
+  lbpar.max_refinement_level = l_max;
+
+  lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
 
@@ -3004,15 +3013,6 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len)
   sc_array_destroy(values_block);
   P4EST_FREE(a);
 #endif // LB_ADAPTIVE_GPU
-}
-
-
-void mpi_lbadapt_set_max_level(int node, int l_max) {
-#ifdef LB_ADAPTIVE
-  lbpar.max_refinement_level = l_max;
-
-  lbadapt_reinit_parameters();
-#endif // LB_ADAPTIVE
 }
 
 void mpi_unif_refinement(int node, int level) {

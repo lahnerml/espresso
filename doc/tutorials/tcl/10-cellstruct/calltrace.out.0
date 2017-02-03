@@ -1,0 +1,580 @@
+<call name="Espresso(main+0x1e) [0x400c5e]" time="" addr="0x0000000000400c5e">
+<call name="on_program_start" time="19992" addr="0x00007fdc5ccde609" line="90" file="initialize.cpp">
+<call name="calc_processor_min_num_cells" time="23225" addr="0x00007fdc5ccbc6ac" line="1637" file="domain_decomposition.cpp">
+</call>
+<call name="dd_topology_init" time="23359" addr="0x00007fdc5ccbf929" line="1304" file="domain_decomposition.cpp">
+<call name="dd_create_cell_grid" time="23493" addr="0x00007fdc5ccbef79" line="558" file="domain_decomposition.cpp">
+<call name="dd_create_p4est_grid" time="23672" addr="0x00007fdc5ccbd65c" line="199" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_mark_cells" time="25548" addr="0x00007fdc5ccb96d6" line="701" file="domain_decomposition.cpp">
+</call>
+<call name="dd_prepare_comm" time="25716" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="25878" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="26067" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="26317" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="26501" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="26699" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="26884" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27037" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27207" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27362" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27515" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27669" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27823" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="27977" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="28130" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="28258" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="28412" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="28566" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="28720" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="28873" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29027" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29189" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29343" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29496" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29650" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29804" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="29957" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="30111" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="30264" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="30392" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="30552" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="30706" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="30852" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="30972" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31092" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31212" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31332" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31452" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31572" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31692" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31812" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="31932" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="32052" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="32151" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32272" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32392" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32512" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32632" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32752" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32872" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="32992" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="33120" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="33240" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="33360" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="33480" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="33600" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_revert_comm_order" time="33721" addr="0x00007fdc5ccba8d9" line="882" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="33822" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="33921" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="34021" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="34123" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_init_cell_interactions" time="34223" addr="0x00007fdc5ccbae26" line="981" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+<call name="[6 unknown]" time="" addr="">
+<call name="cells_re_init" time="42459" addr="0x00007fdc5cca6934" line="180" file="cells.cpp">
+<call name="dd_topology_release" time="42618" addr="0x00007fdc5ccbba86" line="1400" file="domain_decomposition.cpp">
+</call>
+<call name="dd_topology_init" time="42762" addr="0x00007fdc5ccbf929" line="1304" file="domain_decomposition.cpp">
+<call name="dd_create_cell_grid" time="42896" addr="0x00007fdc5ccbef79" line="558" file="domain_decomposition.cpp">
+<call name="dd_create_p4est_grid" time="43063" addr="0x00007fdc5ccbd65c" line="199" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_mark_cells" time="44289" addr="0x00007fdc5ccb96d6" line="701" file="domain_decomposition.cpp">
+</call>
+<call name="dd_prepare_comm" time="44454" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="44604" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="44774" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="44942" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45111" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45278" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45446" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45616" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45784" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="45951" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="46119" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="46287" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="46462" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="46630" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="46797" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="46945" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47113" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47281" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47449" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47616" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47784" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="47952" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48119" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48287" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48455" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48622" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48790" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="48957" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="49125" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="49272" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="49440" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="49608" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="49775" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="49943" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50110" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50283" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50454" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50622" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50789" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="50957" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="51124" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="51292" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="51459" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="51607" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="51775" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="51942" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52110" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52278" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52445" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52613" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52780" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="52949" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="53117" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="53285" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="53453" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="53621" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_revert_comm_order" time="53788" addr="0x00007fdc5ccba8d9" line="882" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="53936" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="54083" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="54231" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="54383" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_init_cell_interactions" time="54531" addr="0x00007fdc5ccbae26" line="981" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+<call name="libEspressoTcl.so.4(_Z16tclcallback_skinP10Tcl_InterpPv+0x31) [0x7fdc5cfa8c71]" time="" addr="0x00007fdc5cfa8c71">
+<call name="libEspressoCore.so.4(_Z19mpi_bcast_parameteri+0x41) [0x7fdc5cca96c1]" time="" addr="0x00007fdc5cca96c1">
+<call name="on_parameter_change" time="54776" addr="0x00007fdc5ccdea8b" line="566" file="initialize.cpp">
+<call name="dd_on_geometry_change" time="54924" addr="0x00007fdc5ccbb734" line="1206" file="domain_decomposition.cpp">
+<call name="dd_update_communicators_w_boxl" time="55085" addr="0x00007fdc5ccbab46" line="933" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="cells_re_init" time="55398" addr="0x00007fdc5cca6934" line="180" file="cells.cpp">
+<call name="dd_topology_release" time="55552" addr="0x00007fdc5ccbba86" line="1400" file="domain_decomposition.cpp">
+</call>
+<call name="dd_topology_init" time="55728" addr="0x00007fdc5ccbf929" line="1304" file="domain_decomposition.cpp">
+<call name="dd_create_cell_grid" time="55905" addr="0x00007fdc5ccbef79" line="558" file="domain_decomposition.cpp">
+<call name="dd_create_p4est_grid" time="56152" addr="0x00007fdc5ccbd65c" line="199" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_mark_cells" time="57313" addr="0x00007fdc5ccb96d6" line="701" file="domain_decomposition.cpp">
+</call>
+<call name="dd_prepare_comm" time="57520" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="57778" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="57995" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="58210" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="58435" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="58650" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="58864" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="59079" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="59294" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="59508" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="59723" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="59938" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="60153" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="60367" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="60582" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="60779" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="60994" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="61209" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="61423" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="61638" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="61853" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="62069" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="62287" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="62501" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="62716" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="62931" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="63146" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="63361" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="63576" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="63770" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="63985" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="64200" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="64414" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="64629" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="64844" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="65058" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="65273" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="65488" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="65703" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="65917" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="66132" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="66352" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="66567" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="66768" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="66984" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="67199" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="67413" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="67628" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="67843" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="68063" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="68284" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="68499" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="68716" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="68933" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="69150" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="69367" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_revert_comm_order" time="69601" addr="0x00007fdc5ccba8d9" line="882" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="69800" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="70002" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="70195" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="70389" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_init_cell_interactions" time="70584" addr="0x00007fdc5ccbae26" line="981" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+</call>
+<call name="dd_on_geometry_change" time="55263" addr="0x00007fdc5ccbb734" line="1206" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="libEspressoCore.so.4(_Z19mpi_bcast_parameteri+0x41) [0x7fdc5cca96c1]" time="" addr="0x00007fdc5cca96c1">
+<call name="on_parameter_change" time="70940" addr="0x00007fdc5ccdea8b" line="566" file="initialize.cpp">
+<call name="dd_update_communicators_w_boxl" time="71222" addr="0x00007fdc5ccbab46" line="933" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_on_geometry_change" time="71086" addr="0x00007fdc5ccbb734" line="1206" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+<call name="[3 unknown]" time="" addr="">
+<call name="on_short_range_ia_change" time="71451" addr="0x00007fdc5ccde7fc" line="368" file="initialize.cpp">
+<call name="dd_on_geometry_change" time="71614" addr="0x00007fdc5ccbb734" line="1206" file="domain_decomposition.cpp">
+<call name="cells_re_init" time="71787" addr="0x00007fdc5cca6934" line="180" file="cells.cpp">
+<call name="dd_topology_release" time="71977" addr="0x00007fdc5ccbba86" line="1400" file="domain_decomposition.cpp">
+</call>
+<call name="dd_topology_init" time="72187" addr="0x00007fdc5ccbf929" line="1304" file="domain_decomposition.cpp">
+<call name="dd_create_cell_grid" time="72399" addr="0x00007fdc5ccbef79" line="558" file="domain_decomposition.cpp">
+<call name="dd_create_p4est_grid" time="72651" addr="0x00007fdc5ccbd65c" line="199" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_mark_cells" time="75244" addr="0x00007fdc5ccb96d6" line="701" file="domain_decomposition.cpp">
+</call>
+<call name="dd_prepare_comm" time="75490" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="75721" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="75972" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="76220" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="76474" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="76722" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="76971" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="77219" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="77468" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="77719" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="77976" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="78225" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="78473" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="78722" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="78970" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="79198" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="79447" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="79696" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="79944" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="80193" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="80441" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="80689" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="80938" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="81186" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="81437" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="81685" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="81937" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="82186" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="82434" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="82663" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="82912" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="83161" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="83409" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="83661" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="83909" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="84157" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="84406" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="84654" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="84905" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="85154" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="85402" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="85650" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_prepare_comm" time="85903" addr="0x00007fdc5ccb9fa0" line="762" file="domain_decomposition.cpp">
+<call name="prepare_comm" time="86132" addr="0x00007fdc5ccd5803" line="70" file="ghosts.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="86381" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="86630" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="86878" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="87126" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="87374" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="87626" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="87874" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="88122" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="88373" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="88625" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="88873" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+<call name="dd_fill_comm_cell_lists" time="89122" addr="0x00007fdc5ccb9b6f" line="738" file="domain_decomposition.cpp">
+</call>
+</call>
+<call name="dd_revert_comm_order" time="89370" addr="0x00007fdc5ccba8d9" line="882" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="89598" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="89826" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="90058" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_assign_prefetches" time="90291" addr="0x00007fdc5ccbaabc" line="914" file="domain_decomposition.cpp">
+</call>
+<call name="dd_init_cell_interactions" time="90521" addr="0x00007fdc5ccbae26" line="981" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+</call>
+</call>
+<call name="on_short_range_ia_change" time="90791" addr="0x00007fdc5ccde7fc" line="368" file="initialize.cpp">
+<call name="dd_on_geometry_change" time="91013" addr="0x00007fdc5ccbb734" line="1206" file="domain_decomposition.cpp">
+<call name="dd_update_communicators_w_boxl" time="91184" addr="0x00007fdc5ccbab46" line="933" file="domain_decomposition.cpp">
+</call>
+</call>
+</call>
+</call>
+</call>
+</call>

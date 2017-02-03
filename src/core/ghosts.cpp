@@ -38,6 +38,8 @@
 #include "particle_data.hpp"
 #include "forces_inline.hpp"
 
+#include "call_trace.hpp"
+
 /** Tag for communication in ghost_comm. */
 #define REQ_GHOST_SEND 100
 
@@ -65,6 +67,8 @@ int ghosts_have_v = 0;
 
 void prepare_comm(GhostCommunicator *comm, int data_parts, int num)
 {
+  CALL_TRACE();
+  
   int i;
   comm->data_parts = data_parts;
 
@@ -136,6 +140,8 @@ int calc_transmit_size(GhostCommunication *gc, int data_parts)
 
 void prepare_send_buffer(GhostCommunication *gc, int data_parts)
 {
+  CALL_TRACE();
+  
   GHOST_TRACE(fprintf(stderr, "%d: prepare sending to/bcast from %d\n", this_node, gc->node));
 
   /* reallocate send buffer */
@@ -236,6 +242,8 @@ void prepare_send_buffer(GhostCommunication *gc, int data_parts)
 
 static void prepare_ghost_cell(Cell *cell, int size)
 {
+  CALL_TRACE();
+  
 #ifdef GHOSTS_HAVE_BONDS
   // free all allocated information, will be resent
   {
@@ -272,6 +280,8 @@ static void prepare_ghost_cell(Cell *cell, int size)
 
 void prepare_recv_buffer(GhostCommunication *gc, int data_parts)
 {
+  CALL_TRACE();
+  
   GHOST_TRACE(fprintf(stderr, "%d: prepare receiving from %d\n", this_node, gc->node));
   /* reallocate recv buffer */
   n_r_buffer = calc_transmit_size(gc, data_parts);
@@ -283,7 +293,7 @@ void prepare_recv_buffer(GhostCommunication *gc, int data_parts)
 }
 
 void put_recv_buffer(GhostCommunication *gc, int data_parts)
-{
+{  
   /* put back data */
   char *retrieve = r_buffer;
 
@@ -532,6 +542,8 @@ static int is_recv_op(int comm_type, int node)
 
 void ghost_communicator(GhostCommunicator *gc)
 {
+  CALL_TRACE();
+  
   MPI_Status status;
   int n, n2;
   int data_parts = gc->data_parts;

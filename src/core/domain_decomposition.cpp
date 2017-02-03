@@ -36,6 +36,12 @@
 #include "initialize.hpp"
 #include "external_potential.hpp"
 
+#include "call_trace.hpp"
+
+#ifndef USE_P4EST
+#define USE_P4EST
+#endif
+
 /************************************************/
 /** \name Defines */
 /************************************************/
@@ -104,6 +110,438 @@ double max_skin   = 0.0;
     n == 0 || n >= dd.ghost_cell_grid[1] - 1 || \
     o == 0 || o == dd.ghost_cell_grid[2] - 1 )
 #endif
+//-----------------------------------------------------------------------------------
+//P4EST start
+//-----------------------------------------------------------------------------------
+#ifdef USE_P4EST
+#include <p4est_to_p8est.h>
+#include <p8est_ghost.h>
+#include <p8est_mesh.h>
+#include <p8est_vtk.h>
+#include <p8est_extended.h>
+#include <vector>
+
+typedef struct {
+  int64_t idx;
+  int64_t rank;
+  int shell;
+  int boundary;
+  int neighbor[26];
+} local_shell_t;
+
+static int grid_level = 1;
+static p4est_t *p4est = NULL;
+static p4est_ghost_t *p4est_ghost = NULL;
+static p4est_mesh_t *p4est_mesh = NULL;
+static p4est_connectivity_t *p4est_conn  = NULL;
+static local_shell_t *p4est_shell = NULL;
+static size_t num_cells = 0;
+static size_t num_local_cells = 0;
+static size_t num_ghost_cells = 0;
+
+static const int neighbor_lut[3][3][3] = {
+  {{18, 6,19},{10, 4,11},{20, 7,21}},
+  {{14, 2,15},{ 0,-1, 1},{16, 3,17}},
+  {{22, 8,23},{12, 5,13},{24, 9,25}}
+};
+
+typedef struct {
+  int rank;
+  int lidx;
+  int ishell[26];
+  int rshell[26];
+} quad_data_t;
+
+static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
+  ((quad_data_t*)(q->p.user_data))->rank = this_node;
+  ((quad_data_t*)(q->p.user_data))->lidx = -1;
+  for (int i=0;i<26;++i) {
+    ((quad_data_t*)(q->p.user_data))->ishell[i] = -1;
+    ((quad_data_t*)(q->p.user_data))->rshell[i] = -1;
+  }
+}
+
+p4est_connectivity_t * p8est_connectivity_new_grid_regular () {
+  int t_x, t_y, t_z;
+  grid_level = 1;
+  t_x = dd.cell_grid[0]*node_grid[0];
+  t_y = dd.cell_grid[1]*node_grid[1];
+  t_z = dd.cell_grid[2]*node_grid[2];
+  while (((t_x|t_y|t_z)&1) == 0) {
+    grid_level = grid_level + 1;
+    t_x >>= 1;
+    t_y >>= 1;
+    t_z >>= 1;
+  }
+  
+  return p8est_connectivity_new_brick(t_x,t_y,t_z, PERIODIC(0), PERIODIC(1), PERIODIC(2));
+}
+
+void dd_free_p4est () {
+  if (p4est_mesh)
+    p4est_mesh_destroy(p4est_mesh);
+  if (p4est_ghost)
+    p4est_ghost_destroy(p4est_ghost);
+  if (p4est)
+    p4est_destroy (p4est);
+  if (p4est_conn)
+    p4est_connectivity_destroy(p4est_conn);
+  if (p4est_shell)
+    delete[] p4est_shell;
+  p4est = NULL;
+  p4est_ghost = NULL;
+  p4est_mesh = NULL;
+  p4est_conn = NULL;
+  p4est_shell = NULL;
+}
+
+void dd_create_p4est_grid () {
+  CALL_TRACE();
+  
+  //p4est_t            *p4est;
+  //p4est_connectivity_t *conn;
+  quad_data_t         *data, *ghost_data;  
+  
+  dd_free_p4est();
+  
+  p4est_conn = p8est_connectivity_new_grid_regular ();
+  p4est = p4est_new_ext (sc_MPI_COMM_WORLD, p4est_conn, 0, grid_level-1, true, 
+                          sizeof(quad_data_t), init_fn, NULL);
+  
+  p4est_partition(p4est, 0, NULL);
+  
+  //p4est_ghost_t* p4est_ghost = 
+  p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
+  //p4est_mesh_t* p4est_mesh = 
+  
+  p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
+  
+  p4est_vtk_write_file (p4est, NULL, P4EST_STRING "_lj");
+  
+  printf("%i : %i %i-%i %i\n",
+    this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants);
+  
+  std::vector<uint64_t> quads;
+  std::vector<local_shell_t> shell;
+  quads.clear();
+  shell.clear();
+  
+  /*for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
+    data = (quad_data_t*)(q->p.user_data);
+    double xyz[3];
+    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
+    uint64_t x = xyz[0]*ql;
+    uint64_t y = xyz[1]*ql;
+    uint64_t z = xyz[2]*ql;
+    quads.push_back((x+1) | ((y+1)<<21) | ((z+1)<<42));
+    local_shell_t ls;
+    ls.idx = i;
+    ls.rank = this_node;
+    ls.shell = 0;
+    shell.push_back(ls);
+    for (int n=0;n<26;++n) {
+      sc_array_t ne, ni;
+      sc_array_init(&ne,sizeof(int));
+      sc_array_init(&ni,sizeof(int));
+      p4est_mesh_get_neighbors(p4est, p4est_ghost, p4est_mesh, i, -1, n, 0, NULL, &ne, &ni);
+      if (ni.elem_count > 1)
+        printf("%i %i %li strange stuff\n",i,n,ni.elem_count);
+      if (ni.elem_count > 0) {
+        data->ishell[n] = ni.array[0];
+        if (ne.array[n] >= 0)
+          data->rshell[n] = this_node;
+        else {
+          data->rshell[n] = p4est_mesh->ghost_to_proc[ni.array[0]];
+          printf("%i %i remote %i\n",i,n,ne.array[n]);
+        }
+      }
+    }
+  }*/
+  
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_mesh_face_neighbor_t mfn;
+    int tidx = -1;
+    int qidx, ridx, fidx;
+    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
+    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
+    int fcnt = 0;
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
+    data = (quad_data_t*)(q->p.user_data);
+    data->lidx = i;
+    data->rank = this_node;
+    double xyz[3];
+    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
+    uint64_t x = xyz[0]*ql;
+    uint64_t y = xyz[1]*ql;
+    uint64_t z = xyz[2]*ql;
+    quads.push_back((x+1) | ((y+1)<<21) | ((z+1)<<42));
+    local_shell_t ls;
+    ls.idx = i;
+    ls.rank = this_node;
+    ls.shell = 0;
+    ls.boundary = 0;
+    for (int n=0;n<26;++n) ls.neighbor[n] = -1;
+    if (PERIODIC(0) && x == 0) ls.boundary |= 1;
+    if (PERIODIC(0) && x == dd.cell_grid[0]*node_grid[0] - 1) ls.boundary |= 2;
+    if (PERIODIC(1) && y == 0) ls.boundary |= 4;
+    if (PERIODIC(1) && y == dd.cell_grid[1]*node_grid[1] - 1) ls.boundary |= 8;
+    if (PERIODIC(2) && z == 0) ls.boundary |= 16;
+    if (PERIODIC(2) && z == dd.cell_grid[2]*node_grid[2] - 1) ls.boundary |= 32;
+    shell.push_back(ls);
+    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
+      if (mfn.current_qtq == i) continue;
+      fcnt = mfn.face-1;
+      if (ridx != this_node)
+        data->ishell[fcnt] = qidx;
+      else
+        data->ishell[fcnt] = p4est_tree_array_index(p4est->trees,tidx)->quadrants_offset + qidx;
+      data->rshell[fcnt] = ridx;
+    }
+  }
+  
+  ghost_data = P4EST_ALLOC (quad_data_t, p4est_ghost->ghosts.elem_count);
+  p4est_ghost_exchange_data (p4est, p4est_ghost, ghost_data);
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_mesh_face_neighbor_t mfn;
+    int tidx = -1;
+    int qidx, ridx, fidx;
+    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
+    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
+    int fcnt = 0;
+    data = (quad_data_t*)p4est_mesh_get_quadrant(p4est,p4est_mesh,i)->p.user_data;
+    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
+      if (mfn.current_qtq == i) continue;
+      fcnt = mfn.face-1;
+      quad_data_t* ndata = (quad_data_t*)p4est_mesh_face_neighbor_data(&mfn,ghost_data);
+      switch(fcnt) {
+      case 0:
+        data->ishell[6 + 8] = ndata->ishell[2];
+        data->rshell[6 + 8] = ndata->rshell[2];
+        data->ishell[6 + 4] = ndata->ishell[4];
+        data->rshell[6 + 4] = ndata->rshell[4];
+        break;
+      case 1:
+        data->ishell[6 + 11] = ndata->ishell[3];
+        data->rshell[6 + 11] = ndata->rshell[3];
+        data->ishell[6 + 7] = ndata->ishell[5];
+        data->rshell[6 + 7] = ndata->rshell[5];
+        break;
+      case 2:
+        data->ishell[6 + 9] = ndata->ishell[1];
+        data->rshell[6 + 9] = ndata->rshell[1];
+        data->ishell[6 + 0] = ndata->ishell[4];
+        data->rshell[6 + 0] = ndata->rshell[4];
+        break;
+      case 3:
+        data->ishell[6 + 10] = ndata->ishell[0];
+        data->rshell[6 + 10] = ndata->rshell[0];
+        data->ishell[6 + 3] = ndata->ishell[5];
+        data->rshell[6 + 3] = ndata->rshell[5];
+        break;
+      case 4:
+        data->ishell[6 + 1] = ndata->ishell[3];
+        data->rshell[6 + 1] = ndata->rshell[3];
+        data->ishell[6 + 5] = ndata->ishell[1];
+        data->rshell[6 + 5] = ndata->rshell[1];
+        break;
+      case 5:
+        data->ishell[6 + 6] = ndata->ishell[0];
+        data->rshell[6 + 6] = ndata->rshell[0];
+        data->ishell[6 + 2] = ndata->ishell[2];
+        data->rshell[6 + 2] = ndata->rshell[2];
+        break;
+      };
+    }
+  }
+  p4est_ghost_exchange_data (p4est, p4est_ghost, ghost_data);
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_mesh_face_neighbor_t mfn;
+    int tidx = -1;
+    int qidx, ridx, fidx;
+    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
+    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
+    int fcnt = 0;
+    data = (quad_data_t*)p4est_mesh_get_quadrant(p4est,p4est_mesh,i)->p.user_data;
+    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
+      if (mfn.current_qtq == i) continue;
+      fcnt = mfn.face-1;
+      quad_data_t* ndata = (quad_data_t*)p4est_mesh_face_neighbor_data(&mfn,ghost_data);
+      switch(fcnt) {
+      case 0:
+        data->ishell[18 + 0] = ndata->ishell[6 + 0];
+        data->rshell[18 + 0] = ndata->rshell[6 + 0];
+        data->ishell[18 + 2] = ndata->ishell[6 + 1];
+        data->rshell[18 + 2] = ndata->rshell[6 + 1];
+        data->ishell[18 + 4] = ndata->ishell[6 + 2];
+        data->rshell[18 + 4] = ndata->rshell[6 + 2];
+        data->ishell[18 + 6] = ndata->ishell[6 + 3];
+        data->rshell[18 + 6] = ndata->rshell[6 + 3];
+        break;
+      case 1:
+        data->ishell[18 + 1] = ndata->ishell[6 + 0];
+        data->rshell[18 + 1] = ndata->rshell[6 + 0];
+        data->ishell[18 + 3] = ndata->ishell[6 + 1];
+        data->rshell[18 + 3] = ndata->rshell[6 + 1];
+        data->ishell[18 + 5] = ndata->ishell[6 + 2];
+        data->rshell[18 + 5] = ndata->rshell[6 + 2];
+        data->ishell[18 + 7] = ndata->ishell[6 + 3];
+        data->rshell[18 + 7] = ndata->rshell[6 + 3];
+        break;
+      };
+    }
+  }
+  P4EST_FREE (ghost_data);
+    
+  char fname[100];
+  sprintf(fname,"cells_%i.list",this_node);
+  FILE* h = fopen(fname,"w");
+  
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_quadrant_t* q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
+    data = (quad_data_t*)(q->p.user_data);
+    double xyz[3];
+    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;//P8EST_QUADRANT_LEN(q->level);
+    uint64_t x = xyz[0]*ql;
+    uint64_t y = xyz[1]*ql;
+    uint64_t z = xyz[2]*ql;
+    fprintf(h,"%i %lix%lix%li ",i,x,y,z);
+    for (uint64_t zi=0;zi <= 2;zi++)
+      for (uint64_t yi=0;yi <= 2;yi++)
+        for (uint64_t xi=0;xi <= 2;xi++) {
+          if (xi == 1 && yi == 1 && zi == 1) continue;
+          uint64_t qidx = (x+xi) | ((y+yi)<<21) | ((z+zi)<<42);
+          size_t pos = 0;
+          while (pos < quads.size() && quads[pos] != qidx) ++pos;
+          if (pos == quads.size()) {
+            quads.push_back(qidx);
+            local_shell_t ls;
+            ls.idx = data->ishell[neighbor_lut[zi][yi][xi]];
+            ls.rank = data->rshell[neighbor_lut[zi][yi][xi]];
+            ls.shell = 2;
+            ls.boundary = 0;//shell[i].boundary;
+            for (int n=0;n<26;++n) ls.neighbor[n] = -1;
+            if (shell[i].boundary != 0) {
+              if (xi == 0) ls.boundary |= 1;
+              if (xi == 2) ls.boundary |= 2;
+              if (yi == 0) ls.boundary |= 4;
+              if (yi == 2) ls.boundary |= 8;
+              if (zi == 0) ls.boundary |= 16;
+              if (zi == 2) ls.boundary |= 32;
+            }
+            ls.boundary &= shell[i].boundary;
+            shell[i].neighbor[neighbor_lut[zi][yi][xi]] = shell.size();
+            shell.push_back(ls);
+            shell[i].shell = 1;
+          } else {
+            if (shell[pos].shell == 2) {
+              shell[i].shell = 1;
+              int tmp = 0;
+              if (shell[i].boundary != 0) {
+                if (xi == 0) tmp |= 1;
+                if (xi == 2) tmp |= 2;
+                if (yi == 0) tmp |= 4;
+                if (yi == 2) tmp |= 8;
+                if (zi == 0) tmp |= 16;
+                if (zi == 2) tmp |= 32;
+              }
+              tmp &= shell[i].boundary;
+              if (shell[pos].boundary > tmp)
+                shell[pos].boundary = tmp;
+            }
+            shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;
+          }
+        }
+    for (int n=0;n<26;++n) {
+      if (n < 6)
+        fprintf(h,"f%i[",n);
+      else if (n < 18)
+        fprintf(h,"e%i[",n-6);
+      else
+        fprintf(h,"c%i[",n-18);
+      if (data->ishell[n] >= 0)
+        fprintf(h,"%i:%i] ",data->rshell[n],data->ishell[n]);
+      else
+        fprintf(h,"] ");
+    }
+    fprintf(h,"\n");
+  }
+  
+  fclose(h);
+
+  /*p4est_mesh_destroy(p4est_mesh);
+  p4est_ghost_destroy(p4est_ghost);
+  p4est_destroy (p4est);
+  p4est_connectivity_destroy (conn);*/
+  
+  num_cells = (size_t)quads.size();
+  num_local_cells = (size_t)p4est->local_num_quadrants;
+  num_ghost_cells = num_cells - (size_t)p4est->local_num_quadrants;
+  
+  p4est_shell = new local_shell_t[num_cells];
+  for (int i=0;i<num_cells;++i)
+    p4est_shell[i] = shell[i];
+  
+  printf("%d : %ld, %ld, %ld\n",this_node,num_cells,num_local_cells,num_ghost_cells);
+
+}
+
+void dd_comm_p4est () {
+  std::vector<int> send_cnt[n_nodes];
+  std::vector<int> recv_cnt[n_nodes];
+  uint64_t comm_cnt[n_nodes];
+  for (int i=0;i<n_nodes;++i) {
+    send_cnt[i].clear();
+    recv_cnt[i].clear();
+  }
+  
+  char fname[100];
+  sprintf(fname,"cells_conn_%i.list",this_node);
+  FILE* h = fopen(fname,"w");
+  for (int i=0;i<num_cells;++i) {
+    if (p4est_shell[i].rank >= 0 && p4est_shell[i].shell == 2) {
+      int pos = 0;
+      while (pos < recv_cnt[p4est_shell[i].rank].size() && 
+        recv_cnt[p4est_shell[i].rank][pos] < p4est_shell[i].idx) pos++;
+      recv_cnt[p4est_shell[i].rank].insert(recv_cnt[p4est_shell[i].rank].begin() + pos, p4est_shell[i].idx);
+    }
+    if (p4est_shell[i].shell == 1) {
+      for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
+      for (int n=0;n<26;++n) {
+        int nidx = p4est_shell[i].neighbor[n];
+        if (nidx < 0 || p4est_shell[nidx].rank < 0) continue;
+        if (p4est_shell[nidx].shell != 2) continue;
+        if ((comm_cnt[p4est_shell[nidx].rank] & (1L<<p4est_shell[nidx].boundary))) continue;
+        comm_cnt[p4est_shell[nidx].rank] |= (1L<<p4est_shell[nidx].boundary);
+        send_cnt[p4est_shell[nidx].rank].push_back(i);
+      }
+    }
+    fprintf(h,"%i %li:%li %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,
+      p4est_shell[i].shell,p4est_shell[i].boundary);
+    for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
+    fprintf(h,"]\n");
+  }
+  fclose(h);
+  sprintf(fname,"send_%i.list",this_node);
+  h = fopen(fname,"w");
+  for (int n=0;n<n_nodes;++n)
+    for (int i=0;i<send_cnt[n].size();++i)
+      fprintf(h,"%i:%i\n",n,send_cnt[n][i]);
+  fclose(h);
+  sprintf(fname,"recv_%i.list",this_node);
+  h = fopen(fname,"w");
+  for (int n=0;n<n_nodes;++n)
+    for (int i=0;i<recv_cnt[n].size();++i)
+      fprintf(h,"%i:%i\n",n,recv_cnt[n][i]);
+  fclose(h);
+}
+#endif //USE_P4EST
+//-----------------------------------------------------------------------------------
+//P4EST end
+//-----------------------------------------------------------------------------------
 
 /** Calculate cell grid dimensions, cell sizes and number of cells.
  *  Calculates the cell grid, based on \ref local_box_l and \ref
@@ -115,8 +553,10 @@ double max_skin   = 0.0;
  *  DomainDecomposition::cell_size, \ref
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
-void dd_create_cell_grid()
+void dd_create_cell_grid ()
 {
+  CALL_TRACE();
+  
   int i,n_local_cells,new_cells,min_ind;
   double cell_range[3], min_size, scale, volume;
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid: max_range %f\n",this_node,max_range));
@@ -124,7 +564,7 @@ void dd_create_cell_grid()
   
   /* initialize */
   cell_range[0]=cell_range[1]=cell_range[2] = max_range;
-
+  
   if (max_range < ROUND_ERROR_PREC*box_l[0]) {
     /* this is the initialization case */
 #ifdef LEES_EDWARDS
@@ -147,21 +587,21 @@ void dd_create_cell_grid()
       cell_range[i] = local_box_l[i]/dd.cell_grid[i];
 
       if ( cell_range[i] < max_range ) {
-	/* ok, too many cells for this direction, set to minimum */
-	dd.cell_grid[i] = (int)floor(local_box_l[i]/max_range);
-	if ( dd.cell_grid[i] < 1 ) {
-	  runtimeErrorMsg() << "interaction range " << max_range << " in direction "
-	      << i << " is larger than the local box size " << local_box_l[i];
-	  dd.cell_grid[i] = 1;
-	}
+        /* ok, too many cells for this direction, set to minimum */
+        dd.cell_grid[i] = (int)floor(local_box_l[i]/max_range);
+        if ( dd.cell_grid[i] < 1 ) {
+          runtimeErrorMsg() << "interaction range " << max_range << " in direction "
+              << i << " is larger than the local box size " << local_box_l[i];
+          dd.cell_grid[i] = 1;
+        }
 #ifdef LEES_EDWARDS
         if ( (i == 0) && (dd.cell_grid[0] < 2) ) {
-	  runtimeErrorMsg() << "interaction range " << max_range << " in direction "
-	      << i << " is larger than half the local box size " << local_box_l[i] << "/2";
-	  dd.cell_grid[0] = 2;
+          runtimeErrorMsg() << "interaction range " << max_range << " in direction "
+            << i << " is larger than half the local box size " << local_box_l[i] << "/2";
+            dd.cell_grid[0] = 2;
         }
 #endif
-	cell_range[i] = local_box_l[i]/dd.cell_grid[i];
+        cell_range[i] = local_box_l[i]/dd.cell_grid[i];
       }
     }
 
@@ -180,14 +620,15 @@ void dd_create_cell_grid()
       min_size = cell_range[0];
 
 #ifdef LEES_EDWARDS
-      for (i = 2; i >= 1; i--) {/*preferably have thin slices in z or y... this is more efficient for Lees Edwards*/
+      for (i = 2; i >= 1; i--) /*preferably have thin slices in z or y... this is more efficient for Lees Edwards*/
 #else
-      for (i = 1; i < 3; i++) {
-#endif       
-          if (dd.cell_grid[i] > 1 && cell_range[i] < min_size) {
-                min_ind = i;
-                min_size = cell_range[i];
-              }
+      for (i = 1; i < 3; i++)
+#endif
+      {
+        if (dd.cell_grid[i] > 1 && cell_range[i] < min_size) {
+          min_ind = i;
+          min_size = cell_range[i];
+        }
       }
       CELL_TRACE(fprintf(stderr, "%d: minimal coordinate %d, size %f, grid %d\n", this_node,min_ind, min_size, dd.cell_grid[min_ind]));
 
@@ -198,8 +639,8 @@ void dd_create_cell_grid()
 
     /* sanity check */
     if (n_local_cells < min_num_cells) {
-        runtimeErrorMsg() << "number of cells "<< n_local_cells << " is smaller than minimum " << min_num_cells <<
-               " (interaction range too large or min_num_cells too large)";
+      runtimeErrorMsg() << "number of cells "<< n_local_cells << " is smaller than minimum " << min_num_cells <<
+        " (interaction range too large or min_num_cells too large)";
     }
   }
 
@@ -207,7 +648,7 @@ void dd_create_cell_grid()
   if(n_local_cells > max_num_cells) {
       runtimeErrorMsg() << "no suitable cell grid found ";
   }
-
+  
   /* now set all dependent variables */
   new_cells=1;
   for(i=0;i<3;i++) {
@@ -222,20 +663,43 @@ void dd_create_cell_grid()
     dd.inv_cell_size[i]   = 1.0 / dd.cell_size[i];
   }
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
+  
+  printf("%d(%dx%dx%d): %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %dx%dx%d\n",
+    this_node, node_grid[0], node_grid[1], node_grid[2], max_range,
+    box_l[0],box_l[1],box_l[2],
+    local_box_l[0],local_box_l[1],local_box_l[2],
+    dd.cell_size[0],dd.cell_size[1],dd.cell_size[2],
+    dd.cell_grid[0],dd.cell_grid[1],dd.cell_grid[2]);
+  
+#ifdef USE_P4EST
+  dd_create_p4est_grid();
+  dd_comm_p4est();
+#endif
+
+//  printf("%d : %d, %d, %d\n", this_node, new_cells, n_local_cells, new_cells-n_local_cells);
 
   /* allocate cell array and cell pointer arrays */
+//#ifndef USE_P4EST
   realloc_cells(new_cells);
   realloc_cellplist(&local_cells, local_cells.n = n_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = new_cells-n_local_cells);
+/*#else
+  realloc_cells(num_cells);
+  realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
+  realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
+#endif*/
 
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid, n_cells=%d, local_cells.n=%d, ghost_cells.n=%d, dd.ghost_cell_grid=(%d,%d,%d)\n", this_node, n_cells,local_cells.n,ghost_cells.n,dd.ghost_cell_grid[0],dd.ghost_cell_grid[1],dd.ghost_cell_grid[2]));
+  
 }
 
 /** Fill local_cells list and ghost_cells list for use with domain
     decomposition.  \ref cells::cells is assumed to be a 3d grid with size
     \ref DomainDecomposition::ghost_cell_grid . */
-void dd_mark_cells()
+void dd_mark_cells ()
 {
+  CALL_TRACE();
+//#ifndef USE_P4EST
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
   DD_CELLS_LOOP(m,n,o) {
@@ -250,7 +714,14 @@ void dd_mark_cells()
     if(DD_IS_LOCAL_CELL(m,n,o)) local_cells.cell[cnt_l++] = &cells[cnt_c++]; 
     else                        ghost_cells.cell[cnt_g++] = &cells[cnt_c++];
   } 
-
+/*#else
+  for (int c=0;c<num_local_cells;++c) {
+    local_cells.cell[c] = &cells[c];
+  }
+  for (int c=0;c<num_ghost_cells;++c) {
+    ghost_cells.cell[c] = &cells[c-num_local_cells];
+  }
+#endif*/
 }
 
 /** Fill a communication cell pointer list. Fill the cell pointers of
@@ -262,8 +733,10 @@ void dd_mark_cells()
     \param lc          lower left corner of the subgrid.
     \param hc          high up corner of the subgrid.
  */
-int dd_fill_comm_cell_lists(Cell **part_lists, int lc[3], int hc[3])
+int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3])
 {
+  CALL_TRACE();
+
   int i,m,n,o,c=0;
   /* sanity check */
   for(i=0; i<3; i++) {
@@ -284,8 +757,10 @@ int dd_fill_comm_cell_lists(Cell **part_lists, int lc[3], int hc[3])
 }
 
 /** Create communicators for cell structure domain decomposition. (see \ref GhostCommunicator) */
-void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
+void dd_prepare_comm (GhostCommunicator *comm, int data_parts)
 {
+  CALL_TRACE();
+
   int dir,lr,i,cnt, num, n_comm_cells[3];
   int lc[3],hc[3],done[3]={0,0,0};
 
@@ -301,6 +776,8 @@ void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
        }
     }
   }
+  
+  //printf("%i : %i\n",this_node, num);
 
   /* prepare communicator */
   CELL_TRACE(fprintf(stderr,"%d Create Communicator: prep_comm data_parts %d num %d\n",this_node,data_parts,num));
@@ -325,36 +802,35 @@ void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
     for(lr=0; lr<2; lr++) {
       if(node_grid[dir] == 1) {
         /* just copy cells on a single node */
-      if( PERIODIC(dir ) || (boundary[2*dir+lr] == 0) )
-      {
-        comm->comm[cnt].type          = GHOST_LOCL;
-        comm->comm[cnt].node          = this_node;
+        if( PERIODIC(dir ) || (boundary[2*dir+lr] == 0) ) {
+          comm->comm[cnt].type          = GHOST_LOCL;
+          comm->comm[cnt].node          = this_node;
 
-        /* Buffer has to contain Send and Recv cells -> factor 2 */
-        comm->comm[cnt].part_lists    = (ParticleList**)Utils::malloc(2*n_comm_cells[dir]*sizeof(ParticleList *));
-        comm->comm[cnt].n_part_lists  = 2*n_comm_cells[dir];
-        /* prepare folding of ghost positions */
-        if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
-             comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
-        }        
-
-            /* fill send comm cells */
-        lc[dir] = hc[dir] = 1 + lr * (dd.cell_grid[dir]-1);
-        
-            dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
-            CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy to          grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
-                               lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
-        
-        /* fill recv comm cells */
-            lc[dir] = hc[dir] = 0 +( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
-        
-            /* place recieve cells after send cells */
-            dd_fill_comm_cell_lists(&comm->comm[cnt].part_lists[n_comm_cells[dir]],lc,hc);
-            CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy from        grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
-            cnt++;
-          }
-      }
-      else {
+          /* Buffer has to contain Send and Recv cells -> factor 2 */
+          comm->comm[cnt].part_lists    = (ParticleList**)Utils::malloc(2*n_comm_cells[dir]*sizeof(ParticleList *));
+          comm->comm[cnt].n_part_lists  = 2*n_comm_cells[dir];
+          /* prepare folding of ghost positions */
+          if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
+            comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
+          }        
+          
+          /* fill send comm cells */
+          lc[dir] = hc[dir] = 1 + lr * (dd.cell_grid[dir]-1);
+          
+          dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
+          CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy to          grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+          
+          /* fill recv comm cells */
+          lc[dir] = hc[dir] = 0 +( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
+      
+          /* place recieve cells after send cells */
+          dd_fill_comm_cell_lists(&comm->comm[cnt].part_lists[n_comm_cells[dir]],lc,hc);
+          CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy from        grid (%d,%d,%d)-(%d,%d,%d)\n",
+            this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+          
+          cnt++;
+        }
+      } else {
         /* i: send/recv loop */
         for(i=0; i<2; i++) {
           if( PERIODIC(dir) || (boundary[2*dir+lr] == 0) )
@@ -366,14 +842,15 @@ void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
               /* prepare folding of ghost positions */
               if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
                  comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
-          }        
+              }        
   
               lc[dir] = hc[dir] = 1 + lr * ( dd.cell_grid[dir] - 1 );
           
               dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
         
-              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d send to   node %d grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
-                                 comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d send to   node %d grid (%d,%d,%d)-(%d,%d,%d)\n",
+                this_node,cnt,comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+              
               cnt++;
             }
           if( PERIODIC(dir) || (boundary[2*dir+(1-lr)] == 0) )
@@ -384,10 +861,10 @@ void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
               comm->comm[cnt].n_part_lists  = n_comm_cells[dir];
         
               lc[dir] = hc[dir] = ( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
-        
-          dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
-              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d recv from node %d grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
-                                 comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+      
+              dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
+              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d recv from node %d grid (%d,%d,%d)-(%d,%d,%d)\n",
+                this_node,cnt,comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
               cnt++;
             }
         }
@@ -400,8 +877,10 @@ void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
 /** Revert the order of a communicator: After calling this the
     communicator is working in reverted order with exchanged
     communication types GHOST_SEND <-> GHOST_RECV. */
-void dd_revert_comm_order(GhostCommunicator *comm)
+void dd_revert_comm_order (GhostCommunicator *comm)
 {
+  CALL_TRACE();
+
   int i,j,nlist2;
   GhostCommunication tmp;
   ParticleList *tmplist;
@@ -430,8 +909,10 @@ void dd_revert_comm_order(GhostCommunicator *comm)
 }
 
 /** Of every two communication rounds, set the first receivers to prefetch and poststore */
-void dd_assign_prefetches(GhostCommunicator *comm)
+void dd_assign_prefetches (GhostCommunicator *comm)
 {
+  CALL_TRACE();
+
   int cnt;
 
   for(cnt=0; cnt<comm->num; cnt += 2) {
@@ -449,6 +930,8 @@ void dd_assign_prefetches(GhostCommunicator *comm)
     dd_prepare_comm. */
 void dd_update_communicators_w_boxl()
 {
+  CALL_TRACE();
+
   int cnt=0;
   
   /* direction loop: x, y, z */
@@ -493,8 +976,10 @@ void dd_update_communicators_w_boxl()
  * created list of interacting neighbor cells is used by the verlet
  * algorithm (see verlet.cpp) to build the verlet lists.
  */
-void dd_init_cell_interactions()
+void dd_init_cell_interactions ()
 {
+  CALL_TRACE();
+
   int m,n,o,p,q,r,ind1,ind2,c_cnt=0,n_cnt;
  
   /* initialize cell neighbor structures */
@@ -534,6 +1019,14 @@ void dd_init_cell_interactions()
   }
 
 #ifdef CELL_DEBUG
+  /*printf("%d(%dx%dx%d): %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %dx%dx%d\n",
+    this_node, node_grid[0], node_grid[1], node_grid[2], max_range,
+    box_l[0],box_l[1],box_l[2],
+    local_box_l[0],local_box_l[1],local_box_l[2],
+    dd.cell_size[0],dd.cell_size[1],dd.cell_size[2],
+    dd.cell_grid[0],dd.cell_grid[1],dd.cell_grid[2]);
+  */
+
   FILE *cells_fp;
   char cLogName[64];
   int  c,nn,this_n;
@@ -570,8 +1063,10 @@ void dd_init_cell_interactions()
 /** Returns pointer to the cell which corresponds to the position if
     the position is in the nodes spatial domain otherwise a NULL
     pointer. */
-Cell *dd_save_position_to_cell(double pos[3]) 
+Cell * dd_save_position_to_cell (double pos[3])
 {
+  CALL_TRACE();
+
   int i,cpos[3];
   double lpos;
 
@@ -605,6 +1100,8 @@ Cell *dd_save_position_to_cell(double pos[3])
 
 Cell *dd_position_to_cell(double pos[3])
 {
+  CALL_TRACE();
+
   int i,cpos[3];
   double lpos;
 
@@ -636,6 +1133,8 @@ Cell *dd_position_to_cell(double pos[3])
 
 void dd_position_to_cell_indices(double pos[3],int* idx)
 {
+  CALL_TRACE();
+
   int i;
   double lpos;
 
@@ -659,6 +1158,8 @@ void dd_position_to_cell_indices(double pos[3],int* idx)
     @return 0 if all particles in pl reside in the nodes domain otherwise 1.*/
 int dd_append_particles(ParticleList *pl, int fold_dir)
 {
+  CALL_TRACE();
+
   int p, dir, c, cpos[3], flag=0, fold_coord=fold_dir/2;
 
   CELL_TRACE(fprintf(stderr, "%d: dd_append_particles %d\n", this_node, pl->n));
@@ -702,6 +1203,7 @@ int dd_append_particles(ParticleList *pl, int fold_dir)
 /************************************************************/
 
 void dd_on_geometry_change(int flags) {
+  CALL_TRACE();
 
   /* Realignment of comms along the periodic y-direction is needed */
   if (flags & CELL_FLAG_LEES_EDWARDS) {
@@ -799,6 +1301,8 @@ void dd_on_geometry_change(int flags) {
 /************************************************************/
 void dd_topology_init(CellPList *old)
 {
+  CALL_TRACE();
+
   int c,p,np;
   int exchange_data, update_data;
   Particle *part;
@@ -893,6 +1397,8 @@ void dd_topology_init(CellPList *old)
 /************************************************************/
 void dd_topology_release()
 {
+  CALL_TRACE();
+
   int i,j;
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
   /* release cell interactions */
@@ -921,8 +1427,10 @@ void dd_topology_release()
 }
 
 /************************************************************/
-void  dd_exchange_and_sort_particles(int global_flag)
+void dd_exchange_and_sort_particles (int global_flag)
 {
+  CALL_TRACE();
+
   int dir, c, p, i, finished=0;
   ParticleList *cell,*sort_cell, send_buf_l, send_buf_r, recv_buf_l, recv_buf_r;
   Particle *part;
@@ -1124,8 +1632,10 @@ void  dd_exchange_and_sort_particles(int global_flag)
 
 /*************************************************/
 
-int calc_processor_min_num_cells()
+int calc_processor_min_num_cells ()
 {
+  CALL_TRACE();
+
   int i, min = 1;
   /* the minimal number of cells can be lower if there are at least two nodes serving a direction,
      since this also ensures that the cell size is at most half the box length. However, if there is
@@ -1138,6 +1648,8 @@ int calc_processor_min_num_cells()
 
 void calc_link_cell()
 {
+  CALL_TRACE();
+
   int c, np1, n, np2, i ,j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;
@@ -1187,6 +1699,8 @@ void calc_link_cell()
 
 void calculate_link_cell_energies()
 {
+  CALL_TRACE();
+
   int c, np1, np2, n, i, j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;
@@ -1238,6 +1752,8 @@ void calculate_link_cell_energies()
 
 void calculate_link_cell_virials(int v_comp)
 {
+  CALL_TRACE();
+
   int c, np1, np2, n, i, j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;

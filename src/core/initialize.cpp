@@ -67,6 +67,12 @@
 #include "cuda_interface.hpp"
 #include "scafacos.hpp"
 
+#include "call_trace.hpp"
+
+#ifdef USE_P4EST
+#include <p4est_to_p8est.h>
+#endif
+
 /** whether the thermostat has to be reinitialized before integration */
 static int reinit_thermo = 1;
 static int reinit_electrostatics = 0;
@@ -79,8 +85,10 @@ static int lb_reinit_particles_gpu = 1;
 static int reinit_particle_comm_gpu = 1;
 #endif
 
-void on_program_start()
+void on_program_start ()
 {
+  CALL_TRACE();
+  
   EVENT_TRACE(fprintf(stderr, "%d: on_program_start\n", this_node));
 
   /* tell Electric fence that we do realloc(0) on purpose. */
@@ -102,6 +110,11 @@ void on_program_start()
   /*
     call the initialization of the modules here
   */
+#ifdef USE_P4EST
+  sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
+  p4est_init (NULL, SC_LP_PRODUCTION);
+#endif
+  
   Random::init_random();
 
   init_node_grid();
@@ -144,6 +157,7 @@ void on_program_start()
     /* interaction_data.c: make sure 0<->0 ia always exists */
     make_particle_type_exist(0);
   }
+  
 }
 
 
@@ -349,8 +363,10 @@ void on_coulomb_change()
   recalc_forces = 1;
 }
 
-void on_short_range_ia_change()
+void on_short_range_ia_change ()
 {
+  CALL_TRACE();
+  
   EVENT_TRACE(fprintf(stderr, "%d: on_short_range_ia_changes\n", this_node));
   invalidate_obs();
 
@@ -547,6 +563,8 @@ void on_temperature_change()
 
 void on_parameter_change(int field)
 {
+  CALL_TRACE();
+  
   EVENT_TRACE(fprintf(stderr, "%d: on_parameter_change %s\n", this_node, fields[field].name));
 
   switch (field) {

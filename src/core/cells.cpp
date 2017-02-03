@@ -42,6 +42,8 @@
 #include "nsquare.hpp"
 #include "layered.hpp"
 
+#include "call_trace.hpp"
+
 /* Variables */
 
 /** list of all cells. */
@@ -173,8 +175,10 @@ static void topology_init(int cs, CellPList *local) {
 
 /************************************************************/
 
-void cells_re_init(int new_cs)
+void cells_re_init (int new_cs)
 {
+  CALL_TRACE();
+  
   CellPList tmp_local;
   Cell *tmp_cells;
   int tmp_n_cells,i;
@@ -409,7 +413,7 @@ void local_sort_particles()
 
 /*************************************************/
 
-void cells_on_geometry_change(int flags)
+void cells_on_geometry_change (int flags)
 {
   if (max_cut > 0.0) {
     max_range = max_cut + skin;

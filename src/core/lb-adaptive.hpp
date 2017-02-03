@@ -57,6 +57,9 @@ extern int finest_level_local;
 extern int coarsest_level_ghost;
 extern int finest_level_ghost;
 extern int finest_level_global;
+extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
+                                                 //        y_min, y_max,
+                                                 //        z_min, z_max
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**

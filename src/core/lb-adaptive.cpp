@@ -70,6 +70,8 @@ int finest_level_local;
 int coarsest_level_ghost;
 int finest_level_ghost;
 int finest_level_global;
+double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
+                                            DBL_MAX, DBL_MIN, DBL_MAX};
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -765,7 +767,12 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
   lb_float midpoint[3];
   lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
-  if (midpoint[2] < 0.5) {
+  if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
+      (midpoint[0] <= coords_for_regional_refinement[1]) &&
+      (coords_for_regional_refinement[2] <= midpoint[1]) &&
+      (midpoint[1] <= coords_for_regional_refinement[3]) &&
+      (coords_for_regional_refinement[4] <= midpoint[2]) &&
+      (midpoint[2] <= coords_for_regional_refinement[5])) {
     return 1;
   }
   return 0;

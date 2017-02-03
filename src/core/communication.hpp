@@ -579,6 +579,10 @@ void mpi_unif_refinement (int node, int level);
  */
 void mpi_rand_refinement (int node, int maxLevel);
 
+/** Call broadcast routine to populate 6 coordinates
+ */
+void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
+
 /** Call non-recursive refinement function for all quadrants whose z-coordinate
  * is smaller than 0.5.
  */

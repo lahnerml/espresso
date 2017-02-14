@@ -351,7 +351,7 @@ void lbadapt_reinit_parameters() {
     if (lbpar.bulk_viscosity[0] > 0.0) {
       gamma_bulk[i] = 1. -
                       2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-                                (prefactors[i] * SQR(lbpar.agrid)) +
+                                (prefactors[i] * SQR(h)) +
                             1.);
     }
   }

@@ -343,11 +343,87 @@ __global__ void lbadapt_gpu_collide_calc_modes(lbadapt_payload_t *quad_data) {
   // clang-format on
 }
 
-__global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data) {
-  lb_float rho, j[3], pi[6];
-  rho = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[0];
+__global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data, int level,
+                                                lb_float h_max) {
+  lb_float rho, j[3], pi_eq[6];
+
+  /** reconstruct real density */
+  rho = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[0] +
+        lbpar.rho[0] * h_max * h_max * h_max;
+
+  /** momentum density is redefined to include half-step of force action */
+  j[0] = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[1];
+  j[1] = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[2];
+  j[2] = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[3];
+
+  j[0] += 0.5 * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0];
+  j[1] += 0.5 * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1];
+  j[2] += 0.5 * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2];
+
+  /** calculate equilibrium part of stress modes */
+  pi_eq[0] = ((j[0] * j[0]) + (j[1] * j[1]) + (j[2] * j[2])) / rho;
+  pi_eq[1] = ((j[0] * j[0]) - (j[1]) * j[1])) / rho;
+  pi_eq[2] =
+      ((j[0] * j[0]) + (j[1] * j[1]) + (j[2] * j[2]) - 3.0f * (j[2] * j[2])) /
+      rho;
+  pi_eq[3] = (j[0] * j[1]) / rho;
+  pi_eq[4] = (j[0] * j[2]) / rho;
+  pi_eq[5] = (j[1] * j[2]) / rho;
+
+  /** relax stress modes toward equilibrium */
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] =
+      pi_eq[0] +
+      lbpar.gamma_bulk[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] -
+           pi_eq[0]);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[5] =
+      pi_eq[1] +
+      lbpar.gamma_shear[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[5] -
+           pi_eq[1]);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[6] =
+      pi_eq[2] +
+      lbpar.gamma_shear[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[6] -
+           pi_eq[2]);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[7] =
+      pi_eq[3] +
+      lbpar.gamma_shear[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[7] -
+           pi_eq[3]);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[8] =
+      pi_eq[4] +
+      lbpar.gamma_shear[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[8] -
+           pi_eq[4]);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[9] =
+      pi_eq[5] +
+      lbpar.gamma_shear[level] *
+          (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[9] -
+           pi_eq[5]);
+
+  /** relax ghost modes */
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] *=
+      gamma_odd;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] *=
+      gamma_even;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] *=
+      gamma_even;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] *=
+      gamma_even;
 }
 
+// TODO: Implement
 __global__ void
 lbadapt_gpu_collide_thermalize_modes(lbadapt_payload_t *quad_data) {}
 
@@ -360,12 +436,17 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
                          LBADAPT_PATCHSIZE_HALO);
 
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+  lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
+               ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+
   // call kernels: calc modes, relax modes, thermalize modes, apply forces
   // TODO: smarter to put into a single kernel?
   lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]);
   lbadapt_gpu_collide_relax_modes<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level]);
+      dev_local_real_quadrants[level], level, h_max);
   lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]); // stub only
   lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(

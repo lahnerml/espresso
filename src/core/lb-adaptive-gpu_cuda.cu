@@ -492,6 +492,268 @@ __global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data,
 #endif // EXTERNAL_FORCES
 }
 
+__global__ void
+lbadapt_gpu_collide_backtransform(lbadapt_payload_t *quad_data) {
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 0] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 1] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] -
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] +
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 2] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] +
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] -
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 3] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] -
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] +
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 4] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] +
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 5] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] -
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 6] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] -
+      2.0f *
+        (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+         quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18]);
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 7] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 7] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modls[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 8] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 7] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modls[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][ 9] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 7] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modls[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][10] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 7] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      2.0f *
+          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modls[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][11] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 8] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][12] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 8] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][13] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 8] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][14] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 1] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 8] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][15] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 9] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][16] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 9] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][17] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 9] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][18] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 0] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 2] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 3] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 4] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 5] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 6] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[ 9] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] +
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] -
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18];
+}
+
 void lbadapt_gpu_execute_collision_kernel(int level) {
   dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
@@ -502,7 +764,8 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
   lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
                ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
-  // call kernels: calc modes, relax modes, thermalize modes, apply forces
+  /** call kernels: calc modes, relax modes, thermalize modes, apply forces,
+   *                backtransform */
   // TODO: smarter to put into a single kernel?
   lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]);
@@ -512,15 +775,23 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
       dev_local_real_quadrants[level]); // stub only
   lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level], level, h_max);
+  lbadapt_gpu_collide_backtransform<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+  )
 }
 
 void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}
 
 void lbadapt_gpu_execute_update_from_virtuals_kernel(int level) {}
 
-__global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data) {}
-
-__global__ void lbadapt_gpu_stream_virtuals(lbadapt_payload_t *quad_data) {}
+__global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data) {
+  for (int i = 0; i < lbmodel.n_veloc; ++i) {
+    quad_data->patch[threadIdx.x + d3q19_lattice[i][0]]
+                    [threadIdx.y + d3q19_lattice[i][1]]
+                    [threadIdx.z + d3q19_lattice[i][2]].lbfluid[1][i] =
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0][i];
+  }
+}
 
 void lbadapt_gpu_execute_streaming_kernel(int level) {}
 

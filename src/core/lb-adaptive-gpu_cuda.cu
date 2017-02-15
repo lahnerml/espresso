@@ -427,8 +427,69 @@ __global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data, in
 __global__ void
 lbadapt_gpu_collide_thermalize_modes(lbadapt_payload_t *quad_data) {}
 
-__global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data) {
+__global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data,
+                                                 int level,
+                                                 double h_max) {
+  lb_float rho, u[3], C[6];
 
+  /** reconstruct density */
+  rho = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[0] +
+        lbpar.rho[0] * h_max * h_max * h_max;
+
+  /** momentum density is redefined in case of external forces */
+  j[0] = (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[1] *
+         0.5f * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0];
+  j[1] = (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[2] *
+         0.5f * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1];
+  j[2] = (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[3] *
+         0.5f * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2];
+
+  C[0] = (1. + gamma_bulk[level]) * u[0] * f[0] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[2] = (1. + gamma_bulk[level]) * u[1] * f[1] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[5] = (1. + gamma_bulk[level]) * u[2] * f[2] +
+         1. / 3. * (gamma_bulk[level] - gamma_shear[level]) * scalar(u, f);
+  C[1] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
+  C[3] = 0.5 * (1. + gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
+  C[4] = 0.5 * (1. + gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
+
+  /** update momentum modes */
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[1] +=
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[2] +=
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[3] +=
+      quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2];
+
+  /** update stress modes */
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] +=
+      C[0] + C[2] + C[5];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[5] +=
+      C[0] - C[2];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[6] +=
+      C[0] + C[2] - 2.0f * C[5];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[7] += C[1];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[8] += C[3];
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[9] += C[4];
+
+  /** reset external force */
+#ifdef EXTERNAL_FORCES
+  // unit conversion: force density
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] =
+      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] =
+      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] =
+      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#else  // EXTERNAL_FORCES
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] =
+      (lb_float) 0.0;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] =
+      (lb_float) 0.0;
+  quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] =
+      (lb_float) 0.0;
+#endif // EXTERNAL_FORCES
 }
 
 void lbadapt_gpu_execute_collision_kernel(int level) {
@@ -450,7 +511,7 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
   lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]); // stub only
   lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level]);
+      dev_local_real_quadrants[level], level, h_max);
 }
 
 void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}

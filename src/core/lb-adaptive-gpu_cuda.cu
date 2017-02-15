@@ -790,9 +790,9 @@ __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data) {
     quad_data->patch[1 + threadIdx.x + d3q19_lattice[i][0]]
                     [1 + threadIdx.y + d3q19_lattice[i][1]]
                     [1 + threadIdx.z + d3q19_lattice[i][2]].lbfluid[1][i] =
-      quad_data->patch[1 + threadIdx.x]
-                      [1 + threadIdx.y]
-                      [1 + threadIdx.z].lbfluid[0][i];
+        quad_data->patch[1 + threadIdx.x]
+                        [1 + threadIdx.y]
+                        [1 + threadIdx.z].lbfluid[0][i];
   }
 }
 
@@ -800,9 +800,25 @@ void lbadapt_gpu_execute_streaming_kernel(int level) {
   dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
                          LBADAPT_PATCHSIZE);
+
+  lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+  lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_virt_quadrants[level]);
 }
 
-void lbadapt_gpu_execute_bounce_back_kernel(int level) {}
+__global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data) {}
+
+void lbadapt_gpu_execute_bounce_back_kernel(int level) {
+  dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
+  dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
+                         LBADAPT_PATCHSIZE);
+
+  lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_real_quadrants[level]);
+  lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
+      dev_local_virt_quadrants[level]);
+}
 
 // NOT LB-specific; visualize utilization of thread and block ids in vtk format
 __global__ void visualize_threads_blocks(thread_block_container_t *a) {

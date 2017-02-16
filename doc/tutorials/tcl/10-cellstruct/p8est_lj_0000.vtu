@@ -4,7 +4,7 @@
     <Piece NumberOfPoints="72" NumberOfCells="9">
       <Points>
         <DataArray type="Float32" Name="Position" NumberOfComponents="3" format="binary">
-          AQAAAACAAABgAwAArQAAAA==eNp1ksENAzEIBJWa7hvlUs31cO9UkdR07ohHhJyFsYMfyGvAuwtyu657+8Xnfe6tuPtZ1VhnjrFtL7yzwJ5PTgus/n63wOpXnvp8U+mRi9rkpQ9qeD05LXA/bU8di3xyWmD1pxcbdkof8zyrXdI35+QMlV96pK95Vs7HmcY5/vnmfa28UJ+a1BGf+qr7qpd15sbwvd2e+X879jiOR+SF1Z9/vGP1Ky/8BdvZyOg=
+          AQAAAACAAABgAwAAsgAAAA==eNp1kssNwzAMQ5GZci0aT5Mdcu4UyUzxRjoUhkrpxbUPhvWhSUpwve9X/Z3rPLY6yNs96rHPGs+6fvDOIm715LSIhffcIhZederzzUiPXNQmL31Qo/WT0yL227bUsagnp0UsfHqxx07po59ntkv65pycYeSXHumrn5XzcabnHP98/b5mXqhPTeqIT7hRPsOyzxrPdS5FO933d8n/vRTtt9Xzjzu+5cL7vh2vuuIvzBnI6A==
         </DataArray>
       </Points>
       <Cells>

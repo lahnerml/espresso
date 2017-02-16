@@ -12,5 +12,6 @@
     </PCellData>
     <Piece Source="p8est_lj_0000.vtu"/>
     <Piece Source="p8est_lj_0001.vtu"/>
+    <Piece Source="p8est_lj_0002.vtu"/>
   </PUnstructuredGrid>
 </VTKFile>

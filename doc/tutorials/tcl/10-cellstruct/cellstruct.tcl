@@ -45,7 +45,7 @@ cellsystem domain_decomposition  -no_verlet_list
 #############################################################
 # System parameters
 #############################################################
-#setmd periodic 1 0 0
+#setmd periodic 0 0 1
 
 # 108 particles
 set n_part  108

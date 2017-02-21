@@ -2216,6 +2216,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
             for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
               lb_float tmp_rho, tmp_j[3];
               lbadapt_calc_local_fields(
+                  data->patch[patch_x][patch_y][patch_z].lbfluid,
                   data->patch[patch_x][patch_y][patch_z].modes,
                   data->patch[patch_x][patch_y][patch_z].force,
                   data->patch[patch_x][patch_y][patch_z].boundary, 1, h,

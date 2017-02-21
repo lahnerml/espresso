@@ -139,11 +139,11 @@ HaloCommunicator update_halo_comm = {0, NULL};
 int fluct;
 
 #ifdef LB_ADAPTIVE
-double prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+lb_float prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+lb_float gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
 #else  // LB_ADAPTIVE
 /** relaxation rate of shear modes */

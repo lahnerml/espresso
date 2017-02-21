@@ -29,6 +29,9 @@
 #define _LB_ADAPTIVE_GPU_H
 
 #ifdef LB_ADAPTIVE_GPU
+#include "constraint.hpp"
+#include "lb-boundaries.hpp"
+
 #include <p8est_vtk.h>
 
 /** CAUTION: CUDA does not work along with Boost::MPI.
@@ -90,6 +93,9 @@ typedef struct {
   lb_float ext_force[3]; /* Open question: Do we want a local force or global
                             force? */
   lb_float rho_lb_units[LB_COMPONENTS];
+  lb_float prefactors[P8EST_MAXLEVEL];
+  lb_float gamma_bulk[P8EST_MAXLEVEL];
+  lb_float gamma_shear[P8EST_MAXLEVEL];
   lb_float gamma_odd[LB_COMPONENTS];
   lb_float gamma_even[LB_COMPONENTS];
   bool is_TRT;
@@ -153,9 +159,13 @@ extern lbadapt_payload_t **dev_local_virt_quadrants;
 
 /** generic LB information on host and device */
 extern LB_Parameters lbpar;
-extern LB_Parameters d_lbpar;
 extern LB_Model lbmodel;
-extern LB_Model d_lbmodel;
+
+#ifdef __CUDACC__
+extern __device__ LB_Parameters d_lbpar;
+extern __device__ LB_Model d_lbmodel;
+extern __device__ LB_Boundary *d_lb_boundaries;
+#endif // __CUDACC__
 
 /* int to indicate fluctuations */
 extern int fluct;

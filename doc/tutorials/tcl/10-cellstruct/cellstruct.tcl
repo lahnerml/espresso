@@ -50,10 +50,27 @@ cellsystem domain_decomposition  -no_verlet_list
 # 108 particles
 set n_part  108
 
+# Interaction parameters
+#############################################################
+
+set lj1_eps     1.0
+set lj1_sig     1.0
+set lj1_cut     2.5
+# set lj1_shift   [expr -4.0*$lj1_eps*(pow(1.0/$lj1_cut,12)-pow(1.0/$lj1_cut,6))]
+set lj1_shift   [expr -(pow(1.0/$lj1_cut,12)-pow(1.0/$lj1_cut,6))]
+set lj1_offset  0.0
+
 # Integration parameters
 #############################################################
 set skin 0.3
 setmd skin  $skin
+
+setmd time_step 0.001
+
+set warm_steps   100
+set warm_n_times 2000
+# do the warmup until the particles have at least the distance min__dist
+set min_dist     0.87
 
 # Other parameters
 #############################################################
@@ -72,12 +89,13 @@ set density 0.2
 set box_length [expr pow($n_part/$density,1.0/3.0)+2*$skin]
 puts " density = $density box_length = $box_length"
 setmd box $box_length $box_length $box_length
-#for {set i 0} {$i < $n_part} {incr i} {
-#   set pos_x [expr rand()*$box_length]
-#   set pos_y [expr rand()*$box_length]
-#   set pos_z [expr rand()*$box_length]
-#   part $i pos $pos_x $pos_y $pos_z q 0.0 type 0
-#}
+
+for {set i 0} {$i < $n_part} {incr i} {
+   set pos_x [expr rand()*$box_length]
+   set pos_y [expr rand()*$box_length]
+   set pos_z [expr rand()*$box_length]
+   part $i pos $pos_x $pos_y $pos_z q 0.0 type 0
+}
 ######################################################################################
 #if { [file exists data/config.pdb]==0 } {
 #    exec mkdir data
@@ -88,17 +106,51 @@ setmd box $box_length $box_length $box_length
 #}
 ######################################################################################
 #writepdb data/config.pdb
-#writevtk data/part.vtk
 
-# Interaction parameters
+# Interaction setup
+#############################################################
+inter 0 0 lennard-jones $lj1_eps $lj1_sig $lj1_cut $lj1_shift $lj1_offset
+
+set act_min_dist [analyze mindist]
+puts "Start with minimal distance $act_min_dist"
+
+#############################################################
+#  Warmup Integration                                       #
 #############################################################
 
-set lj1_eps     1.0
-set lj1_sig     1.0
-set lj1_cut     2.5
-# set lj1_shift   [expr -4.0*$lj1_eps*(pow(1.0/$lj1_cut,12)-pow(1.0/$lj1_cut,6))]
-set lj1_shift   [expr -(pow(1.0/$lj1_cut,12)-pow(1.0/$lj1_cut,6))]
-set lj1_offset  0.0
-inter 0 0 lennard-jones $lj1_eps $lj1_sig $lj1_cut $lj1_shift $lj1_offset
+
+# open Observable file
+
+puts "\nStart warmup integration:"
+puts "At maximum $warm_n_times times $warm_steps steps"
+puts "Stop if minimal distance is larger than $min_dist"
+
+# set LJ cap
+set cap 1.0
+inter forcecap $cap
+
+# Warmup Integration Loop
+set i 0
+while { $i < $warm_n_times && $act_min_dist < $min_dist } {
+
+    integrate $warm_steps
+
+    # Warmup criterion
+    set act_min_dist [analyze mindist]
+    puts -nonewline "run $i at time=[setmd time] (LJ cap=$cap) min dist = $act_min_dist\r"
+    flush stdout
+
+#   write observables
+
+#   Increase LJ cap
+    set cap [expr $cap+1.0]
+    inter forcecap $cap
+    incr i
+}
+
+# 
+puts "\n Warm up finished \n"
+
+writevtk part.vtk
 
 exit

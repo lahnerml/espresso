@@ -11,6 +11,7 @@
 #include <p8est_mesh.h>
 #include <p8est_vtk.h>
 #include <p8est_extended.h>
+#include <p8est_bits.h>
 #include <vector>
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
@@ -30,7 +31,8 @@ typedef struct {
 typedef struct {
   int rank;
   int cnt;
-  uint64_t dir;
+  //uint64_t dir;
+  int dir;
   int *idx;
 } comm_t;
 //--------------------------------------------------------------------------------------------------
@@ -41,6 +43,8 @@ static p4est_connectivity_t *p4est_conn  = NULL;
 static local_shell_t *p4est_shell = NULL;
 //--------------------------------------------------------------------------------------------------
 static int brick_size[3];
+static int grid_size[3];
+static int *p4est_space_idx = NULL;
 //--------------------------------------------------------------------------------------------------
 static comm_t *comm_send = NULL;
 static comm_t *comm_recv = NULL;
@@ -93,6 +97,21 @@ void dd_p4est_free () {
     p4est_connectivity_destroy(p4est_conn);
   if (p4est_shell)
     delete[] p4est_shell;
+  if (p4est_space_idx)
+    delete[] p4est_space_idx;
+  if (comm_send)
+    delete[] comm_send;
+  if (comm_recv)
+    delete[] comm_recv;
+  if (comm_proc)
+    delete[] comm_proc;
+  if (comm_rank)
+    delete[] comm_rank;
+  comm_rank = NULL;
+  comm_proc = NULL;
+  comm_recv = NULL;
+  comm_send = NULL;
+  p4est_space_idx = NULL;
   p4est = NULL;
   p4est_ghost = NULL;
   p4est_mesh = NULL;
@@ -130,15 +149,17 @@ void dd_p4est_create_grid () {
   dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
   dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
+  
+  printf("%i : cellsize %lfx%lfx%lf\n", this_node,  dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]);
 #endif
   
   /*t_x = dd.cell_grid[0]*node_grid[0];
   t_y = dd.cell_grid[1]*node_grid[1];
   t_z = dd.cell_grid[2]*node_grid[2];*/
   
-  brick_size[0] = t_x;
-  brick_size[1] = t_y;
-  brick_size[2] = t_z;
+  grid_size[0] = t_x;
+  grid_size[1] = t_y;
+  grid_size[2] = t_z;
   
   // divide all dimensions by biggest common power of 2
   while (((t_x|t_y|t_z)&1) == 0) {
@@ -147,6 +168,10 @@ void dd_p4est_create_grid () {
     t_y >>= 1;
     t_z >>= 1;
   }
+  
+  brick_size[0] = t_x;
+  brick_size[1] = t_y;
+  brick_size[2] = t_z;
   
   // create p4est structs
   p4est_conn = p8est_connectivity_new_brick (t_x, t_y, t_z, 
@@ -162,6 +187,29 @@ void dd_p4est_create_grid () {
   
   printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants);
+  
+  // create space filling inforamtion from p4est
+  p4est_space_idx = new int[n_nodes + 1];
+  for (int i=0;i<=n_nodes;++i) {
+    p4est_quadrant_t *q = &p4est->global_first_position[i];
+    p4est_quadrant_t c;
+    if (i < n_nodes) {
+      double xyz[3];
+      p4est_qcoord_to_vertex(p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+      c.x = xyz[0]*(1<<grid_level);
+      c.y = xyz[1]*(1<<grid_level);
+      c.z = xyz[2]*(1<<grid_level);
+    } else {
+      c.x = 1<<grid_level;
+      while (c.x < grid_size[0]) c.x <<= 1;
+      c.y = 0;
+      c.z = 0;
+    }
+    c.level = P4EST_QMAXLEVEL;
+    p4est_space_idx[i] = p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
+    if (i == this_node + 1)
+      printf("%i : %i - %i\n", this_node, p4est_space_idx[i-1], p4est_space_idx[i] - 1);
+  }
   
   // geather cell neighbors
   std::vector<uint64_t> quads;
@@ -231,11 +279,11 @@ void dd_p4est_create_grid () {
     ls.coord[2] = z;
     for (int n=0;n<26;++n) ls.neighbor[n] = -1;
     /*if (PERIODIC(0) && x == 0) ls.boundary |= 1;
-    if (PERIODIC(0) && x == brick_size[0] - 1) ls.boundary |= 2;
+    if (PERIODIC(0) && x == grid_size[0] - 1) ls.boundary |= 2;
     if (PERIODIC(1) && y == 0) ls.boundary |= 4;
-    if (PERIODIC(1) && y == brick_size[1] - 1) ls.boundary |= 8;
+    if (PERIODIC(1) && y == grid_size[1] - 1) ls.boundary |= 8;
     if (PERIODIC(2) && z == 0) ls.boundary |= 16;
-    if (PERIODIC(2) && z == brick_size[2] - 1) ls.boundary |= 32;*/
+    if (PERIODIC(2) && z == grid_size[2] - 1) ls.boundary |= 32;*/
     shell.push_back(ls);
     while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
       if (mfn.current_qtq == i) continue;
@@ -355,7 +403,7 @@ void dd_p4est_create_grid () {
     uint64_t x = xyz[0]*ql;
     uint64_t y = xyz[1]*ql;
     uint64_t z = xyz[2]*ql;
-    fprintf(h,"%i %lix%lix%li ",i,x,y,z);
+    fprintf(h,"%i %li %ix%ix%i ",i,dd_p4est_cell_morton_idx(x,y,z), shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
     for (uint64_t zi=0;zi <= 2;zi++)
       for (uint64_t yi=0;yi <= 2;yi++)
         for (uint64_t xi=0;xi <= 2;xi++) {
@@ -372,11 +420,11 @@ void dd_p4est_create_grid () {
             ls.boundary = 0;
             for (int n=0;n<26;++n) ls.neighbor[n] = -1;
             if (PERIODIC(0) && (x + xi) == 0) ls.boundary |= 1;
-            if (PERIODIC(0) && (x + xi) == brick_size[0] + 1) ls.boundary |= 2;
+            if (PERIODIC(0) && (x + xi) == grid_size[0] + 1) ls.boundary |= 2;
             if (PERIODIC(1) && (y + yi) == 0) ls.boundary |= 4;
-            if (PERIODIC(1) && (y + yi) == brick_size[1] + 1) ls.boundary |= 8;
+            if (PERIODIC(1) && (y + yi) == grid_size[1] + 1) ls.boundary |= 8;
             if (PERIODIC(2) && (z + zi) == 0) ls.boundary |= 16;
-            if (PERIODIC(2) && (z + zi) == brick_size[2] + 1) ls.boundary |= 32;
+            if (PERIODIC(2) && (z + zi) == grid_size[2] + 1) ls.boundary |= 32;
             if (xi == 0 && yi == 1 && zi == 1) shell[i].boundary |= 1;
             if (xi == 2 && yi == 1 && zi == 1) shell[i].boundary |= 2;
             if (xi == 1 && yi == 0 && zi == 1) shell[i].boundary |= 4;
@@ -456,6 +504,9 @@ void dd_p4est_create_grid () {
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
 #endif
+  
+  printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n",
+    this_node, max_range, box_l[0],box_l[1],box_l[2], dd.cell_size[0],dd.cell_size[1],dd.cell_size[2]);
 
 }
 //--------------------------------------------------------------------------------------------------
@@ -501,7 +552,7 @@ void dd_p4est_comm () {
       int irank = p4est_shell[i].rank;
       int pos = 0;
       while (pos < recv_idx[irank].size() && 
-        p4est_shell[recv_idx[irank][pos]].idx < p4est_shell[i].idx) pos++;
+        p4est_shell[recv_idx[irank][pos]].idx <= p4est_shell[i].idx) pos++;
       if (pos >= recv_idx[irank].size()) {
         recv_idx[irank].push_back(i);
         recv_tag[irank].push_back(1L<<p4est_shell[i].boundary);
@@ -614,39 +665,50 @@ void dd_p4est_comm () {
       }
     }
   }
+  
+  sprintf(fname,"send_%i.list",this_node);
+  h = fopen(fname,"w");
+  for (int n=0;n<num_comm_send;++n)
+    for (int i=0;i<comm_send[n].cnt;++i)
+      fprintf(h,"%i:%i %i\n",comm_send[n].rank,comm_send[n].idx[i],comm_send[n].dir);
+  fclose(h);
+  sprintf(fname,"recv_%i.list",this_node);
+  h = fopen(fname,"w");
+  for (int n=0;n<num_comm_recv;++n)
+    for (int i=0;i<comm_recv[n].cnt;++i)
+      fprintf(h,"%i:%i %i\n",comm_recv[n].rank,comm_recv[n].idx[i],comm_recv[n].dir);
+  fclose(h);
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
   CALL_TRACE();
-  prepare_comm(comm, data_part, num_comm_send + num_comm_recv);
+  prepare_comm(comm, data_part, num_comm_send + num_comm_recv, true);
   int cnt = 0;
   for (int i=0;i<num_comm_send;++i) {
     comm->comm[cnt].type = GHOST_SEND;
     comm->comm[cnt].node = comm_send[i].rank;
-    //comm->comm[cnt].tag = comm_send[i].dir;
+    comm->comm[cnt].tag = comm_send[i].dir;
     comm->comm[cnt].part_lists = (ParticleList**)Utils::malloc(comm_send[i].cnt*sizeof(ParticleList*));
     comm->comm[cnt].n_part_lists = comm_send[i].cnt;
     for (int n=0;n<comm_send[i].cnt;++n)
       comm->comm[cnt].part_lists[n] = &cells[comm_send[i].idx[n]];
-    if (data_part & GHOSTTRANS_POSSHFTD) {
-      if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] += box_l[0];
-      if ((comm_send[i].dir &  2)) comm->comm[cnt].shift[0] -= box_l[0];
-      if ((comm_send[i].dir &  4)) comm->comm[cnt].shift[1] += box_l[1];
-      if ((comm_send[i].dir &  8)) comm->comm[cnt].shift[1] -= box_l[1];
-      if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] += box_l[2];
-      if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] -= box_l[2];
+    if ((data_part & GHOSTTRANS_POSSHFTD)) {
+      if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] =  box_l[0];
+      if ((comm_send[i].dir &  2)) comm->comm[cnt].shift[0] = -box_l[0];
+      if ((comm_send[i].dir &  4)) comm->comm[cnt].shift[1] =  box_l[1];
+      if ((comm_send[i].dir &  8)) comm->comm[cnt].shift[1] = -box_l[1];
+      if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] =  box_l[2];
+      if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
     }
     ++cnt;
   }
   for (int i=0;i<num_comm_recv;++i) {
     comm->comm[cnt].type = GHOST_RECV;
     comm->comm[cnt].node = comm_recv[i].rank;
-    /*
     comm->comm[cnt].tag = comm_recv[i].dir;
     if ((comm_recv[i].dir &  3)) comm->comm[cnt].tag ^=  3;
     if ((comm_recv[i].dir & 12)) comm->comm[cnt].tag ^= 12;
     if ((comm_recv[i].dir & 48)) comm->comm[cnt].tag ^= 48;
-    */
     comm->comm[cnt].part_lists = (ParticleList**)Utils::malloc(comm_recv[i].cnt*sizeof(ParticleList*));
     comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
     for (int n=0;n<comm_recv[i].cnt;++n)
@@ -678,12 +740,12 @@ void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
   int cnt = 0;
   for (int i=0;i<num_comm_send;++i) {
     comm->comm[cnt].shift[0] = comm->comm[cnt].shift[1] = comm->comm[cnt].shift[2] = 0.0;
-    if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] += box_l[0];
-    if ((comm_send[i].dir &  2)) comm->comm[cnt].shift[0] -= box_l[0];
-    if ((comm_send[i].dir &  4)) comm->comm[cnt].shift[1] += box_l[1];
-    if ((comm_send[i].dir &  8)) comm->comm[cnt].shift[1] -= box_l[1];
-    if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] += box_l[2];
-    if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] -= box_l[2];
+    if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] =  box_l[0];
+    if ((comm_send[i].dir &  2)) comm->comm[cnt].shift[0] = -box_l[0];
+    if ((comm_send[i].dir &  4)) comm->comm[cnt].shift[1] =  box_l[1];
+    if ((comm_send[i].dir &  8)) comm->comm[cnt].shift[1] = -box_l[1];
+    if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] =  box_l[2];
+    if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
     ++cnt;
   }
   /*for (int i=0;i<num_comm_recv;++i) {
@@ -711,12 +773,12 @@ void dd_p4est_init_cell_interaction() {
     
     dd.cell_inter[i].nList[0].cell_ind = i;
     dd.cell_inter[i].nList[0].pList = &cells[i];
-    init_pairList(&dd.cell_inter[i].n_list[0].vList);
+    init_pairList(&dd.cell_inter[i].nList[0].vList);
     
     for (int n=1;n<CELLS_MAX_NEIGHBORS;++n) {
       dd.cell_inter[i].nList[n].cell_ind = p4est_shell[i].neighbor[half_neighbor_idx[n]];
       dd.cell_inter[i].nList[n].pList = &cells[p4est_shell[i].neighbor[half_neighbor_idx[n]]];
-      init_pairList(&dd.cell_inter[i].n_list[n].vList);
+      init_pairList(&dd.cell_inter[i].nList[n].vList);
     }
     
     dd.cell_inter[i].n_neighbors = CELLS_MAX_NEIGHBORS;
@@ -726,6 +788,8 @@ void dd_p4est_init_cell_interaction() {
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_save_position_to_cell(double pos[3]) {
   CALL_TRACE();
+  
+  //return dd_p4est_position_to_cell(pos);
   
   int i;
   int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
@@ -738,9 +802,9 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
     if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
     if (!PERIODIC(d) && scale_pos_l[d] < 0) scale_pos_l[d] = 0;
     if (!PERIODIC(d) && scale_pos_h[d] < 0) scale_pos_h[d] = 0;
-    if (!PERIODIC(d) && scale_pos[d] >= brick_size[d]) scale_pos[d] = brick_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_l[d] >= brick_size[d]) scale_pos_l[d] = brick_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_h[d] >= brick_size[d]) scale_pos_h[d] = brick_size[d] - 1;
+    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
+    if (!PERIODIC(d) && scale_pos_l[d] >= grid_size[d]) scale_pos_l[d] = grid_size[d] - 1;
+    if (!PERIODIC(d) && scale_pos_h[d] >= grid_size[d]) scale_pos_h[d] = grid_size[d] - 1;
   }
   
   for (i=0;i<num_local_cells;++i) {
@@ -765,9 +829,9 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
       if (scale_pos[1] > p4est_shell[i].coord[1]) continue;
     }
     if ((p4est_shell[i].boundary & 16)) {
-      if (scale_pos_l[0] < p4est_shell[i].coord[0]) continue;
+      if (scale_pos_l[2] < p4est_shell[i].coord[2]) continue;
     } else {
-      if (scale_pos[0] < p4est_shell[i].coord[0]) continue;
+      if (scale_pos[2] < p4est_shell[i].coord[2]) continue;
     }
     if ((p4est_shell[i].boundary & 32)) {
       if (scale_pos_h[2] > p4est_shell[i].coord[2]) continue;
@@ -777,7 +841,7 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
     break;
   }
   
-  if (i < num_local_cells) &cells[i];
+  if (i < num_local_cells) return &cells[i];
   return NULL;
 }
 //--------------------------------------------------------------------------------------------------
@@ -794,10 +858,10 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
   for (int d=0;d<3;++d) {
     scale_pos[d] = pos[d]*dd.inv_cell_size[d];
     
-    if (PERIODIC(d) & scale_pos[d] < 0) scale_pos[d] = 0;
-    if (PERIODIC(d) & scale_pos[d] >= brick_size[d]) scale_pos[d] = brick_size[d] - 1;
+    if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
+    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
   }
-  
+    
   for (i=0;i<num_local_cells;++i) {
     if (scale_pos[0] != p4est_shell[i].coord[0]) continue;
     if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
@@ -805,7 +869,7 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
     break;
   }
   
-  if (i < num_local_cells) &cells[i];
+  if (i < num_local_cells) return &cells[i];
   return NULL;
 }
 //--------------------------------------------------------------------------------------------------
@@ -818,8 +882,8 @@ int dd_p4est_position_to_cell_all(double pos[3], int guess = -1) {
   for (int d=0;d<3;++d) {
     scale_pos[d] = pos[d]*dd.inv_cell_size[d];
     
-    if (PERIODIC(d) & scale_pos[d] < 0) scale_pos[d] = 0;
-    if (PERIODIC(d) & scale_pos[d] >= brick_size[d]) scale_pos[d] = brick_size[d] - 1;
+    if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
+    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
   }
   
   if (guess >= 0 && guess < num_cells) {
@@ -841,29 +905,20 @@ int dd_p4est_position_to_cell_all(double pos[3], int guess = -1) {
   return -1;
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_position_to_cell(double pos[3], int* idx) {
+/*void dd_p4est_position_to_cell(double pos[3], int* idx) {
   runtimeErrorMsg() << "function " << __FUNCTION__ << " in " << __FILE__ 
     << "[" << __LINE__ << "] is not implemented";
-}
+}*/
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_exchange_and_sort_particles(int global_flag) {
-  ParticleList send_buf[num_comm_proc], recv_buf[num_comm_proc];
-  
-  for (int i=0;i<num_comm_proc;++i) {
-    init_particlelist(&send_buf[i]);
-    init_particlelist(&recv_buf[i]);
-  }
-  
-  // start recv
-  
+void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn) {
+  double cell_lc[3], cell_hc[3];
   for (int i=0;i<num_local_cells;++i) {
     Cell* cell = local_cells.cell[i];
     local_shell_t* shell = &p4est_shell[i];
     
-    double cell_lc[3], cell_hc[3];
     for (int d=0;d<3;++d) {
-      cell_lc[d] = dd.cell_size[d]*shell->coord[d];
-      cell_hc[d] = dd.cell_size[d]*(shell->coord[d] + 1);
+      cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
+      cell_hc[d] = dd.cell_size[d]*(double)(shell->coord[d] + 1);
       if ((shell->boundary & (1<<(2*d)))) cell_lc[d] -= 0.5*ROUND_ERROR_PREC*box_l[d];
       if ((shell->boundary & (2<<(2*d)))) cell_hc[d] += 0.5*ROUND_ERROR_PREC*box_l[d];
     }
@@ -888,14 +943,33 @@ void dd_p4est_exchange_and_sort_particles(int global_flag) {
         if (nidx >= num_local_cells) { // Remote Cell
           if (p4est_shell[nidx].rank >= 0) {
             CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part %d\n",this_node,part->p.identity));
-            local_particles[part->p.identity] = NULL;
-            if ((p4est_shell[nidx].boundary &  3))
+            
+            /*if ((p4est_shell[nidx].boundary &  3))
               fold_coordinate(part->r.p, part->m.v, part->l.i, 0);
             if ((p4est_shell[nidx].boundary & 12))
               fold_coordinate(part->r.p, part->m.v, part->l.i, 1);
             if ((p4est_shell[nidx].boundary & 48)) 
-              fold_coordinate(part->r.p, part->m.v, part->l.i, 2);
-            move_indexed_particle(&send_buf[comm_proc[p4est_shell[nidx].rank]], cell, p);
+              fold_coordinate(part->r.p, part->m.v, part->l.i, 2);*/
+              
+            if (p4est_shell[nidx].rank != this_node) {
+              /*if (dd_p4est_pos_to_proc(part->r.p) != p4est_shell[nidx].rank) {
+                runtimeErrorMsg() << this_node << " sending to wrong process";
+                fprintf(stderr, "\t%i %i -> %i : %lfx%lfx%lf %li %i; %li %li\n", this_node, i, neighbor_lut[z][y][x],
+                  part->r.p[0], part->r.p[1], part->r.p[2], 
+                  dd_p4est_pos_morton_idx(part->r.p), dd_p4est_pos_to_proc(part->r.p),
+                  p4est_shell[nidx].rank, p4est_shell[nidx].idx);
+              }*/
+              int li = comm_proc[p4est_shell[nidx].rank];
+              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
+#ifdef EXCLUSIONS
+              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
+#endif
+              local_particles[part->p.identity] = NULL;
+              move_indexed_particle(&sendbuf[li], cell, p);
+            } else {
+              fold_position(part->r.p, part->l.i);
+              move_indexed_particle(&cells[p4est_shell[nidx].idx], cell, p);
+            }
             if(p < cell->n) p -= 1;
           }
         } else { // Local Cell
@@ -905,35 +979,335 @@ void dd_p4est_exchange_and_sort_particles(int global_flag) {
       }
     }
   }
+}
+//--------------------------------------------------------------------------------------------------
+static int dd_async_exchange_insert_particles(ParticleList *recvbuf) {
+  int dynsiz = 0;
+
+  update_local_particles(recvbuf);
+
+  for (int p = 0; p < recvbuf->n; ++p) {
+    fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
+
+    dynsiz += recvbuf->part[p].bl.n;
+#ifdef EXCLUSIONS
+    dynsiz += recvbuf->part[p].el.n;
+#endif
+  }
+  // Fold direction of dd_append_particles unused.
+  
+  for (int p=0;p<recvbuf->n;++p) {
+    Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p);
+    if (target) {
+      append_indexed_particle(target, &recvbuf->part[p]);
+    } else {
+      runtimeErrorMsg() << this_node << " received remote particle out of domain";
+      fprintf(stderr, "\t%i : %lfx%lfx%lf %li %i\n", this_node,
+        recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2], 
+        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p));
+    }
+  }
+
+  return dynsiz;
+}
+//--------------------------------------------------------------------------------------------------
+static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<int> &dynrecv) {
+  int read = 0;
+
+  for (int pc = 0; pc < recvbuf->n; pc++) {
+    // Use local_particles to find the correct particle address since the
+    // particles from recvbuf have already been copied by dd_append_particles
+    // in dd_async_exchange_insert_particles.
+    Particle *p = local_particles[recvbuf->part[pc].p.identity];
+    if (p->bl.n > 0) {
+      alloc_intlist(&p->bl, p->bl.n);
+      // used to be memmove, but why?
+      memcpy(p->bl.e, &dynrecv[read], p->bl.n * sizeof(int));
+      read += p->bl.n;
+    } else {
+      p->bl.e = NULL;
+    }
+#ifdef EXCLUSIONS
+    if (p->el.n > 0) {
+      alloc_intlist(&p->el, p->el.n);
+      // used to be memmove, but why?
+      memcpy(p->el.e, &dynrecv[read], p->el.n*sizeof(int));
+      read += p->el.n;
+    }
+    else {
+      p->el.e = NULL;
+    }
+#endif
+  }
+}
+//--------------------------------------------------------------------------------------------------
+static void dd_resort_particles() {
+  for(int c = 0; c < local_cells.n; c++) {
+    ParticleList *cell = local_cells.cell[c];
+    for (int p = 0; p < cell->n; p++) {
+      Particle *part = &cell->part[p];
+      ParticleList *sort_cell = dd_p4est_save_position_to_cell(part->r.p);
+      if (sort_cell == NULL) {
+        fprintf(stderr, "[%i] dd_exchange_and_sort_particles: Particle %i (%lf, %lf, %lf) not inside subdomain\n", this_node, part->p.identity, part->r.p[0], part->r.p[1], part->r.p[2]);
+        errexit();
+      } else if (sort_cell != cell) {
+        move_indexed_particle(sort_cell, cell, p);
+        if(p < cell->n) p--;
+      }
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_exchange_and_sort_particles() {
+  ParticleList sendbuf[num_comm_proc], recvbuf[num_comm_proc];
+  std::vector<int> sendbuf_dyn[num_comm_proc], recvbuf_dyn[num_comm_proc];
+  std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
+  std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
+  std::vector<int> nrecvpart(num_comm_proc, 0);
+  
+  for (int i=0;i<num_comm_proc;++i) {
+    init_particlelist(&sendbuf[i]);
+    init_particlelist(&recvbuf[i]);
+    
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, comm_cart, &rreq[i]);
+  }
+  
+  dd_p4est_fill_sendbuf(sendbuf, sendbuf_dyn);
   
   // send
   for (int i=0;i<num_comm_proc;++i) {
-    if (comm_rank[i] == this_node) {
-      for (int p=0;p<send_buf[i].n;++p) {
-        Cell* target = dd_p4est_save_position_to_cell(send_buf[i].part[p].r.p);
-        if (target)
-          append_indexed_particle(target, &send_buf[i].part[p]);
-        else
-          runtimeErrorMsg() << this_node << " received local particle out of domain";
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, comm_cart, &sreq[2 * i]);
+    if (sendbuf_dyn[i].size() > 0)
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, comm_cart, &sreq[3 * i]);
+  }
+  
+  //dd_resort_particles();
+    
+  // Receive all data
+  MPI_Status status;
+  std::vector<int> recvs(num_comm_proc, 0);
+  int recvidx, tag, source;
+  while (true) {
+    MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
+    if (recvidx == MPI_UNDEFINED)
+      break;
+
+    source = status.MPI_SOURCE; // == neighrank[recvidx]
+    tag = status.MPI_TAG;
+
+    if (recvs[recvidx] == 0) {
+      // Size received
+      realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
+    } else if (recvs[recvidx] == 1) {
+      // Particles received
+      recvbuf[recvidx].n = nrecvpart[recvidx];
+      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
+      if (dyndatasiz > 0) {
+        recvbuf_dyn[recvidx].resize(dyndatasiz);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
       }
     } else {
-      // send to other proc
+      dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
+    }
+    recvs[recvidx]++;
+  }
+  
+  MPI_Waitall(3 * num_comm_proc, sreq.data(), MPI_STATUS_IGNORE);
+  for (int i = 0; i < num_comm_proc; ++i) {
+    // Remove particles from this nodes local list and free data
+    for (int p = 0; p < sendbuf[i].n; p++) {
+      free_particle(&sendbuf[i].part[p]);
+    }
+    realloc_particlelist(&sendbuf[i], 0);
+    realloc_particlelist(&recvbuf[i], 0);
+  }
+
+#ifdef ADDITIONAL_CHECKS
+  check_particle_consistency();
+#endif
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_global_exchange_part (ParticleList* pl) {
+  ParticleList sendbuf[n_nodes], recvbuf[n_nodes];
+  std::vector<int> sendbuf_dyn[n_nodes], recvbuf_dyn[n_nodes];
+  std::vector<MPI_Request> sreq(3 * n_nodes, MPI_REQUEST_NULL);
+  std::vector<MPI_Request> rreq(n_nodes, MPI_REQUEST_NULL);
+  std::vector<int> nrecvpart(n_nodes, 0);
+    
+  for (int i=0;i<n_nodes;++i) {
+    init_particlelist(&sendbuf[i]);
+    init_particlelist(&recvbuf[i]);
+    
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, comm_cart, &rreq[i]);
+  }
+  
+  if (pl) {
+    for (int p = 0; p < pl->n; p++) {
+      Particle *part = &pl->part[p];
+      //fold_position(part->r.p, part->l.i);
+      int rank = dd_p4est_pos_to_proc(part->r.p);
+      if (rank != this_node) {
+        if (rank > n_nodes || rank < 0) {
+          runtimeErrorMsg() << "process " << rank << "invalid";
+        }
+        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->bl.e, part->bl.e + part->bl.n);
+#ifdef EXCLUSIONS
+        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->el.e, part->el.e + part->el.n);
+#endif
+        move_indexed_particle(&sendbuf[rank], pl, p);
+        if(p < pl->n) p -= 1;
+      }
     }
   }
-    
-  // wait for recv
   
-  // append
-  for (int i=0;i<num_comm_proc;++i) {
-    if (comm_rank[i] != this_node) {
-      for (int p=0;p<recv_buf[i].n;++p) {
-        Cell* target = dd_p4est_save_position_to_cell(recv_buf[i].part[p].r.p);
-        if (target) {
-          append_indexed_particle(target, &recv_buf[i].part[p]);
-        } else {
-          runtimeErrorMsg() << this_node << " received remote particle out of domain";
-        }
+  // send
+  for (int i=0;i<n_nodes;++i) {
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, comm_cart, &sreq[i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[2 * i]);
+    if (sendbuf_dyn[i].size() > 0)
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[3 * i]);
+  }
+  
+  // Receive all data
+  MPI_Status status;
+  std::vector<int> recvs(n_nodes, 0);
+  int recvidx, tag, source;
+  while (true) {
+    MPI_Waitany(n_nodes, rreq.data(), &recvidx, &status);
+    if (recvidx == MPI_UNDEFINED)
+      break;
+
+    source = status.MPI_SOURCE; // == neighrank[recvidx]
+    tag = status.MPI_TAG;
+
+    if (recvs[recvidx] == 0) {
+      // Size received
+      realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
+    } else if (recvs[recvidx] == 1) {
+      // Particles received
+      recvbuf[recvidx].n = nrecvpart[recvidx];
+      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
+      if (dyndatasiz > 0) {
+        recvbuf_dyn[recvidx].resize(dyndatasiz);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
       }
+    } else {
+      dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
+    }
+    recvs[recvidx]++;
+  }
+  
+  MPI_Waitall(3 * n_nodes, sreq.data(), MPI_STATUS_IGNORE);
+  for (int i = 0; i < n_nodes; ++i) {
+    // Remove particles from this nodes local list and free data
+    for (int p = 0; p < sendbuf[i].n; p++) {
+      free_particle(&sendbuf[i].part[p]);
+    }
+    realloc_particlelist(&sendbuf[i], 0);
+    realloc_particlelist(&recvbuf[i], 0);
+  }
+  
+  // check
+  for (int i=0;i<num_local_cells;++i) {
+    for (int p = 0; p < cells[i].n; p++) {
+      Particle *part = &cells[i].part[p];
+      if (dd_p4est_pos_to_proc(part->r.p) != this_node) {
+        fprintf(stderr,"W %i:%i : %lfx%lfx%lf %i %s\n", this_node, i,
+          part->r.p[0], part->r.p[1], part->r.p[2],
+          dd_p4est_pos_to_proc(part->r.p), (dd_p4est_save_position_to_cell(part->r.p)?"l":"r"));
+      }
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------
+int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
+  p4est_quadrant_t c;
+  c.x = x; c.y = y; c.z = z;
+  if (c.x < 0 || c.x >= grid_size[0])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
+  if (c.y < 0 || c.y >= grid_size[1])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
+  if (c.z < 0 || c.z >= grid_size[2])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
+  c.level = P4EST_QMAXLEVEL;
+  return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
+}
+//--------------------------------------------------------------------------------------------------
+int64_t dd_p4est_pos_morton_idx(double pos[3]) {
+  double pfold[3];
+  int im[3];
+  pfold[0] = pos[0]; pfold[1] = pos[1]; pfold[2] = pos[2];
+  fold_position(pfold, im);
+  return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0], 
+    pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);
+}
+//--------------------------------------------------------------------------------------------------
+int dd_p4est_pos_to_proc(double pos[3]) {
+  int64_t idx = dd_p4est_pos_morton_idx(pos);
+  for (int i=1;i<=n_nodes;++i) {
+    if (p4est_space_idx[i] > idx) return i - 1;
+  }
+  runtimeErrorMsg() << "position " << pos[0] << "x" << pos[1] << "x" << pos[2] << " not in box";
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_on_geometry_change(int flags) {
+
+  /* check that the CPU domains are still sufficiently large. */
+  for (int i = 0; i < 3; i++)
+    if (box_l[i] < max_range) {
+        runtimeErrorMsg() <<"box_l in direction " << i << " is too small";
+    }
+
+  /* A full resorting is necessary if the grid has changed. We simply
+     don't have anything fast for this case. Probably also not
+     necessary. */
+  if ((flags & CELL_FLAG_GRIDCHANGED)) {
+    CELL_TRACE(fprintf(stderr,"%d: dd_on_geometry_change full redo\n",
+		       this_node));
+    cells_re_init(CELL_STRUCTURE_CURRENT);
+    return;
+  }
+
+  /* otherwise, re-set our geometrical dimensions which have changed
+     (in addition to the general ones that \ref grid_changed_box_l
+     takes care of) */
+  for(int i=0; i<3; i++) {
+    dd.cell_size[i]       = box_l[i]/(double)grid_size[i];
+    dd.inv_cell_size[i]   = 1.0 / dd.cell_size[i];
+  }
+
+  double min_cell_size = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]);
+  max_skin = min_cell_size - max_cut;
+  
+  //printf("%i : cellsize %lfx%lfx%lf\n", this_node,  dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]);
+
+
+  CELL_TRACE(fprintf(stderr, "%d: dd_on_geometry_change: max_range = %f, min_cell_size = %f, max_skin = %f\n", this_node, max_range, min_cell_size, max_skin));
+  
+  if (max_range > min_cell_size) {
+    /* if new box length leads to too small cells, redo cell structure
+       using smaller number of cells. */
+    cells_re_init(CELL_STRUCTURE_DOMDEC);
+    return;
+  }
+
+  /* If we are not in a hurry, check if we can maybe optimize the cell
+     system by using smaller cells. */
+  if (!(flags & CELL_FLAG_FAST)) {
+    int i;
+    for(i=0; i<3; i++) {
+      int poss_size = (int)floor(box_l[i]/max_range);
+      if (poss_size > grid_size[i])
+	break;
+    }
+    if (i < 3) {
+      /* new range/box length allow smaller cells, redo cell structure,
+	 possibly using smaller number of cells. */
+      cells_re_init(CELL_STRUCTURE_DOMDEC);
+      return;
     }
   }
 }

@@ -49,6 +49,8 @@ set name  "lj_liquid"
 set ident "_s1"
 # System parameters
 #############################################################
+#setmd periodic 0 0 0
+
 
 # 108 particles
 set n_part  108
@@ -82,6 +84,7 @@ set min_dist     0.87
 # integration
 set sampling_interval    10
 set equilibration_interval 1000
+#set equilibration_interval 10
 
 set sampling_iterations 10000
 set equilibration_iterations 200
@@ -101,7 +104,8 @@ expr srand([pid])
 # Particle setup
 #############################################################
 
-set density 0.8442
+#set density 0.8442
+set density 0.02
 set box_length [expr pow($n_part/$density,1.0/3.0)+2*$skin]
 puts " density = $density box_length = $box_length"
 setmd box $box_length $box_length $box_length
@@ -147,11 +151,13 @@ inter forcecap $cap
 # Warmup Integration Loop
 set i 0
 while { $i < $warm_n_times && $act_min_dist < $min_dist } {
-
+    #writevtk "part_$i.vtk"
+    
     integrate $warm_steps
 
     # Warmup criterion
     set act_min_dist [analyze mindist]
+    #puts "run $i at time=[setmd time] (LJ cap=$cap) min dist = $act_min_dist\r"
     puts -nonewline "run $i at time=[setmd time] (LJ cap=$cap) min dist = $act_min_dist\r"
     flush stdout
 
@@ -164,9 +170,12 @@ while { $i < $warm_n_times && $act_min_dist < $min_dist } {
 }
 
 inter forcecap 0
-
+ 
 # 
 puts "\n Warm up finished \n"
+set act_min_dist [analyze mindist]
+puts "Minimal distance $act_min_dist"
+
 setmd time_step $eq_tstep
 for { set i 0 } { $i < $equilibration_iterations } { incr i } {
    integrate $equilibration_interval
@@ -186,7 +195,7 @@ setmd time_step $tstep
 set nrep 0
 
 set en [open "data/energy.dat" "w"]
-set blockfile [open "data/sim_info.dat" "w"]
+#set blockfile [open "data/sim_info.dat" "w"]
 
 puts $en "#"
 puts $en "#"
@@ -195,7 +204,7 @@ puts $en "# "
 for {set i 0} { $i < $sampling_iterations } { incr i} {
       incr nrep 
      integrate $sampling_interval
-     save_sim $blockfile "id pos v f q type" "all"
+     #save_sim $blockfile "id pos v f q type" "all"
      set energies [analyze energy]
      set pressure [analyze pressure total]
    # puts "pressure=$pressure "

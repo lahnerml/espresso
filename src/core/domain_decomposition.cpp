@@ -111,6 +111,8 @@ double max_skin   = 0.0;
 //-----------------------------------------------------------------------------------
 #ifdef USE_P4EST
 #include "p4est_dd.hpp"
+#else
+#define P4EST_NOCHANGE
 #endif //USE_P4EST
 //-----------------------------------------------------------------------------------
 //P4EST end
@@ -126,10 +128,15 @@ double max_skin   = 0.0;
  *  DomainDecomposition::cell_size, \ref
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
-void dd_create_cell_grid ()
-{
+void dd_create_cell_grid () {
   CALL_TRACE();
   
+#ifndef P4EST_NOCHANGE
+  dd_p4est_create_grid ();
+  dd_p4est_comm();
+  
+#else
+
   int i,n_local_cells,new_cells,min_ind;
   double cell_range[3], min_size, scale, volume;
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid: max_range %f\n",this_node,max_range));
@@ -263,15 +270,18 @@ void dd_create_cell_grid ()
 #endif*/
 
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid, n_cells=%d, local_cells.n=%d, ghost_cells.n=%d, dd.ghost_cell_grid=(%d,%d,%d)\n", this_node, n_cells,local_cells.n,ghost_cells.n,dd.ghost_cell_grid[0],dd.ghost_cell_grid[1],dd.ghost_cell_grid[2]));
-  
+#endif
 }
 
 /** Fill local_cells list and ghost_cells list for use with domain
     decomposition.  \ref cells::cells is assumed to be a 3d grid with size
     \ref DomainDecomposition::ghost_cell_grid . */
-void dd_mark_cells ()
-{
+void dd_mark_cells () {
   CALL_TRACE();
+#ifndef P4EST_NOCHANGE
+    dd_p4est_mark_cells();
+#else
+
 //#ifndef USE_P4EST
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
@@ -287,14 +297,7 @@ void dd_mark_cells ()
     if(DD_IS_LOCAL_CELL(m,n,o)) local_cells.cell[cnt_l++] = &cells[cnt_c++]; 
     else                        ghost_cells.cell[cnt_g++] = &cells[cnt_c++];
   } 
-/*#else
-  for (int c=0;c<num_local_cells;++c) {
-    local_cells.cell[c] = &cells[c];
-  }
-  for (int c=0;c<num_ghost_cells;++c) {
-    ghost_cells.cell[c] = &cells[c-num_local_cells];
-  }
-#endif*/
+#endif
 }
 
 /** Fill a communication cell pointer list. Fill the cell pointers of
@@ -306,9 +309,12 @@ void dd_mark_cells ()
     \param lc          lower left corner of the subgrid.
     \param hc          high up corner of the subgrid.
  */
-int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3])
-{
+int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
   CALL_TRACE();
+
+#ifndef P4EST_NOCHANGE
+  runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
+#endif
 
   int i,m,n,o,c=0;
   /* sanity check */
@@ -330,9 +336,14 @@ int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3])
 }
 
 /** Create communicators for cell structure domain decomposition. (see \ref GhostCommunicator) */
-void dd_prepare_comm (GhostCommunicator *comm, int data_parts)
-{
+void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
   CALL_TRACE();
+
+#ifndef P4EST_NOCHANGE
+
+  dd_p4est_prepare_comm(comm,data_parts);
+
+#else
 
   int dir,lr,i,cnt, num, n_comm_cells[3];
   int lc[3],hc[3],done[3]={0,0,0};
@@ -445,15 +456,28 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts)
       done[dir]=1;
     }
   }
+#endif
 }
 
 /** Revert the order of a communicator: After calling this the
     communicator is working in reverted order with exchanged
     communication types GHOST_SEND <-> GHOST_RECV. */
-void dd_revert_comm_order (GhostCommunicator *comm)
-{
+void dd_revert_comm_order (GhostCommunicator *comm) {
   CALL_TRACE();
 
+#ifndef P4EST_NOCHANGE
+  int i;
+
+  CELL_TRACE(fprintf(stderr,"%d: dd_revert_comm_order: anz comm: %d\n",this_node,comm->num));
+
+  /* exchange SEND/RECV */
+  for(i = 0; i < comm->num; i++) {
+    if (comm->comm[i].type == GHOST_SEND)
+      comm->comm[i].type = GHOST_RECV;
+    else if (comm->comm[i].type == GHOST_RECV)
+      comm->comm[i].type = GHOST_SEND;
+  }
+#else
   int i,j,nlist2;
   GhostCommunication tmp;
   ParticleList *tmplist;
@@ -479,13 +503,13 @@ void dd_revert_comm_order (GhostCommunicator *comm)
       }
     }
   }
+#endif
 }
 
 /** Of every two communication rounds, set the first receivers to prefetch and poststore */
-void dd_assign_prefetches (GhostCommunicator *comm)
-{
+void dd_assign_prefetches (GhostCommunicator *comm) {
+#ifdef P4EST_NOCHANGE
   CALL_TRACE();
-
   int cnt;
 
   for(cnt=0; cnt<comm->num; cnt += 2) {
@@ -494,6 +518,7 @@ void dd_assign_prefetches (GhostCommunicator *comm)
       comm->comm[cnt + 1].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
     }
   }
+#endif
 }
 
 /** update the 'shift' member of those GhostCommunicators, which use
@@ -501,9 +526,15 @@ void dd_assign_prefetches (GhostCommunicator *comm)
     (see \ref dd_prepare_comm for the original), i.e. all which have
     GHOSTTRANS_POSSHFTD or'd into 'data_parts' upon execution of \ref
     dd_prepare_comm. */
-void dd_update_communicators_w_boxl()
-{
+void dd_update_communicators_w_boxl() {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+
+  dd_p4est_update_comm_w_boxl(&cell_structure.exchange_ghosts_comm);
+  dd_p4est_update_comm_w_boxl(&cell_structure.update_ghost_pos_comm);
+
+#else
 
   int cnt=0;
   
@@ -542,6 +573,7 @@ void dd_update_communicators_w_boxl()
       }
     }
   }
+#endif
 }
 
 /** Init cell interactions for cell system domain decomposition.
@@ -549,9 +581,14 @@ void dd_update_communicators_w_boxl()
  * created list of interacting neighbor cells is used by the verlet
  * algorithm (see verlet.cpp) to build the verlet lists.
  */
-void dd_init_cell_interactions ()
-{
+void dd_init_cell_interactions () {
   CALL_TRACE();
+
+#ifndef P4EST_NOCHANGE
+
+  dd_p4est_init_cell_interaction();
+
+#else
 
   int m,n,o,p,q,r,ind1,ind2,c_cnt=0,n_cnt;
  
@@ -629,6 +666,7 @@ void dd_init_cell_interactions ()
   fclose(cells_fp);
 #endif
 
+#endif
 }
 
 /*************************************************/
@@ -636,9 +674,14 @@ void dd_init_cell_interactions ()
 /** Returns pointer to the cell which corresponds to the position if
     the position is in the nodes spatial domain otherwise a NULL
     pointer. */
-Cell * dd_save_position_to_cell (double pos[3])
-{
+Cell * dd_save_position_to_cell (double pos[3]) {
   CALL_TRACE();
+
+#ifndef P4EST_NOCHANGE
+
+  return dd_p4est_save_position_to_cell(pos);
+
+#else
 
   int i,cpos[3];
   double lpos;
@@ -669,11 +712,18 @@ Cell * dd_save_position_to_cell (double pos[3])
   }
   i = get_linear_index(cpos[0],cpos[1],cpos[2], dd.ghost_cell_grid); 
   return &(cells[i]);  
+  
+#endif
 }
 
-Cell *dd_position_to_cell(double pos[3])
-{
+Cell *dd_position_to_cell(double pos[3]) {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+
+  return dd_p4est_position_to_cell(pos);
+
+#else
 
   int i,cpos[3];
   double lpos;
@@ -702,11 +752,15 @@ Cell *dd_position_to_cell(double pos[3])
   }
   i = get_linear_index(cpos[0],cpos[1],cpos[2], dd.ghost_cell_grid);  
   return &cells[i];
+#endif
 }
 
-void dd_position_to_cell_indices(double pos[3],int* idx)
-{
+void dd_position_to_cell_indices(double pos[3],int* idx) {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+  runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
+#endif
 
   int i;
   double lpos;
@@ -729,9 +783,12 @@ void dd_position_to_cell_indices(double pos[3],int* idx)
 
 /** Append the particles in pl to \ref local_cells and update \ref local_particles.  
     @return 0 if all particles in pl reside in the nodes domain otherwise 1.*/
-int dd_append_particles(ParticleList *pl, int fold_dir)
-{
+int dd_append_particles(ParticleList *pl, int fold_dir) {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+  runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
+#endif
 
   int p, dir, c, cpos[3], flag=0, fold_coord=fold_dir/2;
 
@@ -777,6 +834,12 @@ int dd_append_particles(ParticleList *pl, int fold_dir)
 
 void dd_on_geometry_change(int flags) {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+
+  dd_p4est_on_geometry_change(flags);
+  
+#else
 
   /* Realignment of comms along the periodic y-direction is needed */
   if (flags & CELL_FLAG_LEES_EDWARDS) {
@@ -862,6 +925,8 @@ void dd_on_geometry_change(int flags) {
       return;
     }
   }
+#endif  
+
 #ifdef LEES_EDWARDS
   le_dd_update_communicators_w_boxl(&le_mgr);
 #else
@@ -872,8 +937,7 @@ void dd_on_geometry_change(int flags) {
 }
 
 /************************************************************/
-void dd_topology_init(CellPList *old)
-{
+void dd_topology_init(CellPList *old) {
   CALL_TRACE();
 
   int c,p,np;
@@ -884,10 +948,16 @@ void dd_topology_init(CellPList *old)
 
   /** broadcast the flag for using verlet list */
   MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
- 
+
+#ifndef P4EST_NOCHANGE
+  cell_structure.type             = CELL_STRUCTURE_DOMDEC;
+  cell_structure.position_to_node = dd_p4est_pos_to_proc;
+  cell_structure.position_to_cell = dd_p4est_position_to_cell;
+#else
   cell_structure.type             = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = map_position_node_array;
   cell_structure.position_to_cell = dd_position_to_cell;
+#endif
 
   /* set up new domain decomposition cell structure */
   dd_create_cell_grid();
@@ -917,7 +987,6 @@ void dd_topology_init(CellPList *old)
 
   /* collect forces has to be done in reverted order! */
   dd_revert_comm_order(&cell_structure.collect_ghost_force_comm);
-
   dd_assign_prefetches(&cell_structure.ghost_cells_comm);
   dd_assign_prefetches(&cell_structure.exchange_ghosts_comm);
   dd_assign_prefetches(&cell_structure.update_ghost_pos_comm);
@@ -948,6 +1017,31 @@ void dd_topology_init(CellPList *old)
   dd_init_cell_interactions();
 #endif
 
+#ifndef P4EST_NOCHANGE
+  for (c = 0; c < old->n; c++) {
+    part = old->cell[c]->part;
+    np   = old->cell[c]->n;
+    //if (np > 0)
+    //  printf("aaargh %i\n", np);
+    for (p = 0; p < np; p++) {
+      Cell *nc = dd_save_position_to_cell(part[p].r.p);
+      if (nc == NULL) {
+        append_unindexed_particle(local_cells.cell[0], &part[p]);
+        //runtimeErrorMsg() << "particles out of domain after topology init";
+        //fprintf(stderr, "\t%i : %lfx%lfx%lf %i %i\n", this_node, part[p].r.p[0], part[p].r.p[1], part[p].r.p[2], dd_p4est_pos_to_proc(part[p].r.p), part[p].bl.n);
+      } else {
+        append_unindexed_particle(nc, &part[p]);
+      }
+    }
+  }
+  for(c=0; c<local_cells.n; c++) {
+    update_local_particles(local_cells.cell[c]);
+  }
+  if (local_cells.n > 0)
+    dd_p4est_global_exchange_part(local_cells.cell[0]);
+  else
+    dd_p4est_global_exchange_part(NULL);
+#else
   /* copy particles */
   for (c = 0; c < old->n; c++) {
     part = old->cell[c]->part;
@@ -964,13 +1058,17 @@ void dd_topology_init(CellPList *old)
   for(c=0; c<local_cells.n; c++) {
     update_local_particles(local_cells.cell[c]);
   }
+#endif
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_init: done\n",this_node));
 }
 
 /************************************************************/
-void dd_topology_release()
-{
+void dd_topology_release() {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+  dd_p4est_free();
+#endif
 
   int i,j;
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
@@ -1000,9 +1098,14 @@ void dd_topology_release()
 }
 
 /************************************************************/
-void dd_exchange_and_sort_particles (int global_flag)
-{
+void dd_exchange_and_sort_particles (int global_flag) {
   CALL_TRACE();
+  
+#ifndef P4EST_NOCHANGE
+  
+  dd_p4est_exchange_and_sort_particles();
+
+#else
 
   int dir, c, p, i, finished=0;
   ParticleList *cell,*sort_cell, send_buf_l, send_buf_r, recv_buf_l, recv_buf_r;
@@ -1197,14 +1300,19 @@ void dd_exchange_and_sort_particles (int global_flag)
   check_particle_consistency();
 #endif
 
+#endif
+
   CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
 }
 
 /*************************************************/
 
-int calc_processor_min_num_cells ()
-{
+int calc_processor_min_num_cells () {
   CALL_TRACE();
+
+#ifndef P4EST_NOCHANGE
+  return 2;
+#else
 
   int i, min = 1;
   /* the minimal number of cells can be lower if there are at least two nodes serving a direction,
@@ -1214,10 +1322,10 @@ int calc_processor_min_num_cells ()
     if (node_grid[i] == 1) 
       min *= 2;
   return min;
+#endif
 }
 
-void calc_link_cell()
-{
+void calc_link_cell() {
   CALL_TRACE();
 
   int c, np1, n, np2, i ,j, j_start;

@@ -964,13 +964,15 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
 #ifdef EXCLUSIONS
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
 #endif
-              local_particles[part->p.identity] = NULL;
+              int pid = part->p.identity;
               move_indexed_particle(&sendbuf[li], cell, p);
+              local_particles[pid] = NULL;
+              if(p < cell->n) p -= 1;
             } else {
               fold_position(part->r.p, part->l.i);
               move_indexed_particle(&cells[p4est_shell[nidx].idx], cell, p);
+              if(p < cell->n) p -= 1;
             }
-            if(p < cell->n) p -= 1;
           }
         } else { // Local Cell
           move_indexed_particle(&cells[nidx], cell, p);
@@ -1058,14 +1060,36 @@ static void dd_resort_particles() {
   }
 }
 //--------------------------------------------------------------------------------------------------
+/*ParticleList *sendbuf = NULL, *recvbuf = NULL;
+std::vector<int> *sendbuf_dyn = NULL, *recvbuf_dyn = NULL;
+std::vector<MPI_Request> sreq;//(3 * num_comm_proc, MPI_REQUEST_NULL);
+std::vector<MPI_Request> rreq;//(num_comm_proc, MPI_REQUEST_NULL);
+std::vector<int> nrecvpart;//(num_comm_proc, 0);*/
 void dd_p4est_exchange_and_sort_particles() {
-  ParticleList sendbuf[num_comm_proc], recvbuf[num_comm_proc];
-  std::vector<int> sendbuf_dyn[num_comm_proc], recvbuf_dyn[num_comm_proc];
+  //ParticleList sendbuf[num_comm_proc], recvbuf[num_comm_proc];
+  ParticleList *sendbuf, *recvbuf;
+  //std::vector<int> sendbuf_dyn[num_comm_proc], recvbuf_dyn[num_comm_proc];
+  std::vector<int> *sendbuf_dyn, *recvbuf_dyn;
   std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(num_comm_proc, 0);
   
+  //if (!sendbuf)
+    sendbuf = new ParticleList[num_comm_proc];
+  //if (!recvbuf)
+    recvbuf = new ParticleList[num_comm_proc];
+  //if (!sendbuf_dyn)
+    sendbuf_dyn = new std::vector<int>[num_comm_proc];
+  //if (!recvbuf_dyn)
+    recvbuf_dyn = new std::vector<int>[num_comm_proc];
+  
+  /*sreq.assign(3*num_comm_proc, MPI_REQUEST_NULL);
+  rreq.assign(num_comm_proc, MPI_REQUEST_NULL);
+  nrecvpart.assign(num_comm_proc, 0);*/
+  
   for (int i=0;i<num_comm_proc;++i) {
+    //sendbuf_dyn[i].clear();
+    //recvbuf_dyn[i].clear();
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
     
@@ -1077,9 +1101,9 @@ void dd_p4est_exchange_and_sort_particles() {
   // send
   for (int i=0;i<num_comm_proc;++i) {
     MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, comm_cart, &sreq[2 * i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, comm_cart, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, comm_cart, &sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
   }
   
   //dd_resort_particles();
@@ -1118,11 +1142,19 @@ void dd_p4est_exchange_and_sort_particles() {
   for (int i = 0; i < num_comm_proc; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
+      //local_particles[sendbuf[i].part[p].p.identity] = NULL;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
     realloc_particlelist(&recvbuf[i], 0);
+    sendbuf_dyn[i].clear();
+    recvbuf_dyn[i].clear();
   }
+  
+  delete[] sendbuf;
+  delete[] recvbuf;
+  delete[] sendbuf_dyn;
+  delete[] recvbuf_dyn;
 
 #ifdef ADDITIONAL_CHECKS
   check_particle_consistency();
@@ -1165,9 +1197,9 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
   // send
   for (int i=0;i<n_nodes;++i) {
     MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[2 * i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[i + n_nodes]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
   }
   
   // Receive all data

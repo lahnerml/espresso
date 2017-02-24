@@ -1100,7 +1100,7 @@ void dd_topology_release() {
 /************************************************************/
 void dd_exchange_and_sort_particles (int global_flag) {
   CALL_TRACE();
-  
+  //int64_t ts = clock();
 #ifndef P4EST_NOCHANGE
   
   dd_p4est_exchange_and_sort_particles();
@@ -1301,7 +1301,9 @@ void dd_exchange_and_sort_particles (int global_flag) {
 #endif
 
 #endif
-
+  /*ts = clock() - ts;
+  if (this_node == 0)
+    printf("%li\n",ts);*/
   CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
 }
 

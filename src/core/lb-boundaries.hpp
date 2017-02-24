@@ -39,6 +39,7 @@
 
 #include "utils.hpp"
 #include "constraint.hpp"
+#include "lb-adaptive.hpp"
 
 #if defined (LB_BOUNDARIES) || defined (LB_BOUNDARIES_GPU)
 
@@ -95,6 +96,10 @@ typedef struct {
 extern int n_lb_boundaries;
 extern LB_Boundary *lb_boundaries;
 
+#ifdef LB_ADAPTIVE
+extern std::vector<int> *exclude_in_geom_ref;
+#endif // LB_ADAPTIVE
+
 /*@}*/
 
 /** Initializes the constrains in the system. 
@@ -105,6 +110,10 @@ void lb_init_boundaries();
 void lbboundary_mindist_position(double pos[3], double* mindist, double distvec[3], int* no); 
 
 int lbboundary_get_force(int no, double* f); 
+
+#ifdef LB_ADAPTIVE
+int lbadapt_is_boundary(double pos[3]);
+#endif // LB_ADAPTIVE
 
 #endif // (LB_BOUNDARIES) || (LB_BOUNDARIES_GPU)
 

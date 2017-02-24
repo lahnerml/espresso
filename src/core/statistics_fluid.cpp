@@ -38,6 +38,7 @@
  * \param result Fluid mass
  */
 void lb_calc_fluid_mass(double *result) {
+#ifndef LB_ADAPTIVE
   int x, y, z, index;
   double sum_rho=0.0, rho=0.0;
 
@@ -55,12 +56,14 @@ void lb_calc_fluid_mass(double *result) {
   }
 
   MPI_Reduce(&sum_rho, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate momentum of the LB fluid.
  * \param result Fluid momentum
  */
 void lb_calc_fluid_momentum(double *result) {
+#ifndef LB_ADAPTIVE
 
     int x, y, z, index;
     double j[3], momentum[3] = { 0.0, 0.0, 0.0 };
@@ -84,13 +87,14 @@ void lb_calc_fluid_momentum(double *result) {
     momentum[2] *= lbpar.agrid/lbpar.tau;
 
     MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
-    
+#endif // LB_ADAPTIVE
 }
 
 /** Calculate temperature of the LB fluid.
  * \param result Fluid temperature
  */
 void lb_calc_fluid_temp(double *result) {
+#ifndef LB_ADAPTIVE
   int x, y, z, index;
   double rho, j[3];
   double temp = 0.0;
@@ -119,6 +123,7 @@ void lb_calc_fluid_temp(double *result) {
               lbpar.tau*lbpar.tau*lbpar.agrid)/n_nodes;
 
   MPI_Reduce(&temp, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 void lb_collect_boundary_forces(double *result) {
@@ -138,6 +143,7 @@ void lb_collect_boundary_forces(double *result) {
 
 /** Calculate a density profile of the fluid. */
 void lb_calc_densprof(double *result, int *params) {
+#ifndef LB_ADAPTIVE
 
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
@@ -212,14 +218,14 @@ void lb_calc_densprof(double *result, int *params) {
   }
 
   if (this_node != 0) free(params);
-
+#endif // LB_ADAPTIVE
 }
 
 #define REQ_VELPROF 701
 
 /** Calculate a velocity profile for the LB fluid. */	
 void lb_calc_velprof(double *result, int *params) {
-
+#ifndef LB_ADAPTIVE
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
   double rho, j[3], *velprof;
@@ -312,7 +318,7 @@ void lb_calc_velprof(double *result, int *params) {
   }
 
   if (this_node !=0) free(params);
-
+#endif // LB_ADAPTIVE
 }
 
 #endif /* LB */

@@ -40,6 +40,10 @@
 int n_lb_boundaries = 0;
 LB_Boundary *lb_boundaries = NULL;
 
+#ifdef LB_ADAPTIVE
+std::vector<int> *exclude_in_geom_ref = NULL;
+#endif // LB_ADAPTIVE
+
 void lbboundary_mindist_position(double pos[3], double *mindist,
                                  double distvec[3], int *no) {
   double vec[3] = {1e100, 1e100, 1e100};
@@ -109,9 +113,11 @@ void lbboundary_mindist_position(double pos[3], double *mindist,
 /** Initialize boundary conditions for all constraints in the system. */
 void lb_init_boundaries() {
 
+#ifndef LB_ADAPTIVE
   int n, x, y, z;
   // char *errtxt;
   double pos[3], dist, dist_tmp = 0.0, dist_vec[3];
+#endif // LB_ADAPTIVE
 
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined(LB_GPU) && defined(LB_BOUNDARIES_GPU)
@@ -353,7 +359,7 @@ void lb_init_boundaries() {
 
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   } else {
-#if defined(LB) && defined(LB_BOUNDARIES)
+#if defined(LB) && defined(LB_BOUNDARIES) && not defined(LB_ADAPTIVE)
     int node_domain_position[3], offset[3];
     int the_boundary = -1;
     map_node_array(this_node, node_domain_position);
@@ -423,6 +429,8 @@ void lb_init_boundaries() {
 
             case LB_BOUNDARY_VOXEL: // voxel data do not need dist
               dist_tmp = 1e99;
+              // calculate_voxel_dist((Particle*) NULL, pos, (Particle*) NULL,
+              // &lb_boundaries[n].c.voxel, &dist_tmp, dist_vec);
               break;
 
             default:
@@ -439,6 +447,8 @@ void lb_init_boundaries() {
           if (dist <= 0 && the_boundary >= 0 && n_lb_boundaries > 0) {
             lbfields[get_linear_index(x, y, z, lblattice.halo_grid)].boundary =
                 the_boundary + 1;
+            // printf("boundindex %i: \n",
+            // get_linear_index(x,y,z,lblattice.halo_grid));
           } else {
             lbfields[get_linear_index(x, y, z, lblattice.halo_grid)].boundary =
                 0;
@@ -446,33 +456,78 @@ void lb_init_boundaries() {
         }
       }
     }
-    // printf("init voxels\n\n");
-    // SET VOXEL BOUNDARIES DIRECTLY
-    int xxx, yyy, zzz = 0;
-    char line[80];
-    for (n = 0; n < n_lb_boundaries; n++) {
-      switch (lb_boundaries[n].type) {
-      case LB_BOUNDARY_VOXEL:
-        FILE *fp;
-        fp = fopen(lb_boundaries[n].c.voxel.filename, "r");
-
-        while (fgets(line, 80, fp) != NULL) {
-          sscanf(line, "%d %d %d", &xxx, &yyy, &zzz);
-          lbfields[get_linear_index(xxx, yyy, zzz, lblattice.halo_grid)]
-              .boundary = n + 1;
-        }
-        fclose(fp);
-
-        break;
-
-      default:
-        break;
-      }
-    }
-
-#endif
+#elif defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
+    /* iterate over domain and put cell centers into cell function */
+    /* set boundary information in cell centers */
+    lbadapt_get_boundary_status();
+#endif // defined(LB) && defined(LB_BOUNDARIES) && defined(LB_ADAPTIVE)
   }
 }
+
+#ifdef LB_ADAPTIVE
+int lbadapt_is_boundary(double *pos) {
+  double dist, dist_tmp, dist_vec[3];
+  dist = DBL_MAX;
+  int the_boundary = -1;
+
+  for (int n = 0; n < n_lb_boundaries; ++n) {
+    switch (lb_boundaries[n].type) {
+    case LB_BOUNDARY_WAL:
+      calculate_wall_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.wal, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_SPH:
+      calculate_sphere_dist((Particle *)NULL, pos, (Particle *)NULL,
+                            &lb_boundaries[n].c.sph, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_CYL:
+      calculate_cylinder_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.cyl, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_RHOMBOID:
+      calculate_rhomboid_dist((Particle *)NULL, pos, (Particle *)NULL,
+                              &lb_boundaries[n].c.rhomboid, &dist_tmp,
+                              dist_vec);
+      break;
+
+    case LB_BOUNDARY_POR:
+      calculate_pore_dist((Particle *)NULL, pos, (Particle *)NULL,
+                          &lb_boundaries[n].c.pore, &dist_tmp, dist_vec);
+      break;
+
+    case LB_BOUNDARY_STOMATOCYTE:
+      calculate_stomatocyte_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.stomatocyte, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    case LB_BOUNDARY_HOLLOW_CONE:
+      calculate_hollow_cone_dist((Particle *)NULL, pos, (Particle *)NULL,
+                                 &lb_boundaries[n].c.hollow_cone, &dist_tmp,
+                                 dist_vec);
+      break;
+
+    default:
+      runtimeErrorMsg() << "lbboundary type " << lb_boundaries[n].type
+                        << " not implemented in lb_init_boundaries()\n";
+    }
+
+    if (dist_tmp < dist) {
+      dist = dist_tmp;
+      the_boundary = n;
+    }
+  }
+
+  if (dist <= 0 && n_lb_boundaries > 0) {
+    return the_boundary + 1;
+  } else {
+    return 0;
+  }
+}
+#endif // LB_ADAPTIVE
 
 int lbboundary_get_force(int no, double *f) {
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
@@ -506,13 +561,12 @@ int lbboundary_get_force(int no, double *f) {
 #endif
   return 0;
 }
-
 #endif /* LB_BOUNDARIES or LB_BOUNDARIES_GPU */
 
 #ifdef LB_BOUNDARIES
 
 void lb_bounce_back() {
-
+#ifndef LB_ADAPTIVE
 #ifdef D3Q19
 #ifndef PULL
   int k, i, l;
@@ -558,12 +612,13 @@ void lb_bounce_back() {
             population_shift = 0;
             for (l = 0; l < 3; l++) {
               population_shift -=
-                  lbpar.agrid * lbpar.agrid * lbpar.agrid * lbpar.agrid *
-                  lbpar.agrid * lbpar.rho[0] * 2 * lbmodel.c[i][l] *
+                  lbpar.agrid * lbpar.agrid * lbpar.agrid *
+                  lbpar.rho[0] * 2 * lbmodel.c[i][l] *
                   lbmodel.w[i] *
                   lb_boundaries[lbfields[k].boundary - 1].velocity[l] /
                   lbmodel.c_sound_sq;
             }
+
             if (x - lbmodel.c[i][0] > 0 &&
                 x - lbmodel.c[i][0] < lblattice.grid[0] + 1 &&
                 y - lbmodel.c[i][1] > 0 &&
@@ -592,7 +647,8 @@ void lb_bounce_back() {
 #endif
 #else
 #error Bounce back boundary conditions are only implemented for D3Q19!
-#endif
+#endif // D3Q19
+#endif // LB_ADAPTIVE
 }
 
 #endif

@@ -18,6 +18,8 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -27,8 +29,8 @@
 #endif
 
 #include <boost/mpi.hpp>
-#include <boost/serialization/string.hpp>
 #include <boost/serialization/array.hpp>
+#include <boost/serialization/string.hpp>
 
 #include "communication.hpp"
 
@@ -44,8 +46,8 @@
 #include "elc.hpp"
 #include "energy.hpp"
 #include "external_potential.hpp"
-#include "forces.hpp"
 #include "forcecap.hpp"
+#include "forces.hpp"
 #include "galilei.hpp"
 #include "gb.hpp"
 #include "global.hpp"
@@ -54,6 +56,7 @@
 #include "initialize.hpp"
 #include "integrate.hpp"
 #include "interaction_data.hpp"
+#include "lb-adaptive.hpp"
 #include "lb-boundaries.hpp"
 #include "lb.hpp"
 #include "lj.hpp"
@@ -179,7 +182,17 @@ static int terminated = 0;
   CB(mpi_gather_cuda_devices_slave)                                            \
   CB(mpi_thermalize_cpu_slave)                                                 \
   CB(mpi_scafacos_set_parameters_slave)                                        \
-  CB(mpi_mpiio_slave)
+  CB(mpi_mpiio_slave)                                                          \
+  CB(mpi_lbadapt_grid_init)                                                    \
+  CB(mpi_lbadapt_set_max_level)                                                \
+  CB(mpi_lbadapt_vtk_print_boundary)                                           \
+  CB(mpi_lbadapt_vtk_print_density)                                            \
+  CB(mpi_lbadapt_vtk_print_velocity)                                           \
+  CB(mpi_unif_refinement)                                                      \
+  CB(mpi_rand_refinement)                                                      \
+  CB(mpi_reg_refinement)                                                       \
+  CB(mpi_geometric_refinement)                                                 \
+  CB(mpi_exclude_boundary)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -314,6 +327,27 @@ void mpi_stop() {
 
   mpi_call(mpi_stop_slave, -1, 0);
 
+#ifdef LB_ADAPTIVE
+  lb_release();
+  // shutdown p4est if it was used
+  if (lbadapt_ghost_virt) {
+    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
+  }
+  if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
+
+  sc_finalize();
+#endif
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -323,6 +357,26 @@ void mpi_stop() {
 void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
 
+#ifdef LB_ADAPTIVE
+  lb_release();
+  if (lbadapt_ghost_virt) {
+    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  }
+  if (lbadapt_mesh) {
+    p8est_mesh_destroy(lbadapt_mesh);
+  }
+  if (lbadapt_ghost) {
+    p8est_ghost_destroy(lbadapt_ghost);
+  }
+  if (p8est) {
+    p8est_destroy(p8est);
+  }
+  if (conn) {
+    p8est_connectivity_destroy(conn);
+  }
+
+  sc_finalize();
+#endif
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -2638,6 +2692,282 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 #endif
 }
 
+void mpi_lbadapt_grid_init(int node, int level) {
+#ifdef LB_ADAPTIVE
+  /* create connectivity and octree */
+  conn = p8est_connectivity_new_brick(box_l[0], box_l[1], box_l[2],
+                                      periodic & 1, periodic & 2, periodic & 4);
+  // clang-format off
+  p8est = p8est_new_ext(comm_cart, /* mpi communicator */
+                        conn,      /* connectivity */
+                        0,         /* min octants per process */
+                        level,     /* min level */
+                        1,         /* fill uniform */
+                        0,         /* data size */
+                        NULL,      /* init function */
+                        NULL       /* user pointer */);
+  // clang-format on
+
+  // build initial versions of ghost, mesh and allocate payload
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_local_data = NULL;
+  lbadapt_ghost_data = NULL;
+  finest_level_global = level;
+
+  lbpar.base_level = level;
+  max_refinement_level = level;
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_boundary(int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  sc_array_t *boundary;
+  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  boundary = sc_array_new_size(sizeof(double), num_cells);
+
+  lbadapt_get_boundary_values(boundary);
+
+  /* create VTK output context and set its parameters */
+  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
+  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+
+  /* begin writing the output files */
+  context = p8est_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  context = p8est_vtk_write_cell_dataf(context, 1,
+                                       /* write tree indices */
+                                       1, /* write the refinement level */
+                                       1, /* write the mpi process id */
+                                       0, /* do not wrap the mpi rank */
+                                       1, /* write boundary index as scalar cell
+                                             data */
+                                       0, /* no custom cell vector data */
+                                       "boundary", boundary, context);
+
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = p8est_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+
+  sc_array_destroy(boundary);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_density(int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  sc_array_t *density;
+  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  density = sc_array_new_size(sizeof(double), num_cells);
+
+  lbadapt_get_density_values(density);
+
+  /* create VTK output context and set its parameters */
+  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
+  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+
+  /* begin writing the output files */
+  context = p8est_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  context = p8est_vtk_write_cell_dataf(context, 1,
+                                       /* write tree indices */
+                                       1, /* write the refinement level */
+                                       1, /* write the mpi process id */
+                                       0, /* do not wrap the mpi rank */
+                                       1, /* write density as scalar cell
+                                             data */
+                                       0, /* no custom cell vector data */
+                                       "density", density, context);
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = p8est_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+
+  sc_array_destroy(density);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_vtk_print_velocity(int node, int len) {
+#ifdef LB_ADAPTIVE
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+
+  sc_array_t *velocity;
+  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
+
+  lbadapt_get_velocity_values(velocity);
+
+  /* create VTK output context and set its parameters */
+  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
+  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+
+  /* begin writing the output files */
+  context = p8est_vtk_write_header(context);
+  SC_CHECK_ABORT(context != NULL,
+                 P8EST_STRING "_vtk: Error writing vtk header");
+  // clang-format off
+  context = p8est_vtk_write_cell_dataf(context,
+                                       1, /* write tree indices */
+                                       1, /* write the refinement level */
+                                       1, /* write the mpi process id */
+                                       0, /* do not wrap the mpi rank */
+                                       0, /* no custom cell scalar data */
+                                       1, /* write velocity as vector cell
+                                             data */
+                                       "velocity", velocity, context);
+  // clang-format on
+  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+
+  const int retval = p8est_vtk_write_footer(context);
+  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
+
+  /* free memory */
+  sc_array_destroy(velocity);
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_set_max_level(int node, int l_max) {
+#ifdef LB_ADAPTIVE
+  max_refinement_level = l_max;
+
+  lb_reinit_parameters();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_unif_refinement(int node, int level) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < level; i++) {
+    p8est_refine(p8est, 0, refine_uniform, NULL);
+    p8est_partition(p8est, 0, lbadapt_partition_weight);
+  }
+#endif // LB_ADAPTIVE
+}
+
+void mpi_rand_refinement(int node, int maxLevel) {
+#ifdef LB_ADAPTIVE
+  // assert level 0 is refined
+  p8est_refine(p8est, 0, refine_uniform, NULL);
+
+  // for remaining levels 50% chance they will be refined
+  // refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
+  for (int i = 0; i < maxLevel; i++) {
+    p8est_refine(p8est, 0, refine_random, NULL);
+    p8est_partition(p8est, 0, lbadapt_partition_weight);
+  }
+#endif // LB_ADAPTIVE
+}
+
+void mpi_reg_refinement(int node, int param) {
+#ifdef LB_ADAPTIVE
+  // clang-format off
+  p8est_refine_ext(p8est,               // forest
+                   0,                   // no recursive refinement
+                   P8EST_MAXLEVEL - 1,
+                   refine_regional,     // return true to refine cell
+                   NULL,                // init data
+                   NULL);               // replace data
+
+  p8est_balance_ext(p8est,              // forest
+                    P8EST_CONNECT_EDGE, // connection type
+                    NULL,               // init data
+                    NULL);              // replace data
+  // clang-format on
+
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+
+  int old_flg = finest_level_global;
+  finest_level_global = lbadapt_get_global_maxlevel();
+  // due to non-recursive refinement only 2 cases can occur: finest level
+  // increases or not.
+  lb_step_factor =
+      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
+
+  // FIXME: Implement mapping between two trees
+  lb_release_fluid();
+  lb_reinit_fluid();
+  lb_reinit_forces();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_geometric_refinement(int node, int param) {
+#ifdef LB_ADAPTIVE
+  // clang-format off
+  p8est_refine_ext(p8est,                // forest
+                   1,                    // no recursive refinement
+                   max_refinement_level, // maximum refinement level
+                   refine_geometric,     // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
+
+  p8est_balance_ext(p8est,               // forest
+                    P8EST_CONNECT_EDGE,  // connection type
+                    NULL,                // init data
+                    NULL);               // replace data
+  // clang-format on
+
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  int old_flg = finest_level_global;
+  finest_level_global = lbadapt_get_global_maxlevel();
+
+  lb_step_factor =
+      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
+
+  // FIXME: Implement mapping between two trees
+  lb_release_fluid();
+  lb_reinit_fluid();
+  lb_reinit_forces();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_exclude_boundary(int node, int param) {
+#ifdef LB_ADAPTIVE
+  if (exclude_in_geom_ref == NULL) {
+    exclude_in_geom_ref = new std::vector<int>();
+    exclude_in_geom_ref->reserve(n_lb_boundaries);
+  }
+
+  // ensure to only push each boundary index once
+  std::vector<int>::iterator it;
+  it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(),
+                 param);
+  if (it == exclude_in_geom_ref->end()) {
+    exclude_in_geom_ref->push_back(param);
+  }
+#endif // LB_ADAPTIVE
+}
+
 void mpi_recv_fluid_boundary_flag_slave(int node, int index) {
 #ifdef LB_BOUNDARIES
   if (node == this_node) {
@@ -2853,12 +3183,13 @@ void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3])
 
   if (pnode == this_node) {
     Particle *p = local_particles[part];
+#ifndef ROTATIONAL_INERTIA
     /* here the setting actually happens, if the particle belongs to the local
      * node */
-#ifndef ROTATIONAL_INERTIA
     p->p.gamma_rot = gamma_rot;
 #else
-    for ( j = 0 ; j < 3 ; j++) p->p.gamma_rot[j] = gamma_rot[j];
+    for (j = 0; j < 3; j++)
+      p->p.gamma_rot[j] = gamma_rot[j];
 #endif
   } else {
 #ifndef ROTATIONAL_INERTIA
@@ -2879,12 +3210,12 @@ void mpi_set_particle_gamma_rot_slave(int pnode, int part) {
   if (pnode == this_node) {
     Particle *p = local_particles[part];
     MPI_Status status;
-    /* here the setting happens for nonlocal nodes */
 #ifndef ROTATIONAL_INERTIA
+    /* here the setting happens for nonlocal nodes */
     MPI_Recv(&s_buf, 1, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
     p->p.gamma_rot = s_buf;
 #else
-  	MPI_Recv(p->p.gamma_rot, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
+    MPI_Recv(p->p.gamma_rot, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, &status);
 #endif
   }
   on_particle_change();

@@ -183,7 +183,7 @@ void dd_p4est_create_grid () {
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
   
   // write cells to VTK
-  p4est_vtk_write_file (p4est, NULL, P4EST_STRING "_lj");
+  p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_lj", box_l[0]/(double)t_x);
   
   printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants);

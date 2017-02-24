@@ -105,7 +105,7 @@ expr srand([pid])
 #############################################################
 
 #set density 0.8442
-set density 0.02
+set density 0.2
 set box_length [expr pow($n_part/$density,1.0/3.0)+2*$skin]
 puts " density = $density box_length = $box_length"
 setmd box $box_length $box_length $box_length
@@ -204,6 +204,9 @@ puts $en "# "
 for {set i 0} { $i < $sampling_iterations } { incr i} {
       incr nrep 
      integrate $sampling_interval
+     
+     writevtk "data/part_$i.vtk"
+
      #save_sim $blockfile "id pos v f q type" "all"
      set energies [analyze energy]
      set pressure [analyze pressure total]

@@ -4,7 +4,7 @@
 #include "utils.hpp"
 #include "cells.hpp"
 
-#ifndef USE_P4EST
+#ifndef DD_P4EST
 #define P4EST_NOCHANGE
 #endif
 //#define P4EST_NOCHANGE

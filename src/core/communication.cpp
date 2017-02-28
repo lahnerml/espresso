@@ -2744,6 +2744,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                        /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        1, /* write boundary index as scalar cell
                                              data */
@@ -2782,6 +2783,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                        /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        1, /* write density as scalar cell
                                              data */
@@ -2820,6 +2822,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        0, /* no custom cell scalar data */
                                        1, /* write velocity as vector cell

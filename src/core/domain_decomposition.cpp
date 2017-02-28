@@ -56,7 +56,11 @@
 #ifdef LEES_EDWARDS
 le_dd_comms_manager le_mgr;
 #endif
-DomainDecomposition dd = { 1, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, NULL };
+DomainDecomposition dd = { 1, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, NULL
+#ifdef DD_P4EST
+ , NULL, NULL, NULL, NULL, NULL
+#endif
+};
 
 int max_num_cells = CELLS_MAX_NUM_CELLS;
 int min_num_cells = 1;
@@ -109,11 +113,11 @@ double max_skin   = 0.0;
 //-----------------------------------------------------------------------------------
 //P4EST start
 //-----------------------------------------------------------------------------------
-#ifdef USE_P4EST
+#ifdef DD_P4EST
 #include "p4est_dd.hpp"
 #else
 #define P4EST_NOCHANGE
-#endif //USE_P4EST
+#endif //DD_P4EST
 //-----------------------------------------------------------------------------------
 //P4EST end
 //-----------------------------------------------------------------------------------
@@ -251,7 +255,7 @@ void dd_create_cell_grid () {
     dd.cell_size[0],dd.cell_size[1],dd.cell_size[2],
     dd.cell_grid[0],dd.cell_grid[1],dd.cell_grid[2]);
   
-#ifdef USE_P4EST
+#ifdef DD_P4EST
   dd_p4est_create_grid();
   dd_p4est_comm();
 #endif
@@ -259,7 +263,7 @@ void dd_create_cell_grid () {
 //  printf("%d : %d, %d, %d\n", this_node, new_cells, n_local_cells, new_cells-n_local_cells);
 
   /* allocate cell array and cell pointer arrays */
-//#ifndef USE_P4EST
+//#ifndef DD_P4EST
   realloc_cells(new_cells);
   realloc_cellplist(&local_cells, local_cells.n = n_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = new_cells-n_local_cells);
@@ -282,7 +286,7 @@ void dd_mark_cells () {
     dd_p4est_mark_cells();
 #else
 
-//#ifndef USE_P4EST
+//#ifndef DD_P4EST
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
   DD_CELLS_LOOP(m,n,o) {

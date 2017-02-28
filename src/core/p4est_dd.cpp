@@ -1,6 +1,6 @@
 #include "p4est_dd.hpp"
 //--------------------------------------------------------------------------------------------------
-#ifdef USE_P4EST
+#ifdef DD_P4EST
 //--------------------------------------------------------------------------------------------------
 #ifdef LEES_EDWARDS
 #error "p4est and Lees-Edwards are not compatible yet."
@@ -19,28 +19,16 @@
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
-typedef struct {
-  int64_t idx;
-  int64_t rank;
-  int shell;
-  int boundary;
-  int neighbor[26];
-  int coord[3];
-} local_shell_t;
-//--------------------------------------------------------------------------------------------------
-typedef struct {
-  int rank;
-  int cnt;
-  //uint64_t dir;
-  int dir;
-  int *idx;
-} comm_t;
-//--------------------------------------------------------------------------------------------------
-static p4est_t *p4est = NULL;
+/*static p4est_t *p4est = NULL;
 static p4est_ghost_t *p4est_ghost = NULL;
 static p4est_mesh_t *p4est_mesh = NULL;
 static p4est_connectivity_t *p4est_conn  = NULL;
-static local_shell_t *p4est_shell = NULL;
+static local_shell_t *p4est_shell = NULL;*/
+p4est_t *&p4est = dd.p4est;
+p4est_ghost_t *&p4est_ghost = dd.p4est_ghost;
+p4est_mesh_t *&p4est_mesh = dd.p4est_mesh;
+p4est_connectivity_t *&p4est_conn = dd.p4est_conn;
+local_shell_t *&p4est_shell = dd.p4est_shell;
 //--------------------------------------------------------------------------------------------------
 static int brick_size[3];
 static int grid_size[3];
@@ -87,16 +75,16 @@ static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
 void dd_p4est_free () {
   CALL_TRACE();
   
-  if (p4est_mesh)
-    p4est_mesh_destroy(p4est_mesh);
-  if (p4est_ghost)
-    p4est_ghost_destroy(p4est_ghost);
-  if (p4est)
-    p4est_destroy (p4est);
-  if (p4est_conn)
-    p4est_connectivity_destroy(p4est_conn);
-  if (p4est_shell)
-    delete[] p4est_shell;
+  if (dd.p4est_mesh)
+    p4est_mesh_destroy(dd.p4est_mesh);
+  if (dd.p4est_ghost)
+    p4est_ghost_destroy(dd.p4est_ghost);
+  if (dd.p4est)
+    p4est_destroy (dd.p4est);
+  if (dd.p4est_conn)
+    p4est_connectivity_destroy(dd.p4est_conn);
+  if (dd.p4est_shell)
+    delete[] dd.p4est_shell;
   if (p4est_space_idx)
     delete[] p4est_space_idx;
   if (comm_send)
@@ -112,11 +100,11 @@ void dd_p4est_free () {
   comm_recv = NULL;
   comm_send = NULL;
   p4est_space_idx = NULL;
-  p4est = NULL;
-  p4est_ghost = NULL;
-  p4est_mesh = NULL;
-  p4est_conn = NULL;
-  p4est_shell = NULL;
+  dd.p4est = NULL;
+  dd.p4est_ghost = NULL;
+  dd.p4est_mesh = NULL;
+  dd.p4est_conn = NULL;
+  dd.p4est_shell = NULL;
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_create_grid () {
@@ -176,7 +164,7 @@ void dd_p4est_create_grid () {
   // create p4est structs
   p4est_conn = p8est_connectivity_new_brick (t_x, t_y, t_z, 
                                              PERIODIC(0), PERIODIC(1), PERIODIC(2));
-  p4est = p4est_new_ext (sc_MPI_COMM_WORLD, p4est_conn, 0, grid_level, true, 
+  p4est = p4est_new_ext (MPI_COMM_WORLD, p4est_conn, 0, grid_level, true, 
                          sizeof(quad_data_t), init_fn, NULL);
   p4est_partition(p4est, 0, NULL);
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
@@ -1086,24 +1074,24 @@ void dd_p4est_exchange_and_sort_particles() {
   /*sreq.assign(3*num_comm_proc, MPI_REQUEST_NULL);
   rreq.assign(num_comm_proc, MPI_REQUEST_NULL);
   nrecvpart.assign(num_comm_proc, 0);*/
-  
+    
   for (int i=0;i<num_comm_proc;++i) {
     //sendbuf_dyn[i].clear();
     //recvbuf_dyn[i].clear();
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
-    
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, comm_cart, &rreq[i]);
+        
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &rreq[i]);
   }
-  
+    
   dd_p4est_fill_sendbuf(sendbuf, sendbuf_dyn);
   
   // send
   for (int i=0;i<num_comm_proc;++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, comm_cart, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
   }
   
   //dd_resort_particles();
@@ -1123,14 +1111,14 @@ void dd_p4est_exchange_and_sort_particles() {
     if (recvs[recvidx] == 0) {
       // Size received
       realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
       }
     } else {
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
@@ -1172,7 +1160,7 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
     
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, comm_cart, &rreq[i]);
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, &rreq[i]);
   }
   
   if (pl) {
@@ -1196,10 +1184,10 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
   
   // send
   for (int i=0;i<n_nodes;++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[i + n_nodes]);//&sreq[2 * i]);
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, MPI_COMM_WORLD, &sreq[i + n_nodes]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
   }
   
   // Receive all data
@@ -1217,14 +1205,14 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     if (recvs[recvidx] == 0) {
       // Size received
       realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
       }
     } else {
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);

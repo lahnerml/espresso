@@ -682,7 +682,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   /* call mpi printing routine on all slaves and communicate the filename */
   mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-
+  
   /* perform master IO routine here. */
   sc_array_t *boundary;
   p4est_locidx_t num_cells = p8est->local_num_quadrants;
@@ -702,6 +702,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        1, /* write boundary as scalar cell
                                              data */
@@ -818,6 +819,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        1, /* write density as scalar cell
                                              data */
@@ -910,7 +912,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
-  p8est_vtk_context_set_scale(context, 1);
+  p8est_vtk_context_set_scale(context, 0.9);
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
@@ -921,6 +923,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        1, /* write tree indices */
                                        1, /* write the refinement level */
                                        1, /* write the mpi process id */
+                                       1,
                                        0, /* do not wrap the mpi rank */
                                        0, /* no custom cell scalar data */
                                        1, /* write velocities as cell vector
@@ -2041,6 +2044,8 @@ static void halo_push_communication() {
 
   free(rbuf);
   free(sbuf);
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2134,6 +2139,8 @@ static void lb_realloc_fluid() {
 
   lbfields = (LB_FluidNode *)Utils::realloc(
       lbfields, lblattice.halo_grid_volume * sizeof(*lbfields));
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2187,6 +2194,8 @@ static void lb_prepare_communication() {
   }
 
   release_halo_communication(&comm);
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2639,6 +2648,8 @@ void lb_calc_modes(index_t index, double *mode) {
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
 #endif // !OLD_FLUCT
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 #else  // D3Q19
   int i, j;
@@ -2732,6 +2743,8 @@ inline void lb_pull_calc_modes(index_t index, double *mode) {
     }
   }
 #endif // D3Q19
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2789,6 +2802,8 @@ inline void lb_relax_modes(index_t index, double *mode) {
   mode[17] = gamma_even * mode[17];
   mode[18] = gamma_even * mode[18];
 #endif // !OLD_FLUCT
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2929,6 +2944,8 @@ inline void lb_apply_forces(index_t index, double *mode) {
   lbfields[index].force[2] = 0.0;
   lbfields[index].has_force = 0;
 #endif // EXTERNAL_FORCES
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -2994,6 +3011,8 @@ inline void lb_calc_n_from_modes(index_t index, double *mode) {
     lbfluid[0][i][index] *= w[i];
   }
 #endif // D3Q19
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -3107,6 +3126,8 @@ inline void lb_calc_n_from_modes_push(index_t index, double *m) {
     lbfluid[1][i][index] *= w[i];
   }
 #endif // LB_ADAPTIVE
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // D3Q19
 }
 
@@ -3384,6 +3405,8 @@ inline void lb_stream_collide() {
 #ifdef IMMERSED_BOUNDARY
   IBM_ResetLBForces_CPU();
 #endif
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -3590,6 +3613,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     }
   }
 #endif
+#else
+  //runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 }
 
@@ -3707,6 +3732,8 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   v[0] *= lbpar.agrid / lbpar.tau;
   v[1] *= lbpar.agrid / lbpar.tau;
   v[2] *= lbpar.agrid / lbpar.tau;
+#else
+  //runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
 
   return 0;
@@ -3750,7 +3777,7 @@ void calc_particle_lattice_ia() {
   Cell *cell;
   Particle *p;
   double force[3];
-
+    
   if (transfer_momentum) {
 
     if (lbpar.resend_halo) { /* first MD step after last LB update */
@@ -3825,6 +3852,7 @@ void calc_particle_lattice_ia() {
 #endif
         {
           lb_viscous_coupling(&p[i], force);
+          //printf ("%i : c%i p%i %lf %lf %lf\n",this_node,c,i,force[0],force[1],force[2]);
 
           /* add force to the particle */
           p[i].f.f[0] += force[0];
@@ -3875,6 +3903,8 @@ void calc_particle_lattice_ia() {
         }
       }
     }
+#else
+  //runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
   }
 }

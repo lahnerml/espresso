@@ -39,6 +39,7 @@
 #include <p8est_meshiter.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
+#include <p8est_bits.h>
 
 #include "lb.hpp"
 #include "utils.hpp"
@@ -307,6 +308,10 @@ void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
  * \param [out] j            velocity
  */
 void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
+
+int64_t ldadapt_get_global_idx(p8est_quadrant_t *q);
+int64_t ldadapt_map_pos_to_quad(double pos[3]);
+int64_t ldadapt_map_pos_to_quad(double pos[3], double offset[3]);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);

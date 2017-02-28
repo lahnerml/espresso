@@ -26,7 +26,17 @@ set steps_per_loop 10
 ## this creates the LB fluid with the parameters
 ## of our choice.
 set lb_friction [expr [lindex $argv 0]]
-lbfluid gpu grid 1. dens 1. visc 1. tau 0.01 friction $lb_friction
+
+lbadapt-init 1
+
+#note that the skin below does nothing as there are no particles and hence no Verlet lists which require a skin
+#the variable must be set however as otherwise Espresso throws an error
+
+# set the fluid
+# note that the time step only needs to be larger than the md time step
+lbfluid cpu agrid 0.5 dens 1. visc 1. tau 0.01 friction $lb_friction
+
+#lbfluid cpu grid 1. dens 1. visc 1. tau 0.01 friction $lb_friction
 ## this activates the thermalization of the
 ## LB fluid and adds the random forces on the 
 ## particle

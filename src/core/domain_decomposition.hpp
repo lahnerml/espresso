@@ -61,6 +61,30 @@
 #include "verlet.hpp"
 #include "thermostat.hpp"
 
+#ifdef DD_P4EST
+#include <p4est_to_p8est.h>
+#include <p8est_ghost.h>
+#include <p8est_mesh.h>
+
+typedef struct {
+  int64_t idx;
+  int64_t rank;
+  int shell;
+  int boundary;
+  int neighbor[26];
+  int coord[3];
+} local_shell_t;
+
+typedef struct {
+  int rank;
+  int cnt;
+  //uint64_t dir;
+  int dir;
+  int *idx;
+} comm_t;
+
+#endif
+
 /** Structure containing information about non bonded interactions
     with particles in a neighbor cell. */
 typedef struct {
@@ -117,6 +141,13 @@ typedef struct {
   double inv_cell_size[3];
   /** Array containing information about the interactions between the cells. */
   IA_Neighbor_List *cell_inter;
+#ifdef DD_P4EST
+  p4est_t *p4est;
+  p4est_ghost_t *p4est_ghost;
+  p4est_mesh_t *p4est_mesh;
+  p4est_connectivity_t *p4est_conn;
+  local_shell_t *p4est_shell;
+#endif
 }  DomainDecomposition;
 
 /************************************************************/

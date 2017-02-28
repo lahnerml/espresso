@@ -174,6 +174,7 @@ void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
   }
+    
   int status;
   lbadapt_payload_t *data;
   int lvl;
@@ -1525,7 +1526,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
   int level;
   double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
-
+  
   /* get boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     status = 0;
@@ -1823,6 +1824,44 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 
   myfile.flush();
   myfile.close();
+}
+
+int64_t ldadapt_get_global_idx(p8est_quadrant_t *q) {
+  p8est_quadrant_t c;
+  double xyz[3];
+  p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+  c.x = xyz[0]*(1<<finest_level_global);
+  c.y = xyz[1]*(1<<finest_level_global);
+  c.z = xyz[2]*(1<<finest_level_global);
+  c.level = P8EST_QMAXLEVEL;
+  return p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
+}
+
+int64_t ldadapt_map_pos_to_quad(double pos[3]) {
+  double o[3];
+  o[0] = o[1] = o[2] = 0.0;
+  return ldadapt_map_pos_to_quad(pos, o);
+}
+
+int64_t ldadapt_map_pos_to_quad(double pos[3], double offset[3]) {
+  p8est_quadrant_t c;
+  for (int d=0;d<3;++d) {
+    if (pos[d] + offset[d] > box_l[d]) return -1;
+    if (pos[d] + offset[d] < 0) return -1;
+  }
+  c.x = (pos[0]+offset[0])*(1<<finest_level_global);
+  c.y = (pos[1]+offset[1])*(1<<finest_level_global);
+  c.z = (pos[2]+offset[2])*(1<<finest_level_global);
+  c.level = P8EST_QMAXLEVEL;
+  int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
+  for (int64_t i=0;i<p8est->local_num_quadrants;++i) {
+    if (ldadapt_get_global_idx(p8est_mesh_get_quadrant(p8est,lbadapt_mesh,i)) > pidx)
+      return i - 1;
+  }
+  if (pidx < ldadapt_get_global_idx(&p8est->global_first_position[this_node+1]))
+    return p8est->local_num_quadrants - 1;
+  else
+    return -1;
 }
 
 #endif // LB_ADAPTIVE

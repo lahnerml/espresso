@@ -69,7 +69,7 @@
 
 #include "call_trace.hpp"
 
-#ifdef USE_P4EST
+#ifdef DD_P4EST
 #include <p4est_to_p8est.h>
 #endif
 
@@ -110,16 +110,21 @@ void on_program_start ()
   /*
     call the initialization of the modules here
   */
-#ifdef USE_P4EST
-  sc_init (sc_MPI_COMM_WORLD, 1, 1, NULL, SC_LP_ESSENTIAL);
-  p4est_init (NULL, SC_LP_PRODUCTION);
-#endif
   
   Random::init_random();
 
   init_node_grid();
   /* calculate initial minimal number of cells (see tclcallback_min_num_cells) */
   min_num_cells = calc_processor_min_num_cells();
+
+#ifdef DD_P4EST
+  //sc_init (comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+  //sc_init (comm_cart, 1, 1, NULL, SC_LP_NONE);
+  //p4est_init (NULL, SC_LP_PRODUCTION);
+  sc_init(MPI_COMM_WORLD, 1, 1, NULL, SC_LP_PRODUCTION);
+  //p4est_init(NULL, SC_LP_VERBOSE);
+  p4est_init(NULL, SC_LP_PRODUCTION);
+#endif
 
   /* initially go for domain decomposition */
   dd_topology_init(&local_cells);

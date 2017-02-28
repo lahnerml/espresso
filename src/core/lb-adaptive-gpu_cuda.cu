@@ -20,10 +20,11 @@ void lbadapt_gpu_init() {
 
   lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-  CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
-                       cudaMemcpyHostToDevice));
 
   CUDA_CALL(cudaMemcpy(&d_lbmodel, &lbmodel, sizeof(LB_Model),
+                       cudaMemcpyHostToDevice));
+
+  CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
 }
 
@@ -52,6 +53,7 @@ void lbadapt_gpu_allocate_device_memory() {
 
 void lbadapt_gpu_deallocate_device_memory() {
   CUDA_CALL(cudaFree(d_lb_boundaries));
+
   if (dev_local_real_quadrants == NULL) {
     return;
   }
@@ -797,7 +799,7 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
                          LBADAPT_PATCHSIZE_HALO);
 
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(d_lbpar.max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
   /** call kernels: calc modes, relax modes, thermalize modes, apply forces,
@@ -933,7 +935,7 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
                          LBADAPT_PATCHSIZE);
 
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(d_lbpar.max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
   lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(

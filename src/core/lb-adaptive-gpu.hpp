@@ -160,11 +160,11 @@ extern lbadapt_payload_t **dev_local_virt_quadrants;
 /** generic LB information on host and device */
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;
+extern LB_Boundary *d_lb_boundaries;
 
 #ifdef __CUDACC__
 extern __device__ LB_Parameters d_lbpar;
 extern __device__ LB_Model d_lbmodel;
-extern __device__ LB_Boundary *d_lb_boundaries;
 #endif // __CUDACC__
 
 /* int to indicate fluctuations */

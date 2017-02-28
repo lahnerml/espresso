@@ -3041,7 +3041,9 @@ void mpi_rand_refinement(int node, int maxLevel) {
 }
 
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
+#ifdef LB_ADAPTIVE
   MPI_Bcast (coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_reg_refinement(int node, int param) {

@@ -37,7 +37,7 @@ int main(int argc, char **argv)
   /* first thing to do: fire up MPI */
   mpi_init(&argc, &argv);
 
-  feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW);
+  //feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW);
   on_program_start();
 
   if (this_node == 0) {

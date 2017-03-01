@@ -512,14 +512,16 @@ void dd_p4est_comm () {
   
   int num_send = 0;
   int num_recv = 0;
-  uint32_t num_send_flag = 0;
-  uint32_t num_recv_flag = 0;
+  int8_t num_send_flag[n_nodes];
+  int8_t num_recv_flag[n_nodes];
   
   num_comm_proc = 0;
   if (comm_proc) delete[] comm_proc;
   comm_proc = new int[n_nodes];
   
   for (int i=0;i<n_nodes;++i) {
+    num_send_flag[i] = 0;
+    num_recv_flag[i] = 0;
     comm_proc[i] = -1;
     send_idx[i].clear();
     recv_idx[i].clear();
@@ -556,11 +558,11 @@ void dd_p4est_comm () {
         recv_cnt_tag[irank] |= 1L<<p4est_shell[i].boundary;
       }
       //recv_cnt[p4est_shell[i].rank].insert(recv_cnt[p4est_shell[i].rank].begin() + pos, i); //p4est_shell[i].idx);
-      if ((num_recv_flag & (1<<irank)) == 0) {
+      if (num_recv_flag[irank] == 0) {
           //++num_recv;
           comm_proc[irank] = num_comm_proc;
           num_comm_proc += 1;
-          num_recv_flag |= 1<<irank;
+          num_recv_flag[irank] = 1;
       }
     }
     // is mirror cell -> add to send list
@@ -583,13 +585,13 @@ void dd_p4est_comm () {
           ++num_send;
           send_cnt_tag[nrank] |= 1L<<p4est_shell[nidx].boundary;
         }
-        if ((num_send_flag & (1<<nrank)) == 0) {
+        if (num_send_flag[nrank] == 0) {
           //++num_send;
-          num_send_flag |= 1<<nrank;
+          num_send_flag[nrank] = 1;
         }
       }
     }
-    fprintf(h,"%i %li:%li %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,
+    fprintf(h,"%i %i:%li %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,
       p4est_shell[i].shell,p4est_shell[i].boundary);
     for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
     fprintf(h,"]\n");
@@ -609,7 +611,7 @@ void dd_p4est_comm () {
   fclose(h);
   
   // prepare communicator
-  printf("%i : proc %i send %i, recv %i\n",this_node,num_comm_proc,num_send,num_recv);
+  fprintf(stdout,"%i : proc %i send %i, recv %i\n",this_node,num_comm_proc,num_send,num_recv);
   if (comm_send) {
     for (int i=0;i<num_comm_send;++i)
       delete[] comm_send[i].idx;
@@ -631,7 +633,7 @@ void dd_p4est_comm () {
   for (int n=0,s_cnt=0,r_cnt=0;n<n_nodes;++n) {
     if (comm_proc[n] >= 0) comm_rank[comm_proc[n]] = n;
     for (int i=0;i<64;++i) {
-      if ((num_recv_flag & 1<<n) && (recv_cnt_tag[n] & 1L<<i)) {
+      if (num_recv_flag[n] && (recv_cnt_tag[n] & 1L<<i)) {
         comm_recv[r_cnt].cnt = recv_cnt[n][i];
         comm_recv[r_cnt].rank = n;
         comm_recv[r_cnt].dir = i;
@@ -641,7 +643,7 @@ void dd_p4est_comm () {
             comm_recv[r_cnt].idx[c++] = recv_idx[n][j];
         ++r_cnt;
       }
-      if ((num_send_flag & 1<<n) && (send_cnt_tag[n] & 1L<<i)) {
+      if (num_send_flag[n] && (send_cnt_tag[n] & 1L<<i)) {
         comm_send[s_cnt].cnt = send_cnt[n][i];
         comm_send[s_cnt].rank = n;
         comm_send[s_cnt].dir = i;
@@ -1074,24 +1076,38 @@ void dd_p4est_exchange_and_sort_particles() {
   /*sreq.assign(3*num_comm_proc, MPI_REQUEST_NULL);
   rreq.assign(num_comm_proc, MPI_REQUEST_NULL);
   nrecvpart.assign(num_comm_proc, 0);*/
+  
+  //char snd[200];
+  
+  //sprintf(snd,"%02i send (%i) to ", this_node, num_comm_proc);
     
   for (int i=0;i<num_comm_proc;++i) {
     //sendbuf_dyn[i].clear();
     //recvbuf_dyn[i].clear();
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
+    
+    //sprintf(&snd[strlen(snd)]," %02i",comm_rank[i]);
         
     MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &rreq[i]);
   }
+  
+  //fprintf(stderr,"%s\n",snd);
     
   dd_p4est_fill_sendbuf(sendbuf, sendbuf_dyn);
   
+  
   // send
   for (int i=0;i<num_comm_proc;++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
-    if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
+    //fprintf(stderr, "%02i (%02i) to %02i s t 0 BYTE %li\n", this_node,this_node, comm_rank[i],sizeof(int));
+    //fprintf(stderr, "%02i (%02i) to %02i s t 1 BYTE %li\n", this_node,this_node, comm_rank[i], sendbuf[i].n * sizeof(Particle));
+    int nsend = sendbuf[i].n;
+    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 1, MPI_COMM_WORLD, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
+    if (sendbuf_dyn[i].size() > 0) {
+      //fprintf(stderr, "%02i (%02i) to %02i s t 2 BYTE %li\n", this_node,this_node, comm_rank[i], sendbuf_dyn[i].size()*4);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 2, MPI_COMM_WORLD, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
+    }
   }
   
   //dd_resort_particles();
@@ -1107,26 +1123,36 @@ void dd_p4est_exchange_and_sort_particles() {
 
     source = status.MPI_SOURCE; // == neighrank[recvidx]
     tag = status.MPI_TAG;
-
+    
+    int cnt;
+    MPI_Get_count(&status,MPI_BYTE,&cnt);
+    
+    //fprintf(stderr, "%02i (%02i) to %02i r t %i BYTE %i\n", source, comm_rank[recvidx], this_node, tag, cnt);
+        
     if (recvs[recvidx] == 0) {
       // Size received
       realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, /*tag*/1, MPI_COMM_WORLD, &rreq[recvidx]);
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, MPI_COMM_WORLD, &rreq[recvidx]);
       }
     } else {
+      char fname[30];
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
     }
     recvs[recvidx]++;
   }
+
   
   MPI_Waitall(3 * num_comm_proc, sreq.data(), MPI_STATUS_IGNORE);
+
+  //printf("%0i : done\n", this_node);
+  
   for (int i = 0; i < num_comm_proc; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {

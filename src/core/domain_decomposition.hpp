@@ -68,7 +68,7 @@
 
 typedef struct {
   int64_t idx;
-  int64_t rank;
+  int rank;
   int shell;
   int boundary;
   int neighbor[26];

@@ -1142,7 +1142,6 @@ void dd_p4est_exchange_and_sort_particles() {
         MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, MPI_COMM_WORLD, &rreq[recvidx]);
       }
     } else {
-      char fname[30];
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
     }
     recvs[recvidx]++;

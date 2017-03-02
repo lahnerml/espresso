@@ -12,6 +12,10 @@
 #include "lb-d3q19.hpp"
 #include "utils.hpp"
 
+__device__ LB_Parameters d_lbpar;
+__device__ LB_Model d_lbmodel;
+__device__ LB_Boundary *d_lb_boundaries;
+
 void lbadapt_gpu_init() {
   // FIXME: do this during parameter initialization
   memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(lb_float));

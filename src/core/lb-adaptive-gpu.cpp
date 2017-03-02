@@ -54,7 +54,6 @@ LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
 
 lbadapt_payload_t **dev_local_real_quadrants = NULL;
 lbadapt_payload_t **dev_local_virt_quadrants = NULL;
-LB_Boundary *d_lb_boundaries = NULL;
 
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE

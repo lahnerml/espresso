@@ -12,8 +12,8 @@
 #include "lb-d3q19.hpp"
 #include "utils.hpp"
 
-__device__ LB_Parameters d_lbpar;
-__device__ LB_Model d_lbmodel;
+__device__ LB_Parameters *d_lbpar;
+__device__ LB_Model *d_lbmodel;
 __device__ LB_Boundary *d_lb_boundaries;
 
 void lbadapt_gpu_init() {
@@ -25,10 +25,12 @@ void lbadapt_gpu_init() {
   lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
-  CUDA_CALL(cudaMemcpy(&d_lbmodel, &lbmodel, sizeof(LB_Model),
-                       cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMalloc(&d_lbpar, sizeof(LB_Parameters)));
+  CUDA_CALL(cudaMalloc(&d_lbmodel, sizeof(LB_Model)));
 
   CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
+                       cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(&d_lbmodel, &lbmodel, sizeof(LB_Model),
                        cudaMemcpyHostToDevice));
 }
 
@@ -56,7 +58,9 @@ void lbadapt_gpu_allocate_device_memory() {
 }
 
 void lbadapt_gpu_deallocate_device_memory() {
-  CUDA_CALL(cudaFree(d_lb_boundaries));
+  CUDA_CALL(cudaFree(&d_lb_boundaries));
+  CUDA_CALL(cudaFree(&d_lbmodel));
+  CUDA_CALL(cudaFree(&d_lbpar));
 
   if (dev_local_real_quadrants == NULL) {
     return;
@@ -366,7 +370,7 @@ __global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data, in
 
   /** reconstruct real density */
   rho = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[0] +
-        d_lbpar.rho[0] * h_max * h_max * h_max;
+        d_lbpar->rho[0] * h_max * h_max * h_max;
 
   /** momentum density is redefined to include half-step of force action */
   j[0] = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[1];
@@ -390,54 +394,54 @@ __global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data, in
   /** relax stress modes toward equilibrium */
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] =
       pi_eq[0] +
-      d_lbpar.gamma_bulk[level] *
+      d_lbpar->gamma_bulk[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] -
            pi_eq[0]);
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[5] =
       pi_eq[1] +
-      d_lbpar.gamma_shear[level] *
+      d_lbpar->gamma_shear[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[5] -
            pi_eq[1]);
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[6] =
       pi_eq[2] +
-      d_lbpar.gamma_shear[level] *
+      d_lbpar->gamma_shear[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[6] -
            pi_eq[2]);
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[7] =
       pi_eq[3] +
-      d_lbpar.gamma_shear[level] *
+      d_lbpar->gamma_shear[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[7] -
            pi_eq[3]);
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[8] =
       pi_eq[4] +
-      d_lbpar.gamma_shear[level] *
+      d_lbpar->gamma_shear[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[8] -
            pi_eq[4]);
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[9] =
       pi_eq[5] +
-      d_lbpar.gamma_shear[level] *
+      d_lbpar->gamma_shear[level] *
           (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[9] -
            pi_eq[5]);
 
   /** relax ghost modes */
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[10] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[11] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[12] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[13] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[14] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[15] *=
-      d_lbpar.gamma_odd[0];
+      d_lbpar->gamma_odd[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[16] *=
-      d_lbpar.gamma_even[0];
+      d_lbpar->gamma_even[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[17] *=
-      d_lbpar.gamma_even[0];
+      d_lbpar->gamma_even[0];
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[18] *=
-      d_lbpar.gamma_even[0];
+      d_lbpar->gamma_even[0];
 }
 
 // TODO: Implement
@@ -451,7 +455,7 @@ __global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data,
 
   /** reconstruct density */
   rho = quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[0] +
-        d_lbpar.rho[0] * h_max * h_max * h_max;
+        d_lbpar->rho[0] * h_max * h_max * h_max;
 
   /** momentum density is redefined in case of external forces */
   u[0] = (quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[1] *
@@ -467,31 +471,31 @@ __global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data,
                                  [threadIdx.y]
                                  [threadIdx.z].force[2]) / rho;
 
-  C[0] = (1. + d_lbpar.gamma_bulk[level]) * u[0] *
+  C[0] = (1. + d_lbpar->gamma_bulk[level]) * u[0] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] +
-         1. / 3. * (d_lbpar.gamma_bulk[level] - d_lbpar.gamma_shear[level]) *
+         1. / 3. * (d_lbpar->gamma_bulk[level] - d_lbpar->gamma_shear[level]) *
          (u[0] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] +
           u[1] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] +
           u[2] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2]);
-  C[2] = (1. + d_lbpar.gamma_bulk[level]) * u[1] *
+  C[2] = (1. + d_lbpar->gamma_bulk[level]) * u[1] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] +
-         1. / 3. * (d_lbpar.gamma_bulk[level] - d_lbpar.gamma_shear[level]) *
+         1. / 3. * (d_lbpar->gamma_bulk[level] - d_lbpar->gamma_shear[level]) *
          (u[0] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] +
           u[1] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] +
           u[2] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2]);
-  C[5] = (1. + d_lbpar.gamma_bulk[level]) * u[2] *
+  C[5] = (1. + d_lbpar->gamma_bulk[level]) * u[2] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] +
-         1. / 3. * (d_lbpar.gamma_bulk[level] - d_lbpar.gamma_shear[level]) *
+         1. / 3. * (d_lbpar->gamma_bulk[level] - d_lbpar->gamma_shear[level]) *
          (u[0] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] +
           u[1] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] +
           u[2] * quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2]);
-  C[1] = 0.5 * (1. + d_lbpar.gamma_shear[level]) * (u[0] *
+  C[1] = 0.5 * (1. + d_lbpar->gamma_shear[level]) * (u[0] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] + u[1] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0]);
-  C[3] = 0.5 * (1. + d_lbpar.gamma_shear[level]) * (u[0] *
+  C[3] = 0.5 * (1. + d_lbpar->gamma_shear[level]) * (u[0] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] + u[2] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0]);
-  C[4] = 0.5 * (1. + d_lbpar.gamma_shear[level]) * (u[1] *
+  C[4] = 0.5 * (1. + d_lbpar->gamma_shear[level]) * (u[1] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] + u[2] *
          quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1]);
 
@@ -518,14 +522,14 @@ __global__ void lbadapt_gpu_collide_apply_forces(lbadapt_payload_t *quad_data,
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] =
-      d_lbpar.prefactors[level] * d_lbpar.ext_force[0] * h_max * h_max *
-      d_lbpar.tau * d_lbpar.tau;
+      d_lbpar->prefactors[level] * d_lbpar->ext_force[0] * h_max * h_max *
+      d_lbpar->tau * d_lbpar->tau;
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[1] =
-      d_lbpar.prefactors[level] * d_lbpar.ext_force[1] * h_max * h_max *
-      d_lbpar.tau * d_lbpar.tau;
+      d_lbpar->prefactors[level] * d_lbpar->ext_force[1] * h_max * h_max *
+      d_lbpar->tau * d_lbpar->tau;
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[2] =
-      d_lbpar.prefactors[level] * d_lbpar.ext_force[2] * h_max * h_max *
-      d_lbpar.tau * d_lbpar.tau;
+      d_lbpar->prefactors[level] * d_lbpar->ext_force[2] * h_max * h_max *
+      d_lbpar->tau * d_lbpar->tau;
 #else  // EXTERNAL_FORCES
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].force[0] =
       (lb_float) 0.0;
@@ -826,11 +830,11 @@ void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}
 void lbadapt_gpu_execute_update_from_virtuals_kernel(int level) {}
 
 __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data) {
-  for (int i = 0; i < d_lbmodel.n_veloc; ++i) {
+  for (int i = 0; i < d_lbmodel->n_veloc; ++i) {
     // add 1 for halo offset
-    quad_data->patch[1 + threadIdx.x + (int)d_lbmodel.c[i][0]]
-                    [1 + threadIdx.y + (int)d_lbmodel.c[i][1]]
-                    [1 + threadIdx.z + (int)d_lbmodel.c[i][2]].lbfluid[1][i] =
+    quad_data->patch[1 + threadIdx.x + (int)d_lbmodel->c[i][0]]
+                    [1 + threadIdx.y + (int)d_lbmodel->c[i][1]]
+                    [1 + threadIdx.z + (int)d_lbmodel->c[i][2]].lbfluid[1][i] =
         quad_data->patch[1 + threadIdx.x]
                         [1 + threadIdx.y]
                         [1 + threadIdx.z].lbfluid[0][i];
@@ -864,7 +868,7 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h
      * mirrored back into the original cell, i.e. lbfluid[1][i] has to be
      * written to lbfluid[1][inv(i)] of neighbor in direction inv(i).
      */
-    for (int i = 1; i < d_lbmodel.n_veloc; i += 2) {
+    for (int i = 1; i < d_lbmodel->n_veloc; i += 2) {
       // 2 step loop to avoid if statement
       // first step: inverse velocity is i + 1
 
@@ -873,12 +877,12 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h
       for (int l = 0; l < 3; l++) {
         population_shift -=
             h_max * h_max * h_max *
-            d_lbpar.rho[0] * 2 * d_lbmodel.c[i][l] * d_lbmodel.w[i] *
+            d_lbpar->rho[0] * 2 * d_lbmodel->c[i][l] * d_lbmodel->w[i] *
             d_lb_boundaries[
                 quad_data->patch[1 + threadIdx.x]
                                 [1 + threadIdx.y]
                                 [1 + threadIdx.z].boundary - 1].velocity[l] /
-            d_lbmodel.c_sound_sq;
+            d_lbmodel->c_sound_sq;
       }
       // sum up the force that is applied by the fluid
       for (int l = 0; l < 3; ++l) {
@@ -888,12 +892,12 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h
             (2 * quad_data->patch[1 + threadIdx.x]
                                  [1 + threadIdx.y]
                                  [1 + threadIdx.z].lbfluid[1][i] +
-             population_shift) * d_lbmodel.c[i][l];
+             population_shift) * d_lbmodel->c[i][l];
       }
       // do the actual bounce back step
-      quad_data->patch[1 + threadIdx.x + (int)d_lbmodel.c[i + 1][0]]
-                      [1 + threadIdx.y + (int)d_lbmodel.c[i + 1][1]]
-                      [1 + threadIdx.z + (int)d_lbmodel.c[i + 1][2]].lbfluid[1]
+      quad_data->patch[1 + threadIdx.x + (int)d_lbmodel->c[i + 1][0]]
+                      [1 + threadIdx.y + (int)d_lbmodel->c[i + 1][1]]
+                      [1 + threadIdx.z + (int)d_lbmodel->c[i + 1][2]].lbfluid[1]
                                                                          [i + 1] =
           quad_data->patch[1 + threadIdx.x]
                           [1 + threadIdx.y]
@@ -905,12 +909,12 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h
       for (int l = 0; l < 3; l++) {
         population_shift -=
             h_max * h_max * h_max *
-            d_lbpar.rho[0] * 2 * d_lbmodel.c[i][l] * d_lbmodel.w[i] *
+            d_lbpar->rho[0] * 2 * d_lbmodel->c[i][l] * d_lbmodel->w[i] *
             d_lb_boundaries[
                 quad_data->patch[1 + threadIdx.x]
                                 [1 + threadIdx.y]
                                 [1 + threadIdx.z].boundary - 1].velocity[l] /
-            d_lbmodel.c_sound_sq;
+            d_lbmodel->c_sound_sq;
       }
       // sum up the force that is applied by the fluid
       for (int l = 0; l < 3; ++l) {
@@ -920,12 +924,12 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h
             (2 * quad_data->patch[1 + threadIdx.x]
                                  [1 + threadIdx.y]
                                  [1 + threadIdx.z].lbfluid[1][i] +
-             population_shift) * d_lbmodel.c[i][l];
+             population_shift) * d_lbmodel->c[i][l];
       }
       // do the actual bounce back step
-      quad_data->patch[1 + threadIdx.x + (int)d_lbmodel.c[i - 1][0]]
-                      [1 + threadIdx.y + (int)d_lbmodel.c[i - 1][1]]
-                      [1 + threadIdx.z + (int)d_lbmodel.c[i - 1][2]].lbfluid[1]
+      quad_data->patch[1 + threadIdx.x + (int)d_lbmodel->c[i - 1][0]]
+                      [1 + threadIdx.y + (int)d_lbmodel->c[i - 1][1]]
+                      [1 + threadIdx.z + (int)d_lbmodel->c[i - 1][2]].lbfluid[1]
                                                                          [i - 1] =
           quad_data->patch[1 + threadIdx.x]
                           [1 + threadIdx.y]

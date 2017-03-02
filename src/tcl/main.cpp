@@ -22,7 +22,9 @@
     Main file of Espresso. Initialization of tcl interpreter.
 */
 /* first, since we need the TK define */
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif // _GNU_SOURCE
 #include "utils.hpp"
 #ifdef TK
 #include <tk.h>

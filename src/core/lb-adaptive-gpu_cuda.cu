@@ -28,9 +28,9 @@ void lbadapt_gpu_init() {
   CUDA_CALL(cudaMalloc(&d_lbpar, sizeof(LB_Parameters)));
   CUDA_CALL(cudaMalloc(&d_lbmodel, sizeof(LB_Model)));
 
-  CUDA_CALL(cudaMemcpy(&d_lbpar, &lbpar, sizeof(LB_Parameters),
+  CUDA_CALL(cudaMemcpy(d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
-  CUDA_CALL(cudaMemcpy(&d_lbmodel, &lbmodel, sizeof(LB_Model),
+  CUDA_CALL(cudaMemcpy(d_lbmodel, &lbmodel, sizeof(LB_Model),
                        cudaMemcpyHostToDevice));
 }
 

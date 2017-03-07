@@ -2708,9 +2708,9 @@ void mpi_lbadapt_grid_init(int node, int level) {
   // clang-format on
 
   // build initial versions of ghost, mesh and allocate payload
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
   lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
@@ -2880,7 +2880,7 @@ void mpi_reg_refinement(int node, int param) {
                    NULL);               // replace data
 
   p8est_balance_ext(p8est,              // forest
-                    P8EST_CONNECT_EDGE, // connection type
+                    P8EST_CONNECT_CORNER, // connection type
                     NULL,               // init data
                     NULL);              // replace data
   // clang-format on
@@ -2890,9 +2890,9 @@ void mpi_reg_refinement(int node, int param) {
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
 
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
   lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
   int old_flg = finest_level_global;
@@ -2923,7 +2923,7 @@ void mpi_geometric_refinement(int node, int param) {
                    NULL);                // replace data
 
   p8est_balance_ext(p8est,               // forest
-                    P8EST_CONNECT_EDGE,  // connection type
+                    P8EST_CONNECT_CORNER,  // connection type
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
@@ -2933,9 +2933,9 @@ void mpi_geometric_refinement(int node, int param) {
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
 
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_EDGE);
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
   lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_EDGE);
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();

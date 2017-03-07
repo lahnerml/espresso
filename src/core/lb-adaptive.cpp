@@ -1826,10 +1826,10 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
   myfile.close();
 }
 
-int64_t ldadapt_get_global_idx(p8est_quadrant_t *q) {
+int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   p8est_quadrant_t c;
   double xyz[3];
-  p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+  p8est_qcoord_to_vertex(conn,tree,q->x,q->y,q->z,xyz);
   c.x = xyz[0]*(1<<finest_level_global);
   c.y = xyz[1]*(1<<finest_level_global);
   c.z = xyz[2]*(1<<finest_level_global);
@@ -1837,14 +1837,15 @@ int64_t ldadapt_get_global_idx(p8est_quadrant_t *q) {
   return p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
 }
 
-int64_t ldadapt_map_pos_to_quad(double pos[3]) {
+int64_t lbadapt_map_pos_to_quad(double pos[3]) {
   double o[3];
   o[0] = o[1] = o[2] = 0.0;
-  return ldadapt_map_pos_to_quad(pos, o);
+  return lbadapt_map_pos_to_quad(pos, o);
 }
 
-int64_t ldadapt_map_pos_to_quad(double pos[3], double offset[3]) {
+int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]) {
   p8est_quadrant_t c;
+  p8est_quadrant_t *q;
   for (int d=0;d<3;++d) {
     if (pos[d] + offset[d] > box_l[d]) return -1;
     if (pos[d] + offset[d] < 0) return -1;
@@ -1855,13 +1856,69 @@ int64_t ldadapt_map_pos_to_quad(double pos[3], double offset[3]) {
   c.level = P8EST_QMAXLEVEL;
   int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
   for (int64_t i=0;i<p8est->local_num_quadrants;++i) {
-    if (ldadapt_get_global_idx(p8est_mesh_get_quadrant(p8est,lbadapt_mesh,i)) > pidx)
+    q = p8est_mesh_get_quadrant(p8est,lbadapt_mesh,i);
+    if (lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]) > pidx)
       return i - 1;
   }
-  if (pidx < ldadapt_get_global_idx(&p8est->global_first_position[this_node+1]))
+  q = &p8est->global_first_position[this_node+1];
+  if (pidx < lbadapt_get_global_idx(q, q->p.which_tree))
     return p8est->local_num_quadrants - 1;
   else
     return -1;
+}
+
+void lbadapt_interpolate_pos (double pos[3], lbadapt_payload_t *nodes[8], double delta[6]) {
+  int64_t qidx = lbadapt_map_pos_to_quad(pos);
+  static const int nidx[8][7] = {
+    { 0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
+    { 1, 2, 15, 4, 11, 6, 19}, // right, front, bottom
+    { 0, 3, 16, 4, 10, 7, 20}, // left, back, bottom
+    { 1, 3, 17, 4, 11, 7, 21}, // right, back, bottom
+    { 0, 2, 14, 5, 12, 8, 22}, // left, front, top
+    { 1, 2, 15, 5, 13, 8, 23}, // right, front, top
+    { 0, 3, 16, 5, 12, 9, 24}, // left, back, top
+    { 1, 3, 17, 5, 13, 9, 25}, // right, back, top
+  };
+  if (qidx < 0) {
+    runtimeErrorMsg() << "Position not in local domain";
+    return;
+  }
+  int lvl = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, qidx)->level;
+  int sid = lbadapt_mesh->quad_qreal_offset[qidx];
+  nodes[0] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
+  int corner = 0;
+  for (int d=0;d<3;++d) {
+    double dis = pos[d]*(double)(1<<lvl);
+    dis = dis - floor(dis) + 0.5;
+    if (dis > 1.0) { // right neighbor
+      corner |= 1<<d;
+      dis -= 1.0;
+    }
+    delta[d    ] = dis;
+    delta[d + 3] = 1.0 - dis;
+  }
+  for (int i=0;i<7;++i) {
+    sc_array_t *ne, *ni;
+    ne = sc_array_new(sizeof(int));
+    ni = sc_array_new(sizeof(int));
+    p8est_mesh_get_neighbors(p8est, lbadapt_ghost, lbadapt_mesh, qidx, -1, nidx[corner][i], 0,
+                             NULL, ne, ni);
+    if (ni->elem_count != 1)
+      runtimeErrorMsg() << "There is an error in p8est_mesh_get_neighbors or in the grid";
+    if (ne->array[0] >= 0) { // local quadrant
+      if (lvl != p8est_mesh_get_quadrant(p8est, lbadapt_mesh, ni->array[0])->level)
+        runtimeErrorMsg() << "level mismatch";
+      sid = lbadapt_mesh->quad_qreal_offset[ni->array[0]];
+      nodes[i+1] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
+    } else { // ghost quadrant
+      if (lvl != p8est_quadrant_array_index(&lbadapt_ghost->ghosts,ni->array[0])->level)
+        runtimeErrorMsg() << "level mismatch";
+      sid = lbadapt_mesh->quad_greal_offset[ni->array[0]];
+      nodes[i+1] = &lbadapt_ghost_data[lvl - coarsest_level_ghost][sid];
+    }
+    sc_array_destroy(ne);
+    sc_array_destroy(ni);
+  }
 }
 
 #endif // LB_ADAPTIVE

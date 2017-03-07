@@ -309,9 +309,11 @@ void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
  */
 void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
 
-int64_t ldadapt_get_global_idx(p8est_quadrant_t *q);
-int64_t ldadapt_map_pos_to_quad(double pos[3]);
-int64_t ldadapt_map_pos_to_quad(double pos[3], double offset[3]);
+int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+int64_t lbadapt_map_pos_to_quad(double pos[3]);
+int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
+
+void lbadapt_interpolate_pos (double pos[3], lbadapt_payload_t *nodes[8], double delta[6]);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);

@@ -229,11 +229,11 @@ void dd_p4est_create_grid () {
         printf("%i %i %li strange stuff\n",i,n,ni.elem_count);
       if (ni.elem_count > 0) {
         data->ishell[n] = ni.array[0];
-        if (ne.array[n] >= 0)
+        if (ne.array[0] >= 0)
           data->rshell[n] = this_node;
         else {
           data->rshell[n] = p4est_mesh->ghost_to_proc[ni.array[0]];
-          printf("%i %i remote %i\n",i,n,ne.array[n]);
+          printf("%i %i remote %i\n",i,n,ne.array[0]);
         }
       }
     }

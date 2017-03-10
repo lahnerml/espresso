@@ -2098,12 +2098,13 @@ int lb_sanity_checks() {
 /** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
 #ifdef LB_ADAPTIVE
+#ifndef DD_P4EST
   // one can define the verbosity of p4est and libsc here.
   //sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
   sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
   //p4est_init(NULL, SC_LP_VERBOSE);
   p4est_init(NULL, SC_LP_PRODUCTION);
-
+#endif
 #else  // LB_ADAPTIVE
   lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
@@ -3738,7 +3739,8 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
       for (x = 0; x < 2; x++) {
         data = node_index[(z * 2 + y) * 2 + x];
 #ifdef LB_BOUNDARIES
-        if (data->boundary) {
+        int bnd = data->boundary;
+        if (bnd) {
           local_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
           local_j[0] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
                        lb_boundaries[data->boundary - 1].velocity[0];
@@ -3761,7 +3763,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
         local_j[0] = modes[1];
         local_j[1] = modes[2];
         local_j[2] = modes[3];
-#endif // LB_BOUNDARIES
+#endif // LB_BOUNDARIES       
         interpolated_u[0] += delta[3 * x + 0] * delta[3 * y + 1] *
                              delta[3 * z + 2] * local_j[0] / (local_rho);
         interpolated_u[1] += delta[3 * x + 0] * delta[3 * y + 1] *
@@ -3772,7 +3774,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
     }
   }
 #endif //LB_ADAPTIVE
-
+  
 #ifdef LB_BOUNDARIES
   if (boundary_flag == 1) {
     v[0] = lbboundary_mindist / (0.5 * lbpar.agrid) * interpolated_u[0] +

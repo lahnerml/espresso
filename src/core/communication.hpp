@@ -556,6 +556,13 @@ void mpi_lbadapt_vtk_print_density (int node, int len);
  */
 void mpi_lbadapt_vtk_print_velocity(int node, int len);
 
+/** Call for parallel IO of particle
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_dd_p4est_write_particle_vtk(int node, int len);
+
 /** Set maximum refinement level
  * 
  * @param [in] node   The node on which this function is called (all)

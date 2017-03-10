@@ -32,4 +32,6 @@ int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
 
 void dd_p4est_on_geometry_change(int flags);
 
+void dd_p4est_write_particle_vtk(char *filename);
+
 #endif

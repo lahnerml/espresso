@@ -164,7 +164,8 @@ void dd_p4est_create_grid () {
   // create p4est structs
   p4est_conn = p8est_connectivity_new_brick (t_x, t_y, t_z, 
                                              PERIODIC(0), PERIODIC(1), PERIODIC(2));
-  p4est = p4est_new_ext (MPI_COMM_WORLD, p4est_conn, 0, grid_level, true, 
+  //p4est = p4est_new_ext (MPI_COMM_WORLD, p4est_conn, 0, grid_level, true, 
+  p4est = p4est_new_ext (comm_cart, p4est_conn, 0, grid_level, true, 
                          sizeof(quad_data_t), init_fn, NULL);
   p4est_partition(p4est, 0, NULL);
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
@@ -1089,7 +1090,8 @@ void dd_p4est_exchange_and_sort_particles() {
     
     //sprintf(&snd[strlen(snd)]," %02i",comm_rank[i]);
         
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &rreq[i]);
+    //MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &rreq[i]);
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, comm_cart, &rreq[i]);
   }
   
   //fprintf(stderr,"%s\n",snd);
@@ -1102,11 +1104,14 @@ void dd_p4est_exchange_and_sort_particles() {
     //fprintf(stderr, "%02i (%02i) to %02i s t 0 BYTE %li\n", this_node,this_node, comm_rank[i],sizeof(int));
     //fprintf(stderr, "%02i (%02i) to %02i s t 1 BYTE %li\n", this_node,this_node, comm_rank[i], sendbuf[i].n * sizeof(Particle));
     int nsend = sendbuf[i].n;
-    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 1, MPI_COMM_WORLD, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
+    //MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, MPI_COMM_WORLD, &sreq[i]);
+    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
+    //MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 1, MPI_COMM_WORLD, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 1, comm_cart, &sreq[i + num_comm_proc]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0) {
       //fprintf(stderr, "%02i (%02i) to %02i s t 2 BYTE %li\n", this_node,this_node, comm_rank[i], sendbuf_dyn[i].size()*4);
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 2, MPI_COMM_WORLD, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
+      //MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 2, MPI_COMM_WORLD, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 2, comm_cart, &sreq[i + 2*num_comm_proc]);//&sreq[3 * i]);
     }
   }
   
@@ -1132,14 +1137,16 @@ void dd_p4est_exchange_and_sort_particles() {
     if (recvs[recvidx] == 0) {
       // Size received
       realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, /*tag*/1, MPI_COMM_WORLD, &rreq[recvidx]);
+      //MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, /*tag*/1, MPI_COMM_WORLD, &rreq[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, /*tag*/1, comm_cart, &rreq[recvidx]);
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, MPI_COMM_WORLD, &rreq[recvidx]);
+        //MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, MPI_COMM_WORLD, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, comm_cart, &rreq[recvidx]);
       }
     } else {
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
@@ -1185,7 +1192,8 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
     
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, &rreq[i]);
+    //MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, MPI_COMM_WORLD, &rreq[i]);
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, comm_cart, &rreq[i]);
   }
   
   if (pl) {
@@ -1209,10 +1217,13 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
   
   // send
   for (int i=0;i<n_nodes;++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, MPI_COMM_WORLD, &sreq[i + n_nodes]);//&sreq[2 * i]);
+    //MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i]);
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, comm_cart, &sreq[i]);
+    //MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, MPI_COMM_WORLD, &sreq[i + n_nodes]);//&sreq[2 * i]);
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[i + n_nodes]);//&sreq[2 * i]);
     if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
+      //MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, MPI_COMM_WORLD, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
+      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[i + 2*n_nodes]);//&sreq[3 * i]);
   }
   
   // Receive all data
@@ -1230,14 +1241,16 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     if (recvs[recvidx] == 0) {
       // Size received
       realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+      //MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+        //MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, MPI_COMM_WORLD, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
       }
     } else {
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
@@ -1355,6 +1368,89 @@ void dd_p4est_on_geometry_change(int flags) {
       return;
     }
   }
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_write_particle_vtk(char *filename) {
+  char *pos_file_ending = strpbrk(filename, ".");
+  if (pos_file_ending != 0) {
+    *pos_file_ending = '\0';
+  } else {
+    pos_file_ending = strpbrk(filename, "\0");
+  }
+  //printf("%i : write particle data to %s\n", this_node, filename);
+  char fname[1024];
+  if (this_node == 0) {
+    sprintf(fname,"%s.pvtp",filename);
+    FILE *h = fopen(fname, "w");
+    fprintf(h,"<?xml version=\"1.0\"?>\n");
+    fprintf(h,"<VTKFile type=\"PPolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n\t");
+    fprintf(h,"<PPolyData GhostLevel=\"0\">\n\t\t<PPoints>\n\t\t\t");
+    fprintf(h,"<PDataArray type=\"Float32\" Name=\"Position\" NumberOfComponents=\"3\" format=\"ascii\"/>\n");
+    fprintf(h,"\t\t</PPoints>\n\t\t");
+    fprintf(h,"<PPointData Scalars=\"mpirank,part_id,cell_id\" Vectors=\"velocity\">\n\t\t\t");
+    fprintf(h,"<PDataArray type=\"Int32\" Name=\"mpirank\" format=\"ascii\"/>\n\t\t\t");
+    fprintf(h,"<PDataArray type=\"Int32\" Name=\"part_id\" format=\"ascii\"/>\n\t\t\t");
+    fprintf(h,"<PDataArray type=\"Int32\" Name=\"cell_id\" format=\"ascii\"/>\n\t\t\t");
+    fprintf(h,"<PDataArray type=\"Float32\" Name=\"velocity\" NumberOfComponents=\"3\" format=\"ascii\"/>\n\t\t");
+    fprintf(h,"</PPointData>\n");
+    for (int p=0;p<n_nodes;++p)
+      fprintf(h,"\t\t<Piece Source=\"%s_%04i.vtp\"/>\n",filename, p);
+    fprintf(h,"\t</PPolyData>\n</VTKFile>\n");
+    fclose(h);
+  }
+  sprintf(fname,"%s_%04i.vtp",filename,this_node);
+  int num_p=0;
+  for (int c = 0; c < local_cells.n; c++) {
+    num_p += local_cells.cell[c]->n;
+  }
+  FILE *h = fopen(fname, "w");
+  fprintf(h,"<?xml version=\"1.0\"?>\n");
+  fprintf(h,"<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n\t");
+  fprintf(h,"<PolyData>\n\t\t<Piece NumberOfPoints=\"%i\" NumberOfVerts=\"0\" ",num_p);
+  fprintf(h,"NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"0\">\n\t\t\t<Points>\n\t\t\t\t");
+  fprintf(h,"<DataArray type=\"Float32\" Name=\"Position\" NumberOfComponents=\"3\" format=\"ascii\">\n");
+  for (int c = 0; c < local_cells.n; c++) {
+    int np = local_cells.cell[c]->n;
+    Particle *part = local_cells.cell[c]->part;
+    for (int p=0;p<np;++p) {
+      fprintf(h,"\t\t\t\t\t%le %le %le\n",part[p].r.p[0],part[p].r.p[1],part[p].r.p[2]);
+    }
+  }
+  fprintf(h,"\t\t\t\t</DataArray>\n\t\t\t</Points>\n\t\t\t");
+  fprintf(h,"<PointData Scalars=\"mpirank,part_id,cell_id\" Vectors=\"velocity\">\n\t\t\t\t");
+  fprintf(h,"<DataArray type=\"Int32\" Name=\"mpirank\" format=\"ascii\">\n\t\t\t\t\t");
+  for (int c = 0; c < local_cells.n; c++) {
+    int np = local_cells.cell[c]->n;
+    for (int p=0;p<np;++p) {
+      fprintf(h,"%i ",this_node);
+    }
+  }
+  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Int32\" Name=\"part_id\" format=\"ascii\">\n\t\t\t\t\t");
+  for (int c = 0; c < local_cells.n; c++) {
+    int np = local_cells.cell[c]->n;
+    Particle *part = local_cells.cell[c]->part;
+    for (int p=0;p<np;++p) {
+      fprintf(h,"%i ",part[p].p.identity);
+    }
+  }
+  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Int32\" Name=\"cell_id\" format=\"ascii\">\n\t\t\t\t\t");
+  for (int c = 0; c < local_cells.n; c++) {
+    int np = local_cells.cell[c]->n;
+    for (int p=0;p<np;++p) {
+      fprintf(h,"%i ",c);
+    }
+  }
+  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Float32\" Name=\"velocity\" NumberOfComponents=\"3\" format=\"ascii\">\n");
+  for (int c = 0; c < local_cells.n; c++) {
+    int np = local_cells.cell[c]->n;
+    Particle *part = local_cells.cell[c]->part;
+    for (int p=0;p<np;++p) {
+      fprintf(h,"\t\t\t\t\t%le %le %le\n",part[p].m.v[0],part[p].m.v[1],part[p].m.v[2]);
+    }
+  }
+  fprintf(h,"\t\t\t\t</DataArray>\n\t\t\t</PointData>\n");
+  fprintf(h,"\t\t</Piece>\n\t</PolyData>\n</VTKFile>\n");
+  fclose(h);
 }
 //--------------------------------------------------------------------------------------------------
 #endif

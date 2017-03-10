@@ -85,6 +85,7 @@
 #include "tab.hpp"
 #include "topology.hpp"
 #include "virtual_sites.hpp"
+#include "p4est_dd.hpp"
 
 using namespace std;
 using Communication::mpiCallbacks;
@@ -192,7 +193,8 @@ static int terminated = 0;
   CB(mpi_rand_refinement)                                                      \
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
-  CB(mpi_exclude_boundary)
+  CB(mpi_exclude_boundary)                                                     \
+  CB(mpi_dd_p4est_write_particle_vtk)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -325,6 +327,10 @@ void mpi_stop() {
     return;
 
   mpi_call(mpi_stop_slave, -1, 0);
+  
+#ifdef DD_P4EST
+  dd_p4est_free();
+#endif
 
 #ifdef LB_ADAPTIVE
   lb_release();
@@ -355,6 +361,10 @@ void mpi_stop() {
 
 void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
+
+#ifdef DD_P4EST
+  dd_p4est_free();
+#endif
 
 #ifdef LB_ADAPTIVE
   lb_release();
@@ -2810,7 +2820,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
-  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+  p8est_vtk_context_set_scale(context, 0.9); /* quadrant at almost full scale */
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
@@ -3496,4 +3506,11 @@ void mpi_mpiio_slave(int dummy, int flen) {
   else
     mpi_mpiio_common_read(filename, fields);
   delete[] filename;
+}
+
+void mpi_dd_p4est_write_particle_vtk(int node, int len) {
+  char filename[len];
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  
+  dd_p4est_write_particle_vtk(filename);
 }

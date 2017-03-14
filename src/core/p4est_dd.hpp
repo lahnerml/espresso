@@ -4,6 +4,12 @@
 #include "utils.hpp"
 #include "cells.hpp"
 
+#ifdef DD_P4EST
+#include <p4est_to_p8est.h>
+#include <p8est_mesh.h>
+#endif
+
+
 #ifndef DD_P4EST
 #define P4EST_NOCHANGE
 #endif
@@ -33,5 +39,9 @@ int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
 void dd_p4est_on_geometry_change(int flags);
 
 void dd_p4est_write_particle_vtk(char *filename);
+
+#ifdef DD_P4EST
+void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn);
+#endif
 
 #endif

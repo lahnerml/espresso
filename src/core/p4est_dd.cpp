@@ -12,6 +12,7 @@
 #include <p8est_vtk.h>
 #include <p8est_extended.h>
 #include <p8est_bits.h>
+#include <p8est_algorithms.h>
 #include <vector>
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
@@ -107,6 +108,61 @@ void dd_p4est_free () {
   dd.p4est_shell = NULL;
 }
 //--------------------------------------------------------------------------------------------------
+int dd_p4est_cellsize_optimal () {
+  int cnt[3];
+  int lvl = 0;
+  // compute number of cells
+  cnt[0] = cnt[1] = cnt[2] = 1;
+  if (max_range > 0) {
+    if (box_l[0] > max_range) cnt[0] = box_l[0]/max_range;
+    if (box_l[1] > max_range) cnt[1] = box_l[1]/max_range;
+    if (box_l[2] > max_range) cnt[2] = box_l[2]/max_range;
+    if (cnt[0] < 1) cnt[0] = 1;
+    if (cnt[1] < 1) cnt[1] = 1;
+    if (cnt[2] < 1) cnt[2] = 1;
+  }
+  
+  grid_size[0] = cnt[0];
+  grid_size[1] = cnt[1];
+  grid_size[2] = cnt[2];
+  
+  // divide all dimensions by biggest common power of 2
+  while (((cnt[0]|cnt[1]|cnt[2])&1) == 0) {
+    ++lvl;
+    cnt[0] >>= 1;
+    cnt[1] >>= 1;
+    cnt[2] >>= 1;
+  }
+  
+  brick_size[0] = cnt[0];
+  brick_size[1] = cnt[1];
+  brick_size[2] = cnt[2];
+  
+  return lvl;
+}
+//--------------------------------------------------------------------------------------------------
+int dd_p4est_cellsize_even () {
+  brick_size[0] = box_l[0];
+  brick_size[1] = box_l[1];
+  brick_size[2] = box_l[2];
+  
+  int cnt;
+  int lvl = 0;
+  if (max_range > 0) cnt = 1.0/max_range;
+  if (cnt < 1) cnt = 1;
+  
+  while ((cnt&1) == 0) {
+    ++lvl;
+    cnt >>= 1;
+  }
+  
+  grid_size[0] = brick_size[0]<<lvl;
+  grid_size[1] = brick_size[1]<<lvl;
+  grid_size[2] = brick_size[2]<<lvl;
+
+  return lvl;
+}
+//--------------------------------------------------------------------------------------------------
 void dd_p4est_create_grid () {
   CALL_TRACE();
   
@@ -114,55 +170,34 @@ void dd_p4est_create_grid () {
   
   dd_p4est_free();
   
-  int t_x, t_y, t_z, grid_level;
-  grid_level = 0;
+  int grid_level;
   
-  // compute number of cells
-  t_x = t_y = t_z = 1;
-  if (max_range > 0) {
-    if (box_l[0] > max_range) t_x = box_l[0]/max_range;
-    if (box_l[1] > max_range) t_y = box_l[1]/max_range;
-    if (box_l[2] > max_range) t_z = box_l[2]/max_range;
-    if (t_x < 1) t_x = 1;
-    if (t_y < 1) t_y = 1;
-    if (t_z < 1) t_z = 1;
-  }
+#ifdef LB_ADAPTIVE
+  if (max_range < 1.0)
+    grid_level = dd_p4est_cellsize_even();
+  else
+    grid_level = dd_p4est_cellsize_optimal();
+#else
+  grid_level = dd_p4est_cellsize_optimal();
+#endif
   
 #ifndef P4EST_NOCHANGE
   // set global variables
-  dd.cell_size[0] = box_l[0]/t_x;
-  dd.cell_size[1] = box_l[1]/t_y;
-  dd.cell_size[2] = box_l[2]/t_z;
+  dd.cell_size[0] = box_l[0]/(double)grid_size[0];
+  dd.cell_size[1] = box_l[1]/(double)grid_size[1];
+  dd.cell_size[2] = box_l[2]/(double)grid_size[2];
   dd.inv_cell_size[0] = 1.0/dd.cell_size[0];
   dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
   dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
   
-  printf("%i : cellsize %lfx%lfx%lf\n", this_node,  dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]);
+  printf("%i : gridsize %ix%ix%i\n", this_node, grid_size[0], grid_size[1], grid_size[2]);
+  printf("%i : bricksize %ix%ix%i level %i\n", this_node, brick_size[0], brick_size[1], brick_size[2], grid_level);
+  printf("%i : cellsize %lfx%lfx%lf\n", this_node, dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]);
 #endif
   
-  /*t_x = dd.cell_grid[0]*node_grid[0];
-  t_y = dd.cell_grid[1]*node_grid[1];
-  t_z = dd.cell_grid[2]*node_grid[2];*/
-  
-  grid_size[0] = t_x;
-  grid_size[1] = t_y;
-  grid_size[2] = t_z;
-  
-  // divide all dimensions by biggest common power of 2
-  while (((t_x|t_y|t_z)&1) == 0) {
-    ++grid_level;
-    t_x >>= 1;
-    t_y >>= 1;
-    t_z >>= 1;
-  }
-  
-  brick_size[0] = t_x;
-  brick_size[1] = t_y;
-  brick_size[2] = t_z;
-  
   // create p4est structs
-  p4est_conn = p8est_connectivity_new_brick (t_x, t_y, t_z, 
+  p4est_conn = p8est_connectivity_new_brick (brick_size[0], brick_size[1], brick_size[2], 
                                              PERIODIC(0), PERIODIC(1), PERIODIC(2));
   //p4est = p4est_new_ext (MPI_COMM_WORLD, p4est_conn, 0, grid_level, true, 
   p4est = p4est_new_ext (comm_cart, p4est_conn, 0, grid_level, true, 
@@ -172,7 +207,7 @@ void dd_p4est_create_grid () {
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
   
   // write cells to VTK
-  p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_lj", box_l[0]/(double)t_x);
+  p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_lj", box_l[0]/(double)brick_size[0]);
   
   printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants);
@@ -206,9 +241,9 @@ void dd_p4est_create_grid () {
   quads.clear();
   shell.clear();
   
-  /*for (int i=0;i<p4est->local_num_quadrants;++i) {
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
-    data = (quad_data_t*)(q->p.user_data);
+    quad_data_t *data = (quad_data_t*)(q->p.user_data);
     double xyz[3];
     p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
     uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
@@ -220,26 +255,32 @@ void dd_p4est_create_grid () {
     ls.idx = i;
     ls.rank = this_node;
     ls.shell = 0;
-    shell.push_back(ls);
+    ls.boundary = 0;
+    ls.coord[0] = x;
+    ls.coord[1] = y;
+    ls.coord[2] = z;
     for (int n=0;n<26;++n) {
-      sc_array_t ne, ni;
-      sc_array_init(&ne,sizeof(int));
-      sc_array_init(&ni,sizeof(int));
-      p4est_mesh_get_neighbors(p4est, p4est_ghost, p4est_mesh, i, -1, n, 0, NULL, &ne, &ni);
-      if (ni.elem_count > 1)
-        printf("%i %i %li strange stuff\n",i,n,ni.elem_count);
-      if (ni.elem_count > 0) {
-        data->ishell[n] = ni.array[0];
-        if (ne.array[0] >= 0)
+      ls.neighbor[n] = -1;
+      sc_array_t *ne, *ni;
+      ne = sc_array_new(sizeof(int));
+      ni = sc_array_new(sizeof(int));
+      p4est_mesh_get_neighbors(p4est, p4est_ghost, p4est_mesh, i, -1, n, 0, NULL, ne, ni);
+      if (ni->elem_count > 1)
+        printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
+      if (ni->elem_count > 0) {
+        data->ishell[n] = *((int*)sc_array_index_int(ni,0));
+        if (*((int*)sc_array_index_int(ne,0)) >= 0)
           data->rshell[n] = this_node;
         else {
-          data->rshell[n] = p4est_mesh->ghost_to_proc[ni.array[0]];
-          printf("%i %i remote %i\n",i,n,ne.array[0]);
+          data->rshell[n] = p4est_mesh->ghost_to_proc[data->ishell[n]];
         }
       }
+      sc_array_destroy(ne);
+      sc_array_destroy(ni);
     }
-  }*/
-  
+    shell.push_back(ls);
+  }
+  /*
   for (int i=0;i<p4est->local_num_quadrants;++i) {
     p4est_mesh_face_neighbor_t mfn;
     int tidx = -1;
@@ -273,7 +314,7 @@ void dd_p4est_create_grid () {
     if (PERIODIC(1) && y == grid_size[1] - 1) ls.boundary |= 8;
     if (PERIODIC(2) && z == 0) ls.boundary |= 16;
     if (PERIODIC(2) && z == grid_size[2] - 1) ls.boundary |= 32;*/
-    shell.push_back(ls);
+  /*  shell.push_back(ls);
     while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
       if (mfn.current_qtq == i) continue;
       fcnt = mfn.face-1;
@@ -376,7 +417,7 @@ void dd_p4est_create_grid () {
       };
     }
   }
-  P4EST_FREE (ghost_data);
+  P4EST_FREE (ghost_data);*/
     
   char fname[100];
   sprintf(fname,"cells_%i.list",this_node);
@@ -964,6 +1005,9 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
               move_indexed_particle(&cells[p4est_shell[nidx].idx], cell, p);
               if(p < cell->n) p -= 1;
             }
+          } else {
+            runtimeErrorMsg() << "particle " << p << " on process " << this_node << " is OB";
+            fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
           }
         } else { // Local Cell
           move_indexed_particle(&cells[nidx], cell, p);
@@ -1309,6 +1353,43 @@ int dd_p4est_pos_to_proc(double pos[3]) {
     if (p4est_space_idx[i] > idx) return i - 1;
   }
   runtimeErrorMsg() << "position " << pos[0] << "x" << pos[1] << "x" << pos[2] << " not in box";
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn) {
+  p4est_locidx_t num_quad_per_proc[n_nodes];
+  p4est_locidx_t num_quad_per_proc_global[n_nodes];
+  for (int i=0;i<n_nodes;++i) num_quad_per_proc[i] = 0;
+  
+  for (int i=0;i<p4est->local_num_quadrants;++i) {
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,mesh,i);
+    double xyz[3];
+    p4est_qcoord_to_vertex(conn,mesh->quad_to_tree[i],q->x,q->y,q->z,xyz);
+    int64_t idx = dd_p4est_pos_morton_idx(xyz);
+    for (int n=1;n<=n_nodes;++n) {
+      if (p4est_space_idx[n] > idx) {
+        num_quad_per_proc[n - 1] += 1;
+        break;
+      }
+    }
+  }
+  printf("%i : repartition %i cells: ", this_node, p4est->local_num_quadrants);
+  for (int i=0;i<n_nodes;++i)
+    printf("%i ",num_quad_per_proc[i]);
+  
+  printf("\n");
+  
+  MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes, P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
+  
+  p4est_locidx_t sum = 0;
+  for (int i=0;i<n_nodes;++i) sum += num_quad_per_proc_global[i];
+  if (sum < p4est->global_num_quadrants) {
+    printf("%i : quadrants lost while partitioning\n", this_node);
+    return;
+  }
+  
+  printf("%i : repartitioned LB %i\n", this_node, num_quad_per_proc_global[this_node]);
+  
+  p4est_partition_given(p4est, num_quad_per_proc_global);
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_on_geometry_change(int flags) {

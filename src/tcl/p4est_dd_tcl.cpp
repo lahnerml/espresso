@@ -29,6 +29,7 @@
 int tclcommand_md_vtk(ClientData data, Tcl_Interp *interp,
                      int argc, char *argv[])
 {
+#ifdef DD_P4EST
   char *filename;
   
   if (argc < 2) {
@@ -48,6 +49,6 @@ int tclcommand_md_vtk(ClientData data, Tcl_Interp *interp,
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   
   dd_p4est_write_particle_vtk(filename);
-
+#endif
   return (TCL_OK);
 }

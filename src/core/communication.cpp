@@ -2728,6 +2728,19 @@ void mpi_lbadapt_grid_init(int node, int level) {
 
   lbpar.base_level = level;
   max_refinement_level = level;
+  
+#ifdef DD_P4EST
+  dd_p4est_partition(p8est, lbadapt_mesh, conn);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#endif
+
 #endif // LB_ADAPTIVE
 }
 
@@ -2820,7 +2833,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
-  p8est_vtk_context_set_scale(context, 0.9); /* quadrant at almost full scale */
+  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
@@ -3509,8 +3522,10 @@ void mpi_mpiio_slave(int dummy, int flen) {
 }
 
 void mpi_dd_p4est_write_particle_vtk(int node, int len) {
+#ifdef DD_P4EST
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   
   dd_p4est_write_particle_vtk(filename);
+#endif
 }

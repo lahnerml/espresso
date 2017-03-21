@@ -15,6 +15,8 @@
 LB_Parameters *d_lbpar = NULL;
 LB_Model *d_lbmodel = NULL;
 LB_Boundary *d_lb_boundaries;
+lb_float d_d3q19_lattice[19][3];
+lb_float d_d3q19_w[19];
 
 void lbadapt_gpu_init() {
   lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
@@ -31,6 +33,13 @@ void lbadapt_gpu_init() {
   CUDA_CALL(cudaMemcpy(d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
   CUDA_CALL(cudaMemcpy(d_lbmodel, &lbmodel, sizeof(LB_Model),
+                       cudaMemcpyHostToDevice));
+
+  CUDA_CALL(cudaMemcpy(&d_d3q19_w, &d3q19_w,
+                       sizeof(lb_float) * 19,
+                       cudaMemcpyHostToDevice));
+  CUDA_CALL(cudaMemcpy(&d_d3q19_lattice, &d3q19_lattice,
+                       sizeof(lb_float) * 3 * 19,
                        cudaMemcpyHostToDevice));
 }
 
@@ -847,13 +856,14 @@ void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}
 void lbadapt_gpu_execute_update_from_virtuals_kernel(int level) {}
 
 __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data,
-                                   LB_Model *d_lbmodel) {
+                                   LB_Model *d_lbmodel,
+                                   lb_float d_d3q19_lattice[19][3]) {
   for (int i = 0; i < d_lbmodel->n_veloc; ++i) {
     // add 1 for halo offset
     quad_data
-        ->patch[1 + threadIdx.x + (int)d_lbmodel->c[i][0]]
-               [1 + threadIdx.y + (int)d_lbmodel->c[i][1]]
-               [1 + threadIdx.z + (int)d_lbmodel->c[i][2]]
+        ->patch[1 + threadIdx.x + (int)d_d3q19_lattice[i][0]]
+               [1 + threadIdx.y + (int)d_d3q19_lattice[i][1]]
+               [1 + threadIdx.z + (int)d_d3q19_lattice[i][2]]
         .lbfluid[1][i] =
         quad_data->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
             .lbfluid[0][i];
@@ -866,16 +876,18 @@ void lbadapt_gpu_execute_streaming_kernel(int level) {
                          LBADAPT_PATCHSIZE);
 
   lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level], d_lbmodel);
+      dev_local_real_quadrants[level], d_lbmodel, d_d3q19_lattice);
   lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_virt_quadrants[level], d_lbmodel);
+      dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
 }
 
 __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
                                         lb_float h_max,
                                         LB_Boundary *d_lb_boundaries,
                                         LB_Parameters *d_lbpar,
-                                        LB_Model *d_lbmodel) {
+                                        LB_Model *d_lbmodel,
+                                        lb_float d_d3q19_lattice[19][3],
+                                        lb_float d_d3q19_w[19]) {
   lb_float population_shift;
   /** if current quadrant is boundary: reset resting velocity to 0 and stream
    * all obtained velocities back to neighboring quadrants */
@@ -897,8 +909,8 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
       population_shift = (lb_float)0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
-            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_lbmodel->c[i][l] *
-            d_lbmodel->w[i] *
+            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_d3q19_lattice[i][l] *
+            d_d3q19_w[i] *
             d_lb_boundaries
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
@@ -917,13 +929,13 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
                      .lbfluid[1][i] +
              population_shift) *
-            d_lbmodel->c[i][l];
+            d_d3q19_lattice[i][l];
       }
       // do the actual bounce back step
       quad_data
-          ->patch[1 + threadIdx.x + (int)d_lbmodel->c[i + 1][0]]
-                 [1 + threadIdx.y + (int)d_lbmodel->c[i + 1][1]]
-                 [1 + threadIdx.z + (int)d_lbmodel->c[i + 1][2]]
+          ->patch[1 + threadIdx.x + (int)d_d3q19_lattice[i + 1][0]]
+                 [1 + threadIdx.y + (int)d_d3q19_lattice[i + 1][1]]
+                 [1 + threadIdx.z + (int)d_d3q19_lattice[i + 1][2]]
           .lbfluid[1][i + 1] =
           quad_data->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
               .lbfluid[1][i] +
@@ -934,8 +946,8 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
       population_shift = (lb_float)0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
-            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_lbmodel->c[i][l] *
-            d_lbmodel->w[i] *
+            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_d3q19_lattice[i][l] *
+            d_d3q19_w[i] *
             d_lb_boundaries
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
@@ -953,13 +965,13 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
                      .lbfluid[1][i] +
              population_shift) *
-            d_lbmodel->c[i][l];
+            d_d3q19_lattice[i][l];
       }
       // do the actual bounce back step
       quad_data
-          ->patch[1 + threadIdx.x + (int)d_lbmodel->c[i - 1][0]]
-                 [1 + threadIdx.y + (int)d_lbmodel->c[i - 1][1]]
-                 [1 + threadIdx.z + (int)d_lbmodel->c[i - 1][2]]
+          ->patch[1 + threadIdx.x + (int)d_d3q19_lattice[i - 1][0]]
+                 [1 + threadIdx.y + (int)d_d3q19_lattice[i - 1][1]]
+                 [1 + threadIdx.z + (int)d_d3q19_lattice[i - 1][2]]
           .lbfluid[1][i - 1] =
           quad_data->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
               .lbfluid[1][i] +
@@ -978,10 +990,10 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
 
   lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-      d_lbmodel);
+      d_lbmodel, d_d3q19_lattice, d_d3q19_w);
   lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
       dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-      d_lbmodel);
+      d_lbmodel, d_d3q19_lattice, d_d3q19_w);
 }
 
 // NOT LB-specific; visualize utilization of thread and block ids in vtk format

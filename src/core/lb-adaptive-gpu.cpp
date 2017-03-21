@@ -85,6 +85,9 @@ double lb_coupl_pref = 0.0;
 double lb_coupl_pref2 = 0.0;
 
 void lbadapt_gpu_offload_data(int level) {
+  if (dev_local_real_quadrants == NULL) {
+    lbadapt_gpu_allocate_device_memory();
+  }
   lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
   tmp_real = P4EST_ALLOC(lbadapt_payload_t,
                          (lbadapt_mesh->quad_level + level)->elem_count);

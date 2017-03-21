@@ -356,6 +356,10 @@ void lbadapt_reinit_parameters() {
     }
   }
 #ifdef LB_ADAPTIVE_GPU
+  memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(lb_float));
+  memcpy(lbpar.gamma_bulk, gamma_bulk, P8EST_MAXLEVEL * sizeof(lb_float));
+  memcpy(lbpar.gamma_shear, gamma_shear, P8EST_MAXLEVEL * sizeof(lb_float));
+
   lbadapt_gpu_init();
 #endif // LB_ADAPTIVE_GPU
 }

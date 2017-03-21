@@ -17,11 +17,6 @@ __device__ LB_Model *d_lbmodel = NULL;
 __device__ LB_Boundary *d_lb_boundaries;
 
 void lbadapt_gpu_init() {
-  // FIXME: do this during parameter initialization
-  memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(lb_float));
-  memcpy(lbpar.gamma_bulk, gamma_bulk, P8EST_MAXLEVEL * sizeof(lb_float));
-  memcpy(lbpar.gamma_shear, gamma_shear, P8EST_MAXLEVEL * sizeof(lb_float));
-
   lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 

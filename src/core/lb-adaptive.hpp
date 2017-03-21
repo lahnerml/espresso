@@ -314,6 +314,7 @@ int64_t lbadapt_map_pos_to_quad(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
 
 void lbadapt_interpolate_pos (double pos[3], lbadapt_payload_t *nodes[8], double delta[6]);
+int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], double delta[20]);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);

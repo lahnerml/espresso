@@ -3454,10 +3454,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   int x, y, z;
 #ifndef LB_ADAPTIVE
   index_t node_index[8];
-#else
-  lbadapt_payload_t *node_index[8];
-#endif
   double delta[6];
+#else
+  lbadapt_payload_t *node_index[20];
+  double delta[20];
+  double dcnt = 0;
+#endif
   double *local_f, interpolated_u[3], delta_j[3];
 
 #ifdef EXTERNAL_FORCES
@@ -3475,7 +3477,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 #ifndef LB_ADAPTIVE
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
 #else
-  lbadapt_interpolate_pos(p->r.p, node_index, delta);
+  //lbadapt_interpolate_pos(p->r.p, node_index, delta);
+  dcnt = lbadapt_interpolate_pos_adapt(p->r.p, node_index, delta);
 #endif
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
@@ -3553,14 +3556,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   delta_j[1] = -force[1] * time_step * lbpar.tau / lbpar.agrid;
   delta_j[2] = -force[2] * time_step * lbpar.tau / lbpar.agrid;
   
+#ifndef LB_ADAPTIVE
   for (z = 0; z < 2; z++) {
     for (y = 0; y < 2; y++) {
       for (x = 0; x < 2; x++) {
-#ifndef LB_ADAPTIVE
         local_f = lbfields[node_index[(z * 2 + y) * 2 + x]].force;
-#else
-        local_f = node_index[(z * 2 + y) * 2 + x]->lbfields.force;
-#endif
 
         local_f[0] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[0];
@@ -3571,6 +3571,14 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
       }
     }
   }
+#else
+  for (x = 0; x < dcnt; ++x) {
+    local_f = node_index[x]->lbfields.force;
+    local_f[0] += delta[x] * delta_j[0];
+    local_f[1] += delta[x] * delta_j[1];
+    local_f[2] += delta[x] * delta_j[2];
+  }
+#endif
 
 // map_position_to_lattice: position ... not inside a local plaquette in ...
 #ifdef ENGINE
@@ -3600,7 +3608,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 #ifndef LB_ADAPTIVE
     lblattice.map_position_to_lattice(source_position, node_index, delta);
 #else
-    lbadapt_interpolate_pos(source_position, node_index, delta);
+    //lbadapt_interpolate_pos(source_position, node_index, delta);
+    dcnt = lbadapt_interpolate_pos(source_position, node_index, delta);
 #endif
 
     lb_lbfluid_get_interpolated_velocity(source_position, p->swim.v_source);
@@ -3613,14 +3622,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     delta_j[2] =
         -p->swim.f_swim * p->r.quatu[2] * time_step * lbpar.tau / lbpar.agrid;
 
+#ifndef LB_ADAPTIVE
     for (z = 0; z < 2; z++) {
       for (y = 0; y < 2; y++) {
         for (x = 0; x < 2; x++) {
-#ifndef LB_ADAPTIVE
           local_f = lbfields[node_index[(z * 2 + y) * 2 + x]].force;
-#else
-          local_f = node_index[(z * 2 + y) * 2 + x]->lbfields.force;
-#endif
 
           local_f[0] += delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] *
                         delta_j[0];
@@ -3631,6 +3637,14 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
         }
       }
     }
+#else
+    for (x = 0; x < dcnt; ++x) {
+      local_f = node_index[x]->lbfields.force;
+      local_f[0] += delta[x] * delta_j[0];
+      local_f[1] += delta[x] * delta_j[1];
+      local_f[2] += delta[x] * delta_j[2];
+    }
+#endif
   }
 #endif
 }
@@ -3638,10 +3652,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
 #ifndef LB_ADAPTIVE
   index_t node_index[8], index;
-#else
-  lbadapt_payload_t *node_index[8], *data;
-#endif
   double delta[6];
+#else
+  lbadapt_payload_t *node_index[20], *data;
+  double delta[20];
+  int dcnt;
+#endif
   double local_rho, local_j[3], interpolated_u[3];
   double modes[19];
   int x, y, z;
@@ -3685,7 +3701,8 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
      and the relative position of the particle in this cell */
   lblattice.map_position_to_lattice(pos, node_index, delta);
 #else
-  lbadapt_interpolate_pos(pos, node_index, delta);
+  //lbadapt_interpolate_pos(pos, node_index, delta);
+  dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta);
 #endif
 
   /* calculate fluid velocity at particle's position
@@ -3734,44 +3751,37 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
     }
   }
 #else //LB_ADAPTIVE
-  for (z = 0; z < 2; z++) {
-    for (y = 0; y < 2; y++) {
-      for (x = 0; x < 2; x++) {
-        data = node_index[(z * 2 + y) * 2 + x];
+  for (x = 0; x < dcnt; x++) {
+    data = node_index[x];
 #ifdef LB_BOUNDARIES
-        int bnd = data->boundary;
-        if (bnd) {
-          local_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
-          local_j[0] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
-                       lb_boundaries[data->boundary - 1].velocity[0];
-          local_j[1] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
-                       lb_boundaries[data->boundary - 1].velocity[1];
-          local_j[2] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
-                       lb_boundaries[data->boundary - 1].velocity[2];
-        } else {
-          lbadapt_calc_modes(data->lbfluid, modes);
-          local_rho =
-              lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
-          local_j[0] = modes[1];
-          local_j[1] = modes[2];
-          local_j[2] = modes[3];
-        }
-#else  // LB_BOUNDARIES
-        lbadapt_calc_modes(data->lbfluid, modes);
-        local_rho =
-            lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
-        local_j[0] = modes[1];
-        local_j[1] = modes[2];
-        local_j[2] = modes[3];
-#endif // LB_BOUNDARIES       
-        interpolated_u[0] += delta[3 * x + 0] * delta[3 * y + 1] *
-                             delta[3 * z + 2] * local_j[0] / (local_rho);
-        interpolated_u[1] += delta[3 * x + 0] * delta[3 * y + 1] *
-                             delta[3 * z + 2] * local_j[1] / (local_rho);
-        interpolated_u[2] += delta[3 * x + 0] * delta[3 * y + 1] *
-                             delta[3 * z + 2] * local_j[2] / (local_rho);
-      }
+    int bnd = data->boundary;
+    if (bnd) {
+      local_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
+      local_j[0] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+                   lb_boundaries[data->boundary - 1].velocity[0];
+      local_j[1] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+                   lb_boundaries[data->boundary - 1].velocity[1];
+      local_j[2] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+                   lb_boundaries[data->boundary - 1].velocity[2];
+    } else {
+      lbadapt_calc_modes(data->lbfluid, modes);
+      local_rho =
+          lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
+      local_j[0] = modes[1];
+      local_j[1] = modes[2];
+      local_j[2] = modes[3];
     }
+#else  // LB_BOUNDARIES
+    lbadapt_calc_modes(data->lbfluid, modes);
+    local_rho =
+        lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
+    local_j[0] = modes[1];
+    local_j[1] = modes[2];
+    local_j[2] = modes[3];
+#endif // LB_BOUNDARIES       
+    interpolated_u[0] += delta[x] * local_j[0] / (local_rho);
+    interpolated_u[1] += delta[x] * local_j[1] / (local_rho);
+    interpolated_u[2] += delta[x] * local_j[2] / (local_rho);
   }
 #endif //LB_ADAPTIVE
   

@@ -99,7 +99,7 @@ void lbadapt_gpu_offload_data(int level) {
   int status = 0;
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(m);
-    if (m->current_qid != -1) {
+    if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
         memcpy(next_real,
                &lbadapt_local_data[level - coarsest_level_local]
@@ -137,7 +137,7 @@ void lbadapt_gpu_retrieve_data(int level) {
   int status = 0;
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(m);
-    if (m->current_qid != -1) {
+    if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
         memcpy(&lbadapt_local_data[level - coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(m)],

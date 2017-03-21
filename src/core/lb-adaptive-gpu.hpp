@@ -157,7 +157,7 @@ extern int local_num_virt_quadrants_level[P8EST_MAXLEVEL];
 extern lbadapt_payload_t **dev_local_real_quadrants;
 extern lbadapt_payload_t **dev_local_virt_quadrants;
 
-/** generic LB information on host and device */
+/** generic LB information on host */
 extern LB_Parameters lbpar;
 extern LB_Model lbmodel;
 

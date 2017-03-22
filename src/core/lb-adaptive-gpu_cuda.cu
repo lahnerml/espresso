@@ -96,10 +96,10 @@ void lbadapt_gpu_allocate_device_memory() {
 
 void lbadapt_gpu_deallocate_device_memory() {
   CUDA_CALL(cudaFree(d_lb_boundaries));
-  CUDA_CALL(cudaFree(&d_lbmodel));
-  CUDA_CALL(cudaFree(&d_lbpar));
-  CUDA_CALL(cudaFree(&d_d3q19_w));
-  CUDA_CALL(cudaFree(&d_d3q19_lattice));
+  CUDA_CALL(cudaFree(d_lbmodel));
+  CUDA_CALL(cudaFree(d_lbpar));
+  CUDA_CALL(cudaFree(d_d3q19_w));
+  CUDA_CALL(cudaFree(d_d3q19_lattice));
 
   if (dev_local_real_quadrants == NULL) {
     return;

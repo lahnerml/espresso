@@ -46,6 +46,8 @@ void print_device_info() {
          prop.sharedMemPerBlock);
   printf("  Maximum amount of shared memory per streaming multiprocessor %zu\n",
          prop.sharedMemPerMultiprocessor);
+  printf("  Single to double performance ratio: %i\n",
+         prop.singleToDoublePrecisionPerfRatio);
   printf("\n");
 }
 

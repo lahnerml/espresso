@@ -23,10 +23,13 @@ void print_device_info() {
   cudaGetDevice(&device);
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, device);
-  printf("Device Number: %d\n", i);
+  printf("Device Number: %d\n", device);
   printf("  Device name: %s\n", prop.name);
   printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
   printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
+  printf("  Warp size: %i\n", prop.warpSize);
+  printf("  Max memory pitch allowed: %i\n", prop.memPitch);
+  printf("  Constant memory available: %i\n", prop.totalConstMem);
   printf("  Peak Memory Bandwidth (GB/s): %f\n",
          2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
   printf("  Number of Streaming Multiprocessors: %i\n",
@@ -35,11 +38,13 @@ void print_device_info() {
          prop.maxThreadsPerBlock);
   printf("  Maximum thread size: [%i, %i, %i]\n", prop.maxThreadsDim[0],
          prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+  printf("  Maximum grid size: [%i, %i, %i]\n", prop.maxGridSize[0],
+         prop.maxGridSize[1], prop.maxGridSize[2]);
   printf("\n");
 }
 
 void lbadapt_gpu_init() {
-  print_device_info();
+    print_device_info();
   CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
   CUDA_CALL(cudaMemset(d_d3q19_lattice, -1, 3 * 19));
   CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice[3], sizeof(lb_float) * 3,

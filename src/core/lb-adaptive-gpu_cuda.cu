@@ -18,12 +18,32 @@ LB_Boundary *d_lb_boundaries;
 lb_float *d_d3q19_lattice;
 lb_float *d_d3q19_w;
 
+void print_device_info() {
+  int device = -1;
+  cudaGetDevice(&device);
+  cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, device);
+  printf("Device Number: %d\n", i);
+  printf("  Device name: %s\n", prop.name);
+  printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
+  printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
+  printf("  Peak Memory Bandwidth (GB/s): %f\n",
+         2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
+  printf("  Number of Streaming Multiprocessors: %i\n",
+         prop.multiProcessorCount);
+  printf("  Maximum number of Threads per block: %i\n",
+         prop.maxThreadsPerBlock);
+  printf("  Maximum thread size: [%i, %i, %i]\n", prop.maxThreadsDim[0],
+         prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
+  printf("\n");
+}
+
 void lbadapt_gpu_init() {
-    CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
-    CUDA_CALL(cudaMemset(d_d3q19_lattice, -1, 3 * 19));
-    CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice[3],
-                         sizeof(lb_float) * 3,
-                         cudaMemcpyHostToDevice));
+  print_device_info();
+  CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
+  CUDA_CALL(cudaMemset(d_d3q19_lattice, -1, 3 * 19));
+  CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice[3], sizeof(lb_float) * 3,
+                       cudaMemcpyHostToDevice));
 
   if (d_d3q19_w == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_w, sizeof(lb_float) * 19));
@@ -887,13 +907,11 @@ void lbadapt_gpu_execute_streaming_kernel(int level) {
       dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
 }
 
-__global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
-                                        lb_float h_max,
-                                        LB_Boundary *d_lb_boundaries,
-                                        LB_Parameters *d_lbpar,
-                                        LB_Model *d_lbmodel,
-                                        lb_float *d_d3q19_lattice,
-                                        lb_float *d_d3q19_w) {
+__global__ void
+lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
+                        LB_Boundary *d_lb_boundaries, LB_Parameters *d_lbpar,
+                        LB_Model *d_lbmodel, lb_float *d_d3q19_lattice,
+                        lb_float *d_d3q19_w) {
   lb_float population_shift;
   /** if current quadrant is boundary: reset resting velocity to 0 and stream
    * all obtained velocities back to neighboring quadrants */
@@ -915,8 +933,8 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
       population_shift = (lb_float)0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
-            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_d3q19_lattice[3 * i + l] *
-            d_d3q19_w[i] *
+            h_max * h_max * h_max * d_lbpar->rho[0] * 2 *
+            d_d3q19_lattice[3 * i + l] * d_d3q19_w[i] *
             d_lb_boundaries
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
@@ -952,8 +970,8 @@ __global__ void lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data,
       population_shift = (lb_float)0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
-            h_max * h_max * h_max * d_lbpar->rho[0] * 2 * d_d3q19_lattice[3 * i + l] *
-            d_d3q19_w[i] *
+            h_max * h_max * h_max * d_lbpar->rho[0] * 2 *
+            d_d3q19_lattice[3 * i + l] * d_d3q19_w[i] *
             d_lb_boundaries
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]

@@ -12,11 +12,11 @@
 #include "lb-d3q19.hpp"
 #include "utils.hpp"
 
-LB_Parameters *d_lbpar;
-LB_Model *d_lbmodel;
+LB_Parameters *d_lbpar = NULL;
+LB_Model *d_lbmodel = NULL;
 LB_Boundary *d_lb_boundaries;
-lb_float *d_d3q19_lattice;
-lb_float *d_d3q19_w;
+lb_float *d_d3q19_lattice = NULL;
+lb_float *d_d3q19_w = NULL;
 
 void print_device_info() {
   int device = -1;
@@ -46,10 +46,11 @@ void print_device_info() {
 void lbadapt_gpu_init() {
   print_device_info();
 
-  CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
-  CUDA_CALL(cudaMemset(d_d3q19_lattice, 1, 3 * 19));
-  CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice[3], sizeof(lb_float) * 3,
-                       cudaMemcpyHostToDevice));
+  if (d_d3q19_lattice == NULL) {
+    CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
+    CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice,
+                         sizeof(lb_float) * 19 * 3, cudaMemcpyHostToDevice));
+  }
 
   if (d_d3q19_w == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_w, sizeof(lb_float) * 19));

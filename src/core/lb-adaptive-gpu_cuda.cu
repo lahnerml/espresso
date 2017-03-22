@@ -44,9 +44,10 @@ void print_device_info() {
 }
 
 void lbadapt_gpu_init() {
-    print_device_info();
+  print_device_info();
+
   CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
-  CUDA_CALL(cudaMemset(d_d3q19_lattice, -1, 3 * 19));
+  CUDA_CALL(cudaMemset(d_d3q19_lattice, 1, 3 * 19));
   CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice[3], sizeof(lb_float) * 3,
                        cudaMemcpyHostToDevice));
 

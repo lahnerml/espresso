@@ -28,8 +28,8 @@ void print_device_info() {
   printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
   printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
   printf("  Warp size: %i\n", prop.warpSize);
-  printf("  Max memory pitch allowed: %i\n", prop.memPitch);
-  printf("  Constant memory available: %i\n", prop.totalConstMem);
+  printf("  Max memory pitch allowed: %zu\n", prop.memPitch);
+  printf("  Constant memory available: %zu\n", prop.totalConstMem);
   printf("  Peak Memory Bandwidth (GB/s): %f\n",
          2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
   printf("  Number of Streaming Multiprocessors: %i\n",

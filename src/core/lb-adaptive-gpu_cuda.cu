@@ -34,12 +34,18 @@ void print_device_info() {
          2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
   printf("  Number of Streaming Multiprocessors: %i\n",
          prop.multiProcessorCount);
+  printf("  Maximum number of Threads per streaming multiprocessor: %i\n",
+         prop.maxThreadsPerMultiProcessor);
   printf("  Maximum number of Threads per block: %i\n",
          prop.maxThreadsPerBlock);
   printf("  Maximum thread size: [%i, %i, %i]\n", prop.maxThreadsDim[0],
          prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
   printf("  Maximum grid size: [%i, %i, %i]\n", prop.maxGridSize[0],
          prop.maxGridSize[1], prop.maxGridSize[2]);
+  printf("  Maximum amount of shared memory per block: %zu\n",
+         prop.sharedMemPerBlock);
+  printf("  Maximum amount of shared memory per streaming multiprocessor %zu\n",
+         prop.sharedMemPerMultiprocessor);
   printf("\n");
 }
 
@@ -861,6 +867,7 @@ lbadapt_gpu_collide_backtransform(lbadapt_payload_t *quad_data) {
 }
 
 void lbadapt_gpu_execute_collision_kernel(int level) {
+
   dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
   dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
                          LBADAPT_PATCHSIZE_HALO);
@@ -873,12 +880,16 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
   // TODO: smarter to put into a single kernel?
   lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]);
+
   lbadapt_gpu_collide_relax_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level], level, h_max, d_lbpar);
+
   lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]); // stub only
+
   lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level], level, h_max, d_lbpar);
+
   lbadapt_gpu_collide_backtransform<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level]);
 }
@@ -909,9 +920,13 @@ void lbadapt_gpu_execute_streaming_kernel(int level) {
 
   lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
       dev_local_real_quadrants[level], d_lbmodel, d_d3q19_lattice);
+
+#if 0
   blocks_per_grid.x = local_num_virt_quadrants_level[level];
+
   lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
       dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
+#endif // 0
 }
 
 __global__ void
@@ -1023,10 +1038,12 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
       dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
       d_lbmodel, d_d3q19_lattice, d_d3q19_w);
 
+#if 0
   blocks_per_grid.x = local_num_virt_quadrants_level[level];
   lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
       dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
       d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+#endif // 0
 }
 
 // NOT LB-specific; visualize utilization of thread and block ids in vtk format

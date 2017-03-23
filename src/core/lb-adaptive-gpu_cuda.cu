@@ -28,8 +28,8 @@ void print_device_info() {
   printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
   printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
   printf("  Warp size: %i\n", prop.warpSize);
-  printf("  Max memory pitch allowed: %i\n", prop.memPitch);
-  printf("  Constant memory available: %i\n", prop.totalConstMem);
+  printf("  Max memory pitch allowed: %zu\n", prop.memPitch);
+  printf("  Constant memory available: %zu\n", prop.totalConstMem);
   printf("  Peak Memory Bandwidth (GB/s): %f\n",
          2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
   printf("  Number of Streaming Multiprocessors: %i\n",
@@ -50,7 +50,7 @@ void print_device_info() {
 }
 
 void lbadapt_gpu_init() {
-  print_device_info();
+  // print_device_info();
 
   if (d_d3q19_lattice == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
@@ -867,31 +867,32 @@ lbadapt_gpu_collide_backtransform(lbadapt_payload_t *quad_data) {
 }
 
 void lbadapt_gpu_execute_collision_kernel(int level) {
+  if (local_num_real_quadrants_level[level]) {
+    dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
+    dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
+        LBADAPT_PATCHSIZE_HALO);
 
-  dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
-  dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
-                         LBADAPT_PATCHSIZE_HALO);
+    lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+      ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+    /** call kernels: calc modes, relax modes, thermalize modes, apply forces,
+     *                backtransform */
+    // TODO: smarter to put into a single kernel?
+    lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level]);
 
-  /** call kernels: calc modes, relax modes, thermalize modes, apply forces,
-   *                backtransform */
-  // TODO: smarter to put into a single kernel?
-  lbadapt_gpu_collide_calc_modes<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level]);
+    lbadapt_gpu_collide_relax_modes<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level], level, h_max, d_lbpar);
 
-  lbadapt_gpu_collide_relax_modes<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level], level, h_max, d_lbpar);
+    lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level]); // stub only
 
-  lbadapt_gpu_collide_thermalize_modes<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level]); // stub only
+    lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level], level, h_max, d_lbpar);
 
-  lbadapt_gpu_collide_apply_forces<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level], level, h_max, d_lbpar);
-
-  lbadapt_gpu_collide_backtransform<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level]);
+    lbadapt_gpu_collide_backtransform<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level]);
+  }
 }
 
 void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}
@@ -914,19 +915,22 @@ __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data,
 }
 
 void lbadapt_gpu_execute_streaming_kernel(int level) {
-  dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
+  dim3 blocks_per_grid(1);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
-                         LBADAPT_PATCHSIZE);
+      LBADAPT_PATCHSIZE);
+  if (local_num_real_quadrants_level[level]) {
+    blocks_per_grid.x = local_num_real_quadrants_level[level];
 
-  lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level], d_lbmodel, d_d3q19_lattice);
+    lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level], d_lbmodel, d_d3q19_lattice);
+  }
 
-#if 0
-  blocks_per_grid.x = local_num_virt_quadrants_level[level];
+  if (local_num_virt_quadrants_level[level]) {
+    blocks_per_grid.x = local_num_virt_quadrants_level[level];
 
-  lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
-#endif // 0
+    lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
+  }
 }
 
 __global__ void
@@ -989,7 +993,7 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
 
       // second step: inverse velocity is i - 1
       // calculate population shift from inflow/outflow boundary conditions
-      population_shift = (lb_float)0.0;
+      population_shift = (lb_float) 0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
             h_max * h_max * h_max * d_lbpar->rho[0] * 2 *
@@ -1027,23 +1031,27 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
 }
 
 void lbadapt_gpu_execute_bounce_back_kernel(int level) {
-  dim3 blocks_per_grid(local_num_real_quadrants_level[level]);
+  dim3 blocks_per_grid(1);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
-                         LBADAPT_PATCHSIZE);
-
+      LBADAPT_PATCHSIZE);
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
-  lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-      d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+  if (local_num_real_quadrants_level[level]) {
+    blocks_per_grid.x = local_num_real_quadrants_level[level];
 
-#if 0
-  blocks_per_grid.x = local_num_virt_quadrants_level[level];
-  lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
-      dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-      d_lbmodel, d_d3q19_lattice, d_d3q19_w);
-#endif // 0
+    lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
+        d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+  }
+
+  if (local_num_virt_quadrants_level[level]) {
+    blocks_per_grid.x = local_num_virt_quadrants_level[level];
+
+    lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
+        d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+  }
 }
 
 // NOT LB-specific; visualize utilization of thread and block ids in vtk format

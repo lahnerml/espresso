@@ -46,8 +46,10 @@ void print_device_info() {
          prop.sharedMemPerBlock);
   printf("  Maximum amount of shared memory per streaming multiprocessor %zu\n",
          prop.sharedMemPerMultiprocessor);
+#if CUDART_VERSION >= 8000
   printf("  Single to double performance ratio: %i\n",
          prop.singleToDoublePrecisionPerfRatio);
+#endif // CUDART_VERSION > 8
   printf("\n");
 }
 
@@ -444,7 +446,7 @@ __global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data,
   pi_eq[4] = (j[0] * j[2]) / rho;
   pi_eq[5] = (j[1] * j[2]) / rho;
 
-  /** relax stress modes toward equilibrium */
+  /** relax stress modes */
   quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].modes[4] =
       pi_eq[0] +
       d_lbpar->gamma_bulk[level] *
@@ -497,7 +499,7 @@ __global__ void lbadapt_gpu_collide_relax_modes(lbadapt_payload_t *quad_data,
       d_lbpar->gamma_even[0];
 }
 
-// TODO: Implement
+// FIXME: Implement
 __global__ void
 lbadapt_gpu_collide_thermalize_modes(lbadapt_payload_t *quad_data) {}
 
@@ -917,9 +919,12 @@ __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data,
 }
 
 void lbadapt_gpu_execute_streaming_kernel(int level) {
+  // default: create 1 threadblock and fill real number as actual number of
+  // quadrants on that respective level
   dim3 blocks_per_grid(1);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
       LBADAPT_PATCHSIZE);
+
   if (local_num_real_quadrants_level[level]) {
     blocks_per_grid.x = local_num_real_quadrants_level[level];
 
@@ -995,7 +1000,7 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
 
       // second step: inverse velocity is i - 1
       // calculate population shift from inflow/outflow boundary conditions
-      population_shift = (lb_float) 0.0;
+      population_shift = (lb_float)0.0;
       for (int l = 0; l < 3; l++) {
         population_shift -=
             h_max * h_max * h_max * d_lbpar->rho[0] * 2 *
@@ -1033,6 +1038,8 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
 }
 
 void lbadapt_gpu_execute_bounce_back_kernel(int level) {
+  // default: create 1 threadblock and fill real number as actual number of
+  // quadrants on that respective level
   dim3 blocks_per_grid(1);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
       LBADAPT_PATCHSIZE);

@@ -31,7 +31,7 @@ void print_device_info() {
   printf("  Max memory pitch allowed: %zu\n", prop.memPitch);
   printf("  Constant memory available: %zu\n", prop.totalConstMem);
   printf("  Peak Memory Bandwidth (GB/s): %f\n",
-         2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8) / 1.0e6);
+         2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8.0) / 1.0e6);
   printf("  Number of Streaming Multiprocessors: %i\n",
          prop.multiProcessorCount);
   printf("  Maximum number of Threads per streaming multiprocessor: %i\n",
@@ -56,6 +56,7 @@ void print_device_info() {
 void lbadapt_gpu_init() {
   // print_device_info();
 
+  // avoid allocating containers multiple times
   if (d_d3q19_lattice == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));
     CUDA_CALL(cudaMemcpy(d_d3q19_lattice, d3q19_lattice,
@@ -77,6 +78,7 @@ void lbadapt_gpu_init() {
   if (d_lbpar == NULL) {
     CUDA_CALL(cudaMalloc(&d_lbpar, sizeof(LB_Parameters)));
   }
+  // update agrid value
   lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
   CUDA_CALL(cudaMemcpy(d_lbpar, &lbpar, sizeof(LB_Parameters),
@@ -1037,6 +1039,20 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
   }
 }
 
+__global__ void lbadapt_gpu_swap_pointers(lbadapt_payload_t *quad_data) {
+  lb_float tmp[19];
+  memcpy(tmp,
+        quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0],
+        19 * sizeof(lb_float));
+  memcpy(
+        quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[0],
+        quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[1],
+        19 * sizeof(lb_float));
+  memcpy(
+        quad_data->patch[threadIdx.x][threadIdx.y][threadIdx.z].lbfluid[1],
+        tmp, 19 * sizeof(lb_float));
+}
+
 void lbadapt_gpu_execute_bounce_back_kernel(int level) {
   // default: create 1 threadblock and fill real number as actual number of
   // quadrants on that respective level
@@ -1052,6 +1068,10 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
     lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
         dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
         d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+
+    // swap pointers
+    lbadapt_gpu_swap_pointers<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_real_quadrants[level]);
   }
 
   if (local_num_virt_quadrants_level[level]) {
@@ -1060,6 +1080,10 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
     lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
         dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
         d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+
+    // swap pointers
+    lbadapt_gpu_swap_pointers<<<blocks_per_grid, threads_per_block>>>(
+        dev_local_virt_quadrants[level]);
   }
 }
 

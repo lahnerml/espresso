@@ -253,7 +253,7 @@ void lbadapt_gpu_execute_update_from_virtuals_kernel(int level);
  */
 void lbadapt_gpu_execute_streaming_kernel(int level);
 
-/** Call the bounce back kernel on the device
+/** Call the bounce back kernel on the device, swaps pointers afterwards.
  *
  * @param [in] level          The level of quadrants that perform bounce back
  *                            step.

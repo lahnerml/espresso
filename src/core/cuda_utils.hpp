@@ -1,20 +1,20 @@
 /*
   Copyright (C) 2013,2014,2015,2016 The ESPResSo project
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #ifndef _CUDA_UTILS_HPP
 #define _CUDA_UTILS_HPP
@@ -34,13 +34,13 @@ extern cudaError_t _err;
 
 // Simple error checking function for CUDA actions
 void checkCUDAError(const char* action);
-#define CUDA_CALL( call )     \
-{                             \
+#define CUDA_CALL( call )   \
+{                           \
   call;                     \
   checkCUDAError( #call );  \
 }
 
-/**erroroutput for memory allocation and memory copy 
+/**erroroutput for memory allocation and memory copy
  * @param err cuda error code
  * @param *file .cu file were the error took place
  * @param line line of the file were the error took place

@@ -258,7 +258,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 
 #ifdef EXTERNAL_FORCES
-  // unit conversion: force density
+// unit conversion: force density
 #ifdef LB_ADAPTIVE_GPU
   data->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
@@ -266,7 +266,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
       prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   data->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   data->lbfields.force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   data->lbfields.force[1] =
@@ -279,7 +279,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   data->force[0] = 0.0;
   data->force[1] = 0.0;
   data->force[2] = 0.0;
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
   data->lbfields.force[0] = 0.0;
   data->lbfields.force[1] = 0.0;
   data->lbfields.force[2] = 0.0;
@@ -621,8 +621,8 @@ void lbadapt_patches_populate_halos(int level) {
             // for faces:
             // The face is orthogonal to the direction it is associated with.
             // That means for populating the halo of the patch we have to
-            // iterate over the other to indices, keeping the original direction
-            // constant.
+            // iterate over the other two indices, keeping the original
+            // direction constant.
             iter_max_x = iter_max_y = iter_max_z = LBADAPT_PATCHSIZE;
             r_offset_x = r_offset_y = r_offset_z = 1;
             w_offset_x = w_offset_y = w_offset_z = 0;
@@ -630,16 +630,14 @@ void lbadapt_patches_populate_halos(int level) {
               iter_max_z = 1;
               r_offset_z = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
               w_offset_z = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
-            } else {
-              if (2 == (dir_p4est & 2)) {
+            } else if (2 == (dir_p4est & 2)) {
                 iter_max_y = 1;
                 r_offset_y = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
                 w_offset_y = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
-              } else {
-                iter_max_x = 1;
-                r_offset_x = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
-                w_offset_x = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
-              }
+            } else {
+              iter_max_x = 1;
+              r_offset_x = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
+              w_offset_x = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
             }
 
           } else if (P8EST_FACES <= dir_p4est &&
@@ -2065,8 +2063,8 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   double h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                  ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max =
-      (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) / (double)P8EST_ROOT_LEN;
+  lb_float h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                   (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
@@ -2194,15 +2192,15 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_local_fields(data->lbfluid, data->modes, data->lbfields.force,
-                                  data->boundary, data->lbfields.has_force, h,
-                                  &rho, j, NULL);
+        lbadapt_calc_local_fields(data->lbfluid, data->modes,
+                                  data->lbfields.force, data->boundary,
+                                  data->lbfields.has_force, h, &rho, j, NULL);
 
 #if 1
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
         j[2] = j[2] / rho * h_max / lbpar.tau;
-#else // 0
+#else  // 0
         j[0] = j[0] / rho * h / lbpar.tau;
         j[1] = j[1] / rho * h / lbpar.tau;
         j[2] = j[2] / rho * h / lbpar.tau;

@@ -1,18 +1,18 @@
-/* 
+/*
    Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
 
    This file is part of ESPResSo.
-  
+
    ESPResSo is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-   
+
    ESPResSo is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
@@ -34,7 +34,7 @@
 static int max_ran = 1000000;
 static CUDA_global_part_vars global_part_vars_host = {0,0,0};
 static __device__ __constant__ CUDA_global_part_vars global_part_vars_device;
-  
+
 /** struct for particle force */
 static float *particle_forces_device = NULL;
 static float *particle_torques_device = NULL;
@@ -65,7 +65,7 @@ cudaError_t _err;
 cudaError_t CU_err;
 
 void _cuda_safe_mem(cudaError_t CU_err, const char *file, unsigned int line){
-  if( cudaSuccess != CU_err) {                                             
+  if( cudaSuccess != CU_err) {
     fprintf(stderr, "Cuda Memory error at %s:%u.\n", file, line);
     printf("CUDA error: %s\n", cudaGetErrorString(CU_err));
     if ( CU_err == cudaErrorInvalidValue )
@@ -131,12 +131,12 @@ __global__ void init_particle_force(float *particle_forces_device, float* partic
 
 }
 
-/** kernel for the initalisation of the fluid composition 
+/** kernel for the initalisation of the fluid composition
  * @param *fluid_composition_device Pointer to local fluid composition (Output)
 */
 __global__ void init_fluid_composition(CUDA_fluid_composition *fluid_composition_device){
 
- /* Note: these are initialized to zero and not to the fluid density because we cannot assume that 
+ /* Note: these are initialized to zero and not to the fluid density because we cannot assume that
           particles have been created after the fluid */
   unsigned int part_index = getThreadIndex();
 
@@ -154,9 +154,9 @@ __global__ void init_fluid_composition(CUDA_fluid_composition *fluid_composition
  * @param *particle_forces_device	pointer to local particle force (Input)
 */
 __global__ void reset_particle_force(float *particle_forces_device, float* particle_torques_device){
-	
+
   unsigned int part_index = getThreadIndex();
-	
+
   if(part_index<global_part_vars_device.number_of_particles){
     particle_forces_device[3*part_index+0] = 0.0f;
     particle_forces_device[3*part_index+1] = 0.0f;
@@ -166,7 +166,7 @@ __global__ void reset_particle_force(float *particle_forces_device, float* parti
     particle_torques_device[3*part_index+1] = 0.0f;
     particle_torques_device[3*part_index+2] = 0.0f;
 #endif
- }			
+ }
 }
 
 /** change number of particles to be communicated to the GPU
@@ -178,7 +178,7 @@ void gpu_change_number_of_part_to_comm() {
   //we only run the function if there are new particles which have been created since the last call of this function
 
   if ( global_part_vars_host.number_of_particles != n_part && global_part_vars_host.communication_enabled == 1 && this_node == 0) {
-    
+
     global_part_vars_host.seed = (unsigned int)i_random(max_ran);
     global_part_vars_host.number_of_particles = n_part;
 
@@ -206,7 +206,7 @@ void gpu_change_number_of_part_to_comm() {
 #endif
 
     if ( global_part_vars_host.number_of_particles ) {
-      
+
 #if !defined __CUDA_ARCH__ || __CUDA_ARCH__ >= 200
       /**pinned memory mode - use special function to get OS-pinned memory*/
       cuda_safe_mem(cudaHostAlloc((void**)&particle_data_host, global_part_vars_host.number_of_particles * sizeof(CUDA_particle_data), cudaHostAllocWriteCombined));
@@ -246,13 +246,13 @@ void gpu_change_number_of_part_to_comm() {
 #ifdef SHANCHEN
       cuda_safe_mem(cudaMalloc((void**)&fluid_composition_device, global_part_vars_host.number_of_particles * sizeof(CUDA_fluid_composition)));
 #endif
-      
+
       /** values for the particle kernel */
       int threads_per_block_particles = 64;
       int blocks_per_grid_particles_y = 4;
       int blocks_per_grid_particles_x = (global_part_vars_host.number_of_particles + threads_per_block_particles * blocks_per_grid_particles_y - 1)/(threads_per_block_particles * blocks_per_grid_particles_y);
       dim3 dim_grid_particles = make_uint3(blocks_per_grid_particles_x, blocks_per_grid_particles_y, 1);
-      
+
       KERNELCALL(init_particle_force, dim_grid_particles, threads_per_block_particles, (particle_forces_device, particle_torques_device, particle_seeds_device));
 
 
@@ -260,9 +260,9 @@ void gpu_change_number_of_part_to_comm() {
       KERNELCALL(init_fluid_composition, dim_grid_particles, threads_per_block_particles, (fluid_composition_device));
 #endif
     }
-    
+
   }
-  
+
 }
 
 /** setup and call particle reallocation from the host
@@ -287,7 +287,7 @@ void gpu_init_particle_comm() {
     }
   }
   global_part_vars_host.communication_enabled = 1;
-  gpu_change_number_of_part_to_comm(); 
+  gpu_change_number_of_part_to_comm();
 }
 
 CUDA_particle_data* gpu_get_particle_pointer() {
@@ -295,7 +295,7 @@ CUDA_particle_data* gpu_get_particle_pointer() {
 }
 CUDA_global_part_vars* gpu_get_global_particle_vars_pointer_host() {
   return &global_part_vars_host;
-}  
+}
 CUDA_global_part_vars* gpu_get_global_particle_vars_pointer() {
   return &global_part_vars_device;
 }
@@ -321,17 +321,17 @@ void copy_part_data_to_gpu() {
   COMM_TRACE(printf("global_part_vars_host.communication_enabled = %d && global_part_vars_host.number_of_particles = %d\n", global_part_vars_host.communication_enabled, global_part_vars_host.number_of_particles));
   if ( global_part_vars_host.communication_enabled == 1 && global_part_vars_host.number_of_particles ) {
     cuda_mpi_get_particles(particle_data_host);
-    
+
     /** get espresso md particle values*/
     if ( this_node == 0 ) cudaMemcpyAsync(particle_data_device, particle_data_host, global_part_vars_host.number_of_particles * sizeof(CUDA_particle_data), cudaMemcpyHostToDevice, stream[0]);
-    
+
   }
 }
 
 /** setup and call kernel to copy particle forces to host
  */
 void copy_forces_from_GPU() {
-  
+
   if ( global_part_vars_host.communication_enabled == 1 && global_part_vars_host.number_of_particles ) {
 
     /** Copy result from device memory to host memory*/
@@ -343,16 +343,16 @@ void copy_forces_from_GPU() {
 #ifdef SHANCHEN
       cuda_safe_mem(cudaMemcpy(fluid_composition_host, fluid_composition_device, global_part_vars_host.number_of_particles * sizeof(CUDA_fluid_composition), cudaMemcpyDeviceToHost));
 #endif
-      
-      
+
+
       /** values for the particle kernel */
       int threads_per_block_particles = 64;
       int blocks_per_grid_particles_y = 4;
       int blocks_per_grid_particles_x = (global_part_vars_host.number_of_particles + threads_per_block_particles * blocks_per_grid_particles_y - 1)/(threads_per_block_particles * blocks_per_grid_particles_y);
       dim3 dim_grid_particles = make_uint3(blocks_per_grid_particles_x, blocks_per_grid_particles_y, 1);
-      
+
       /** reset part forces with zero*/
-      
+
       KERNELCALL(reset_particle_force, dim_grid_particles, threads_per_block_particles, (particle_forces_device,particle_torques_device));
       cudaThreadSynchronize();
     }
@@ -378,7 +378,7 @@ void copy_v_cs_from_GPU() {
 
 void clear_energy_on_GPU() {
   if ( !global_part_vars_host.communication_enabled)
- // || !global_part_vars_host.number_of_particles )
+  // || !global_part_vars_host.number_of_particles )
     return;
   if (energy_device == NULL)
     cuda_safe_mem( cudaMalloc((void**) &energy_device, sizeof(CUDA_energy)) );
@@ -392,8 +392,7 @@ void copy_energy_from_GPU() {
   copy_CUDA_energy_to_energy(energy_host);
 }
 
-/** Generic copy functions from an to device **/
-
+/** Generic copy functions from and to device **/
 void cuda_copy_to_device(void *host_data, void *device_data, size_t n) {
   cuda_safe_mem( cudaMemcpy(host_data, device_data, n, cudaMemcpyHostToDevice) );
 }

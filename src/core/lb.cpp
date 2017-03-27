@@ -164,7 +164,7 @@ double lb_coupl_pref2 = 0.0;
 static int fluidstep = 0;
 
 #ifdef LB_ADAPTIVE
-static int n_lbsteps = 0;
+int n_lbsteps = 0;
 
 double lb_step_factor = 1.;
 
@@ -3451,6 +3451,12 @@ void lattice_boltzmann_update() {
  * @param force      Coupling force between particle and fluid (Output).
  */
 inline void lb_viscous_coupling(Particle *p, double force[3]) {
+  /*if (n_lbsteps % (1 << (finest_level_global - lbpar.base_level)) != 0) {
+    force[0] = 0;
+    force[1] = 0;
+    force[2] = 0;
+    return;
+  }*/
   int x, y, z;
 #ifndef LB_ADAPTIVE
   index_t node_index[8];
@@ -3459,6 +3465,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   lbadapt_payload_t *node_index[20];
   double delta[20];
   double dcnt = 0;
+  int level[20];
 #endif
   double *local_f, interpolated_u[3], delta_j[3];
 
@@ -3476,9 +3483,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
      and the relative position of the particle in this cell */
 #ifndef LB_ADAPTIVE
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
+  double h = lbpar.agrid;
 #else
   //lbadapt_interpolate_pos(p->r.p, node_index, delta);
-  dcnt = lbadapt_interpolate_pos_adapt(p->r.p, node_index, delta);
+  dcnt = lbadapt_interpolate_pos_adapt(p->r.p, node_index, delta, level);
+  double h = 1.0/(double)(1<<level[0]);
+  double h_max = 1.0/(double)(1<<max_refinement_level);
 #endif
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
@@ -3494,7 +3504,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   lb_lbfluid_get_interpolated_velocity(p->r.p, interpolated_u);
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
-    fprintf(stderr, "%d: OPT: LB u = (%.16e,%.3e,%.3e) v = (%.16e,%.3e,%.3e)\n",
+    fprintf(stderr, "%d: u (%le,%le,%le) v (%le,%le,%le)\n",
             this_node, interpolated_u[0], interpolated_u[1], interpolated_u[2],
             p->m.v[0], p->m.v[1], p->m.v[2]);
   });
@@ -3531,6 +3541,14 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   force[2] = -lbpar.friction[0] * (velocity[2] / time_step - interpolated_u[2]);
 #endif
 
+  //force[0] *= double(1 << (finest_level_global - lbpar.base_level));
+  //force[1] *= double(1 << (finest_level_global - lbpar.base_level));
+  //force[2] *= double(1 << (finest_level_global - lbpar.base_level));
+  
+  /*force[0] *= h_max*h_max / (h*h);
+  force[1] *= h_max*h_max / (h*h);
+  force[2] *= h_max*h_max / (h*h);*/
+
   ONEPART_TRACE(if (p->p.identity == check_id) {
     fprintf(stderr, "%d: OPT: LB f_drag = (%.6e,%.3e,%.3e)\n", this_node,
             force[0], force[1], force[2]);
@@ -3552,10 +3570,23 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 
   /* transform momentum transfer to lattice units
      (Eq. (12) Ahlrichs and Duenweg, JCP 111(17):8225 (1999)) */
-  delta_j[0] = -force[0] * time_step * lbpar.tau / lbpar.agrid;
-  delta_j[1] = -force[1] * time_step * lbpar.tau / lbpar.agrid;
-  delta_j[2] = -force[2] * time_step * lbpar.tau / lbpar.agrid;
   
+  delta_j[0] = -force[0] * time_step * lbpar.tau / h_max;
+  delta_j[1] = -force[1] * time_step * lbpar.tau / h_max;
+  delta_j[2] = -force[2] * time_step * lbpar.tau / h_max;
+  
+  //force[0] *= time_step;
+  //force[1] *= time_step;
+  //force[2] *= time_step;
+  
+  //printf("%lf\n", lbpar.tau);
+  
+  //if (n_lbsteps % (1 << (finest_level_global - level[0])) == 0) {
+  //  force[0] = 0;
+  //  force[1] = 0;
+  //  force[2] = 0;
+  //}
+    
 #ifndef LB_ADAPTIVE
   for (z = 0; z < 2; z++) {
     for (y = 0; y < 2; y++) {
@@ -3573,10 +3604,26 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   }
 #else
   for (x = 0; x < dcnt; ++x) {
-    local_f = node_index[x]->lbfields.force;
-    local_f[0] += delta[x] * delta_j[0];
-    local_f[1] += delta[x] * delta_j[1];
-    local_f[2] += delta[x] * delta_j[2];
+    if (n_lbsteps % (1 << (finest_level_global - level[x])) == 0) {
+    //if (level[x] == finest_level_global) {
+      double level_fact = double(1<<(finest_level_global - level[x]));
+      double h_loc = 1.0/(double)(1 << level[x]);
+      //level_fact = level_fact * level_fact;
+      local_f = node_index[x]->lbfields.force;
+      /*double f[3];
+      double h = (double)P8EST_QUADRANT_LEN(level[x]) / (double)P8EST_ROOT_LEN;
+      f[0] = delta_j[0] * delta[x];
+      f[1] = delta_j[1] * delta[x];
+      f[2] = delta_j[2] * delta[x];
+      lbadapt_apply_forces(node_index[x]->modes, f, h);*/
+      local_f[0] -= delta[x] * prefactors[level[x]] * force[0] * SQR(h_max) * SQR(lbpar.tau);
+      local_f[1] -= delta[x] * prefactors[level[x]] * force[1] * SQR(h_max) * SQR(lbpar.tau);
+      local_f[2] -= delta[x] * prefactors[level[x]] * force[2] * SQR(h_max) * SQR(lbpar.tau);
+      
+      //local_f[0] += delta[x] * delta_j[0];// * h_loc / level_fact;
+      //local_f[1] += delta[x] * delta_j[1];// * h_loc / level_fact;
+      //local_f[2] += delta[x] * delta_j[2];// * h_loc / level_fact;
+    }
   }
 #endif
 
@@ -3609,7 +3656,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
     lblattice.map_position_to_lattice(source_position, node_index, delta);
 #else
     //lbadapt_interpolate_pos(source_position, node_index, delta);
-    dcnt = lbadapt_interpolate_pos(source_position, node_index, delta);
+    dcnt = lbadapt_interpolate_pos(source_position, node_index, delta, level);
 #endif
 
     lb_lbfluid_get_interpolated_velocity(source_position, p->swim.v_source);
@@ -3657,6 +3704,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   lbadapt_payload_t *node_index[20], *data;
   double delta[20];
   int dcnt;
+  int level[20];
 #endif
   double local_rho, local_j[3], interpolated_u[3];
   double modes[19];
@@ -3700,9 +3748,16 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   /* determine elementary lattice cell surrounding the particle
      and the relative position of the particle in this cell */
   lblattice.map_position_to_lattice(pos, node_index, delta);
+  double h = lbpar.agrid;
+  double h_max = h;
 #else
   //lbadapt_interpolate_pos(pos, node_index, delta);
-  dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta);
+  dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
+  double h = 1.0/(double)(1<<level[0]);
+  double h_max = 1.0/(double)(1<<max_refinement_level);
+      //(double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  //printf("h %le hmax %le\n",h,h_max);
+  //h_max = h;
 #endif
 
   /* calculate fluid velocity at particle's position
@@ -3718,17 +3773,17 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
 
 #ifdef LB_BOUNDARIES
         if (lbfields[index].boundary) {
-          local_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
-          local_j[0] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+          local_rho = lbpar.rho[0] * h * h * h;
+          local_j[0] = lbpar.rho[0] * h * h * h *
                        lb_boundaries[lbfields[index].boundary - 1].velocity[0];
-          local_j[1] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+          local_j[1] = lbpar.rho[0] * h * h * h *
                        lb_boundaries[lbfields[index].boundary - 1].velocity[1];
-          local_j[2] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+          local_j[2] = lbpar.rho[0] * h * h * h *
                        lb_boundaries[lbfields[index].boundary - 1].velocity[2];
         } else {
           lb_calc_modes(index, modes);
           local_rho =
-              lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
+              lbpar.rho[0] * h * h * h + modes[0];
           local_j[0] = modes[1];
           local_j[1] = modes[2];
           local_j[2] = modes[3];
@@ -3736,7 +3791,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
 #else  // LB_BOUNDARIES
         lb_calc_modes(index, modes);
         local_rho =
-            lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
+            lbpar.rho[0] * h * h * h + modes[0];
         local_j[0] = modes[1];
         local_j[1] = modes[2];
         local_j[2] = modes[3];
@@ -3756,25 +3811,25 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
 #ifdef LB_BOUNDARIES
     int bnd = data->boundary;
     if (bnd) {
-      local_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
-      local_j[0] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+      local_rho = lbpar.rho[0] * h_max * h_max * h_max;
+      local_j[0] = local_rho *
                    lb_boundaries[data->boundary - 1].velocity[0];
-      local_j[1] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+      local_j[1] = local_rho *
                    lb_boundaries[data->boundary - 1].velocity[1];
-      local_j[2] = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid *
+      local_j[2] = local_rho *
                    lb_boundaries[data->boundary - 1].velocity[2];
     } else {
-      lbadapt_calc_modes(data->lbfluid, modes);
+      /*lbadapt_calc_modes(data->lbfluid, modes);*/
       local_rho =
-          lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
-      local_j[0] = modes[1];
-      local_j[1] = modes[2];
-      local_j[2] = modes[3];
+          lbpar.rho[0] * h_max * h_max * h_max + data->modes[0];
+      local_j[0] = data->modes[1] + 0.5 * data->lbfields.force[0];
+      local_j[1] = data->modes[2] + 0.5 * data->lbfields.force[1];
+      local_j[2] = data->modes[3] + 0.5 * data->lbfields.force[2];
     }
 #else  // LB_BOUNDARIES
-    lbadapt_calc_modes(data->lbfluid, modes);
+    //lbadapt_calc_modes(data->lbfluid, modes);
     local_rho =
-        lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid + modes[0];
+        lbpar.rho[0] * h_max * h_max * h_max + modes[0];
     local_j[0] = modes[1];
     local_j[1] = modes[2];
     local_j[2] = modes[3];
@@ -3787,14 +3842,14 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   
 #ifdef LB_BOUNDARIES
   if (boundary_flag == 1) {
-    v[0] = lbboundary_mindist / (0.5 * lbpar.agrid) * interpolated_u[0] +
-           (1 - lbboundary_mindist / (0.5 * lbpar.agrid)) *
+    v[0] = lbboundary_mindist / (0.5 * h) * interpolated_u[0] +
+           (1 - lbboundary_mindist / (0.5 * h)) *
                lb_boundaries[boundary_no].velocity[0];
-    v[1] = lbboundary_mindist / (0.5 * lbpar.agrid) * interpolated_u[1] +
+    v[1] = lbboundary_mindist / (0.5 * h) * interpolated_u[1] +
            (1 - lbboundary_mindist / (0.5 * lbpar.agrid)) *
                lb_boundaries[boundary_no].velocity[1];
-    v[2] = lbboundary_mindist / (0.5 * lbpar.agrid) * interpolated_u[2] +
-           (1 - lbboundary_mindist / (0.5 * lbpar.agrid)) *
+    v[2] = lbboundary_mindist / (0.5 * h) * interpolated_u[2] +
+           (1 - lbboundary_mindist / (0.5 * h)) *
                lb_boundaries[boundary_no].velocity[2];
   } else {
     v[0] = interpolated_u[0];
@@ -3806,9 +3861,9 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
   v[1] = interpolated_u[1];
   v[2] = interpolated_u[2];
 #endif // LB_BOUNDARIES
-  v[0] *= lbpar.agrid / lbpar.tau;
-  v[1] *= lbpar.agrid / lbpar.tau;
-  v[2] *= lbpar.agrid / lbpar.tau;
+  v[0] *= h_max / lbpar.tau;
+  v[1] *= h_max / lbpar.tau;
+  v[2] *= h_max / lbpar.tau;
 
   return 0;
 }

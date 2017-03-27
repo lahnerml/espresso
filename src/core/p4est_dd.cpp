@@ -113,7 +113,7 @@ int dd_p4est_cellsize_optimal () {
   int lvl = 0;
   // compute number of cells
   cnt[0] = cnt[1] = cnt[2] = 1;
-  if (max_range > 0) {
+  if (max_range > ROUND_ERROR_PREC) {
     if (box_l[0] > max_range) cnt[0] = box_l[0]/max_range;
     if (box_l[1] > max_range) cnt[1] = box_l[1]/max_range;
     if (box_l[2] > max_range) cnt[2] = box_l[2]/max_range;
@@ -146,9 +146,9 @@ int dd_p4est_cellsize_even () {
   brick_size[1] = box_l[1];
   brick_size[2] = box_l[2];
   
-  int cnt;
+  int cnt = 1;
   int lvl = 0;
-  if (max_range > 0) cnt = 1.0/max_range;
+  if (max_range > ROUND_ERROR_PREC) cnt = 1.0/max_range;
   if (cnt < 1) cnt = 1;
   
   while ((cnt&1) == 0) {
@@ -164,6 +164,7 @@ int dd_p4est_cellsize_even () {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_create_grid () {
+  printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
   
   quad_data_t *ghost_data;  
@@ -206,6 +207,7 @@ void dd_p4est_create_grid () {
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
   
+  //printf("%i : checkk\n", this_node);
   // write cells to VTK
   p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_lj", box_l[0]/(double)brick_size[0]);
   
@@ -280,144 +282,6 @@ void dd_p4est_create_grid () {
     }
     shell.push_back(ls);
   }
-  /*
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_mesh_face_neighbor_t mfn;
-    int tidx = -1;
-    int qidx, ridx, fidx;
-    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
-    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
-    int fcnt = 0;
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
-    quad_data_t *data = (quad_data_t*)(q->p.user_data);
-    data->lidx = i;
-    data->rank = this_node;
-    double xyz[3];
-    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
-    uint64_t x = xyz[0]*ql;
-    uint64_t y = xyz[1]*ql;
-    uint64_t z = xyz[2]*ql;
-    quads.push_back((x+1) | ((y+1)<<21) | ((z+1)<<42));
-    local_shell_t ls;
-    ls.idx = i;
-    ls.rank = this_node;
-    ls.shell = 0;
-    ls.boundary = 0;
-    ls.coord[0] = x;
-    ls.coord[1] = y;
-    ls.coord[2] = z;
-    for (int n=0;n<26;++n) ls.neighbor[n] = -1;
-    /*if (PERIODIC(0) && x == 0) ls.boundary |= 1;
-    if (PERIODIC(0) && x == grid_size[0] - 1) ls.boundary |= 2;
-    if (PERIODIC(1) && y == 0) ls.boundary |= 4;
-    if (PERIODIC(1) && y == grid_size[1] - 1) ls.boundary |= 8;
-    if (PERIODIC(2) && z == 0) ls.boundary |= 16;
-    if (PERIODIC(2) && z == grid_size[2] - 1) ls.boundary |= 32;*/
-  /*  shell.push_back(ls);
-    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
-      if (mfn.current_qtq == i) continue;
-      fcnt = mfn.face-1;
-      if (ridx != this_node)
-        data->ishell[fcnt] = p4est_quadrant_array_index(&p4est_ghost->ghosts,qidx)->p.piggy3.local_num;//qidx - p4est_ghost->proc_offsets[ridx];
-      else
-        data->ishell[fcnt] = p4est_tree_array_index(p4est->trees,tidx)->quadrants_offset + qidx;
-      data->rshell[fcnt] = ridx;
-    }
-  }
-  
-  ghost_data = P4EST_ALLOC (quad_data_t, p4est_ghost->ghosts.elem_count);
-  p4est_ghost_exchange_data (p4est, p4est_ghost, ghost_data);
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_mesh_face_neighbor_t mfn;
-    int tidx = -1;
-    int qidx, ridx, fidx;
-    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
-    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
-    int fcnt = 0;
-    quad_data_t *data = (quad_data_t*)p4est_mesh_get_quadrant(p4est,p4est_mesh,i)->p.user_data;
-    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
-      if (mfn.current_qtq == i) continue;
-      fcnt = mfn.face-1;
-      quad_data_t* ndata = (quad_data_t*)p4est_mesh_face_neighbor_data(&mfn,ghost_data);
-      switch(fcnt) {
-      case 0:
-        data->ishell[6 + 8] = ndata->ishell[2];
-        data->rshell[6 + 8] = ndata->rshell[2];
-        data->ishell[6 + 4] = ndata->ishell[4];
-        data->rshell[6 + 4] = ndata->rshell[4];
-        break;
-      case 1:
-        data->ishell[6 + 11] = ndata->ishell[3];
-        data->rshell[6 + 11] = ndata->rshell[3];
-        data->ishell[6 + 7] = ndata->ishell[5];
-        data->rshell[6 + 7] = ndata->rshell[5];
-        break;
-      case 2:
-        data->ishell[6 + 9] = ndata->ishell[1];
-        data->rshell[6 + 9] = ndata->rshell[1];
-        data->ishell[6 + 0] = ndata->ishell[4];
-        data->rshell[6 + 0] = ndata->rshell[4];
-        break;
-      case 3:
-        data->ishell[6 + 10] = ndata->ishell[0];
-        data->rshell[6 + 10] = ndata->rshell[0];
-        data->ishell[6 + 3] = ndata->ishell[5];
-        data->rshell[6 + 3] = ndata->rshell[5];
-        break;
-      case 4:
-        data->ishell[6 + 1] = ndata->ishell[3];
-        data->rshell[6 + 1] = ndata->rshell[3];
-        data->ishell[6 + 5] = ndata->ishell[1];
-        data->rshell[6 + 5] = ndata->rshell[1];
-        break;
-      case 5:
-        data->ishell[6 + 6] = ndata->ishell[0];
-        data->rshell[6 + 6] = ndata->rshell[0];
-        data->ishell[6 + 2] = ndata->ishell[2];
-        data->rshell[6 + 2] = ndata->rshell[2];
-        break;
-      };
-    }
-  }
-  p4est_ghost_exchange_data (p4est, p4est_ghost, ghost_data);
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_mesh_face_neighbor_t mfn;
-    int tidx = -1;
-    int qidx, ridx, fidx;
-    p4est_mesh_quadrant_cumulative (p4est, p4est_mesh, i, &tidx, &qidx);
-    p4est_mesh_face_neighbor_init2(&mfn, p4est, p4est_ghost, p4est_mesh, tidx, qidx);
-    int fcnt = 0;
-    quad_data_t* data = (quad_data_t*)p4est_mesh_get_quadrant(p4est,p4est_mesh,i)->p.user_data;
-    while (p4est_mesh_face_neighbor_next(&mfn, &tidx, &qidx,&fidx,&ridx) != NULL) {
-      if (mfn.current_qtq == i) continue;
-      fcnt = mfn.face-1;
-      quad_data_t* ndata = (quad_data_t*)p4est_mesh_face_neighbor_data(&mfn,ghost_data);
-      switch(fcnt) {
-      case 0:
-        data->ishell[18 + 0] = ndata->ishell[6 + 0];
-        data->rshell[18 + 0] = ndata->rshell[6 + 0];
-        data->ishell[18 + 2] = ndata->ishell[6 + 1];
-        data->rshell[18 + 2] = ndata->rshell[6 + 1];
-        data->ishell[18 + 4] = ndata->ishell[6 + 2];
-        data->rshell[18 + 4] = ndata->rshell[6 + 2];
-        data->ishell[18 + 6] = ndata->ishell[6 + 3];
-        data->rshell[18 + 6] = ndata->rshell[6 + 3];
-        break;
-      case 1:
-        data->ishell[18 + 1] = ndata->ishell[6 + 0];
-        data->rshell[18 + 1] = ndata->rshell[6 + 0];
-        data->ishell[18 + 3] = ndata->ishell[6 + 1];
-        data->rshell[18 + 3] = ndata->rshell[6 + 1];
-        data->ishell[18 + 5] = ndata->ishell[6 + 2];
-        data->rshell[18 + 5] = ndata->rshell[6 + 2];
-        data->ishell[18 + 7] = ndata->ishell[6 + 3];
-        data->rshell[18 + 7] = ndata->rshell[6 + 3];
-        break;
-      };
-    }
-  }
-  P4EST_FREE (ghost_data);*/
     
   char fname[100];
   sprintf(fname,"cells_%i.list",this_node);
@@ -461,15 +325,6 @@ void dd_p4est_create_grid () {
             if (xi == 1 && yi == 2 && zi == 1) shell[i].boundary |= 8;
             if (xi == 1 && yi == 1 && zi == 0) shell[i].boundary |= 16;
             if (xi == 1 && yi == 1 && zi == 2) shell[i].boundary |= 32;
-            /*if (shell[i].boundary != 0) {
-              if (xi == 0) ls.boundary |= 1;
-              if (xi == 2) ls.boundary |= 2;
-              if (yi == 0) ls.boundary |= 4;
-              if (yi == 2) ls.boundary |= 8;
-              if (zi == 0) ls.boundary |= 16;
-              if (zi == 2) ls.boundary |= 32;
-            }*/
-            //ls.boundary &= shell[i].boundary;
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = shell.size();
             ls.coord[0] = int(x + xi) - 1;
             ls.coord[1] = int(y + yi) - 1;
@@ -485,18 +340,6 @@ void dd_p4est_create_grid () {
               if (xi == 1 && yi == 2 && zi == 1) shell[i].boundary |= 8;
               if (xi == 1 && yi == 1 && zi == 0) shell[i].boundary |= 16;
               if (xi == 1 && yi == 1 && zi == 2) shell[i].boundary |= 32;
-              /*int tmp = 0;
-              if (shell[i].boundary != 0) {
-                if (xi == 0) tmp |= 1;
-                if (xi == 2) tmp |= 2;
-                if (yi == 0) tmp |= 4;
-                if (yi == 2) tmp |= 8;
-                if (zi == 0) tmp |= 16;
-                if (zi == 2) tmp |= 32;
-              }
-              tmp &= shell[i].boundary;
-              if (shell[pos].boundary > tmp)
-                shell[pos].boundary = tmp;*/
             }
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;
           }
@@ -745,14 +588,6 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
     for (int n=0;n<comm_recv[i].cnt;++n)
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
-    /*if (data_part & GHOSTTRANS_POSSHFTD) {
-      if ((comm_recv[i].dir &  1)) comm->comm[cnt].shift[0] += box_l[0];
-      if ((comm_recv[i].dir &  2)) comm->comm[cnt].shift[0] -= box_l[0];
-      if ((comm_recv[i].dir &  4)) comm->comm[cnt].shift[1] += box_l[1];
-      if ((comm_recv[i].dir &  8)) comm->comm[cnt].shift[1] -= box_l[1];
-      if ((comm_recv[i].dir & 16)) comm->comm[cnt].shift[2] += box_l[2];
-      if ((comm_recv[i].dir & 32)) comm->comm[cnt].shift[2] -= box_l[2];
-    }*/
     ++cnt;
   }
 }
@@ -780,16 +615,6 @@ void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
     if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
     ++cnt;
   }
-  /*for (int i=0;i<num_comm_recv;++i) {
-    comm->comm[cnt].shift[0] = comm->comm[cnt].shift[1] = comm->comm[cnt].shift[2] = 0.0;
-    if ((comm_recv[i].dir &  1)) comm->comm[cnt].shift[0] += box_l[0];
-    if ((comm_recv[i].dir &  2)) comm->comm[cnt].shift[0] -= box_l[0];
-    if ((comm_recv[i].dir &  4)) comm->comm[cnt].shift[1] += box_l[1];
-    if ((comm_recv[i].dir &  8)) comm->comm[cnt].shift[1] -= box_l[1];
-    if ((comm_recv[i].dir & 16)) comm->comm[cnt].shift[2] += box_l[2];
-    if ((comm_recv[i].dir & 32)) comm->comm[cnt].shift[2] -= box_l[2];
-    ++cnt;
-  }*/
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_cell_interaction() {
@@ -1206,7 +1031,7 @@ void dd_p4est_exchange_and_sort_particles() {
   for (int i = 0; i < num_comm_proc; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
-      //local_particles[sendbuf[i].part[p].p.identity] = NULL;
+      local_particles[sendbuf[i].part[p].p.identity] = NULL;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
@@ -1253,7 +1078,9 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 #ifdef EXCLUSIONS
         sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->el.e, part->el.e + part->el.n);
 #endif
+        int pid = part->p.identity;
         move_indexed_particle(&sendbuf[rank], pl, p);
+        local_particles[pid] = NULL;
         if(p < pl->n) p -= 1;
       }
     }
@@ -1306,6 +1133,7 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
   for (int i = 0; i < n_nodes; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
+      local_particlessendbuf[i].part[p].p.identity] = NULL;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
@@ -1526,7 +1354,8 @@ void dd_p4est_write_particle_vtk(char *filename) {
     int np = local_cells.cell[c]->n;
     Particle *part = local_cells.cell[c]->part;
     for (int p=0;p<np;++p) {
-      fprintf(h,"\t\t\t\t\t%le %le %le\n",part[p].m.v[0],part[p].m.v[1],part[p].m.v[2]);
+      fprintf(h,"\t\t\t\t\t%le %le %le\n",
+        part[p].m.v[0]/time_step,part[p].m.v[1]/time_step,part[p].m.v[2]/time_step);
     }
   }
   fprintf(h,"\t\t\t\t</DataArray>\n\t\t\t</PointData>\n");

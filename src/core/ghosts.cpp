@@ -57,6 +57,11 @@ public:
   CommBuf(): nbytes(0), maxbytes(0), buf(nullptr) {}
 
   ~CommBuf() { Utils::realloc(buf, 0); }
+  
+  CommBuf(const CommBuf& other): nbytes(other.nbytes), maxbytes(other.maxbytes), buf((char*)Utils::malloc(maxbytes))
+  {
+    memcpy(buf, other.buf, nbytes);
+  }
 
   /** Returns the size in bytes set by the last call to ensure_and_set_size.
    */
@@ -578,6 +583,13 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   // bond Isends are stored. After reception of the particle data, the finished
   // Irecv requests are replaced by new bond Irecv requests.
   static std::vector<MPI_Request> reqs;
+
+  // Zero the size of *all* bondbufs since we rely of zero size receive
+  // bondbufs and we cannot guarantee that all comm_types are ordered the same
+  // way for each GhostCommunicator.
+  for (int i = 0; i < commbufs.size(); ++i)
+    commbufs[i].bondbuf().resize(0);
+
 
   // Ensure minimum size of buffers
   if (commbufs.size() < gc->num) {

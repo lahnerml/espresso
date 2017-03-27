@@ -535,6 +535,12 @@ void mpi_bcast_constraint(int del_num);
  */
 void mpi_lbadapt_grid_init (int node, int level);
 
+/** resets an adaptive grid
+ *
+ * @param [in] node the node on which this function is called
+ */
+void mpi_lbadapt_grid_reset (int node, int dummy);
+
 /** Call for parallel IO of boundary
  *
  * @param [in] node the node on which this function is called

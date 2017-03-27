@@ -127,6 +127,7 @@ typedef struct {
 
   /** local force density */
   double force[3];
+  double force_md[3];
 #ifdef IMMERSED_BOUNDARY
 // For particle update, we need the force on the nodes in LBM
 // Yet, Espresso resets the force immediately after the LBM update
@@ -235,6 +236,8 @@ extern double prefactors[P8EST_MAXLEVEL];
 extern double gamma_shear[P8EST_MAXLEVEL];
 
 extern double gamma_bulk[P8EST_MAXLEVEL];
+
+extern int n_lbsteps;
 #else // LB_ADAPTIVE
 extern int resend_halo;
 

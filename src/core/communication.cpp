@@ -194,7 +194,8 @@ static int terminated = 0;
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
   CB(mpi_exclude_boundary)                                                     \
-  CB(mpi_dd_p4est_write_particle_vtk)
+  CB(mpi_dd_p4est_write_particle_vtk)                                          \
+  CB(mpi_lbadapt_grid_reset)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -2699,6 +2700,15 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
     *boundary = data;
   }
 #endif
+}
+
+void mpi_lbadapt_grid_reset(int node, int dummy) {
+#ifdef LB_ADAPTIVE
+  lbadapt_reinit();
+  //lbadapt_reinit_fluid_per_cell();
+  //lbadapt_reinit_force_per_cell();
+  printf("Resetting LB fluid\n");
+#endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_grid_init(int node, int level) {

@@ -172,6 +172,68 @@ void lbadapt_allocate_data() {
   }
 } // lbadapt_allocate_data();
 
+void lbadapt_reinit() {
+  if (lbadapt_local_data == NULL) {
+    lbadapt_allocate_data();
+  }
+    
+  int status;
+  lbadapt_payload_t *data;
+  int lvl;
+  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+    status = 0;
+    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+        p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
+        P8EST_TRAVERSE_PARBOUNDINNER);
+
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        if (!mesh_iter->current_is_ghost) {
+          lvl = level - coarsest_level_local;
+          data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
+        } else {
+          lvl = level - coarsest_level_ghost;
+          data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
+        }
+
+        //data->boundary = 0;
+        for (int i = 0; i < lbmodel.n_veloc; i++) {
+          data->lbfluid[0][i] = 0.;
+          data->lbfluid[1][i] = 0.;
+          data->modes[i] = 0.;
+        }
+
+        // ints
+        //data->lbfields.recalc_fields = 1;
+        //data->lbfields.has_force = 0;
+
+        // 1D "array"
+        data->lbfields.rho[0] = 0.;
+
+        // 3D arrays
+        for (int i = 0; i < 3; i++) {
+          data->lbfields.j[i] = 0;
+          data->lbfields.force[i] = 0;
+          data->lbfields.force_md[i] = 0;
+#ifdef IMMERSED_BOUNDARY
+          data->lbfields.force_buf[i] = 0;
+#endif // IMMERSED_BOUNDARY
+        }
+
+        // 6D array
+        for (int i = 0; i < 6; i++) {
+          data->lbfields.pi[i] = 0;
+        }
+      }
+    }
+    p8est_meshiter_destroy(mesh_iter);
+  }
+} // lbadapt_init();
+
 void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
@@ -218,6 +280,7 @@ void lbadapt_init() {
         for (int i = 0; i < 3; i++) {
           data->lbfields.j[i] = 0;
           data->lbfields.force[i] = 0;
+          data->lbfields.force_md[i] = 0;
 #ifdef IMMERSED_BOUNDARY
           data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
@@ -918,13 +981,18 @@ int lbadapt_thermalize_modes(double *mode) {
 }
 
 int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
-  double rho, u[3], C[6], *f;
+//int lbadapt_apply_forces(double *mode, double force[3], double h) {
+  double rho, u[3], C[6], f[3];//*f;
 
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 
-  f = lbfields->force;
+  //f = lbfields->force;
+  f[0] = lbfields->force[0];// * pow(h, 2) * lbpar.tau * lbpar.tau; // + lbfields->force_md[0];
+  f[1] = lbfields->force[1];// * pow(h, 2) * lbpar.tau * lbpar.tau;// + lbfields->force_md[1];
+  f[2] = lbfields->force[2];// * pow(h, 2) * lbpar.tau * lbpar.tau;// + lbfields->force_md[2];
+  //f = force;
 
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
@@ -960,12 +1028,21 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  lbfields->force[0] =
-    prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
-  lbfields->force[1] =
-    prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
-  lbfields->force[2] =
-    prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+  lbfields->force[0] = //lbpar.ext_force[0];
+  //force[0] =
+    //SQR(prefactors[level]) * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[0];
+    prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[0];
+  lbfields->force[1] = //lbpar.ext_force[1];
+  //force[1] =
+    //SQR(prefactors[level]) * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[1];
+    prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[1];
+  lbfields->force[2] = //lbpar.ext_force[2];
+  //force[2] =
+    //SQR(prefactors[level]) * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[2];
+    prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);// + lbfields->force_md[2];
+  lbfields->force_md[0] = 0;
+  lbfields->force_md[1] = 0;
+  lbfields->force_md[2] = 0;
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -1221,6 +1298,7 @@ void lbadapt_collide(int level) {
 /* apply forces */
 #ifdef EXTERNAL_FORCES
         lbadapt_apply_forces(data->modes, &data->lbfields, h);
+        //lbadapt_apply_forces(data->modes, data->lbfields.force, h);
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
         if (data->lbfields.has_force)
@@ -1266,6 +1344,10 @@ void lbadapt_populate_virtuals(int level) {
       }
       // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
+      
+      current_data->lbfields.force[0] *= 0.25;
+      current_data->lbfields.force[1] *= 0.25;
+      current_data->lbfields.force[2] *= 0.25;
 
       // calculate post_collision populations from cell
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
@@ -1921,7 +2003,8 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   }
 }
 
-int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], double delta[20]) {
+int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], 
+  double delta[20], int level[20]) {
   static const int nidx[8][7] = {
     { 0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
     { 1, 2, 15, 4, 11, 6, 19}, // right, front, bottom
@@ -1957,6 +2040,7 @@ int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], 
   int lvl = quad->level;
   int sid = lbadapt_mesh->quad_qreal_offset[qidx];
   nodes[0] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
+  level[0] = lvl;
   int corner = 0;
   double delta_loc[6];
   for (int d=0;d<3;++d) {
@@ -1964,43 +2048,99 @@ int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], 
     dis = dis - floor(dis) + 0.5;
     if (dis > 1.0) { // right neighbor
       corner |= 1<<d;
-      dis -= 1.0;
+      dis = 2.0 - dis;
     }
     delta_loc[d    ] = dis;
     delta_loc[d + 3] = 1.0 - dis;
   }
   delta[0] = delta_loc[didx[0][0]]*delta_loc[didx[0][1]]*delta_loc[didx[0][2]];
+  //delta[0] *= 1.0/(double)(1<<(finest_level_global-lvl));
   int ncnt = 1;
+  int xidx = -1;
+  int yidx = -1;
+  int zidx = -1;
   for (int i=0;i<7;++i) {
     sc_array_t *ne, *ni;
     ne = sc_array_new(sizeof(int));
     ni = sc_array_new(sizeof(int));
     p8est_mesh_get_neighbors(p8est, lbadapt_ghost, lbadapt_mesh, qidx, -1, nidx[corner][i], 0,
                              NULL, ne, ni);
+    if (ne->elem_count == 0) {
+      switch(i) {
+      case 2: // X-Y edge
+        if (xidx >= 0)
+          delta[xidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        else if (yidx >= 0)
+          delta[yidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        break;
+      case 4: // X-Z edge
+        if (xidx >= 0)
+          delta[xidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        else if (zidx >= 0)
+          delta[zidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        break;
+      case 5: // Y-Z edge
+        if (yidx >= 0)
+          delta[xidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        else if (zidx >= 0)
+          delta[yidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        break;
+      case 6: // X-Y-Z corner
+        if (xidx >= 0)
+          delta[xidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        else if (yidx >= 0)
+          delta[xidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        else if (zidx >= 0)
+          delta[yidx] += (delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]]);
+        break;
+      default:
+        printf("A LB cell neighbor is missing over a face\n");
+        break;
+      };
+    }
     for (int n=0;n<ne->elem_count;++n) {
       int nidx = *((int*)sc_array_index_int(ni, n));
       int enc = *((int*)sc_array_index_int(ne, n));
       if (enc > 0) { // local quadrant
+        if (enc >=25 && enc <= 120) { // double size quad over face
+          if (i == 0) xidx = ncnt;
+          if (i == 1) yidx = ncnt;
+          if (i == 3) zidx = ncnt;
+        }
         quad = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, nidx);
         lvl = quad->level;
         sid = lbadapt_mesh->quad_qreal_offset[nidx];
         nodes[ncnt] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
-        delta[ncnt] = delta_loc[didx[0][0]]*delta_loc[didx[0][1]]*delta_loc[didx[0][2]];
+        delta[ncnt] = delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]];
         delta[ncnt] = delta[ncnt]/(double)(ne->elem_count);
+        level[ncnt] = lvl;
+        //delta[ncnt] = delta[ncnt]/(double)(1<<(finest_level_global-lvl));
         ncnt += 1;
       } else { // ghost quadrant
+        if (enc >=-120 && enc <= -25) { // double size quad over face
+          if (i == 0) xidx = ncnt;
+          if (i == 1) yidx = ncnt;
+          if (i == 3) zidx = ncnt;
+        }
         quad = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, nidx);
         lvl = quad->level;
         sid = lbadapt_mesh->quad_greal_offset[nidx];
         nodes[ncnt] = &lbadapt_ghost_data[lvl - coarsest_level_ghost][sid];
-        delta[ncnt] = delta_loc[didx[0][0]]*delta_loc[didx[0][1]]*delta_loc[didx[0][2]];
+        delta[ncnt] = delta_loc[didx[i+1][0]]*delta_loc[didx[i+1][1]]*delta_loc[didx[i+1][2]];
         delta[ncnt] = delta[ncnt]/(double)(ne->elem_count);
+        level[ncnt] = lvl;
+        //delta[ncnt] = delta[ncnt]/(double)(1<<(finest_level_global-lvl));
         ncnt += 1;
       }
     }
     sc_array_destroy(ne);
     sc_array_destroy(ni);
   }
+  double dsum = 1.0;
+  for (int i=0;i<ncnt;++i) dsum -= delta[i];
+  if (abs(dsum) >  ROUND_ERROR_PREC) printf("%le\n", dsum);
+  //if (ncnt != 8) printf("%i %le\n", ncnt, dsum);
+  if (ncnt > 20) printf("to many neighbours\n");
   return ncnt;
 }
 

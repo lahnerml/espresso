@@ -227,4 +227,20 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 
   return TCL_OK;
 }
+
+int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp,
+                          int argc, char **argv) {
+  int bnd_index;
+
+  if (argc != 1) {
+    Tcl_AppendResult(interp, "Resetting the grid takes no parameters",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_lbadapt_grid_reset, -1, 0);
+  mpi_lbadapt_grid_reset(0, 0);
+
+  return TCL_OK;
+}
 #endif // LB_ADAPTIVE

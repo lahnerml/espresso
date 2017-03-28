@@ -116,7 +116,7 @@ double max_skin   = 0.0;
 #ifdef DD_P4EST
 #include "p4est_dd.hpp"
 #else
-#define P4EST_NOCHANGE
+#define P4EST_NOCHANGE // Used in p4est_dd for debugging
 #endif //DD_P4EST
 //-----------------------------------------------------------------------------------
 //P4EST end
@@ -136,7 +136,10 @@ void dd_create_cell_grid () {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
+
+  // Construct p4est-DD and allocate memory
   dd_p4est_create_grid ();
+  // Fill internal communator lists
   dd_p4est_comm();
   
 #else
@@ -254,24 +257,12 @@ void dd_create_cell_grid () {
     local_box_l[0],local_box_l[1],local_box_l[2],
     dd.cell_size[0],dd.cell_size[1],dd.cell_size[2],
     dd.cell_grid[0],dd.cell_grid[1],dd.cell_grid[2]);
-  
-#ifdef DD_P4EST
-  dd_p4est_create_grid();
-  dd_p4est_comm();
-#endif
-
-//  printf("%d : %d, %d, %d\n", this_node, new_cells, n_local_cells, new_cells-n_local_cells);
 
   /* allocate cell array and cell pointer arrays */
-//#ifndef DD_P4EST
   realloc_cells(new_cells);
   realloc_cellplist(&local_cells, local_cells.n = n_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = new_cells-n_local_cells);
-/*#else
-  realloc_cells(num_cells);
-  realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
-  realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
-#endif*/
+
 
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid, n_cells=%d, local_cells.n=%d, ghost_cells.n=%d, dd.ghost_cell_grid=(%d,%d,%d)\n", this_node, n_cells,local_cells.n,ghost_cells.n,dd.ghost_cell_grid[0],dd.ghost_cell_grid[1],dd.ghost_cell_grid[2]));
 #endif
@@ -282,11 +273,12 @@ void dd_create_cell_grid () {
     \ref DomainDecomposition::ghost_cell_grid . */
 void dd_mark_cells () {
   CALL_TRACE();
+  
 #ifndef P4EST_NOCHANGE
-    dd_p4est_mark_cells();
+  // Marks cells with p4est grid. [local_cells..., ghost_cells...]
+  dd_p4est_mark_cells();
 #else
 
-//#ifndef DD_P4EST
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
   DD_CELLS_LOOP(m,n,o) {
@@ -317,6 +309,7 @@ int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
   CALL_TRACE();
 
 #ifndef P4EST_NOCHANGE
+  // This function is not available for p4est_dd
   runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
 #endif
 
@@ -345,7 +338,8 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
 
 #ifndef P4EST_NOCHANGE
 
-  dd_p4est_prepare_comm(comm,data_parts);
+  // Fill the communicator using the internal communication lists
+  dd_p4est_prepare_comm(comm, data_parts);
 
 #else
 
@@ -365,8 +359,6 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
     }
   }
   
-  //printf("%i : %i\n",this_node, num);
-
   /* prepare communicator */
   CELL_TRACE(fprintf(stderr,"%d Create Communicator: prep_comm data_parts %d num %d\n",this_node,data_parts,num));
   prepare_comm(comm, data_parts, num);
@@ -534,7 +526,8 @@ void dd_update_communicators_w_boxl() {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
-
+  
+  // call the p4est_dd version
   dd_p4est_update_comm_w_boxl(&cell_structure.exchange_ghosts_comm);
   dd_p4est_update_comm_w_boxl(&cell_structure.update_ghost_pos_comm);
 
@@ -590,6 +583,7 @@ void dd_init_cell_interactions () {
 
 #ifndef P4EST_NOCHANGE
 
+  // Call the p4est_dd version
   dd_p4est_init_cell_interaction();
 
 #else
@@ -633,13 +627,6 @@ void dd_init_cell_interactions () {
   }
 
 #ifdef CELL_DEBUG
-  /*printf("%d(%dx%dx%d): %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f %dx%dx%d\n",
-    this_node, node_grid[0], node_grid[1], node_grid[2], max_range,
-    box_l[0],box_l[1],box_l[2],
-    local_box_l[0],local_box_l[1],local_box_l[2],
-    dd.cell_size[0],dd.cell_size[1],dd.cell_size[2],
-    dd.cell_grid[0],dd.cell_grid[1],dd.cell_grid[2]);
-  */
 
   FILE *cells_fp;
   char cLogName[64];
@@ -683,6 +670,7 @@ Cell * dd_save_position_to_cell (double pos[3]) {
 
 #ifndef P4EST_NOCHANGE
 
+  // Map position to cell
   return dd_p4est_save_position_to_cell(pos);
 
 #else
@@ -725,6 +713,7 @@ Cell *dd_position_to_cell(double pos[3]) {
   
 #ifndef P4EST_NOCHANGE
 
+  // Map position to cell
   return dd_p4est_position_to_cell(pos);
 
 #else
@@ -841,6 +830,7 @@ void dd_on_geometry_change(int flags) {
   
 #ifndef P4EST_NOCHANGE
 
+  // Call p4est_dd version
   dd_p4est_on_geometry_change(flags);
   
 #else
@@ -954,6 +944,7 @@ void dd_topology_init(CellPList *old) {
   MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
 
 #ifndef P4EST_NOCHANGE
+  // use p4est_dd callbacks, but Espresso sees a DOMDEC
   cell_structure.type             = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = dd_p4est_pos_to_proc;
   cell_structure.position_to_cell = dd_p4est_position_to_cell;
@@ -1022,28 +1013,27 @@ void dd_topology_init(CellPList *old) {
 #endif
 
 #ifndef P4EST_NOCHANGE
+  // Go through all old particles and find owner & cell
   for (c = 0; c < old->n; c++) {
     part = old->cell[c]->part;
     np   = old->cell[c]->n;
-    //if (np > 0)
-    //  printf("aaargh %i\n", np);
     for (p = 0; p < np; p++) {
       Cell *nc = dd_save_position_to_cell(part[p].r.p);
-      if (nc == NULL) {
+      if (nc == NULL) { // Particle is on other process, move it to cell[0]
         append_unindexed_particle(local_cells.cell[0], &part[p]);
-        //runtimeErrorMsg() << "particles out of domain after topology init";
-        //fprintf(stderr, "\t%i : %lfx%lfx%lf %i %i\n", this_node, part[p].r.p[0], part[p].r.p[1], part[p].r.p[2], dd_p4est_pos_to_proc(part[p].r.p), part[p].bl.n);
-      } else {
+      } else { // It is on this node, move it to right local_cell
         append_unindexed_particle(nc, &part[p]);
       }
     }
   }
+  // Create particle index
   for(c=0; c<local_cells.n; c++) {
     update_local_particles(local_cells.cell[c]);
   }
+  // Invoke global communication for cell[0] containing particles of other processes
   if (local_cells.n > 0)
     dd_p4est_global_exchange_part(local_cells.cell[0]);
-  else
+  else // Call it anyway in case there are no cells on this node (happens during startup)
     dd_p4est_global_exchange_part(NULL);
 #else
   /* copy particles */
@@ -1071,7 +1061,10 @@ void dd_topology_release() {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
+
+  // delete all the p4est stuff
   dd_p4est_free();
+  
 #endif
 
   int i,j;
@@ -1104,35 +1097,38 @@ void dd_topology_release() {
 /************************************************************/
 void dd_exchange_and_sort_particles (int global_flag) {
   CALL_TRACE();
-  //int64_t ts = clock();
 #ifndef P4EST_NOCHANGE
   
-  if (global_flag) {
+  if (global_flag) { // perform a global resorting
     ParticleList sendbuf;
     init_particlelist(&sendbuf);
+    // Go through all local particles and move those not on node to the sendbuf
     for (int c = 0; c < local_cells.n; c++) {
       Cell *pl = local_cells.cell[c];
       int np   = local_cells.cell[c]->n;
       for (int p = 0; p < np; p++) {
         Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
-        if (nc == NULL) {
+        if (nc == NULL) { // Belongs to other node
           move_indexed_particle(&sendbuf, pl, p);
           if(p < np) p -= 1;
-        } else if(nc != pl) {
+        } else if(nc != pl) { // Still on node but particle belongs to other cell
           move_indexed_particle(nc, pl, p);
           if(p < np) p -= 1;
         }
+        // Else not required since particle in cell it belongs to
       }
     }
+    // Invoke communication, the particle index is cleared there
     if (local_cells.n > 0)
       dd_p4est_global_exchange_part(&sendbuf);
-    else
+    else // Still call it if there are no cells on this node
       dd_p4est_global_exchange_part(NULL);
+    // Free remaining particles in sendbuf, but it should be empty already
     for (int p = 0; p < sendbuf.n; p++) {
       free_particle(&sendbuf.part[p]);
     }
     realloc_particlelist(&sendbuf, 0);
-  } else {
+  } else { // do the local resorting (particles move at most on cell)
     dd_p4est_exchange_and_sort_particles();
   }
 
@@ -1332,9 +1328,6 @@ void dd_exchange_and_sort_particles (int global_flag) {
 #endif
 
 #endif
-  /*ts = clock() - ts;
-  if (this_node == 0)
-    printf("%li\n",ts);*/
   CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
 }
 
@@ -1344,7 +1337,7 @@ int calc_processor_min_num_cells () {
   CALL_TRACE();
 
 #ifndef P4EST_NOCHANGE
-  return 2;
+  return 1; // I see no reason why this should be 2. 
 #else
 
   int i, min = 1;

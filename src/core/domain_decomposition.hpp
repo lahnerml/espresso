@@ -66,21 +66,25 @@
 #include <p8est_ghost.h>
 #include <p8est_mesh.h>
 
+// Structure that stores basic grid information
 typedef struct {
-  int64_t idx;
-  int rank;
-  int shell;
-  int boundary;
-  int neighbor[26];
-  int coord[3];
+  int64_t idx; // a unique index within all cells (as used by p4est for locals)
+  int rank; // the rank of this cell (equals this_node for locals)
+  int shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
+  int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
+                // Cells with shell-type 0 or those located within the domain are always 0
+                // Cells with shell-type 1 store information about which face is a boundary
+                // Cells with shell-type 2 are set if the are in the periodic halo
+  int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
+  int coord[3]; // cartesian coordinates of the cell
 } local_shell_t;
 
+// Structure to store communications
 typedef struct {
-  int rank;
-  int cnt;
-  //uint64_t dir;
-  int dir;
-  int *idx;
+  int rank; // Rank of the communication partner
+  int cnt;  // number of cells to communicate
+  int dir;  // Bitmask for communication direction. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
+  int *idx; // List of cell indexes
 } comm_t;
 
 #endif
@@ -142,11 +146,11 @@ typedef struct {
   /** Array containing information about the interactions between the cells. */
   IA_Neighbor_List *cell_inter;
 #ifdef DD_P4EST
-  p4est_t *p4est;
-  p4est_ghost_t *p4est_ghost;
-  p4est_mesh_t *p4est_mesh;
-  p4est_connectivity_t *p4est_conn;
-  local_shell_t *p4est_shell;
+  p4est_t *p4est; // the forest
+  p4est_ghost_t *p4est_ghost; // the forest's ghost layer
+  p4est_mesh_t *p4est_mesh; // the forest's mesh information
+  p4est_connectivity_t *p4est_conn; // the topology on which the forest is build
+  local_shell_t *p4est_shell; // inforamtion about all cells on this node (same order as cells)
 #endif
 }  DomainDecomposition;
 

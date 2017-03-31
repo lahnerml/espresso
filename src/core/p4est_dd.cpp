@@ -164,7 +164,7 @@ int dd_p4est_cellsize_even () {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_create_grid () {
-  printf("%i : new MD grid\n", this_node);
+  //printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
   
   // delete all existing stuff  

@@ -213,21 +213,26 @@ void dd_p4est_create_grid () {
   p4est_space_idx = new int[n_nodes + 1];
   for (int i=0;i<=n_nodes;++i) {
     p4est_quadrant_t *q = &p4est->global_first_position[i];
-    p4est_quadrant_t c;
+    //p4est_quadrant_t c;
     if (i < n_nodes) {
       double xyz[3];
       p4est_qcoord_to_vertex(p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-      c.x = xyz[0]*(1<<grid_level);
-      c.y = xyz[1]*(1<<grid_level);
-      c.z = xyz[2]*(1<<grid_level);
+      //c.x = xyz[0]*(1<<grid_level);
+      //c.y = xyz[1]*(1<<grid_level);
+      //c.z = xyz[2]*(1<<grid_level);
+      p4est_space_idx[i] = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
+                                                    xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
     } else {
-      c.x = 1<<grid_level;
+      /*c.x = 1<<grid_level;
       while (c.x < grid_size[0]) c.x <<= 1;
       c.y = 0;
-      c.z = 0;
+      c.z = 0;*/
+      int64_t tmp = 1<<grid_level;
+      while(tmp < grid_size[0]) tmp <<= 1;
+      p4est_space_idx[i] = tmp*tmp*tmp;
     }
-    c.level = P4EST_QMAXLEVEL;
-    p4est_space_idx[i] = p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
+    //c.level = P4EST_QMAXLEVEL;
+    //p4est_space_idx[i] = p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
     if (i == this_node + 1) {
       CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i-1], p4est_space_idx[i] - 1));
     }
@@ -1133,16 +1138,30 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
 int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
-  p4est_quadrant_t c;
-  c.x = x; c.y = y; c.z = z;
-  if (c.x < 0 || c.x >= grid_size[0])
+  //p4est_quadrant_t c;
+  //c.x = x; c.y = y; c.z = z;
+  /*if (x < 0 || x >= grid_size[0])
     runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (c.y < 0 || c.y >= grid_size[1])
+  if (y < 0 || y >= grid_size[1])
     runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (c.z < 0 || c.z >= grid_size[2])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  c.level = P4EST_QMAXLEVEL;
-  return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
+  if (z < 0 || z >= grid_size[2])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";*/
+  
+  int64_t idx = 0;
+  int64_t pos = 1;
+  
+  for (int i = 0; i < 21; ++i) {
+    if ((x&1)) idx += pos;
+    x >>= 1; pos <<= 1;
+    if ((y&1)) idx += pos;
+    y >>= 1; pos <<= 1;
+    if ((z&1)) idx += pos;
+    z >>= 1; pos <<= 1;
+  }
+  
+  return idx;
+  //c.level = P4EST_QMAXLEVEL;
+  //return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL);
 }
 //--------------------------------------------------------------------------------------------------
 // Maps a position to the cartesian grid and returns the morton index of this coordinates

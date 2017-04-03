@@ -51,12 +51,10 @@ set(CMAKE_FIND_FRAMEWORK LAST)
 # User input options
 ######################################################################
 
-option(WITH_PYTHON "Build python interface"  OFF)
+option(WITH_PYTHON "Build python interface"  ON)
 option(WITH_TCL    "Build tcl interface"     ON)
-
-option(WITH_CUDA   "Build with GPU support"  OFF)
-option(WITH_HDF5   "Build with HDF5 support" OFF)
-
+option(WITH_CUDA   "Build with GPU support"  ON)
+option(WITH_HDF5   "Build with HDF5 support" ON)
 option(WITH_P4EST  "Enable adaptive grid"    ON)
 option(WITH_TESTS  "Enable tests"            ON)
 option(WITH_SCAFACOS "Build with Scafacos support" ON)
@@ -162,8 +160,6 @@ if(WITH_P4EST)
   if(SC_FOUND)
     list(APPEND LIBRARIES ${SC_LIBRARIES})
     include_directories(${SC_INCLUDE_DIR})
-    message(${SC_LIBRARIES})
-    set(sc 1)
   endif(SC_FOUND)
   if(P4EST_FOUND)
     list(APPEND LIBRARIES ${P4EST_LIBRARIES})
@@ -171,7 +167,6 @@ if(WITH_P4EST)
     message(STATUS ${P4EST_INCLUDE_DIRS})
     set(p4est 1)
   endif(P4EST_FOUND)
-  list(APPEND LIBRARIES "-lp4est -lsc -L /home/malte/Documents/Uni/MSc-Thesis/p4est/local/lib/")
 endif(WITH_P4EST)
 
 if(WITH_SCAFACOS)

@@ -328,10 +328,10 @@ void mpi_stop() {
     return;
 
   mpi_call(mpi_stop_slave, -1, 0);
-  
+
 #ifdef DD_P4EST
   dd_p4est_free();
-#endif
+#endif // DD_P4EST
 
 #ifdef LB_ADAPTIVE
   lb_release();
@@ -353,7 +353,7 @@ void mpi_stop() {
   }
 
   sc_finalize();
-#endif
+#endif // LB_ADAPTIVE
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
@@ -365,7 +365,7 @@ void mpi_stop_slave(int node, int param) {
 
 #ifdef DD_P4EST
   dd_p4est_free();
-#endif
+#endif // DD_P4EST
 
 #ifdef LB_ADAPTIVE
   lb_release();
@@ -386,10 +386,12 @@ void mpi_stop_slave(int node, int param) {
   }
 
   sc_finalize();
-#endif
+#endif // LB_ADAPTIVE
+
   MPI_Barrier(comm_cart);
   MPI_Finalize();
   regular_exit = 1;
+  terminated = 1;
   exit(0);
 }
 
@@ -2738,7 +2740,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
 
   lbpar.base_level = level;
   max_refinement_level = level;
-  
+
 #ifdef DD_P4EST
   dd_p4est_partition(p8est, lbadapt_mesh, conn);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
@@ -3535,7 +3537,7 @@ void mpi_dd_p4est_write_particle_vtk(int node, int len) {
 #ifdef DD_P4EST
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-  
+
   dd_p4est_write_particle_vtk(filename);
 #endif
 }

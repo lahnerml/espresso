@@ -2963,6 +2963,20 @@ void mpi_geometric_refinement(int node, int param) {
                     NULL);               // replace data
   // clang-format on
 
+#ifdef DD_P4EST
+  p8est_mesh_destroy(lbadapt_mesh);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  dd_p4est_partition(p8est, lbadapt_mesh, conn);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#else
   p8est_partition(p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
@@ -2972,6 +2986,7 @@ void mpi_geometric_refinement(int node, int param) {
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#endif
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
 

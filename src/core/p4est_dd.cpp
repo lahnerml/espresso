@@ -29,6 +29,7 @@ local_shell_t *&p4est_shell = dd.p4est_shell;
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
 static int *p4est_space_idx = NULL; // n_nodes + 1 elements, storing the first Morton index of local cell
+static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
 static comm_t *comm_send = NULL;  // Internal send lists, idx maps to local cells
 static comm_t *comm_recv = NULL;  // Internal recv lists, idx maps to ghost cells
@@ -170,8 +171,6 @@ void dd_p4est_create_grid () {
   // delete all existing stuff  
   dd_p4est_free();
   
-  int grid_level;
-  
 #ifdef LB_ADAPTIVE
   // the adaptive LB has a strange grid, thus we have to do something similar here
   if (max_range < 1.0)
@@ -205,6 +204,8 @@ void dd_p4est_create_grid () {
   p4est_partition(p4est, 0, NULL);
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
+  
+  dd_p4est_write_vtk();
   
   CELL_TRACE(printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants));
@@ -1205,13 +1206,16 @@ void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,mesh,i);
     double xyz[3];
     p4est_qcoord_to_vertex(conn,mesh->quad_to_tree[i],q->x,q->y,q->z,xyz);
-    int64_t idx = dd_p4est_pos_morton_idx(xyz);
+    /*int64_t idx = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
+                                           xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
+                                           //dd_p4est_pos_morton_idx(xyz);
     for (int n=1;n<=n_nodes;++n) {
       if (p4est_space_idx[n] > idx) {
         num_quad_per_proc[n - 1] += 1;
         break;
       }
-    }
+    }*/
+    num_quad_per_proc[dd_p4est_pos_to_proc(xyz)] += 1;
   }
   CELL_TRACE(printf("%i : repartition %i cells: ", this_node, p4est->local_num_quadrants));
   for (int i=0;i<n_nodes;++i) {

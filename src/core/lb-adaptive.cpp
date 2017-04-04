@@ -1912,16 +1912,14 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   //p8est_quadrant_t c;
-  //int x, y, z;
+  int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(conn,tree,q->x,q->y,q->z,xyz);
-  /*x = xyz[0]*(1<<finest_level_global);
+  x = xyz[0]*(1<<finest_level_global);
   y = xyz[1]*(1<<finest_level_global);
-  z = xyz[2]*(1<<finest_level_global);*/
+  z = xyz[2]*(1<<finest_level_global);
   
-  return dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
-                                  xyz[1]*(1<<finest_level_global),
-                                  xyz[2]*(1<<finest_level_global));
+  return dd_p4est_cell_morton_idx(x,y,z);
   
   //c.level = P8EST_QMAXLEVEL;
   //return p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
@@ -1959,8 +1957,8 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   int xid, yid, zid;
   p8est_quadrant_t *q;
   for (int d=0;d<3;++d) {
-    if (pos[d] > box_l[d]) return -1;
-    if (pos[d] < 0) return -1;
+    if (pos[d] > (box_l[d] + box_l[d]*ROUND_ERROR_PREC)) return -1;
+    if (pos[d] < -box_l[d]*ROUND_ERROR_PREC) return -1;
   }
   xid = (pos[0])*(1<<finest_level_global);
   yid = (pos[1])*(1<<finest_level_global);
@@ -1968,6 +1966,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   //c.level = P8EST_QMAXLEVEL;
   //int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);*/
   int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
+  //printf ("checkpoint: pidx %li [%i %i %i]\n", pidx, xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;
   for (int z=-1;z<=1;z+=2) {
@@ -1991,7 +1990,14 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
       if (qidx > sidx[j])
         ret[j] = i - 1;
   }
-  q = &p8est->global_first_position[this_node+1];
+  /*double xyz[3];
+  q = p8est_mesh_get_quadrant(p8est,lbadapt_mesh,0);
+  qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[0]);
+  p8est_qcoord_to_vertex(conn,lbadapt_mesh->quad_to_tree[0],q->x,q->y,q->z,xyz);
+  xid = xyz[0]*(1<<finest_level_global);
+  yid = xyz[1]*(1<<finest_level_global);
+  zid = xyz[2]*(1<<finest_level_global);
+  printf("first %li [%i %i %i]\n", qidx, xid,yid,zid);*/
   if (this_node + 1 >= n_nodes) {
     int64_t tmp = (1<<finest_level_global);
     while (tmp < (box_l[0]*(1<<finest_level_global))) tmp <<= 1;
@@ -2005,7 +2011,13 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     c.level = P8EST_QMAXLEVEL;
     qidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);*/
   } else {
+    q = &p8est->global_first_position[this_node+1];
     qidx = lbadapt_get_global_idx(q, q->p.which_tree);
+    /*p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+    xid = xyz[0]*(1<<finest_level_global);
+    yid = xyz[1]*(1<<finest_level_global);
+    zid = xyz[2]*(1<<finest_level_global);
+    printf("last %li [%i %i %i]\n", qidx, xid,yid,zid);*/
   }
   if (pidx < qidx) {
     return p8est->local_num_quadrants - 1;

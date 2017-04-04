@@ -48,8 +48,6 @@ void dd_p4est_global_exchange_part(ParticleList* cp);
 int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)
 int64_t dd_p4est_pos_morton_idx(double pos[3]);
-// Comute a Morton index for a cell using its coordinates
-int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
 
 // Handles everything that needs to be done on a geometry change
 void dd_p4est_on_geometry_change(int flags);

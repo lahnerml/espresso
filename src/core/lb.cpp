@@ -1384,6 +1384,29 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     // unit conversion
     rho *= 1 / lbpar.agrid / lbpar.agrid / lbpar.agrid;
     *p_rho = rho;
+#else
+  double rho;
+  double j[3];
+  double pi[6];
+  int64_t index = dd_p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+  int proc = 0;
+  for (; proc < n_nodes; ++proc) {
+    p8est_quadrant_t *q = &p8est->global_first_position[proc];
+    double xyz[3];
+    p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
+                                            xyz[1]*(1<<finest_level_global),
+                                            xyz[2]*(1<<finest_level_global));
+    if (qidx > index) {
+      proc -= 1;
+      break;
+    }
+  }
+  double h_max = 1.0 / double(1<<max_refinement_level);
+  mpi_recv_fluid(proc, index, &rho, j, pi);
+  // unit conversion
+  rho *= 1 / h_max / h_max / h_max;
+    *p_rho = rho;;
 #endif // LB_ADAPTIVE
 #endif // LB
   }
@@ -1427,6 +1450,30 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     p_u[0] = j[0] / rho * lbpar.agrid / lbpar.tau;
     p_u[1] = j[1] / rho * lbpar.agrid / lbpar.tau;
     p_u[2] = j[2] / rho * lbpar.agrid / lbpar.tau;
+#else
+  double rho;
+  double j[3];
+  double pi[6];
+  int64_t index = dd_p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+  int proc = 0;
+  for (; proc < n_nodes; ++proc) {
+    p8est_quadrant_t *q = &p8est->global_first_position[proc];
+    double xyz[3];
+    p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
+                                            xyz[1]*(1<<finest_level_global),
+                                            xyz[2]*(1<<finest_level_global));
+    if (qidx > index) {
+      proc -= 1;
+      break;
+    }
+  }
+  double h_max = 1.0 / double(1<<max_refinement_level);
+  mpi_recv_fluid(proc, index, &rho, j, pi);
+  // unit conversion
+  p_u[0] = j[0] / rho * h_max / lbpar.tau;
+  p_u[1] = j[1] / rho * h_max / lbpar.tau;
+  p_u[2] = j[2] / rho * h_max / lbpar.tau;
 #endif // LB_ADAPTIVE
 #endif // LB
   }
@@ -1579,6 +1626,33 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
         p_pi[3] = pi[3]/lbpar.tau/lbpar.tau/lbpar.agrid;
         p_pi[4] = pi[4]/lbpar.tau/lbpar.tau/lbpar.agrid;
         p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/lbpar.agrid;
+#else
+  double rho;
+  double j[3];
+  double pi[6];
+  int64_t index = dd_p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+  int proc = 0;
+  for (; proc < n_nodes; ++proc) {
+    p8est_quadrant_t *q = &p8est->global_first_position[proc];
+    double xyz[3];
+    p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
+                                            xyz[1]*(1<<finest_level_global),
+                                            xyz[2]*(1<<finest_level_global));
+    if (qidx > index) {
+      proc -= 1;
+      break;
+    }
+  }
+  double h_max = 1.0 / double(1<<max_refinement_level);
+  mpi_recv_fluid(proc, index, &rho, j, pi);
+  // unit conversion
+        p_pi[0] = pi[0]/lbpar.tau/lbpar.tau/h_max;
+        p_pi[1] = pi[1]/lbpar.tau/lbpar.tau/h_max;
+        p_pi[2] = pi[2]/lbpar.tau/lbpar.tau/h_max;
+        p_pi[3] = pi[3]/lbpar.tau/lbpar.tau/h_max;
+        p_pi[4] = pi[4]/lbpar.tau/lbpar.tau/h_max;
+        p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/h_max;
 #endif // LB_ADAPTIVE
 #endif // LB
   }
@@ -3609,7 +3683,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   }
 #else
   for (x = 0; x < dcnt; ++x) {
-    if (n_lbsteps % (1 << (finest_level_global - level[x])) == 0) {
+    //if (n_lbsteps % (1 << (finest_level_global - level[x])) == 0) {
     //if (level[x] == finest_level_global) {
       //double level_fact = double(1<<(finest_level_global - level[x]));
       //double h_loc = 1.0/(double)(1 << level[x]);
@@ -3628,7 +3702,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
       local_f[0] += delta[x] * delta_j[0];// * h_loc / level_fact;
       local_f[1] += delta[x] * delta_j[1];// * h_loc / level_fact;
       local_f[2] += delta[x] * delta_j[2];// * h_loc / level_fact;
-    }
+    //}
   }
 #endif
 

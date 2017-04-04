@@ -81,6 +81,9 @@ const int p4est_to_ci[18] =
 /*@}*/
 #endif // LB_ADAPTIVE
 
+// Comute a Morton index for a cell using its coordinates
+int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
+
 /************************************************
  * data types
  ************************************************/

@@ -2059,7 +2059,7 @@ int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20],
     runtimeErrorMsg() << "Position not in local domain";
     fprintf(stderr, "Position not in local domain\n");
     fprintf(stderr, "%i : %li [%lf %lf %lf]\n", this_node, qidx, pos[0], pos[1], pos[2]);
-    fprintf(stderr, "belongs to %i\n", dd_p4est_pos_to_proc(pos));
+    fprintf(stderr, "belongs to MD process %i\n", dd_p4est_pos_to_proc(pos));
     if (dd_p4est_save_position_to_cell(pos) == NULL) {
       fprintf(stderr, "not even in MD\n");
     }
@@ -2204,7 +2204,7 @@ void lbadapt_interpolate_pos (double pos[3], lbadapt_payload_t *nodes[8], double
     dis = dis - floor(dis) + 0.5;
     if (dis > 1.0) { // right neighbor
       corner |= 1<<d;
-      dis -= 1.0;
+      dis = 2.0 - dis;
     }
     delta[d    ] = dis;
     delta[d + 3] = 1.0 - dis;

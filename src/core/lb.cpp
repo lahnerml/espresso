@@ -3484,6 +3484,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
 #ifndef LB_ADAPTIVE
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
   double h = lbpar.agrid;
+  double h_max = lbpar.agrid;
 #else
   //lbadapt_interpolate_pos(p->r.p, node_index, delta);
   dcnt = lbadapt_interpolate_pos_adapt(p->r.p, node_index, delta, level);
@@ -3575,6 +3576,10 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   delta_j[1] = -force[1] * time_step * lbpar.tau / h_max;
   delta_j[2] = -force[2] * time_step * lbpar.tau / h_max;
   
+  //delta_j[0] *= 1.0/(prefactors[level[0]]*prefactors[level[0]]);
+  //delta_j[1] *= 1.0/(prefactors[level[0]]*prefactors[level[0]]);
+  //delta_j[2] *= 1.0/(prefactors[level[0]]*prefactors[level[0]]);
+  
   //force[0] *= time_step;
   //force[1] *= time_step;
   //force[2] *= time_step;
@@ -3606,8 +3611,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
   for (x = 0; x < dcnt; ++x) {
     if (n_lbsteps % (1 << (finest_level_global - level[x])) == 0) {
     //if (level[x] == finest_level_global) {
-      double level_fact = double(1<<(finest_level_global - level[x]));
-      double h_loc = 1.0/(double)(1 << level[x]);
+      //double level_fact = double(1<<(finest_level_global - level[x]));
+      //double h_loc = 1.0/(double)(1 << level[x]);
       //level_fact = level_fact * level_fact;
       local_f = node_index[x]->lbfields.force;
       /*double f[3];
@@ -3616,13 +3621,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3]) {
       f[1] = delta_j[1] * delta[x];
       f[2] = delta_j[2] * delta[x];
       lbadapt_apply_forces(node_index[x]->modes, f, h);*/
-      local_f[0] -= delta[x] * prefactors[level[x]] * force[0] * SQR(h_max) * SQR(lbpar.tau);
-      local_f[1] -= delta[x] * prefactors[level[x]] * force[1] * SQR(h_max) * SQR(lbpar.tau);
-      local_f[2] -= delta[x] * prefactors[level[x]] * force[2] * SQR(h_max) * SQR(lbpar.tau);
+      //local_f[0] -= delta[x] * prefactors[level[x]] * force[0] * SQR(h_max) * SQR(lbpar.tau);
+      //local_f[1] -= delta[x] * prefactors[level[x]] * force[1] * SQR(h_max) * SQR(lbpar.tau);
+      //local_f[2] -= delta[x] * prefactors[level[x]] * force[2] * SQR(h_max) * SQR(lbpar.tau);
       
-      //local_f[0] += delta[x] * delta_j[0];// * h_loc / level_fact;
-      //local_f[1] += delta[x] * delta_j[1];// * h_loc / level_fact;
-      //local_f[2] += delta[x] * delta_j[2];// * h_loc / level_fact;
+      local_f[0] += delta[x] * delta_j[0];// * h_loc / level_fact;
+      local_f[1] += delta[x] * delta_j[1];// * h_loc / level_fact;
+      local_f[2] += delta[x] * delta_j[2];// * h_loc / level_fact;
     }
   }
 #endif

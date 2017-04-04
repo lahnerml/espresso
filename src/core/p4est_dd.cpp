@@ -229,6 +229,8 @@ void dd_p4est_create_grid () {
       c.z = 0;*/
       int64_t tmp = 1<<grid_level;
       while(tmp < grid_size[0]) tmp <<= 1;
+      while(tmp < grid_size[1]) tmp <<= 1;
+      while(tmp < grid_size[2]) tmp <<= 1;
       p4est_space_idx[i] = tmp*tmp*tmp;
     }
     //c.level = P4EST_QMAXLEVEL;

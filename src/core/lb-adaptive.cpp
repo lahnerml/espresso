@@ -1995,6 +1995,8 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   if (this_node + 1 >= n_nodes) {
     int64_t tmp = (1<<finest_level_global);
     while (tmp < (box_l[0]*(1<<finest_level_global))) tmp <<= 1;
+    while (tmp < (box_l[1]*(1<<finest_level_global))) tmp <<= 1;
+    while (tmp < (box_l[2]*(1<<finest_level_global))) tmp <<= 1;
     qidx == tmp*tmp*tmp;
     /*c.x = (1<<finest_level_global);
     while (c.x < (box_l[0]*(1<<finest_level_global))) c.x <<= 1;

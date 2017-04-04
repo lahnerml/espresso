@@ -1182,11 +1182,14 @@ int dd_p4est_pos_to_proc(double pos[3]) {
   int64_t idx = dd_p4est_pos_morton_idx(pos);
   // Note: Since p4est_space_idx is a ordered list, it is possible to do a binary search here.
   // Doing so would reduce the complexity from O(N) to O(log(N))
-  for (int i=1;i<=n_nodes;++i) {
-    // compare the first cell of a process with this cell
-    if (p4est_space_idx[i] > idx) return i - 1;
+  if (idx >= 0) {
+    for (int i=1;i<=n_nodes;++i) {
+      // compare the first cell of a process with this cell
+      if (p4est_space_idx[i] > idx) return i - 1;
+    }
   }
-  runtimeErrorMsg() << "position " << pos[0] << "x" << pos[1] << "x" << pos[2] << " not in box";
+  fprintf(stderr, "position %lfx%lfx%lf not in boxl", pos[0], pos[1], pos[2]);
+  errexit();
 }
 //--------------------------------------------------------------------------------------------------
 // Repartitions the given p4est, such that process boundaries do not intersect the partition of the

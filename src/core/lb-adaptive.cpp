@@ -1914,9 +1914,9 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(conn,tree,q->x,q->y,q->z,xyz);
-  x = xyz[0]*(1<<finest_level_global);
-  y = xyz[1]*(1<<finest_level_global);
-  z = xyz[2]*(1<<finest_level_global);
+  x = xyz[0]*(1<<max_refinement_level);
+  y = xyz[1]*(1<<max_refinement_level);
+  z = xyz[2]*(1<<max_refinement_level);
 
   return dd_p4est_cell_morton_idx(x,y,z);
 
@@ -1936,9 +1936,9 @@ int64_t lbadapt_map_pos_to_quad(double pos[3]) {
   //c.z = (pos[2])*(1<<finest_level_global);
   //c.level = P8EST_QMAXLEVEL;
   //int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
-  int64_t pidx = dd_p4est_cell_morton_idx((pos[0])*(1<<finest_level_global),
-                                          (pos[1])*(1<<finest_level_global),
-                                          (pos[2])*(1<<finest_level_global));
+  int64_t pidx = dd_p4est_cell_morton_idx((pos[0])*(1<<max_refinement_level),
+                                          (pos[1])*(1<<max_refinement_level),
+                                          (pos[2])*(1<<max_refinement_level));
   for (int64_t i=0;i<p8est->local_num_quadrants;++i) {
     q = p8est_mesh_get_quadrant(p8est,lbadapt_mesh,i);
     if (lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]) > pidx)
@@ -1959,9 +1959,9 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     if (pos[d] > (box_l[d] + box_l[d]*ROUND_ERROR_PREC)) return -1;
     if (pos[d] < -box_l[d]*ROUND_ERROR_PREC) return -1;
   }
-  xid = (pos[0])*(1<<finest_level_global);
-  yid = (pos[1])*(1<<finest_level_global);
-  zid = (pos[2])*(1<<finest_level_global);
+  xid = (pos[0])*(1<<max_refinement_level);
+  yid = (pos[1])*(1<<max_refinement_level);
+  zid = (pos[2])*(1<<max_refinement_level);
   //c.level = P8EST_QMAXLEVEL;
   //int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);*/
   int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
@@ -1971,9 +1971,9 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   for (int z=-1;z<=1;z+=2) {
     for (int y=-1;y<=1;y+=2) {
       for (int x=-1;x<=1;x+=2) {
-        xid = (pos[0] + x*box_l[0]*ROUND_ERROR_PREC)*(1<<finest_level_global);
-        yid = (pos[1] + y*box_l[1]*ROUND_ERROR_PREC)*(1<<finest_level_global);
-        zid = (pos[2] + z*box_l[2]*ROUND_ERROR_PREC)*(1<<finest_level_global);
+        xid = (pos[0] + x*box_l[0]*ROUND_ERROR_PREC)*(1<<max_refinement_level);
+        yid = (pos[1] + y*box_l[1]*ROUND_ERROR_PREC)*(1<<max_refinement_level);
+        zid = (pos[2] + z*box_l[2]*ROUND_ERROR_PREC)*(1<<max_refinement_level);
         ret[cnt] = -1;
         //sidx[cnt++] = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
         sidx[cnt++] = dd_p4est_cell_morton_idx(xid, yid, zid);
@@ -1998,10 +1998,10 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   zid = xyz[2]*(1<<finest_level_global);
   printf("first %li [%i %i %i]\n", qidx, xid,yid,zid);*/
   if (this_node + 1 >= n_nodes) {
-    int64_t tmp = (1<<finest_level_global);
-    while (tmp < (box_l[0]*(1<<finest_level_global))) tmp <<= 1;
-    while (tmp < (box_l[1]*(1<<finest_level_global))) tmp <<= 1;
-    while (tmp < (box_l[2]*(1<<finest_level_global))) tmp <<= 1;
+    int64_t tmp = (1<<max_refinement_level);
+    while (tmp < (box_l[0]*(1<<max_refinement_level))) tmp <<= 1;
+    while (tmp < (box_l[1]*(1<<max_refinement_level))) tmp <<= 1;
+    while (tmp < (box_l[2]*(1<<max_refinement_level))) tmp <<= 1;
     qidx == tmp*tmp*tmp;
     /*c.x = (1<<finest_level_global);
     while (c.x < (box_l[0]*(1<<finest_level_global))) c.x <<= 1;

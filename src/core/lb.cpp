@@ -1394,9 +1394,9 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     p8est_quadrant_t *q = &p8est->global_first_position[proc];
     double xyz[3];
     p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
-                                            xyz[1]*(1<<finest_level_global),
-                                            xyz[2]*(1<<finest_level_global));
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<max_refinement_level),
+                                            xyz[1]*(1<<max_refinement_level),
+                                            xyz[2]*(1<<max_refinement_level));
     if (qidx > index) {
       proc -= 1;
       break;
@@ -1460,14 +1460,14 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     p8est_quadrant_t *q = &p8est->global_first_position[proc];
     double xyz[3];
     p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
-                                            xyz[1]*(1<<finest_level_global),
-                                            xyz[2]*(1<<finest_level_global));
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<max_refinement_level),
+                                            xyz[1]*(1<<max_refinement_level),
+                                            xyz[2]*(1<<max_refinement_level));
     if (qidx > index) {
-      proc -= 1;
       break;
     }
   }
+  proc -= 1;
   double h_max = 1.0 / double(1<<max_refinement_level);
   mpi_recv_fluid(proc, index, &rho, j, pi);
   // unit conversion
@@ -1636,14 +1636,14 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     p8est_quadrant_t *q = &p8est->global_first_position[proc];
     double xyz[3];
     p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<finest_level_global),
-                                            xyz[1]*(1<<finest_level_global),
-                                            xyz[2]*(1<<finest_level_global));
+    int64_t qidx = dd_p4est_cell_morton_idx(xyz[0]*(1<<max_refinement_level),
+                                            xyz[1]*(1<<max_refinement_level),
+                                            xyz[2]*(1<<max_refinement_level));
     if (qidx > index) {
-      proc -= 1;
       break;
     }
   }
+  proc -= 1;
   double h_max = 1.0 / double(1<<max_refinement_level);
   mpi_recv_fluid(proc, index, &rho, j, pi);
   // unit conversion
@@ -3898,20 +3898,28 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
       local_j[2] = local_rho *
                    lb_boundaries[data->boundary - 1].velocity[2];
     } else {
-      /*lbadapt_calc_modes(data->lbfluid, modes);*/
+      lbadapt_calc_local_fields(data->lbfluid, data->modes,
+                                data->lbfields.force, data->boundary,
+                                data->lbfields.has_force, h,
+                                &local_rho, local_j, NULL);
+      /*lbadapt_calc_modes(data->lbfluid, modes);
       local_rho =
-          lbpar.rho[0] * h_max * h_max * h_max + data->modes[0];
-      local_j[0] = data->modes[1] + 0.5 * data->lbfields.force[0];
-      local_j[1] = data->modes[2] + 0.5 * data->lbfields.force[1];
-      local_j[2] = data->modes[3] + 0.5 * data->lbfields.force[2];
+        lbpar.rho[0] * h_max * h_max * h_max + modes[0];
+      local_j[0] = modes[1];
+      local_j[1] = modes[2];
+      local_j[2] = modes[3];*/
     }
 #else  // LB_BOUNDARIES
-    //lbadapt_calc_modes(data->lbfluid, modes);
+    lbadapt_calc_local_fields(data->lbfluid, data->modes,
+                                data->lbfields.force, data->boundary,
+                                data->lbfields.has_force, h,
+                                &local_rho, local_j, NULL);
+    /*lbadapt_calc_modes(data->lbfluid, modes);
     local_rho =
         lbpar.rho[0] * h_max * h_max * h_max + modes[0];
     local_j[0] = modes[1];
     local_j[1] = modes[2];
-    local_j[2] = modes[3];
+    local_j[2] = modes[3];*/
 #endif // LB_BOUNDARIES       
     interpolated_u[0] += delta[x] * local_j[0] / (local_rho);
     interpolated_u[1] += delta[x] * local_j[1] / (local_rho);

@@ -176,7 +176,7 @@ void lbadapt_reinit() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
   }
-    
+
   int status;
   lbadapt_payload_t *data;
   int lvl;
@@ -238,7 +238,7 @@ void lbadapt_init() {
   if (lbadapt_local_data == NULL) {
     lbadapt_allocate_data();
   }
-    
+
   int status;
   lbadapt_payload_t *data;
   int lvl;
@@ -660,9 +660,9 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
   return 0;
 }
 
-int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
-                              int has_force, double h, double *rho, double *j,
-                              double *pi) {
+int lbadapt_calc_local_fields(double populations[2][19], double mode[19],
+                              double force[3], int boundary, int has_force,
+                              double h, double *rho, double *j, double *pi) {
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
@@ -686,9 +686,8 @@ int lbadapt_calc_local_fields(double mode[19], double force[3], int boundary,
 #endif // LB_BOUNDARIES
 
   double cpmode[19];
-  for (int i = 0; i < 19; ++i) {
-    cpmode[i] = mode[i];
-  }
+  lbadapt_calc_modes(populations, cpmode);
+
   double modes_from_pi_eq[6];
 
   *rho = cpmode[0] + lbpar.rho[0] * h_max * h_max * h_max;
@@ -1344,7 +1343,7 @@ void lbadapt_populate_virtuals(int level) {
       }
       // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
-      
+
       current_data->lbfields.force[0] *= 0.25;
       current_data->lbfields.force[1] *= 0.25;
       current_data->lbfields.force[2] *= 0.25;
@@ -1497,7 +1496,7 @@ void lbadapt_bounce_back(int level) {
             }
 
             // case 2
-            else if (mesh_iter->neighbor_is_ghost == 1 && data->boundary) {
+            else if (mesh_iter->neighbor_is_ghost && data->boundary) {
               if (!currCellData->boundary) {
                 if (-1. == local_post_collision_populations[0]) {
                   for (int i = 0; i < lbmodel.n_veloc; ++i) {
@@ -1610,7 +1609,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
   int level;
   double bnd, *bnd_ptr;
   lbadapt_payload_t *data;
-  
+
   /* get boundary status */
   for (level = coarsest_level_local; level <= finest_level_local; ++level) {
     status = 0;
@@ -1717,9 +1716,9 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double rho;
         double j[3];
 
-        lbadapt_calc_local_fields(data->modes, data->lbfields.force,
-                                  data->boundary, data->lbfields.has_force, h,
-                                  &rho, j, NULL);
+        lbadapt_calc_local_fields(data->lbfluid, data->modes,
+                                  data->lbfields.force, data->boundary,
+                                  data->lbfields.has_force, h, &rho, j, NULL);
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
@@ -1918,9 +1917,9 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   x = xyz[0]*(1<<finest_level_global);
   y = xyz[1]*(1<<finest_level_global);
   z = xyz[2]*(1<<finest_level_global);
-  
+
   return dd_p4est_cell_morton_idx(x,y,z);
-  
+
   //c.level = P8EST_QMAXLEVEL;
   //return p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
 }
@@ -2032,7 +2031,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   }
 }
 
-int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], 
+int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20],
   double delta[20], int level[20]) {
   static const int nidx[8][7] = {
     { 0, 2, 14, 4, 10, 6, 18}, // left, front, bottom

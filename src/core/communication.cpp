@@ -2674,9 +2674,9 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
       }
       lvl = q->level;
     }
-    lbadapt_payload_t *data = 
+    lbadapt_payload_t *data =
       &lbadapt_local_data[lvl - coarsest_level_local][lbadapt_mesh->quad_qreal_offset[quad]];
-    lbadapt_calc_local_fields(data->modes, data->lbfields.force,
+    lbadapt_calc_local_fields(data->lbfluid, data->modes, data->lbfields.force,
                               data->boundary, data->lbfields.has_force, 1.0 / double(lvl),
                               rho, j, pi);
 #endif
@@ -2717,9 +2717,9 @@ void mpi_recv_fluid_slave(int node, int index) {
       }
       lvl = q->level;
     }
-    lbadapt_payload_t *dat = 
+    lbadapt_payload_t *dat =
       &lbadapt_local_data[lvl - coarsest_level_local][lbadapt_mesh->quad_qreal_offset[quad]];
-    lbadapt_calc_local_fields(dat->modes, dat->lbfields.force,
+    lbadapt_calc_local_fields(dat->lbfluid, dat->modes, dat->lbfields.force,
                               dat->boundary, dat->lbfields.has_force, 1.0 / double(lvl),
                               &data[0], &data[1], &data[4]);
 #endif

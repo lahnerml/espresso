@@ -1,13 +1,13 @@
 cellsystem domain_decomposition -no_verlet_list
- 
-set n_part 0
+
+set n_part 5
 set iter 200
 set iteri 200
 
 setmd skin 0.1
 
 inter 0 0 lennard-jones 1.0 0.1 0.8 auto 0.0
- 
+
 set boxl 4.0
 
 setmd box_l $boxl $boxl 1
@@ -21,7 +21,7 @@ set wall 0.5
 set agrid [expr 1./pow(2, $mlvl)]
 
 expr srand([pid])
-for {set i 1} {$i <= $n_part} {incr i} {
+for {set i 1} {$i < $n_part} {incr i} {
   set pos_x [expr rand()*($boxl-2*$wall) + $wall]
   set pos_y [expr rand()*($boxl-2*$wall) + $wall]
   set pos_z [expr rand()*1.0]
@@ -39,25 +39,25 @@ kill_particle_motion
 kill_particle_forces
 puts "Mindist: [analyze mindist]"
 
-lbadapt-init 1
+lbadapt-init 2
 lbadapt_set_max_level $mlvl
 
-lbfluid cpu agrid $agrid dens 1. visc 0.032 tau [expr $dt*0.5] friction 0.5 
+lbfluid cpu agrid $agrid dens 1. visc 0.032 tau [expr $dt*0.5] friction 0.5
 #ext_force 0.01 0.0 0.0
 
-# set inflow/outflow boundaries 
-#lbboundary wall dist $agrid normal 1 0 0  velocity 1 0 0 
+# set inflow/outflow boundaries
+#lbboundary wall dist $agrid normal 1 0 0  velocity 1 0 0
 #lbboundary wall dist [expr -$boxl + $agrid] normal -1 0 0 velocity 1 0 0
-# setup a channel 
-lbboundary wall dist $wall normal 0 1 0 
-lbboundary wall dist [expr -$boxl + $wall] normal 0 -1 0 
+# setup a channel
+lbboundary wall dist $wall normal 0 1 0
+lbboundary wall dist [expr -$boxl + $wall] normal 0 -1 0
 #lbboundary wall dist 0.5 normal 0 1 0
 #lbboundary wall dist [expr $boxl -0.5] normal 0 -1 0
 
 #lbadapt-exclude-bnd-from-geom-ref 0
 #lbadapt-exclude-bnd-from-geom-ref 1
 
-#lbadapt-geom-ref
+lbadapt-geom-ref
 
 lbfluid print vtk boundary boundary.vtk
 

@@ -1369,10 +1369,6 @@ void lbadapt_populate_virtuals(int level) {
       // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
 
-      current_data->lbfields.force[0] *= 0.25;
-      current_data->lbfields.force[1] *= 0.25;
-      current_data->lbfields.force[2] *= 0.25;
-
       // calculate post_collision populations from cell
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
         current_data->modes[i] *= (1. / d3q19_modebase[19][i]);

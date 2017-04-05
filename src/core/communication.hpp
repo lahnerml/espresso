@@ -593,6 +593,8 @@ void mpi_reg_refinement (int node, int param=0);
  */
 void mpi_geometric_refinement (int node, int param);
 
+void mpi_inv_geometric_refinement (int node, int param);
+
 /** Ignore boundary with given index in geometric refinement function.
  */
 void mpi_exclude_boundary (int node, int param);

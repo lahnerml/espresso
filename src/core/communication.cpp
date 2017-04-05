@@ -196,6 +196,7 @@ static int terminated = 0;
   CB(mpi_bcast_parameters_for_regional_refinement)                             \
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
+  CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)
 
 // create the forward declarations
@@ -310,8 +311,7 @@ void mpi_reshape_communicator(std::array<int, 3> const &node_grid,
   MPI_Comm temp_comm;
   MPI_Cart_create(MPI_COMM_WORLD, 3, const_cast<int *>(node_grid.data()),
                   const_cast<int *>(periodicity.data()), 0, &temp_comm);
-  comm_cart =
-      boost::mpi::communicator(temp_comm, boost::mpi::comm_take_ownership);
+  comm_cart = boost::mpi::communicator(temp_comm, boost::mpi::comm_take_ownership);
 
   MPI_Comm_rank(comm_cart, &this_node);
 }
@@ -2737,6 +2737,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
 
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
+  finest_level_global = level;
 
   // regular grid
 #ifdef LB_ADAPTIVE_GPU
@@ -3049,12 +3050,12 @@ void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
 void mpi_reg_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
   // clang-format off
-  p8est_refine_ext(p8est,               // forest
-                   0,                   // no recursive refinement
-                   P8EST_MAXLEVEL - 1,
-                   refine_regional,     // return true to refine cell
-                   NULL,                // init data
-                   NULL);               // replace data
+  p8est_refine_ext(p8est,                // forest
+                   0,                    // no recursive refinement
+                   lbpar.max_refinement_level, // maximum refinement level
+                   refine_regional,      // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
 
   p8est_balance_ext(p8est,              // forest
                     P8EST_CONNECT_EDGE, // connection type
@@ -3094,6 +3095,59 @@ void mpi_geometric_refinement(int node, int param) {
                    1,                    // no recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
+
+  p8est_balance_ext(p8est,               // forest
+                    P8EST_CONNECT_CORNER,  // connection type
+                    NULL,                // init data
+                    NULL);               // replace data
+  // clang-format on
+
+#ifdef DD_P4EST
+  p8est_mesh_destroy(lbadapt_mesh);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  dd_p4est_partition(p8est, lbadapt_mesh, conn);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#else
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#endif
+  int old_flg = finest_level_global;
+  finest_level_global = lbadapt_get_global_maxlevel();
+
+  // FIXME: Implement mapping between two trees
+  lb_release();
+  lb_reinit_fluid();
+  lb_reinit_forces();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_inv_geometric_refinement(int node, int param) {
+#ifdef LB_ADAPTIVE
+  // clang-format off
+  p8est_refine_ext(p8est,                // forest
+                   1,                    // no recursive refinement
+                   lbpar.max_refinement_level, // maximum refinement level
+                   refine_inv_geometric,    // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
 

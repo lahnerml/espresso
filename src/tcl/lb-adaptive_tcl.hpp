@@ -44,6 +44,9 @@ int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
 int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv);
 
+int tclcommand_set_inv_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
+                                char **argv);
+
 int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
                                      int argc, char **argv);
 

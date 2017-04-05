@@ -186,6 +186,16 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q);
 
+/** Refinement function that refines all cells whose midpoint is closer to a
+ * boundary than half the cells side length.
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quadrant    The Quadrant.
+ */
+int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
+                         p8est_quadrant_t *q);
+
 /*** HELPER FUNCTIONS ***/
 /* Geometry */
 /** Get the coordinates of the midpoint of a quadrant.

@@ -329,9 +329,9 @@ void lbadapt_reinit_force_per_cell() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-        double xyz[3];
-        lbadapt_get_midpoint(mesh_iter, xyz);
-        if (xyz[1] < 6.5 && xyz[1] > 5.5) {
+        //double xyz[3];
+        //lbadapt_get_midpoint(mesh_iter, xyz);
+        //if (xyz[1] < 6.5 && xyz[1] > 5.5) {
 #ifdef EXTERNAL_FORCES
         // unit conversion: force density
         data->lbfields.force[0] =
@@ -346,12 +346,12 @@ void lbadapt_reinit_force_per_cell() {
         data->lbfields.force[2] = 0.0;
         data->lbfields.has_force = 0;
 #endif // EXTERNAL_FORCES
-      } else {
+      /*} else {
         data->lbfields.force[0] = 0.0;
         data->lbfields.force[1] = 0.0;
         data->lbfields.force[2] = 0.0;
         data->lbfields.has_force = 0;
-      }
+      }*/
       }
     }
     p8est_meshiter_destroy(mesh_iter);
@@ -1307,9 +1307,9 @@ void lbadapt_collide(int level) {
         if (fluct)
           lbadapt_thermalize_modes(data->modes);
 
-      double xyz[3];
-      lbadapt_get_midpoint(mesh_iter, xyz);
-      if (xyz[1] < 6.5 && xyz[1] > 5.5) {
+      //double xyz[3];
+      //lbadapt_get_midpoint(mesh_iter, xyz);
+      //if (xyz[1] < 6.5 && xyz[1] > 5.5) {
 /* apply forces */
 #ifdef EXTERNAL_FORCES
         lbadapt_apply_forces(data->modes, &data->lbfields, h);
@@ -1319,7 +1319,7 @@ void lbadapt_collide(int level) {
         if (data->lbfields.has_force)
           lbadapt_apply_forces(data->modes, &data->lbfields, h);
 #endif // EXTERNAL_FORCES
-      }
+      //}
       }
     }
   }

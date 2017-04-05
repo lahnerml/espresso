@@ -253,6 +253,22 @@ int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
   return TCL_OK;
 }
 
+int tclcommand_set_inv_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
+                                char **argv) {
+  if (argc != 1) {
+    Tcl_AppendResult(
+        interp,
+        "Setting geometric refinement does not allow setting parameters.",
+        (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_inv_geometric_refinement, -1, 0);
+  mpi_inv_geometric_refinement(0, 0);
+
+  return TCL_OK;
+}
+
 int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
                                      int argc, char **argv) {
   int bnd_index;

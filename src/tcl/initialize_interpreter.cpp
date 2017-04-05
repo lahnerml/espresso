@@ -216,6 +216,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
   REGISTER_COMMAND("lbadapt-regref", tclcommand_set_reg_ref);
   REGISTER_COMMAND("lbadapt-geom-ref", tclcommand_set_geom_ref);
+  REGISTER_COMMAND("lbadapt-inv-geom-ref", tclcommand_set_inv_geom_ref);
   REGISTER_COMMAND("lbadapt-exclude-bnd-from-geom-ref", tclcommand_excl_bnd_idx_geom_ref);
   REGISTER_COMMAND("lbadapt-reset-fluid", tclcommand_reset_fluid);
 #endif // LB_ADAPTIVE

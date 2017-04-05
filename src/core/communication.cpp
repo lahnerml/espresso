@@ -194,6 +194,7 @@ static int terminated = 0;
   CB(mpi_bcast_parameters_for_regional_refinement)                             \
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
+  CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_dd_p4est_write_particle_vtk)                                          \
   CB(mpi_lbadapt_grid_reset)
@@ -2997,6 +2998,62 @@ void mpi_geometric_refinement(int node, int param) {
                    1,                    // no recursive refinement
                    max_refinement_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
+
+  p8est_balance_ext(p8est,               // forest
+                    P8EST_CONNECT_CORNER,  // connection type
+                    NULL,                // init data
+                    NULL);               // replace data
+  // clang-format on
+
+#ifdef DD_P4EST
+  p8est_mesh_destroy(lbadapt_mesh);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  dd_p4est_partition(p8est, lbadapt_mesh, conn);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#else
+  p8est_partition(p8est, 0, lbadapt_partition_weight);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#endif
+  int old_flg = finest_level_global;
+  finest_level_global = lbadapt_get_global_maxlevel();
+
+  lb_step_factor =
+      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
+
+  // FIXME: Implement mapping between two trees
+  lb_release_fluid();
+  lb_reinit_fluid();
+  lb_reinit_forces();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_inv_geometric_refinement(int node, int param) {
+#ifdef LB_ADAPTIVE
+  // clang-format off
+  p8est_refine_ext(p8est,                // forest
+                   1,                    // no recursive refinement
+                   max_refinement_level, // maximum refinement level
+                   refine_inv_geometric,    // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
 

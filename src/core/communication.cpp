@@ -191,6 +191,7 @@ static int terminated = 0;
   CB(mpi_lbadapt_vtk_print_velocity)                                           \
   CB(mpi_unif_refinement)                                                      \
   CB(mpi_rand_refinement)                                                      \
+  CB(mpi_bcast_parameters_for_regional_refinement)                             \
   CB(mpi_reg_refinement)                                                       \
   CB(mpi_geometric_refinement)                                                 \
   CB(mpi_exclude_boundary)                                                     \
@@ -2940,6 +2941,10 @@ void mpi_rand_refinement(int node, int maxLevel) {
     p8est_partition(p8est, 0, lbadapt_partition_weight);
   }
 #endif // LB_ADAPTIVE
+}
+
+void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
+  MPI_Bcast (coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
 }
 
 void mpi_reg_refinement(int node, int param) {

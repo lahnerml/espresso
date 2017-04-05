@@ -19,8 +19,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
    */
 #include "communication.hpp"
-#include "lb-adaptive_tcl.hpp"
 #include "lb-boundaries.hpp"
+#include "lb-adaptive_tcl.hpp"
 
 #include <stdio.h>
 
@@ -163,13 +163,73 @@ int tclcommand_set_rand_ref(ClientData data, Tcl_Interp *interp, int argc,
 
 int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
                            char **argv) {
-  if (argc != 1) {
-    Tcl_AppendResult(
-        interp,
-        "Setting regional refinement does not allow setting parameters.",
-        (char *)NULL);
+  if (argc == 7) {
+    if (!ARG_IS_D(1, coords_for_regional_refinement[0])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(2, coords_for_regional_refinement[1])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(3, coords_for_regional_refinement[2])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(4, coords_for_regional_refinement[3])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(5, coords_for_regional_refinement[4])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(6, coords_for_regional_refinement[5])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n",
+                       (char *)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                       (char *)NULL);
+      return TCL_ERROR;
+    }
+  } else {
+    Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                             "type and meaning:\n",
+                     (char *)NULL);
+    Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
+    Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
+                     (char *)NULL);
     return TCL_ERROR;
   }
+
+  mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
+  mpi_bcast_parameters_for_regional_refinement(0, 0);
 
   mpi_call(mpi_reg_refinement, -1, 0);
   mpi_reg_refinement(0, 0);
@@ -228,8 +288,8 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
   return TCL_OK;
 }
 
-int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp,
-                          int argc, char **argv) {
+int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp, int argc,
+                           char **argv) {
   int bnd_index;
 
   if (argc != 1) {

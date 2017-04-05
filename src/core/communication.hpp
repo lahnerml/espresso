@@ -573,6 +573,10 @@ void mpi_unif_refinement (int node, int level);
 
 void mpi_rand_refinement (int node, int maxLevel);
 
+/** Call broadcast routine to populate 6 coordinates
+ */
+void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
+
 void mpi_reg_refinement (int node, int param=0);
 
 void mpi_geometric_refinement (int node, int param);

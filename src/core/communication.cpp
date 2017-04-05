@@ -2950,17 +2950,17 @@ void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
 void mpi_reg_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
   // clang-format off
-  p8est_refine_ext(p8est,               // forest
-                   0,                   // no recursive refinement
-                   P8EST_MAXLEVEL - 1,
-                   refine_regional,     // return true to refine cell
-                   NULL,                // init data
-                   NULL);               // replace data
+  p8est_refine_ext(p8est,                // forest
+                   0,                    // no recursive refinement
+                   max_refinement_level, // maximum refinement level
+                   refine_regional,      // return true to refine cell
+                   NULL,                 // init data
+                   NULL);                // replace data
 
-  p8est_balance_ext(p8est,              // forest
+  p8est_balance_ext(p8est,               // forest
                     P8EST_CONNECT_CORNER, // connection type
-                    NULL,               // init data
-                    NULL);              // replace data
+                    NULL,                // init data
+                    NULL);               // replace data
   // clang-format on
 
   p8est_partition(p8est, 0, lbadapt_partition_weight);

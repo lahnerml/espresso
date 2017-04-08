@@ -77,6 +77,8 @@ typedef struct {
                 // Cells with shell-type 2 are set if the are in the periodic halo
   int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
   int coord[3]; // cartesian coordinates of the cell
+  int p_cnt; // periodic count of this cell, local cells are always 0, for each new periodic occurence
+             // the new occurence is increased by one
 } local_shell_t;
 
 // Structure to store communications

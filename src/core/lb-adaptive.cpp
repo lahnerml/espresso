@@ -66,6 +66,7 @@ p8est_ghostvirt_t *lbadapt_ghost_virt;
 p8est_mesh_t *lbadapt_mesh;
 lbadapt_payload_t **lbadapt_local_data;
 lbadapt_payload_t **lbadapt_ghost_data;
+int lb_conn_brick[3] = {0, 0, 0};
 int coarsest_level_local;
 int finest_level_local;
 int coarsest_level_ghost;
@@ -220,7 +221,6 @@ void lbadapt_reinit() {
         for (int i = 0; i < 3; i++) {
           data->lbfields.j[i] = 0;
           data->lbfields.force[i] = 0;
-          data->lbfields.force_md[i] = 0;
 #ifdef IMMERSED_BOUNDARY
           data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
@@ -282,7 +282,6 @@ void lbadapt_init() {
         for (int i = 0; i < 3; i++) {
           data->lbfields.j[i] = 0;
           data->lbfields.force[i] = 0;
-          data->lbfields.force_md[i] = 0;
 #ifdef IMMERSED_BOUNDARY
           data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
@@ -1133,9 +1132,6 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
        prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   lbfields->force[2] =
        prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
-  lbfields->force_md[0] = 0;
-  lbfields->force_md[1] = 0;
-  lbfields->force_md[2] = 0;
 #else  // EXTERNAL_FORCES
   lbfields->force[0] = 0.0;
   lbfields->force[1] = 0.0;
@@ -2004,7 +2000,6 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 }
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
-  // p8est_quadrant_t c;
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(conn, tree, q->x, q->y, q->z, xyz);
@@ -2013,43 +2008,54 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   z = xyz[2] * (1 << max_refinement_level);
 
   return dd_p4est_cell_morton_idx(x, y, z);
-
-  // c.level = P8EST_QMAXLEVEL;
-  // return p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
 }
 
-int64_t lbadapt_map_pos_to_quad(double pos[3]) {
-  // p8est_quadrant_t c;
+int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree, int displace[3]) {
+  int x, y, z;
+  double xyz[3];
+  p8est_qcoord_to_vertex(conn, tree, q->x, q->y, q->z, xyz);
+  x = xyz[0] * (1 << max_refinement_level) + displace[0];
+  y = xyz[1] * (1 << max_refinement_level) + displace[1];
+  z = xyz[2] * (1 << max_refinement_level) + displace[2];
+  
+  int ub = lb_conn_brick[0] * (1 << max_refinement_level);
+  if (x >= ub) x -= ub;
+  if (x < 0) x += ub;
+  ub = lb_conn_brick[1] * (1 << max_refinement_level);
+  if (y >= ub) y -= ub;
+  if (y < 0) y += ub;
+  ub = lb_conn_brick[2] * (1 << max_refinement_level);
+  if (z >= ub) z -= ub;
+  if (z < 0) z += ub;
+
+  return dd_p4est_cell_morton_idx(x, y, z);
+}
+
+int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
+  int xid, yid, zid;
   for (int d = 0; d < 3; ++d) {
-    if (pos[d] > box_l[d])
+    if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
       return -1;
-    if (pos[d] < 0)
+    if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  // c.x = (pos[0])*(1<<finest_level_global);
-  // c.y = (pos[1])*(1<<finest_level_global);
-  // c.z = (pos[2])*(1<<finest_level_global);
-  // c.level = P8EST_QMAXLEVEL;
-  // int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
-  int64_t pidx =
-      dd_p4est_cell_morton_idx((pos[0]) * (1 << max_refinement_level),
-                               (pos[1]) * (1 << max_refinement_level),
-                               (pos[2]) * (1 << max_refinement_level));
-  for (int64_t i = 0; i < p8est->local_num_quadrants; ++i) {
-    q = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, i);
-    if (lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]) > pidx)
-      return i - 1;
+  xid = (pos[0]) * (1 << max_refinement_level);
+  yid = (pos[1]) * (1 << max_refinement_level);
+  zid = (pos[2]) * (1 << max_refinement_level);
+  int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
+  int64_t qidx, zlvlfill;
+  for (int64_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
+    q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
+    qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+    zlvlfill = 1 << (3*(max_refinement_level - q->level));
+    if (qidx <= pidx && pidx < qidx + zlvlfill)
+      return i;
   }
-  q = &p8est->global_first_position[this_node + 1];
-  if (pidx < lbadapt_get_global_idx(q, q->p.which_tree))
-    return p8est->local_num_quadrants - 1;
-  else
-    return -1;
+  return -1;
 }
 
 int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
-  // p8est_quadrant_t c;
   int xid, yid, zid;
   p8est_quadrant_t *q;
   for (int d = 0; d < 3; ++d) {
@@ -2061,10 +2067,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   xid = (pos[0]) * (1 << max_refinement_level);
   yid = (pos[1]) * (1 << max_refinement_level);
   zid = (pos[2]) * (1 << max_refinement_level);
-  // c.level = P8EST_QMAXLEVEL;
-  // int64_t pidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);*/
   int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
-  // printf ("checkpoint: pidx %li [%i %i %i]\n", pidx, xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;
   for (int z = -1; z <= 1; z += 2) {
@@ -2077,7 +2080,6 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
         zid = (pos[2] + z * box_l[2] * ROUND_ERROR_PREC) *
               (1 << max_refinement_level);
         ret[cnt] = -1;
-        // sidx[cnt++] = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);
         sidx[cnt++] = dd_p4est_cell_morton_idx(xid, yid, zid);
       }
     }
@@ -2091,14 +2093,6 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
       if (qidx > sidx[j])
         ret[j] = i - 1;
   }
-  /*double xyz[3];
-  q = p8est_mesh_get_quadrant(p8est,lbadapt_mesh,0);
-  qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[0]);
-  p8est_qcoord_to_vertex(conn,lbadapt_mesh->quad_to_tree[0],q->x,q->y,q->z,xyz);
-  xid = xyz[0]*(1<<finest_level_global);
-  yid = xyz[1]*(1<<finest_level_global);
-  zid = xyz[2]*(1<<finest_level_global);
-  printf("first %li [%i %i %i]\n", qidx, xid,yid,zid);*/
   if (this_node + 1 >= n_nodes) {
     int64_t tmp = (1 << max_refinement_level);
     while (tmp < (box_l[0] * (1 << max_refinement_level)))
@@ -2108,20 +2102,9 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     while (tmp < (box_l[2] * (1 << max_refinement_level)))
       tmp <<= 1;
     qidx == tmp *tmp *tmp;
-    /*c.x = (1<<finest_level_global);
-    while (c.x < (box_l[0]*(1<<finest_level_global))) c.x <<= 1;
-    c.y = 0;
-    c.z = 0;
-    c.level = P8EST_QMAXLEVEL;
-    qidx = p8est_quadrant_linear_id(&c,P8EST_QMAXLEVEL+1);*/
   } else {
     q = &p8est->global_first_position[this_node + 1];
     qidx = lbadapt_get_global_idx(q, q->p.which_tree);
-    /*p8est_qcoord_to_vertex(conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-    xid = xyz[0]*(1<<finest_level_global);
-    yid = xyz[1]*(1<<finest_level_global);
-    zid = xyz[2]*(1<<finest_level_global);
-    printf("last %li [%i %i %i]\n", qidx, xid,yid,zid);*/
   }
   if (pidx < qidx) {
     return p8est->local_num_quadrants - 1;
@@ -2153,20 +2136,20 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
   int64_t qidx = lbadapt_map_pos_to_quad_ext(pos);
-  if (qidx < 0 || qidx >= p8est->local_num_quadrants) {
-    runtimeErrorMsg() << "Position not in local domain";
-    fprintf(stderr, "Position not in local domain\n");
-    fprintf(stderr, "%i : %li [%lf %lf %lf]\n", this_node, qidx, pos[0], pos[1],
-            pos[2]);
+  if (qidx < 0) {
+    int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
+    if (ncnt > 0) return ncnt;
+    fprintf(stderr, "Particle not in local LB domain ");
+    fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx, pos[0], pos[1], pos[2]);
     fprintf(stderr, "belongs to MD process %i\n", dd_p4est_pos_to_proc(pos));
-    if (dd_p4est_save_position_to_cell(pos) == NULL) {
-      fprintf(stderr, "not even in MD\n");
-    }
+    errexit();
     return -1;
   }
-  p8est_quadrant_t *quad = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, qidx);
-  int lvl = quad->level;
-  int sid = lbadapt_mesh->quad_qreal_offset[qidx];
+  int lvl, sid;
+  p8est_quadrant_t *quad;
+  quad = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, qidx);
+  lvl = quad->level;
+  sid = lbadapt_mesh->quad_qreal_offset[qidx];
   nodes[0] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
   level[0] = lvl;
   int corner = 0;
@@ -2183,7 +2166,6 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   }
   delta[0] =
       delta_loc[didx[0][0]] * delta_loc[didx[0][1]] * delta_loc[didx[0][2]];
-  // delta[0] *= 1.0/(double)(1<<(finest_level_global-lvl));
   int ncnt = 1;
   int xidx = -1;
   int yidx = -1;
@@ -2265,7 +2247,6 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
                       delta_loc[didx[i + 1][2]];
         delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
         level[ncnt] = lvl;
-        // delta[ncnt] = delta[ncnt]/(double)(1<<(finest_level_global-lvl));
         ncnt += 1;
       } else {                           // ghost quadrant
         if (enc >= -120 && enc <= -25) { // double size quad over face
@@ -2284,7 +2265,6 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
                       delta_loc[didx[i + 1][2]];
         delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
         level[ncnt] = lvl;
-        // delta[ncnt] = delta[ncnt]/(double)(1<<(finest_level_global-lvl));
         ncnt += 1;
       }
     }
@@ -2296,40 +2276,39 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
     printf("%le\n", dsum);
-  // if (ncnt != 8) printf("%i %le\n", ncnt, dsum);
   if (ncnt > 20)
     printf("to many neighbours\n");
   return ncnt;
 }
 
-void lbadapt_interpolate_pos(double pos[3], lbadapt_payload_t *nodes[8],
-                             double delta[6]) {
-  int64_t qidx = lbadapt_map_pos_to_quad_ext(pos);
-  static const int nidx[8][7] = {
-      {0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
-      {1, 2, 15, 4, 11, 6, 19}, // right, front, bottom
-      {0, 3, 16, 4, 10, 7, 20}, // left, back, bottom
-      {1, 3, 17, 4, 11, 7, 21}, // right, back, bottom
-      {0, 2, 14, 5, 12, 8, 22}, // left, front, top
-      {1, 2, 15, 5, 13, 8, 23}, // right, front, top
-      {0, 3, 16, 5, 12, 9, 24}, // left, back, top
-      {1, 3, 17, 5, 13, 9, 25}, // right, back, top
+int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
+                                  double delta[20], int level[20]) {
+  static const int didx[8][3] = {
+      {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
+      {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  if (qidx < 0 || qidx >= p8est->local_num_quadrants) {
-    runtimeErrorMsg() << "Position not in local domain";
-    fprintf(stderr, "Position not in local domain\n");
-    fprintf(stderr, "%i : %li [%lf %lf %lf]\n", this_node, qidx, pos[0], pos[1],
-            pos[2]);
-    fprintf(stderr, "belongs to %i\n", dd_p4est_pos_to_proc(pos));
-    if (dd_p4est_save_position_to_cell(pos) == NULL) {
-      fprintf(stderr, "not even in MD\n");
-    }
-    return;
-  }
-  int lvl = p8est_mesh_get_quadrant(p8est, lbadapt_mesh, qidx)->level;
-  int sid = lbadapt_mesh->quad_qreal_offset[qidx];
-  nodes[0] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
+    
+  int fold[3] = {0, 0, 0};
+  double pos[3] = {opos[0], opos[1], opos[2]};
+  fold_position(pos,fold);
+    
+  int64_t qidx = lbadapt_map_pos_to_ghost(pos);
+  
+  if (qidx < 0) return 0;
+  
+  int lvl, sid, tree, zarea, zsize;
+  p8est_quadrant_t *quad;
+  
+  quad = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, qidx);
+  tree = quad->p.piggy3.which_tree;
+  lvl = quad->level;
+  sid = lbadapt_mesh->quad_greal_offset[qidx];
+  nodes[0] = &lbadapt_ghost_data[lvl - coarsest_level_local][sid];
+  level[0] = lvl;
+  
+  
   int corner = 0;
+  double delta_loc[6];
   for (int d = 0; d < 3; ++d) {
     double dis = pos[d] * (double)(1 << lvl);
     dis = dis - floor(dis) + 0.5;
@@ -2337,32 +2316,73 @@ void lbadapt_interpolate_pos(double pos[3], lbadapt_payload_t *nodes[8],
       corner |= 1 << d;
       dis = 2.0 - dis;
     }
-    delta[d] = dis;
-    delta[d + 3] = 1.0 - dis;
+    delta_loc[d] = dis;
+    delta_loc[d + 3] = 1.0 - dis;
   }
-  for (int i = 0; i < 7; ++i) {
-    sc_array_t *ne, *ni;
-    ne = sc_array_new(sizeof(int));
-    ni = sc_array_new(sizeof(int));
-    p8est_mesh_get_neighbors(p8est, lbadapt_ghost, lbadapt_mesh, qidx, -1,
-                             nidx[corner][i], 0, NULL, ne, ni);
-    if (ni->elem_count != 1)
-      runtimeErrorMsg()
-          << "There is an error in p8est_mesh_get_neighbors or in the grid";
-    int qidx = *((int *)sc_array_index_int(ni, 0));
-    int enc = *((int *)sc_array_index_int(ne, 0));
-    if (enc >= 1 && enc <= 24) { // local quadrant
-      sid = lbadapt_mesh->quad_qreal_offset[qidx];
-      nodes[i + 1] = &lbadapt_local_data[lvl - coarsest_level_local][sid];
-    } else if (enc >= -24 && enc <= -1) { // ghost quadrant
-      sid = lbadapt_mesh->quad_greal_offset[qidx];
-      nodes[i + 1] = &lbadapt_ghost_data[lvl - coarsest_level_ghost][sid];
-    } else {
-      runtimeErrorMsg() << "level mismatch";
+  delta[0] = delta_loc[didx[0][0]] * delta_loc[didx[0][1]] * delta_loc[didx[0][2]];
+  zsize = 1 << (max_refinement_level - lvl);
+  zarea = zsize*zsize*zsize;
+  
+  int ncnt = 1;
+  
+  // collect over all 7 direction wrt. to corner
+  int cnt_dir = 1;
+  for (int dir = 1; dir < 8; ++dir) {
+    int displace[3] = {0, 0, 0};
+    if ((dir&1)) {
+      if ((corner&1)) displace[0] = zsize;
+      else displace[0] = -zsize;
     }
-    sc_array_destroy(ne);
-    sc_array_destroy(ni);
+    if ((dir&2)) {
+      if ((corner&2)) displace[1] = zsize;
+      else displace[1] = -zsize;
+    }
+    if ((dir&4)) {
+      if ((corner&4)) displace[2] = zsize;
+      else displace[2] = -zsize;
+    }
+    int64_t nidx = lbadapt_get_global_idx(quad, tree, displace);
+    for (int64_t i=0; i<lbadapt_ghost->mirrors.elem_count; ++i) {
+      p8est_quadrant_t *q = p8est_quadrant_array_index(&lbadapt_ghost->mirrors, i);
+      qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+      if (qidx >= nidx && qidx < nidx + zarea) {
+        sid = lbadapt_mesh->quad_qreal_offset[q->p.piggy3.local_num];
+        nodes[ncnt] = &lbadapt_local_data[q->level - coarsest_level_local][sid];
+        level[ncnt] = q->level;
+        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] * delta_loc[didx[dir][2]];
+        if (q->level > lvl) {
+          if (dir == 1 || dir == 2 || dir == 4)
+            delta[ncnt] *= 0.25;
+          if (dir == 3 || dir == 5 || dir == 6)
+            delta[ncnt] *= 0.5;
+        }
+        ncnt += 1;
+        cnt_dir |= 1 << dir;
+      }
+    }
+    for (int64_t i=0; i<lbadapt_ghost->ghosts.elem_count; ++i) {
+      p8est_quadrant_t *q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
+      qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+      if (qidx >= nidx && qidx < nidx + zarea) {
+        sid = lbadapt_mesh->quad_greal_offset[i];
+        nodes[ncnt] = &lbadapt_ghost_data[q->level - coarsest_level_local][sid];
+        level[ncnt] = q->level;
+        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] * delta_loc[didx[dir][2]];
+        if (q->level > lvl) {
+          if (dir == 1 || dir == 2 || dir == 4)
+            delta[ncnt] *= 0.25;
+          if (dir == 3 || dir == 5 || dir == 6)
+            delta[ncnt] *= 0.5;
+        }
+        ncnt += 1;
+        cnt_dir |= 1 << dir;
+      }
+    }
   }
+  if (cnt_dir != 255) { // not all neighbors for all directions exist => in outside halo
+    return 0;
+  }
+  return ncnt;
 }
 
 #endif // LB_ADAPTIVE

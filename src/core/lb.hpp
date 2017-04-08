@@ -127,7 +127,6 @@ typedef struct {
 
   /** local force density */
   double force[3];
-  double force_md[3];
 #ifdef IMMERSED_BOUNDARY
 // For particle update, we need the force on the nodes in LBM
 // Yet, Espresso resets the force immediately after the LBM update
@@ -334,6 +333,7 @@ void calc_particle_lattice_ia();
  * lattice. Note that it can lead to undefined behaviour if the
  * position is not within the local lattice. */
 int lb_lbfluid_get_interpolated_velocity(double* p, double* v); 
+int lb_lbfluid_get_interpolated_velocity(double* p, double* v, bool ghost);
 
 inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *pi); 
 

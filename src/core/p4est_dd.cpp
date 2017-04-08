@@ -267,6 +267,7 @@ void dd_p4est_create_grid () {
     ls.coord[0] = x;
     ls.coord[1] = y;
     ls.coord[2] = z;
+    ls.p_cnt = 0;
     // Geather all inforamtion about neighboring cells
     for (int n=0;n<26;++n) {
       ls.neighbor[n] = -1;
@@ -344,6 +345,11 @@ void dd_p4est_create_grid () {
             ls.coord[0] = int(x + xi) - 1;
             ls.coord[1] = int(y + yi) - 1;
             ls.coord[2] = int(z + zi) - 1;
+            ls.p_cnt = 0;
+            for (uint64_t l=0;l<shell.size();++l) {
+              if (shell[l].idx == ls.idx && shell[l].rank == ls.rank)
+                ls.p_cnt += 1;
+            }
             shell.push_back(ls); // add the new ghost cell to all cells
             shell[i].shell = 1; // The cell for which this one was added is a the domain bound
           } else { // Cell already exists in list
@@ -515,7 +521,7 @@ void dd_p4est_comm () {
         }
       }
     }
-    //fprintf(h,"%i %i:%li %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,
+    //fprintf(h,"%i %i:%li (%i) %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,p4est_shell[i].p_cnt,
     //  p4est_shell[i].shell,p4est_shell[i].boundary);
     //for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
     //fprintf(h,"]\n");
@@ -1273,7 +1279,7 @@ void dd_p4est_on_geometry_change(int flags) {
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_write_particle_vtk(char *filename) {
   // strip file endings
-  char *pos_file_ending = strpbrk(filename, ".");
+  char *pos_file_ending = strrchr(filename, '.');
   if (pos_file_ending != 0) {
     *pos_file_ending = '\0';
   } else {

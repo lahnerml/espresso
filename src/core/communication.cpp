@@ -2749,14 +2749,18 @@ void mpi_lbadapt_grid_reset(int node, int dummy) {
   lbadapt_reinit();
   //lbadapt_reinit_fluid_per_cell();
   //lbadapt_reinit_force_per_cell();
-  printf("Resetting LB fluid\n");
+  //printf("Resetting LB fluid\n");
 #endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_grid_init(int node, int level) {
 #ifdef LB_ADAPTIVE
   /* create connectivity and octree */
-  conn = p8est_connectivity_new_brick(box_l[0], box_l[1], box_l[2],
+  lb_conn_brick[0] = box_l[0];
+  lb_conn_brick[1] = box_l[1];
+  lb_conn_brick[2] = box_l[2];
+  
+  conn = p8est_connectivity_new_brick(lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2],
                                       periodic & 1, periodic & 2, periodic & 4);
   // clang-format off
   p8est = p8est_new_ext(comm_cart, /* mpi communicator */
@@ -2945,7 +2949,9 @@ void mpi_rand_refinement(int node, int maxLevel) {
 }
 
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
+#ifdef LB_ADAPTIVE
   MPI_Bcast (coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_reg_refinement(int node, int param) {
@@ -2964,6 +2970,20 @@ void mpi_reg_refinement(int node, int param) {
                     NULL);               // replace data
   // clang-format on
 
+#ifdef DD_P4EST
+  p8est_mesh_destroy(lbadapt_mesh);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  dd_p4est_partition(p8est, lbadapt_mesh, conn);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#else
   p8est_partition(p8est, 0, lbadapt_partition_weight);
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
@@ -2973,6 +2993,7 @@ void mpi_reg_refinement(int node, int param) {
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+#endif
 
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();

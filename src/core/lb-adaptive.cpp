@@ -315,7 +315,6 @@ void lbadapt_reinit_force_per_cell() {
 
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
@@ -474,7 +473,6 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
-  int the_boundary = -1;
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
@@ -532,7 +530,6 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     if (dist_tmp < dist) {
       dist = dist_tmp;
-      the_boundary = n;
     }
   }
 
@@ -555,7 +552,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
-  int the_boundary = -1;
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
@@ -613,7 +609,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     if (dist_tmp < dist) {
       dist = dist_tmp;
-      the_boundary = n;
     }
   }
 
@@ -1492,7 +1487,6 @@ void lbadapt_stream(int level) {
 void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
-  double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
@@ -1734,7 +1728,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 void lbadapt_get_density_values(sc_array_t *density_values) {
   int status;
   int level;
-  double dens, *dens_ptr, h;
+  double dens, *dens_ptr;
   lbadapt_payload_t *data;
 
   double h_max =
@@ -1748,7 +1742,6 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         P8EST_TRAVERSE_PARBOUNDINNER);
 
     int lvl = level - coarsest_level_local;
-    h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -1919,8 +1912,6 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
   p8est_quadrant_t *q = info->quad;  /* get current global cell id */
   lbadapt_payload_t *data =
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-  double h;                                /* local meshwidth */
-  h = (double)P8EST_QUADRANT_LEN(q->level) / (double)P8EST_ROOT_LEN;
   double h_max =
       (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
 
@@ -2051,7 +2042,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   zid = (pos[2]) * (1 << max_refinement_level);
   int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
   int64_t qidx, zlvlfill;
-  for (int64_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
+  for (size_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
     qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
     zlvlfill = 1 << (3*(max_refinement_level - q->level));
@@ -2233,7 +2224,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
         break;
       };
     }
-    for (int n = 0; n < ne->elem_count; ++n) {
+    for (size_t n = 0; n < ne->elem_count; ++n) {
       int nidx = *((int *)sc_array_index_int(ni, n));
       int enc = *((int *)sc_array_index_int(ne, n));
       if (enc > 0) {                   // local quadrant

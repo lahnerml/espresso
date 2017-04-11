@@ -74,6 +74,8 @@ int finest_level_ghost;
 int finest_level_global;
 double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
                                             DBL_MAX, DBL_MIN, DBL_MAX};
+sc_array *lb_neighbor_ids = NULL;
+sc_array *lb_neighbor_enc = NULL;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -102,6 +104,10 @@ double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
 
 /*** SETUP ***/
 void lbadapt_allocate_data() {
+  if (!lb_neighbor_ids) {
+    lb_neighbor_ids = sc_array_new(sizeof(int));
+    lb_neighbor_enc = sc_array_new(sizeof(int));
+  }
   int level;
   coarsest_level_local = -1;
   finest_level_local = -1;

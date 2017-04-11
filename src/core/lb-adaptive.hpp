@@ -30,6 +30,7 @@
 
 #ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
+#include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
@@ -39,7 +40,6 @@
 #include <p8est_meshiter.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
-#include <p8est_bits.h>
 
 #include "lb.hpp"
 #include "utils.hpp"
@@ -61,6 +61,8 @@ extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
                                                  //        z_min, z_max
+extern sc_array *lb_neighbor_ids;
+extern sc_array *lb_neighbor_enc;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
@@ -99,7 +101,7 @@ void lbadapt_reinit();
 
 /** Init lb parameters
  */
-//void lbadapt_reinit_parameters();
+// void lbadapt_reinit_parameters();
 
 /** Init cell-local force values
  */
@@ -135,8 +137,8 @@ void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
  * \param [in] quadrant    The Quadrant.
  * @returns quadrants weight according to subcycling
  */
-int lbadapt_partition_weight (p8est_t *p8est, p4est_topidx_t which_tree,
-                              p8est_quadrant_t *q);
+int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
+                             p8est_quadrant_t *q);
 /*** REFINEMENT ***/
 /** Refinement function that refines all cells
  *
@@ -247,7 +249,7 @@ int lbadapt_relax_modes(double *mode);
  * \param [in]      h     The local mesh width.
  */
 int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h);
-//int lbadapt_apply_forces(double *mode, double force[3], double h);
+// int lbadapt_apply_forces(double *mode, double force[3], double h);
 
 /** Transfer modes back to populations
  *
@@ -337,8 +339,10 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
 int64_t lbadapt_map_pos_to_quad(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
 
-int lbadapt_interpolate_pos_adapt (double pos[3], lbadapt_payload_t *nodes[20], double delta[20], int level[20]);
-int lbadapt_interpolate_pos_ghost (double pos[3], lbadapt_payload_t *nodes[20], double delta[20], int level[20]);
+int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
+                                  double delta[20], int level[20]);
+int lbadapt_interpolate_pos_ghost(double pos[3], lbadapt_payload_t *nodes[20],
+                                  double delta[20], int level[20]);
 
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);

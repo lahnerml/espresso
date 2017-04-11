@@ -1325,7 +1325,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
             // neighbor is a real quadrant: do inverse streaming operation
             for (int i = 0; i < lbmodel.n_veloc; ++i) {
               ghost_m[i] = data->modes[i];
-              ghost_m[i] = (1. / d3q19_modebase[19][i]) * ghost_m[i];
+              ghost_m[i] *= (1. / d3q19_modebase[19][i]);
             }
             currCellData->lbfluid[1][inv[dir_ESPR]] =
                 lbadapt_backTransformation(ghost_m, inv_neigh_dir_ESPR) *
@@ -1405,11 +1405,11 @@ void lbadapt_collide(int level) {
 }
 
 void lbadapt_populate_virtuals(int level) {
-  int status = 0;
-  int current_sid;
-  int parent_sid;
-  lbadapt_payload_t *current_data, *parent_data;
   int lvl;
+  int status = 0;
+  int current_sid, parent_sid;
+  lbadapt_payload_t *current_data, *parent_data;
+
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
@@ -1445,7 +1445,7 @@ void lbadapt_populate_virtuals(int level) {
       }
 
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
-        current_data->lbfluid[0][i] = /*0.125 **/
+        current_data->lbfluid[0][i] =
             lbadapt_backTransformation(current_data->modes, i) * lbmodel.w[i];
       }
 

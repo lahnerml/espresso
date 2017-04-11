@@ -2546,8 +2546,6 @@ void lb_release_fluid() {
     }
     lbadapt_ghost_data = NULL;
   }
-  sc_array_destroy(lb_neighbor_ids);
-  sc_array_destroy(lb_neighbor_encs);
 #else  // LB_ADAPTIVE
   free(lbfluid[0][0]);
   free(lbfluid[0]);

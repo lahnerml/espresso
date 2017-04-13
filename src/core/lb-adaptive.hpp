@@ -61,8 +61,6 @@ extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
                                                  //        z_min, z_max
-extern sc_array *lb_neighbor_ids;
-extern sc_array *lb_neighbor_enc;
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**

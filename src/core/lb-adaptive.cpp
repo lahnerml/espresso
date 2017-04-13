@@ -1356,6 +1356,9 @@ void lbadapt_collide(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
+
+      assert (mesh_iter->current_vid == -1);
+
       if (mesh_iter->current_is_ghost) {
         data = &lbadapt_ghost_data[level - coarsest_level_ghost]
                                   [p8est_meshiter_get_current_storage_id(
@@ -1415,7 +1418,6 @@ void lbadapt_populate_virtuals(int level) {
     if (status != P8EST_MESHITER_DONE) {
       if (!mesh_iter->current_is_ghost) {
         lvl = level - coarsest_level_local;
-
         parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
         current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
 
@@ -1423,21 +1425,20 @@ void lbadapt_populate_virtuals(int level) {
         current_data = &lbadapt_local_data[lvl + 1][current_sid];
       } else {
         lvl = level - coarsest_level_ghost;
-
         parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
         current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
 
         parent_data = &lbadapt_ghost_data[lvl][parent_sid];
         current_data = &lbadapt_ghost_data[lvl + 1][current_sid];
       }
+
       // copy payload from coarse cell
       memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
 
-      // calculate post_collision populations from cell
+      // perform backtransformation for streaming step of virtual quadrants.
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
         current_data->modes[i] *= (1. / d3q19_modebase[19][i]);
       }
-
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
         current_data->lbfluid[0][i] =
             lbadapt_backTransformation(current_data->modes, i) * lbmodel.w[i];

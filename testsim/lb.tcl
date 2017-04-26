@@ -1,5 +1,5 @@
 set base_level 1
-set max_level 2
+set max_level 3
 
 set final_time 1000.0
 set force 0.001
@@ -15,7 +15,7 @@ set do_refine 1
 # 4 .. refine lower y region
 # 5 .. refine upper y region
 # 6 .. refine lower and upper y region
-set refinement_pattern 3
+set refinement_pattern 2
 
 set iter 4000
 
@@ -62,20 +62,28 @@ if { $do_refine >= 1 } {
       set filename ${filename}inverse_geometric_level_${base_level}_to_${max_level}
     }
     3 {
-      lbadapt-regref 0 4 4.5 7.5 0 1
+      for {set j 0} {$j < [expr $max_level - $base_level]} {incr j} {
+        lbadapt-regref 0 4 4.5 7.5 0 1
+      }
       set filename ${filename}center_refined_level_${base_level}_to_${max_level}
     }
     4 {
-      lbadapt-regref 0 4 0 4 0 1
+      for {set j 0} {$j < [expr $max_level - $base_level]} {incr j} {
+        lbadapt-regref 0 4 0 4 0 1
+      }
       set filename ${filename}lower_ref_level_${base_level}_to_${max_level}
     }
     5 {
-      lbadapt-regref 0 4 8 12 0 1
+      for {set j 0} {$j < [expr $max_level - $base_level]} {incr j} {
+        lbadapt-regref 0 4 8 12 0 1
+      }
       set filename ${filename}upper_ref_level${base_level}_to_${max_level}
     }
     6 {
-      lbadapt-regref 0 4 0 4 0 1
-      lbadapt-regref 0 4 8 12 0 1
+      for {set j 0} {$j < [expr $max_level - $base_level]} {incr j} {
+        lbadapt-regref 0 4 0 4 0 1
+        lbadapt-regref 0 4 8 12 0 1
+      }
       set filename ${filename}both_ref_level_${base_level}_to_${max_level}
     }
     default {

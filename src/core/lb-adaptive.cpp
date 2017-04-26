@@ -1726,9 +1726,10 @@ void lbadapt_collide(int level) {
 #endif // LB_ADAPTIVE_GPU
 
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
+  p8est_meshiter_t *mesh_iter =
+      p8est_meshiter_new_ext(p8est, lbadapt_ghost, lbadapt_mesh, level,
+                             P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST,
+                             P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1780,7 +1781,7 @@ void lbadapt_populate_virtuals(int level) {
   int lvl;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
@@ -2022,7 +2023,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int lvl;
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
       p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
@@ -2070,9 +2071,14 @@ void lbadapt_swap_pointers(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
-      data =
-          &lbadapt_local_data[lvl]
-                             [p8est_meshiter_get_current_storage_id(mesh_iter)];
+      if (!mesh_iter->current_is_ghost) {
+        data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
+            mesh_iter)];
+      } else {
+        data = &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
+      }
       std::swap(data->lbfluid[0], data->lbfluid[1]);
     }
   }
@@ -2354,6 +2360,7 @@ void lbadapt_get_boundary_status() {
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
+        assert(!mesh_iter->current_is_ghost);
         data = &lbadapt_local_data[lvl][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
 
@@ -2389,6 +2396,11 @@ void lbadapt_get_boundary_status() {
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+
+  /** exchange boundary values */
+  p8est_ghostvirt_exchange_data(
+      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
 }
 
 void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho) {

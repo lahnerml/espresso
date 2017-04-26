@@ -876,7 +876,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
-  int the_boundary = -1;
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
@@ -934,7 +933,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     if (dist_tmp < dist) {
       dist = dist_tmp;
-      the_boundary = n;
     }
   }
 

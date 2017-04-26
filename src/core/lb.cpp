@@ -140,11 +140,11 @@ int fluct;
 
 #ifdef LB_ADAPTIVE
 lb_float prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
 lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
+                                        0., 0., 0., 0., 0., 0., 0., 0., 0.};
 lb_float gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
+                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
 #else  // LB_ADAPTIVE
 /** relaxation rate of shear modes */
 double gamma_shear = 0.0;
@@ -1657,14 +1657,14 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
                              lblattice.halo_grid);
 
     mpi_recv_fluid(node, index, &rho, j, pi);
-        // unit conversion
-        p_pi[0] = pi[0]/lbpar.tau/lbpar.tau/lbpar.agrid;
-        p_pi[1] = pi[1]/lbpar.tau/lbpar.tau/lbpar.agrid;
-        p_pi[2] = pi[2]/lbpar.tau/lbpar.tau/lbpar.agrid;
-        p_pi[3] = pi[3]/lbpar.tau/lbpar.tau/lbpar.agrid;
-        p_pi[4] = pi[4]/lbpar.tau/lbpar.tau/lbpar.agrid;
-        p_pi[5] = pi[5]/lbpar.tau/lbpar.tau/lbpar.agrid;
-#endif //!LB_ADAPTIVE
+    // unit conversion
+    p_pi[0] = pi[0] / lbpar.tau / lbpar.tau / lbpar.agrid;
+    p_pi[1] = pi[1] / lbpar.tau / lbpar.tau / lbpar.agrid;
+    p_pi[2] = pi[2] / lbpar.tau / lbpar.tau / lbpar.agrid;
+    p_pi[3] = pi[3] / lbpar.tau / lbpar.tau / lbpar.agrid;
+    p_pi[4] = pi[4] / lbpar.tau / lbpar.tau / lbpar.agrid;
+    p_pi[5] = pi[5] / lbpar.tau / lbpar.tau / lbpar.agrid;
+#endif //! LB_ADAPTIVE
 #endif // LB
   }
   return 0;
@@ -2275,7 +2275,7 @@ static void lb_prepare_communication() {
 void lb_reinit_parameters() {
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   if (lbpar.viscosity[0] > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -3267,7 +3267,6 @@ inline void lb_collide_stream() {
         if (!lbfields[index].boundary)
 #endif // LB_BOUNDARIES
         {
-
           /* calculate modes locally */
           lb_calc_modes(index, modes);
 

@@ -631,9 +631,9 @@ void lbadapt_patches_populate_halos(int level) {
               r_offset_z = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
               w_offset_z = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
             } else if (2 == (dir_p4est & 2)) {
-                iter_max_y = 1;
-                r_offset_y = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
-                w_offset_y = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
+              iter_max_y = 1;
+              r_offset_y = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);
+              w_offset_y = (dir_p4est % 2 == 0 ? 0 : LBADAPT_PATCHSIZE + 1);
             } else {
               iter_max_x = 1;
               r_offset_x = (dir_p4est % 2 == 0 ? LBADAPT_PATCHSIZE : 1);

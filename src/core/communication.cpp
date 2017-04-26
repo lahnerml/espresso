@@ -3002,10 +3002,6 @@ void mpi_reg_refinement(int node, int param) {
 
   int old_flg = finest_level_global;
   finest_level_global = lbadapt_get_global_maxlevel();
-  // due to non-recursive refinement only 2 cases can occur: finest level
-  // increases or not.
-  lb_step_factor =
-      lb_step_factor / (double)(1 << (finest_level_global - old_flg));
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();

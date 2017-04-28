@@ -1892,112 +1892,129 @@ void lbadapt_bounce_back(int level) {
 #ifndef PULL
       lb_float population_shift;
       lb_float local_post_collision_populations[19] = {
-          -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
-          -1, -1, -1, -1, -1, -1, -1, -1, -1};
+          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX,
+          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX,
+          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX};
+      lb_float local_modes[19];
       if (currCellData->boundary) {
         currCellData->lbfluid[1][0] = 0.0;
       }
 
-      // We cannot copy this with minimal invasiveness, because boundary cells
-      // can end in the ghost layer and p4est_iterate does not visit ghost
-      // cells. Therefore we have to inspect in each cell, if it has neighbors
-      // that are part of the ghost layer.
-      // Then there are 2 cases where we have to bounce back:
-      // 1. Current cell itself is boundary cell
-      //    In this case we perform the same algorithm as in the regular grid
-      // 2. Current cell is fluid cell and has ghost neighbors that are
-      //    boundary cells.
-      //    In this case we we have to do something different:
-      //    The neighboring cell was not allowed to stream, because it is a
-      //    boundary cell and in addition, we did not stream to it.
-      //    So instead we have to perform the back-transformation for the
-      //    populations of this cell and write our population in search
-      //    direction to our inverse position.
+      /** The general idea of the implementation on a regular Cartesian grid is
+       * that the grid is traversed and for each population we check if we got
+       * it streamed in error.
+       * E.g. f_1 (c_1: 1, 0, 0) had to be streamed from cell in the inverse
+       * directon (c_2: -1, 0, 0).
+       * So check if cell in inverse direction is a boundary or a fluid cell:
+       * Boundary:
+       * Set f_(iinv) of neighbor cell and f_i of current cell to 0.
+       * Fluid:
+       * Set f_(iinv) of neighbor cell to (f_i + shift) of current cell.
+       *
+       * We cannot copy this with minimal invasiveness, because boundary cells
+       * can end in the ghost layer and p4est_iterate does not visit ghost
+       * cells. Therefore we have to inspect in each cell, if it has neighbors
+       * that are part of the ghost layer.
+       * Then there are 2 cases where we have to bounce back:
+       * 1. Current cell itself is boundary cell
+       *    In this case we perform the same algorithm as in the regular grid
+       * 2. Current cell is fluid cell and has ghost neighbors that are
+       *    boundary cells.
+       *    In this case we we have to do something different:
+       *    The neighboring cell was not allowed to stream, because it is a
+       *    boundary cell and in addition, we did not stream to it.
+       *    So instead we have to perform the back-transformation for the
+       *    populations of this cell and write our population in search
+       *    direction to our inverse position.
+       */
       for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR) {
         // set neighboring cell information in iterator
-        int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
-        p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
+        int inv_dir_p4est = ci_to_p4est[inv[dir_ESPR] - 1];
+        p8est_meshiter_set_neighbor_quad_info(mesh_iter, inv_dir_p4est);
 
         if (mesh_iter->neighbor_qid != -1) {
-          int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
-          int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
-          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
-          assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+          /** read c_i in neighbors orientation and p4est's direction system.
+           * Convert it to ESPResSo's directions.
+           * The inverse direction of that result is the correct value to bounce
+           * back to.
+           */
+          int neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+          int neigh_dir_ESPR = p4est_to_ci[neigh_dir_p4est];
+          int inv_neigh_dir_ESPR = inv[neigh_dir_ESPR];
 
-          // get neighboring cells
-          p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
-          if (mesh_iter->neighbor_qid != -1) {
-            if (mesh_iter->neighbor_is_ghost) {
+          /** in case of a brick connectivity certain symmetries hold even
+           * across tree boundaries
+           */
+          assert(dir_ESPR == neigh_dir_ESPR);
+          assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+
+          /** fetch data of neighbor cell */
+          if (mesh_iter->neighbor_is_ghost) {
               data = &lbadapt_ghost_data[level - coarsest_level_ghost]
                                         [p8est_meshiter_get_neighbor_storage_id(
                                             mesh_iter)];
+          } else {
+            data = &lbadapt_local_data[level - coarsest_level_local]
+                                      [p8est_meshiter_get_neighbor_storage_id(
+                                          mesh_iter)];
+          }
+
+          // case 1
+          if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
+            if (!data->boundary) {
+              // calculate population shift (velocity boundary condition)
+              population_shift = 0;
+              for (int l = 0; l < 3; ++l) {
+                population_shift -=
+                    h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                    lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
+                    lb_boundaries[currCellData->boundary - 1].velocity[l] /
+                    lbmodel.c_sound_sq;
+              }
+
+              // sum up the force that the fluid applies on the boundary
+              for (int l = 0; l < 3; ++l) {
+                lb_boundaries[currCellData->boundary - 1].force[l] +=
+                  (2 * currCellData->lbfluid[1][dir_ESPR] +
+                      population_shift) * lbmodel.c[dir_ESPR][l];
+              }
+              data->lbfluid[1][inv_neigh_dir_ESPR] =
+                  currCellData->lbfluid[1][dir_ESPR] + population_shift;
             } else {
-              data = &lbadapt_local_data[level - coarsest_level_local]
-                                        [p8est_meshiter_get_neighbor_storage_id(
-                                            mesh_iter)];
+              data->lbfluid[1][inv_neigh_dir_ESPR] =
+                  currCellData->lbfluid[1][dir_ESPR] = 0.0;
             }
+          }
 
-            // case 1
-            if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
-              if (!data->boundary) {
-                // calculate population shift (moving boundary)
-                population_shift = 0;
-                for (int l = 0; l < 3; ++l) {
-                  population_shift -=
-                      h_max * h_max * h_max * lbpar.rho[0] * 2 *
-                      lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
-                      lb_boundaries[currCellData->boundary - 1].velocity[l] /
-                      lbmodel.c_sound_sq;
+          // case 2
+          else if (mesh_iter->neighbor_is_ghost && data->boundary) {
+            if (!currCellData->boundary) {
+              if (-DBL_MAX == local_post_collision_populations[0]) {
+                std::memcpy(local_modes, currCellData->modes,
+                            lbmodel.n_veloc * sizeof(lb_float));
+                for (int i = 0; i < lbmodel.n_veloc; ++i) {
+                  local_modes[i] *= (1. / d3q19_modebase[19][i]);
                 }
-
-                // sum up the force that is applied by the fluid
-                for (int l = 0; l < 3; ++l) {
-                  lb_boundaries[currCellData->boundary - 1].force[l] +=
-                      (2 * currCellData->lbfluid[1][dir_ESPR] +
-                       population_shift) *
-                      lbmodel.c[dir_ESPR][l];
+                for (int i = 0; i < lbmodel.n_veloc; ++i) {
+                  local_post_collision_populations[i] =
+                      lbadapt_backTransformation(local_modes, i) * lbmodel.w[i];
                 }
-
-                // perform bounce back, corrected by the impact resulting from
-                // velocity boundary condition
-                data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
-                    currCellData->lbfluid[1][inv[dir_ESPR]] - population_shift;
-              } else {
-                data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
-                    currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
               }
-            }
-
-            // case 2
-            else if (mesh_iter->neighbor_is_ghost && data->boundary) {
-              if (!currCellData->boundary) {
-                if (-1. == local_post_collision_populations[0]) {
-                  for (int i = 0; i < lbmodel.n_veloc; ++i) {
-                    local_post_collision_populations[i] =
-                        lbadapt_backTransformation(currCellData->modes, i) *
-                        lbmodel.w[i];
-                  }
-                }
-                // calculate population shift (moving boundary)
-                population_shift = 0.;
-                for (int l = 0; l < 3; l++) {
-                  population_shift -=
-                      h_max * h_max * h_max * lbpar.rho[0] * 2 *
-                      lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
-                      lb_boundaries[data->boundary - 1].velocity[l] /
-                      lbmodel.c_sound_sq;
-                }
-                for (int l = 0; l < 3; ++l) {
-                  lb_boundaries[data->boundary - 1].force[l] +=
-                      (2 * data->lbfluid[1][inv[dir_ESPR]] - population_shift) *
-                      lbmodel.c[inv[dir_ESPR]][l];
-                }
-                currCellData->lbfluid[1][inv[dir_ESPR]] =
-                    local_post_collision_populations[dir_ESPR] +
-                    population_shift;
-              } else {
-                currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
+              // calculate population shift
+              population_shift = 0.;
+              for (int l = 0; l < 3; l++) {
+                population_shift -=
+                    h_max * h_max * h_max * lbpar.rho[0] * 2 *
+                    lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
+                    lb_boundaries[data->boundary - 1].velocity[l] /
+                    lbmodel.c_sound_sq;
               }
+
+              currCellData->lbfluid[1][inv[dir_ESPR]] =
+                  local_post_collision_populations[dir_ESPR] -
+                  population_shift;
+            } else {
+              currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
             }
           }
         }

@@ -1961,7 +1961,7 @@ void lbadapt_bounce_back(int level) {
                 // perform bounce back, corrected by the impact resulting from
                 // velocity boundary condition
                 data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
-                    currCellData->lbfluid[1][inv[dir_ESPR]] + population_shift;
+                    currCellData->lbfluid[1][inv[dir_ESPR]] - population_shift;
               } else {
                 data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
                     currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
@@ -1989,7 +1989,7 @@ void lbadapt_bounce_back(int level) {
                 }
                 for (int l = 0; l < 3; ++l) {
                   lb_boundaries[data->boundary - 1].force[l] +=
-                      (2 * data->lbfluid[1][inv[dir_ESPR]] + population_shift) *
+                      (2 * data->lbfluid[1][inv[dir_ESPR]] - population_shift) *
                       lbmodel.c[inv[dir_ESPR]][l];
                 }
                 currCellData->lbfluid[1][inv[dir_ESPR]] =

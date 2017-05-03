@@ -1161,15 +1161,36 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
+int dd_p4est_cell1d_of_pos(double pos[3], double pfold[3], int d)
+{
+  const double errmargin = 0.5 * ROUND_ERROR_PREC * box_l[d];
+  // Keep the particle if it is only slightly OOB since rounding errors
+  // return a non-existent cell or trigger its folding back.
+  //
+  // Rounding errors are only supposed to happen at the domain boundary
+  // since very small positions, e.g. -1e-30 can are added to box_l
+  // inside of fold_position called from dd_p4est_pos_morton_idx (i.e. the
+  // argument "pfold" to this function is subject to rounding errors). These
+  // errors are corrected, here.
+  if (pos[d] < 0.0 && pos[d] > -errmargin)
+    return 0;
+  else if (pos[d] > box_l[d] && pos[d] - box_l[d] < errmargin)
+    return grid_size[d] - 1;
+  else
+    return static_cast<int>(pfold[d] * dd.inv_cell_size[d]);
+}
+//--------------------------------------------------------------------------------------------------
 // Maps a position to the cartesian grid and returns the morton index of this coordinates
 // Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
-  double pfold[3];
-  int im[3];
-  pfold[0] = pos[0]; pfold[1] = pos[1]; pfold[2] = pos[2];
+  double pfold[3] = {pos[0], pos[1], pos[2]};
+  int im[3] = {0, 0, 0}; /* dummy */
   fold_position(pfold, im);
-  return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0], 
-    pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);
+
+  int cx = dd_p4est_cell1d_of_pos(pos, pfold, 0);
+  int cy = dd_p4est_cell1d_of_pos(pos, pfold, 1);
+  int cz = dd_p4est_cell1d_of_pos(pos, pfold, 2);
+  return dd_p4est_cell_morton_idx(cx, cy, cz);
 }
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
@@ -1179,12 +1200,12 @@ int dd_p4est_pos_to_proc(double pos[3]) {
   // Note: Since p4est_space_idx is a ordered list, it is possible to do a binary search here.
   // Doing so would reduce the complexity from O(N) to O(log(N))
   if (idx >= 0) {
-    for (int i=1;i<=n_nodes;++i) {
+    for (int i = 1; i <= n_nodes; ++i) {
       // compare the first cell of a process with this cell
       if (p4est_space_idx[i] > idx) return i - 1;
     }
   }
-  fprintf(stderr, "position %lfx%lfx%lf not in boxl", pos[0], pos[1], pos[2]);
+  fprintf(stderr, "Could not resolve the proc of particle %lf %lf %lf\n", pos[0], pos[1], pos[2]);
   errexit();
 }
 //--------------------------------------------------------------------------------------------------

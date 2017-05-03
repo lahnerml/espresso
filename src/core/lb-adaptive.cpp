@@ -1891,11 +1891,9 @@ void lbadapt_bounce_back(int level) {
 #ifdef D3Q19
 #ifndef PULL
       lb_float population_shift;
-      lb_float local_post_collision_populations[19] = {
-          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX,
-          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX,
-          -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX, -DBL_MAX};
+      lb_float local_post_collision_populations[19];
       lb_float local_modes[19];
+
       if (currCellData->boundary) {
         currCellData->lbfluid[1][0] = 0.0;
       }
@@ -1950,9 +1948,9 @@ void lbadapt_bounce_back(int level) {
 
           /** fetch data of neighbor cell */
           if (mesh_iter->neighbor_is_ghost) {
-              data = &lbadapt_ghost_data[level - coarsest_level_ghost]
-                                        [p8est_meshiter_get_neighbor_storage_id(
-                                            mesh_iter)];
+            data = &lbadapt_ghost_data[level - coarsest_level_ghost]
+                                      [p8est_meshiter_get_neighbor_storage_id(
+                                          mesh_iter)];
           } else {
             data = &lbadapt_local_data[level - coarsest_level_local]
                                       [p8est_meshiter_get_neighbor_storage_id(
@@ -1975,8 +1973,9 @@ void lbadapt_bounce_back(int level) {
               // sum up the force that the fluid applies on the boundary
               for (int l = 0; l < 3; ++l) {
                 lb_boundaries[currCellData->boundary - 1].force[l] +=
-                  (2 * currCellData->lbfluid[1][dir_ESPR] +
-                      population_shift) * lbmodel.c[dir_ESPR][l];
+                    (2 * currCellData->lbfluid[1][dir_ESPR] +
+                     population_shift) *
+                    lbmodel.c[dir_ESPR][l];
               }
               data->lbfluid[1][inv_neigh_dir_ESPR] =
                   currCellData->lbfluid[1][dir_ESPR] + population_shift;
@@ -1984,21 +1983,18 @@ void lbadapt_bounce_back(int level) {
               data->lbfluid[1][inv_neigh_dir_ESPR] =
                   currCellData->lbfluid[1][dir_ESPR] = 0.0;
             }
-          }
+          } // if (!mesh_iter->neighbor_is_ghost && currCellData->boundary)
 
           // case 2
           else if (mesh_iter->neighbor_is_ghost && data->boundary) {
             if (!currCellData->boundary) {
-              if (-DBL_MAX == local_post_collision_populations[0]) {
-                std::memcpy(local_modes, currCellData->modes,
-                            lbmodel.n_veloc * sizeof(lb_float));
-                for (int i = 0; i < lbmodel.n_veloc; ++i) {
-                  local_modes[i] *= (1. / d3q19_modebase[19][i]);
-                }
-                for (int i = 0; i < lbmodel.n_veloc; ++i) {
-                  local_post_collision_populations[i] =
-                      lbadapt_backTransformation(local_modes, i) * lbmodel.w[i];
-                }
+              std::memcpy(local_modes, currCellData->modes,
+                          lbmodel.n_veloc * sizeof(lb_float));
+              // No need to weigh modes again as this already happened in the
+              // streaming step
+              for (int i = 0; i < lbmodel.n_veloc; ++i) {
+                local_post_collision_populations[i] =
+                    lbadapt_backTransformation(local_modes, i) * lbmodel.w[i];
               }
               // calculate population shift
               population_shift = 0.;
@@ -2010,16 +2006,16 @@ void lbadapt_bounce_back(int level) {
                     lbmodel.c_sound_sq;
               }
 
-              currCellData->lbfluid[1][inv[dir_ESPR]] =
-                  local_post_collision_populations[dir_ESPR] -
+              currCellData->lbfluid[1][dir_ESPR] =
+                  local_post_collision_populations[inv[dir_ESPR]] +
                   population_shift;
             } else {
-              currCellData->lbfluid[1][inv[dir_ESPR]] = 0.0;
+              currCellData->lbfluid[1][dir_ESPR] = 0.0;
             }
           }
-        }
-      }
-#else // !PULL
+        } // if (mesh_iter->neighbor_qid) != -1
+      }   // for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR)
+#else     // !PULL
 #error Bounce back boundary conditions are only implemented for PUSH scheme!
 #endif // !PULL
 #else  // D3Q19
@@ -2356,7 +2352,7 @@ void lbadapt_get_boundary_status() {
   lbadapt_payload_t *data;
 
   /* set boundary status */
-  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
 #ifdef LB_ADAPTIVE_GPU
     int base = P8EST_QUADRANT_LEN(level);
     int root = P8EST_ROOT_LEN;
@@ -2412,12 +2408,12 @@ void lbadapt_get_boundary_status() {
       }
     }
     p8est_meshiter_destroy(mesh_iter);
-  }
 
-  /** exchange boundary values */
-  p8est_ghostvirt_exchange_data(
-      p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-      (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+    /** exchange boundary values */
+    p8est_ghostvirt_exchange_data(
+        p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+        (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+  }
 }
 
 void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho) {

@@ -3188,7 +3188,7 @@ inline void lb_collide_stream() {
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
-  for (level = finest_level_global; lbpar.base_level <= level; --level) {
+  for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
     lbadapt_gpu_execute_update_from_virtuals_kernel(level);
@@ -3212,27 +3212,54 @@ inline void lb_collide_stream() {
 #else  // LB_ADAPTIVE_GPU
   int lvl_diff;
   // perform 1st half of subcycling here (process coarse before fine)
+  // TODO: which max refinement level is needed?
+  /** TODO:
+   * change to
+   * for  (..) do
+   * collide_populate_local
+   * od
+   * p8est_ghostvirt_exchange_data_end
+   * for (..) do
+   * collide_populate_ghost
+   * od
+   * use array of status pointers (one pointer per level)
+   *
+   * FIXME mind first and last step (regridding and end of simulation)
+   * FIXME use different MPI_Tag for different levels
+   * maybe use counter for each level to check if counters match
+   * use different finest_level_global and lbpar.max_refinement_level, i.e. do
+   * not make use of maximum set p4est refinement capability
+   */
+  /** TODO: Include timers for each operation (ASAP -> see optimization results)
+   */
+  /** TODO: prevent overlap in n_lbsteps
+   */
   for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
-    lvl_diff = finest_level_global - level;
+    // level always relates to level of real cells
+    lvl_diff = lbpar.max_refinement_level - level;
 
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       lbadapt_collide(level);
       lbadapt_populate_virtuals(level);
-
     }
   }
+
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
 
   // perform second half of subcycling here (process fine before coarse)
-  for (level = finest_level_global; lbpar.base_level <= level; --level) {
-    lvl_diff = finest_level_global - level;
+  // TODO: which max refinement level is needed?
+  for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
+    // level always relates to level of real cells
+    lvl_diff = lbpar.max_refinement_level - level;
 
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       lbadapt_update_populations_from_virtuals(level);
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
       lbadapt_swap_pointers(level);
+      // TODO: do not use convenience function here
+      // (exchange_data_begin)
       p8est_ghostvirt_exchange_data(
           p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);

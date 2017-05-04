@@ -205,8 +205,6 @@ void dd_p4est_create_grid () {
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
   
-  dd_p4est_write_vtk();
-  
   CELL_TRACE(printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants));
   
@@ -346,9 +344,14 @@ void dd_p4est_create_grid () {
             ls.coord[1] = int(y + yi) - 1;
             ls.coord[2] = int(z + zi) - 1;
             ls.p_cnt = 0;
-            for (uint64_t l=0;l<shell.size();++l) {
-              if (shell[l].idx == ls.idx && shell[l].rank == ls.rank)
-                ls.p_cnt += 1;
+            if (ls.rank == this_node) ls.p_cnt = 1;
+            for (uint64_t l=num_local_cells;l<shell.size();++l) {
+              if (shell[l].idx == ls.idx && shell[l].rank == ls.rank) {
+                if (shell[l].boundary < ls.boundary)
+                  ls.p_cnt += 1;
+                else
+                  shell[l].p_cnt += 1;
+              }
             }
             shell.push_back(ls); // add the new ghost cell to all cells
             shell[i].shell = 1; // The cell for which this one was added is a the domain bound
@@ -402,6 +405,8 @@ void dd_p4est_create_grid () {
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
 #endif
+  
+  dd_p4est_write_vtk();
   
   CELL_TRACE(printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n",
     this_node, max_range, box_l[0],box_l[1],box_l[2], dd.cell_size[0],dd.cell_size[1],dd.cell_size[2]));
@@ -1145,6 +1150,7 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 }
 //--------------------------------------------------------------------------------------------------
 // Maps a position to the cartesian grid and returns the morton index of this coordinates
+// Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
   double pfold[3];
   int im[3];
@@ -1366,6 +1372,17 @@ void dd_p4est_write_particle_vtk(char *filename) {
 void dd_p4est_write_vtk() {
   // write cells to VTK with a given streching
   p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_dd", box_l[0]/(double)brick_size[0]);
+  
+  /*char fname[100];
+  sprintf(fname,"cells_conn_%i.list",this_node);
+  FILE* h = fopen(fname,"w");
+  for (int i=0;i<num_cells;++i) {
+    fprintf(h,"%i %i:%li (%i) %i %i [ ",i, p4est_shell[i].rank, p4est_shell[i].idx,
+      p4est_shell[i].p_cnt, p4est_shell[i].shell, p4est_shell[i].boundary);
+    for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
+    fprintf(h,"]\n");
+  }
+  fclose(h);*/
 }
 //--------------------------------------------------------------------------------------------------
 #endif

@@ -61,6 +61,18 @@ typedef struct {
   int rshell[26]; // rank of fullshell cells
 } quad_data_t;
 //--------------------------------------------------------------------------------------------------
+int dd_p4est_full_shell_neigh(int cell, int neighidx)
+{
+    if (neighidx >= 0 && neighidx < 26)
+        return p4est_shell[cell].neighbor[neighidx];
+    else if (neighidx == 26)
+        return cell;
+    else {
+        fprintf(stderr, "dd_p4est_full_shell_neigh: Require 0 <= neighidx < 27.\n");
+        errexit();
+    }
+}
+//-----------------------------------------------------------------------------------------
 // Init Callback for internal structure
 static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
   ((quad_data_t*)(q->p.user_data))->rank = this_node;

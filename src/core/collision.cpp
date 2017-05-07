@@ -23,6 +23,7 @@
 #include "errorhandling.hpp"
 #include "grid.hpp"
 #include "domain_decomposition.hpp"
+#include "p4est_dd.hpp"
 
 
 using namespace std;
@@ -563,7 +564,7 @@ void three_particle_binding_domain_decomposition()
   // We have domain decomposition
     
   // Indices of the cells in which the colliding particles reside
-  int cellIdx[2][3];
+  int collcellidx[2];
     
   // Iterate over collision queue
 
@@ -574,26 +575,29 @@ void three_particle_binding_domain_decomposition()
 
         Particle* p1=local_particles[gathered_queue[id].pp1];
         Particle* p2=local_particles[gathered_queue[id].pp2];
-        dd_position_to_cell_indices(p1->r.p,cellIdx[0]);
-        dd_position_to_cell_indices(p2->r.p,cellIdx[1]);
+        collcellidx[0] = dd_position_to_cell(p1->r.p) - &cells[0];
+        collcellidx[1] = dd_position_to_cell(p2->r.p) - &cells[0];
+
+        if (collcellidx[0] < 0 || collcellidx[1] < 0) {
+            fprintf(stderr, "dd_position_to_cell returned NULL\n");
+            errexit();
+        }
 
         // Iterate over the cells + their neighbors
         // if p1 and p2 are in the same cell, we don't need to consider it 2x
         int lim=1;
 
-        if ((cellIdx[0][0]==cellIdx[1][0]) && (cellIdx[0][1]==cellIdx[1][1]) && (cellIdx[0][2]==cellIdx[1][2]))
+        if (collcellidx[0] == collcellidx[1])
           lim=0; // Only consider the 1st cell
 
         for (int j=0;j<=lim;j++) {
 
             // Iterate the cell with indices cellIdx[j][] and all its neighbors.
             // code taken from dd_init_cell_interactions()
-            for(int p=cellIdx[j][0]-1; p<=cellIdx[j][0]+1; p++)	
-               for(int q=cellIdx[j][1]-1; q<=cellIdx[j][1]+1; q++)
-	                for(int r=cellIdx[j][2]-1; r<=cellIdx[j][2]+1; r++) {   
-	                   int ind2 = get_linear_index(p,q,r,dd.ghost_cell_grid);
-	                   Cell* cell=cells+ind2;
- 
+            for (int i = 0; i < 27; ++i) {
+                int ind2 = dd_p4est_full_shell_neigh(collcellidx[j], i);
+	        Cell* cell = cells + ind2;
+
 	                   // Iterate over particles in this cell
                      for(int a=0; a<cell->n; a++) {
                         Particle* P=&cell->part[a];
@@ -615,26 +619,11 @@ void three_particle_binding_domain_decomposition()
                         // (bond is placed on 1st particle, order of bond partners
   	                      // does not matter, so we don't need non-cyclic permutations):
 
-                        if (P->l.ghost) {
-                          //TRACE(printf("%d: center particle is ghost: %d\n", this_node, P->p.identity));
-                          continue;
-                        }
-                        //TRACE(printf("%d: LOOP: %d Handling collision of particles FIRST CONFIGURATION %d %d %d\n", this_node, id, p1->p.identity, P->p.identity, p2->p.identity));
-                        coldet_do_three_particle_bond(P,p1,p2);
-
-                        if (p1->l.ghost) {
-                          //TRACE(printf("%d: center particle is ghost: %d\n", this_node, p1->p.identity));
-                          continue;
-                        }
+                        if (!P->l.ghost)
+                            coldet_do_three_particle_bond(P,p1,p2);
 
                         coldet_do_three_particle_bond(p1,P,p2);
-
-                        if (p2->l.ghost) {
-                          //TRACE(printf("%d: center particle is ghost: %d\n", this_node, p2->p.identity));
-                          continue;
-                        }
-
-  	                      coldet_do_three_particle_bond(p2,P,p1);
+  	                coldet_do_three_particle_bond(p2,P,p1);
 
                      } // loop over particles in this cell
 

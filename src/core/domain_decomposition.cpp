@@ -752,7 +752,9 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
-  runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
+  *idx = (size_t)dd_p4est_position_to_cell(pos) - (size_t)(&cells[0]);
+  return;
+  //runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
 #endif
 
   int i;

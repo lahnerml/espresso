@@ -14,6 +14,7 @@
 #define P4EST_NOCHANGE 
 #endif
 //#define P4EST_NOCHANGE
+int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Free the memory and all p4est related stuff
 void dd_p4est_free ();

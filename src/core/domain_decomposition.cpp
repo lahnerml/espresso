@@ -750,12 +750,15 @@ Cell *dd_position_to_cell(double pos[3]) {
 
 void dd_position_to_cell_indices(double pos[3],int* idx) {
   CALL_TRACE();
-  
+
 #ifndef P4EST_NOCHANGE
-  fprintf(stderr, "dd_position_to_cell_indices is no valid function for p4est based DD\n");
+  std::cerr << __FUNCTION__ << ": This function is not supported by p4est-md."
+            << " Use a p4est-md branch which is capable of handling"
+            << " collision detection.\n"
+            << " Do not use this function for anything else."
+            << std::endl;
   errexit();
-  //runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
-#endif
+#else
 
   int i;
   double lpos;
@@ -772,6 +775,7 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
       idx[i] = dd.cell_grid[i];
     }
   }
+#endif
 }
 
 /*************************************************/
@@ -1021,6 +1025,8 @@ void dd_topology_init(CellPList *old) {
     part = old->cell[c]->part;
     np   = old->cell[c]->n;
     for (p = 0; p < np; p++) {
+      fold_position(part[p].r.p, part[p].l.i);
+      
       Cell *nc = dd_save_position_to_cell(part[p].r.p);
       if (nc == NULL) { // Particle is on other process, move it to cell[0]
         append_unindexed_particle(local_cells.cell[0], &part[p]);
@@ -1110,6 +1116,7 @@ void dd_exchange_and_sort_particles (int global_flag) {
       Cell *pl = local_cells.cell[c];
       int np   = local_cells.cell[c]->n;
       for (int p = 0; p < np; p++) {
+        //fold_position(pl->part[p].r.p, pl->part[p].l.i);
         Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
         if (nc == NULL) { // Belongs to other node
           move_indexed_particle(&sendbuf, pl, p);

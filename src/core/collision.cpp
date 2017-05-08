@@ -580,17 +580,22 @@ void three_particle_binding_domain_decomposition()
 
         if (collcellidx[0] < 0 || collcellidx[1] < 0) {
             fprintf(stderr, "box size %lfx%lfx%lf\n", box_l[0], box_l[1], box_l[2]);
-            fprintf(stderr, "%i : dd_position_to_cell returned NULL\n\t%lu : %lu(%lfx%lfx%lf)\n\t%lu : %lu(%lfx%lfx%lf)\n", this_node,
-            (size_t)dd_position_to_cell(p1->r.p) != 0,(size_t)gathered_queue[id].pp1,p1->r.p[0],p1->r.p[1],p1->r.p[2],
-            (size_t)dd_position_to_cell(p2->r.p) != 0,(size_t)gathered_queue[id].pp2,p2->r.p[0],p2->r.p[1],p2->r.p[2]);
+            fprintf(stderr, "%i : dd_position_to_cell returned NULL\n\t%i : p%lu (%lfx%lfx%lf)\n\t%i : p%lu (%lfx%lfx%lf)\n", this_node,
+            (size_t)dd_position_to_cell(p1->r.p) != 0,(size_t)p1->p.identity,p1->r.p[0],p1->r.p[1],p1->r.p[2],
+            (size_t)dd_position_to_cell(p2->r.p) != 0,(size_t)p2->p.identity,p2->r.p[0],p2->r.p[1],p2->r.p[2]);
             if (p1->r.p[0] > box_l[0] || p1->r.p[0] < 0)
-              if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
-                if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
-                  fprintf(stderr, "crtic part %i\n", gathered_queue[id].pp1);
+              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+            else if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
+              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+            else if (p1->r.p[2] > box_l[2] || p1->r.p[2] < 0)
+              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+              
             if (p2->r.p[0] > box_l[0] || p2->r.p[0] < 0)
-              if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
-                if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
-                  fprintf(stderr, "crtic part %i\n", gathered_queue[id].pp2);
+              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
+            else if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
+              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
+            else if (p2->r.p[2] > box_l[2] || p2->r.p[2] < 0)
+              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
             errexit();
         }
 

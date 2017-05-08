@@ -366,7 +366,7 @@ void dd_p4est_create_grid () {
               }
             }
             shell.push_back(ls); // add the new ghost cell to all cells
-            shell[i].shell = 1; // The cell for which this one was added is a the domain bound
+            shell[i].shell = 1; // The cell for which this one was added is at the domain bound
           } else { // Cell already exists in list
             if (shell[pos].shell == 2) { // is it a ghost cell, then ubdate the boundary info
               // of the current local cell, since they are neighbors
@@ -865,6 +865,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
 #endif
               int pid = part->p.identity;
+              //fold_position(part->r.p, part->l.i);
               move_indexed_particle(&sendbuf[li], cell, p);
               local_particles[pid] = NULL;
               if(p < cell->n) p -= 1;
@@ -1083,6 +1084,7 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     // Find the correct node for each particle in pl
     for (int p = 0; p < pl->n; p++) {
       Particle *part = &pl->part[p];
+      //fold_position(part->r.p, part->l.i);
       int rank = dd_p4est_pos_to_proc(part->r.p);
       if (rank != this_node) { // It is actually a remote particle -> copy all data to sendbuffer
         if (rank > n_nodes || rank < 0) {
@@ -1168,13 +1170,13 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 // Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
   double pfold[3];
-  //int im[3];
+  int im[3];
   pfold[0] = pos[0]; pfold[1] = pos[1]; pfold[2] = pos[2];
-  //fold_position(pfold, im);
+  fold_position(pfold, im);
   for (int d=0;d<3;++d) {
-    double errmar = ROUND_ERROR_PREC * box_l[d];
+    double errmar = 0.5*ROUND_ERROR_PREC * box_l[d];
     if (pos[d] < 0 && pos[d] > -errmar) pfold[d] = 0;
-    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] -= 0.5*dd.cell_size[d];
+    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] = pos[d] - 0.5*dd.cell_size[d];
     else if (pos[d] <= -errmar) return -1;
     else if (pos[d] >= box_l[d] + errmar) return -1;
   }

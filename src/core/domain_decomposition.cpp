@@ -750,12 +750,15 @@ Cell *dd_position_to_cell(double pos[3]) {
 
 void dd_position_to_cell_indices(double pos[3],int* idx) {
   CALL_TRACE();
-  
+
 #ifndef P4EST_NOCHANGE
-  *idx = (size_t)dd_p4est_position_to_cell(pos) - (size_t)(&cells[0]);
-  return;
-  //runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
-#endif
+  std::cerr << __FUNCTION__ << ": This function is not supported by p4est-md."
+            << " Use a p4est-md branch which is capable of handling"
+            << " collision detection.\n"
+            << " Do not use this function for anything else."
+            << std::endl;
+  errexit();
+#else
 
   int i;
   double lpos;
@@ -772,6 +775,7 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
       idx[i] = dd.cell_grid[i];
     }
   }
+#endif
 }
 
 /*************************************************/

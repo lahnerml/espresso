@@ -752,8 +752,8 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
-  *idx = (size_t)dd_p4est_position_to_cell(pos) - (size_t)(&cells[0]);
-  return;
+  fprintf(stderr, "dd_position_to_cell_indices is no valid function for p4est based DD\n");
+  errexit();
   //runtimeErrorMsg() << __FUNCTION__ << " should not be called with p4est";
 #endif
 
@@ -950,6 +950,7 @@ void dd_topology_init(CellPList *old) {
   cell_structure.type             = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = dd_p4est_pos_to_proc;
   cell_structure.position_to_cell = dd_p4est_position_to_cell;
+  //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
 #else
   cell_structure.type             = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = map_position_node_array;

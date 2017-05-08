@@ -579,7 +579,18 @@ void three_particle_binding_domain_decomposition()
         collcellidx[1] = dd_position_to_cell(p2->r.p) - &cells[0];
 
         if (collcellidx[0] < 0 || collcellidx[1] < 0) {
-            fprintf(stderr, "dd_position_to_cell returned NULL\n");
+            fprintf(stderr, "box size %lfx%lfx%lf\n", box_l[0], box_l[1], box_l[2]);
+            fprintf(stderr, "%i : dd_position_to_cell returned NULL\n\t%lu : %lu(%lfx%lfx%lf)\n\t%lu : %lu(%lfx%lfx%lf)\n", this_node,
+            (size_t)dd_position_to_cell(p1->r.p) != 0,(size_t)gathered_queue[id].pp1,p1->r.p[0],p1->r.p[1],p1->r.p[2],
+            (size_t)dd_position_to_cell(p2->r.p) != 0,(size_t)gathered_queue[id].pp2,p2->r.p[0],p2->r.p[1],p2->r.p[2]);
+            if (p1->r.p[0] > box_l[0] || p1->r.p[0] < 0)
+              if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
+                if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
+                  fprintf(stderr, "crtic part %i\n", gathered_queue[id].pp1);
+            if (p2->r.p[0] > box_l[0] || p2->r.p[0] < 0)
+              if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
+                if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
+                  fprintf(stderr, "crtic part %i\n", gathered_queue[id].pp2);
             errexit();
         }
 

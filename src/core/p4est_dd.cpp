@@ -794,20 +794,23 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
   // by the error bounds
   
   int i;
-  int scale_pos[3];
+  //int scale_pos[3];
   
-  for (int d=0;d<3;++d) {
+  int64_t pidx = dd_p4est_pos_morton_idx(pos);
+  
+  /*for (int d=0;d<3;++d) {
     scale_pos[d] = pos[d]*dd.inv_cell_size[d];
     
     if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
     if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
-  }
+  }*/
     
   for (i=0;i<num_local_cells;++i) {
-    if (scale_pos[0] != p4est_shell[i].coord[0]) continue;
-    if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
-    if (scale_pos[2] != p4est_shell[i].coord[2]) continue;
-    break;
+    //if (scale_pos[0] != p4est_shell[i].coord[0]) continue;
+    //if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
+    //if (scale_pos[2] != p4est_shell[i].coord[2]) continue;
+    if (pidx == dd_p4est_cell_morton_idx(p4est_shell[i].coord[0],p4est_shell[i].coord[1],p4est_shell[i].coord[2]))
+      break;
   }
   
   if (i < num_local_cells) return &cells[i];
@@ -1165,9 +1168,16 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 // Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
   double pfold[3];
-  int im[3];
+  //int im[3];
   pfold[0] = pos[0]; pfold[1] = pos[1]; pfold[2] = pos[2];
-  fold_position(pfold, im);
+  //fold_position(pfold, im);
+  for (int d=0;d<3;++d) {
+    double errmar = ROUND_ERROR_PREC * box_l[d];
+    if (pos[d] < 0 && pos[d] > -errmar) pfold[d] = 0;
+    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] -= 0.5*dd.cell_size[d];
+    else if (pos[d] <= -errmar) return -1;
+    else if (pos[d] >= box_l[d] + errmar) return -1;
+  }
   return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0], 
     pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);
 }
@@ -1184,7 +1194,7 @@ int dd_p4est_pos_to_proc(double pos[3]) {
       if (p4est_space_idx[i] > idx) return i - 1;
     }
   }
-  fprintf(stderr, "position %lfx%lfx%lf not in boxl", pos[0], pos[1], pos[2]);
+  fprintf(stderr, "position %lfx%lfx%lf not in boxl\n", pos[0], pos[1], pos[2]);
   errexit();
 }
 //--------------------------------------------------------------------------------------------------

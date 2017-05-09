@@ -230,7 +230,6 @@ void integrate_ensemble_init() {
 void integrate_vv(int n_steps, int reuse_forces) {
   /* Prepare the Integrator */
   on_integration_start();
-
 #ifdef IMMERSED_BOUNDARY
   // Here we initialize volume conservation
   // This function checks if the reference volumes have been set and if
@@ -303,18 +302,14 @@ void integrate_vv(int n_steps, int reuse_forces) {
                      "only matters if it happens frequently during "
                      "sampling.\n");
 #endif
-
     force_calc();
-
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
       rescale_forces();
 #ifdef ROTATION
       convert_initial_torques();
 #endif
     }
-
     thermo_cool_down();
-
 #ifdef MULTI_TIMESTEP
 #ifdef NPT
     if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO)
@@ -323,10 +318,20 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #endif
 #endif
 
-  /*for (int i=0;i<local_cells.n;++i) {
+#if 0
+  int cnt_lp = 0, cnt_cp = 0, cnt_gp = 0;
+  for (int i=0;i<n_part;++i) {
+    if (local_particles[i] != NULL) {
+      cnt_lp += 1;
+      if (local_particles[i]->p.identity != i)
+        fprintf(stderr,"%i : particle identity missmatch %i %i\n", this_node, i, local_particles[i]->p.identity);
+    }
+  }
+  for (int i=0;i<local_cells.n;++i) {
     Cell *cell = local_cells.cell[i];
     for (int n=0;n<cell->n;++n) {
       Particle *p = &cell->part[n];
+      cnt_cp += 1;
       if (p->r.p[0] < 0 || p->r.p[0] > box_l[0])
         fprintf(stderr,"%i : OOB part p%i\n", this_node, p->p.identity);
       else if (p->r.p[1] < 0 || p->r.p[1] > box_l[1])
@@ -337,8 +342,20 @@ void integrate_vv(int n_steps, int reuse_forces) {
         fprintf(stderr,"%i : particle p%i on wrong process -> %i\n", this_node, p->p.identity, cell_structure.position_to_node(p->r.p));
       else if (cell != cell_structure.position_to_cell(p->r.p))
         fprintf(stderr,"%i : particle p%i in wrong local cell\n", this_node, p->p.identity);
+      if (local_particles[p->p.identity] != p)
+        fprintf(stderr,"%i : invalid reference for particle p%i\n", this_node, p->p.identity);
     }
-  }*/
+  }
+  for (int i=0;i<ghost_cells.n;++i) {
+    Cell *cell = ghost_cells.cell[i];
+    for (int n=0;n<cell->n;++n) {
+      Particle *p = &cell->part[n];
+      if (local_particles[p->p.identity] == p)
+        cnt_gp += 1;
+    }
+  }
+  fprintf(stderr, "%i : particle index wrong: %i listed, %i local, %i ghost\n", this_node, cnt_lp, cnt_cp, cnt_gp);
+#endif
 #ifdef COLLISION_DETECTION
     handle_collisions();
 #endif

@@ -1108,7 +1108,7 @@ void dd_exchange_and_sort_particles (int global_flag) {
   CALL_TRACE();
 #ifndef P4EST_NOCHANGE
   
-  if (global_flag) { // perform a global resorting
+  if (global_flag == CELL_GLOBAL_EXCHANGE) { // perform a global resorting
     ParticleList sendbuf;
     init_particlelist(&sendbuf);
     // Go through all local particles and move those not on node to the sendbuf
@@ -1119,7 +1119,9 @@ void dd_exchange_and_sort_particles (int global_flag) {
         //fold_position(pl->part[p].r.p, pl->part[p].l.i);
         Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
         if (nc == NULL) { // Belongs to other node
+          int pid = pl->part[p].p.identity;
           move_indexed_particle(&sendbuf, pl, p);
+          local_particles[pid] = NULL;
           if(p < np) p -= 1;
         } else if(nc != pl) { // Still on node but particle belongs to other cell
           move_indexed_particle(nc, pl, p);
@@ -1135,6 +1137,7 @@ void dd_exchange_and_sort_particles (int global_flag) {
       dd_p4est_global_exchange_part(NULL);
     // Free remaining particles in sendbuf, but it should be empty already
     for (int p = 0; p < sendbuf.n; p++) {
+      local_particles[sendbuf.part[p].p.identity] = NULL;
       free_particle(&sendbuf.part[p]);
     }
     realloc_particlelist(&sendbuf, 0);

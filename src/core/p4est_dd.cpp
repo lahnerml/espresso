@@ -830,7 +830,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
     
     for (int d=0;d<3;++d) {
       cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
-      cell_hc[d] = dd.cell_size[d]*(double)(shell->coord[d] + 1);
+      cell_hc[d] = cell_lc[d] + dd.cell_size[d];
       if ((shell->boundary & (1<<(2*d)))) cell_lc[d] -= 0.5*ROUND_ERROR_PREC*box_l[d];
       if ((shell->boundary & (2<<(2*d)))) cell_hc[d] += 0.5*ROUND_ERROR_PREC*box_l[d];
     }
@@ -852,6 +852,24 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
       
       int nidx = neighbor_lut[z][y][x];
       if (nidx != -1) { // Particle p outside of cell i
+        // recalculate neighboring cell to prevent rounding errors
+        // If particle left local domain, check for correct ghost cell, thus without ROUND_ERROR_PREC
+        for (int d=0;d<3;++d) {
+          cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
+          cell_hc[d] = cell_lc[d] + dd.cell_size[d];
+        }
+        if (part->r.p[0] < cell_lc[0]) x = 0;
+        else if (part->r.p[0] >= cell_hc[0]) x = 2;
+        else x = 1;
+        if (part->r.p[1] < cell_lc[1]) y = 0;
+        else if (part->r.p[1] >= cell_hc[1]) y = 2;
+        else y = 1;
+        if (part->r.p[2] < cell_lc[2]) z = 0;
+        else if (part->r.p[2] >= cell_hc[2]) z = 2;
+        else z = 1;
+        
+        nidx = neighbor_lut[z][y][x];
+        // get neighbor cell
         nidx = shell->neighbor[nidx];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
           if (p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
@@ -887,30 +905,33 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
   }
 }
 //--------------------------------------------------------------------------------------------------
-static int dd_async_exchange_insert_particles(ParticleList *recvbuf) {
+static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_flag, int from) {
   // add all particle in a recvbuf to the local storage
   int dynsiz = 0;
 
   update_local_particles(recvbuf);
 
   for (int p = 0; p < recvbuf->n; ++p) {
+    double op[3] = {recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2]};
     fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
 
     dynsiz += recvbuf->part[p].bl.n;
 #ifdef EXCLUSIONS
     dynsiz += recvbuf->part[p].el.n;
 #endif
-  }
+  //}
   // Fold direction of dd_append_particles unused.
   
-  for (int p=0;p<recvbuf->n;++p) {
+  //for (int p=0;p<recvbuf->n;++p) {
     Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p);
     if (target) {
       append_indexed_particle(target, &recvbuf->part[p]);
     } else {
-      fprintf(stderr, "%i received remote particle out of domain\n\t%i : %lfx%lfx%lf %li %i\n", this_node, this_node,
+      fprintf(stderr, "proc %i received remote particle p%i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n", 
+        this_node, recvbuf->part[p].p.identity, global_flag, from,
         recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2], 
-        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p));
+        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p),
+        op[0], op[1], op[2]);
       errexit();
     }
   }
@@ -1027,7 +1048,7 @@ void dd_p4est_exchange_and_sort_particles() {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
       // Add new particles to local storage
-      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
+      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
       if (dyndatasiz > 0) { // If there is dynamic data, invoke recv thread for that as well
         recvbuf_dyn[recvidx].resize(dyndatasiz);
         MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, comm_cart, &rreq[recvidx]);
@@ -1130,7 +1151,7 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
     } else if (recvs[recvidx] == 1) {
       // Particles received
       recvbuf[recvidx].n = nrecvpart[recvidx];
-      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx]);
+      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx], 1, source);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
         MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);

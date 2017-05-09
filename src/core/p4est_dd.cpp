@@ -908,10 +908,10 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf) {
     if (target) {
       append_indexed_particle(target, &recvbuf->part[p]);
     } else {
-      runtimeErrorMsg() << this_node << " received remote particle out of domain";
-      fprintf(stderr, "\t%i : %lfx%lfx%lf %li %i\n", this_node,
+      fprintf(stderr, "%i received remote particle out of domain\n\t%i : %lfx%lfx%lf %li %i\n", this_node, this_node,
         recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2], 
         dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p));
+      errexit();
     }
   }
 
@@ -1088,7 +1088,8 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
       int rank = dd_p4est_pos_to_proc(part->r.p);
       if (rank != this_node) { // It is actually a remote particle -> copy all data to sendbuffer
         if (rank > n_nodes || rank < 0) {
-          runtimeErrorMsg() << "process " << rank << "invalid";
+          fprintf(stderr,"process %i invalid\n", rank);
+          errexit();
         }
         sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->bl.e, part->bl.e + part->bl.n);
 #ifdef EXCLUSIONS

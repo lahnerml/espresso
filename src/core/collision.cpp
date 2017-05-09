@@ -556,100 +556,82 @@ void three_particle_binding_full_search()
 }
 
 
+// Do not call this method for particles p1(!) in ghost cells.
+// This method searches the full shell neighborhood of p1's cell
+// which is not available for ghost particles.
+// Also position-to-cell mappings do NOT work for ghost particles.
+// Note that p2, however, is allowed to be a ghost particle.
+static void
+three_particle_binding_dd_do_search(Particle *p1, Particle *p2)
+{
+    int cellidx = dd_position_to_cell(p1->r.p) - &cells[0];
+
+    if (cellidx < 0) {
+        fprintf(stderr, "box size %lfx%lfx%lf\n", box_l[0], box_l[1], box_l[2]);
+        fprintf(stderr, "%i : dd_position_to_cell returned NULL\n\t%i : p%lu (%lfx%lfx%lf)\n\t%i : p%lu (%lfx%lfx%lf)\n", this_node,
+                (size_t)dd_position_to_cell(p1->r.p) != 0,(size_t)p1->p.identity,p1->r.p[0],p1->r.p[1],p1->r.p[2],
+                (size_t)dd_position_to_cell(p2->r.p) != 0,(size_t)p2->p.identity,p2->r.p[0],p2->r.p[1],p2->r.p[2]);
+        if (p1->r.p[0] > box_l[0] || p1->r.p[0] < 0)
+            fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+        else if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
+            fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+        else if (p1->r.p[2] > box_l[2] || p1->r.p[2] < 0)
+            fprintf(stderr, "crtic part p%i\n", p1->p.identity);
+
+        if (p2->r.p[0] > box_l[0] || p2->r.p[0] < 0)
+            fprintf(stderr, "crtic part p%i\n", p2->p.identity);
+        else if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
+            fprintf(stderr, "crtic part p%i\n", p2->p.identity);
+        else if (p2->r.p[2] > box_l[2] || p2->r.p[2] < 0)
+            fprintf(stderr, "crtic part p%i\n", p2->p.identity);
+        errexit();
+    }
+
+    for (int i = 0; i < 27; ++i) {
+        int neighidx = dd_p4est_full_shell_neigh(cellidx, i);
+        Cell* cell = cells + neighidx;
+
+        // Iterate over particles in this cell
+        for(int a = 0; a < cell->n; a++) {
+            Particle* P = &cell->part[a];
+
+            if ((P->p.identity == p1->p.identity)
+                || (P->p.identity == p2->p.identity))
+                continue;
+
+            // We need all cyclical permutations, here
+            // (bond is placed on 1st particle, order of bond partners
+            // does not matter, so we don't need non-cyclic permutations):
+            if (!P->l.ghost)
+                coldet_do_three_particle_bond(P,p1,p2);
+
+            if (!p1->l.ghost)
+                coldet_do_three_particle_bond(p1,P,p2);
+
+            if (!p2->l.ghost)
+                coldet_do_three_particle_bond(p2,P,p1);
+        }
+    }
+}
+
 // Goes through the collision queue and for each pair in it
 // looks for a third particle by using the domain decomposition
 // cell system. If found, it performs three particle binding
 void three_particle_binding_domain_decomposition()
 {
-  // We have domain decomposition
-    
-  // Indices of the cells in which the colliding particles reside
-  int collcellidx[2];
-    
-  // Iterate over collision queue
+    for (int i = 0;i < total_collisions; i++) {
+        Particle *p1 = local_particles[gathered_queue[i].pp1];
+        Particle *p2 = local_particles[gathered_queue[i].pp2];
 
-  for (int id=0;id<total_collisions;id++) {
+        if (p1 == NULL || p2 == NULL)
+            continue;
 
-      // Get first cell Idx
-      if ((local_particles[gathered_queue[id].pp1] != NULL) && (local_particles[gathered_queue[id].pp2] != NULL)) {
-
-        Particle* p1=local_particles[gathered_queue[id].pp1];
-        Particle* p2=local_particles[gathered_queue[id].pp2];
-        collcellidx[0] = dd_position_to_cell(p1->r.p) - &cells[0];
-        collcellidx[1] = dd_position_to_cell(p2->r.p) - &cells[0];
-
-        if (collcellidx[0] < 0 || collcellidx[1] < 0) {
-            fprintf(stderr, "box size %lfx%lfx%lf\n", box_l[0], box_l[1], box_l[2]);
-            fprintf(stderr, "%i : dd_position_to_cell returned NULL\n\t%i : p%lu (%lfx%lfx%lf)\n\t%i : p%lu (%lfx%lfx%lf)\n", this_node,
-            (size_t)dd_position_to_cell(p1->r.p) != 0,(size_t)p1->p.identity,p1->r.p[0],p1->r.p[1],p1->r.p[2],
-            (size_t)dd_position_to_cell(p2->r.p) != 0,(size_t)p2->p.identity,p2->r.p[0],p2->r.p[1],p2->r.p[2]);
-            if (p1->r.p[0] > box_l[0] || p1->r.p[0] < 0)
-              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
-            else if (p1->r.p[1] > box_l[1] || p1->r.p[1] < 0)
-              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
-            else if (p1->r.p[2] > box_l[2] || p1->r.p[2] < 0)
-              fprintf(stderr, "crtic part p%i\n", p1->p.identity);
-              
-            if (p2->r.p[0] > box_l[0] || p2->r.p[0] < 0)
-              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
-            else if (p2->r.p[1] > box_l[1] || p2->r.p[1] < 0)
-              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
-            else if (p2->r.p[2] > box_l[2] || p2->r.p[2] < 0)
-              fprintf(stderr, "crtic part p%i\n", p2->p.identity);
-            errexit();
-        }
-
-        // Iterate over the cells + their neighbors
-        // if p1 and p2 are in the same cell, we don't need to consider it 2x
-        int lim=1;
-
-        if (collcellidx[0] == collcellidx[1])
-          lim=0; // Only consider the 1st cell
-
-        for (int j=0;j<=lim;j++) {
-
-            // Iterate the cell with indices cellIdx[j][] and all its neighbors.
-            // code taken from dd_init_cell_interactions()
-            for (int i = 0; i < 27; ++i) {
-                int ind2 = dd_p4est_full_shell_neigh(collcellidx[j], i);
-	        Cell* cell = cells + ind2;
-
-	                   // Iterate over particles in this cell
-                     for(int a=0; a<cell->n; a++) {
-                        Particle* P=&cell->part[a];
-                        // for all p:
-  	                      // Check, whether p is equal to one of the particles in the
-  	                      // collision. If so, skip
-  	                      if ((P->p.identity ==p1->p.identity) || (P->p.identity == p2->p.identity)) {
-                          //TRACE(printf("same particle\n"));
-  		                continue;
-  	                      }
-
-                        // The following checks, 
-                        // if the particle p is closer that the cutoff from p1 and/or p2.
-                        // If yes, three particle bonds are created on all particles
-  	                      // which have two other particles within the cutoff distance,
-                        // unless such a bond already exists
-
-  	                      // We need all cyclical permutations, here 
-                        // (bond is placed on 1st particle, order of bond partners
-  	                      // does not matter, so we don't need non-cyclic permutations):
-
-                        if (!P->l.ghost)
-                            coldet_do_three_particle_bond(P,p1,p2);
-
-                        coldet_do_three_particle_bond(p1,P,p2);
-  	                coldet_do_three_particle_bond(p2,P,p1);
-
-                     } // loop over particles in this cell
-
-	                } // Loop over cell
-
-        } // Loop over particles if they are in different cells
-    
-      } // If local particles exist
-
-  } // Loop over total collisions
+        if (!p1->l.ghost)
+            three_particle_binding_dd_do_search(p1, p2);
+        if (!p2->l.ghost &&
+            dd_position_to_cell(p1->r.p) != dd_position_to_cell(p2->r.p))
+                three_particle_binding_dd_do_search(p2, p1);
+    }
 }
 
 

@@ -1169,9 +1169,8 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 // Maps a position to the cartesian grid and returns the morton index of this coordinates
 // Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
-  double pfold[3];
-  int im[3];
-  pfold[0] = pos[0]; pfold[1] = pos[1]; pfold[2] = pos[2];
+  double pfold[3] = {pos[0], pos[1], pos[2]};
+  int im[3] = {0, 0, 0}; /* dummy */
   fold_position(pfold, im);
   for (int d=0;d<3;++d) {
     double errmar = 0.5*ROUND_ERROR_PREC * box_l[d];
@@ -1191,12 +1190,12 @@ int dd_p4est_pos_to_proc(double pos[3]) {
   // Note: Since p4est_space_idx is a ordered list, it is possible to do a binary search here.
   // Doing so would reduce the complexity from O(N) to O(log(N))
   if (idx >= 0) {
-    for (int i=1;i<=n_nodes;++i) {
+    for (int i = 1; i <= n_nodes; ++i) {
       // compare the first cell of a process with this cell
       if (p4est_space_idx[i] > idx) return i - 1;
     }
   }
-  fprintf(stderr, "position %lfx%lfx%lf not in boxl\n", pos[0], pos[1], pos[2]);
+  fprintf(stderr, "Could not resolve the proc of particle %lf %lf %lf\n", pos[0], pos[1], pos[2]);
   errexit();
 }
 //--------------------------------------------------------------------------------------------------

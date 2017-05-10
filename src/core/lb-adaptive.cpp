@@ -548,9 +548,9 @@ int lbadapt_get_global_maxlevel() {
 #ifdef LB_ADAPTIVE_GPU
 void lbadapt_patches_populate_halos(int level) {
   // clang-format off
-  const int inv[] = {0,
-                     2,  1,  4,  3,  6,  5,
-                     8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+    const int inv[] = { 0,
+                        2,  1,  4,  3,  6,  5,
+                        8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
   lbadapt_payload_t *data, *neighbor_data;
   int status = 0;
@@ -1550,9 +1550,9 @@ int lbadapt_calc_n_from_modes_push(p8est_meshiter_t *mesh_iter) {
 #ifdef D3Q19
   /* index of inverse velocity vector, 0 is inverse to itself. */
   // clang-format off
-  int inv[] = {0,
-               2,  1,  4,  3,  6,  5,
-               8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  int inv[] = { 0,
+                2,  1,  4,  3,  6,  5,
+                8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
 
   /**************************************************/
@@ -1855,9 +1855,9 @@ void lbadapt_bounce_back(int level) {
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
-  const int inv[] = {0,
-                     2,  1,  4,  3,  6,  5,
-                     8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17};
+  const int inv[] = { 0,
+                      2,  1,  4,  3,  6,  5,
+                      8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
 
   p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(

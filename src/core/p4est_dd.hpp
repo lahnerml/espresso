@@ -64,4 +64,6 @@ void dd_p4est_write_vtk();
 void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn);
 #endif
 
+void p4est_dd_repartition(const std::string& desc, bool debug);
+
 #endif

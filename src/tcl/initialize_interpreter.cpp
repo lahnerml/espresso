@@ -278,6 +278,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
 #if defined(SCAFACOS) and defined(ELECTROSTATICS)
   REGISTER_COMMAND("scafacos_methods", tclcommand_scafacos_methods);
 #endif
+  REGISTER_COMMAND("repart", tclcommand_repart);
 }
 
 static void tcl_register_global_variables(Tcl_Interp *interp)

@@ -197,7 +197,8 @@ static int terminated = 0;
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_dd_p4est_write_particle_vtk)                                          \
-  CB(mpi_lbadapt_grid_reset)
+  CB(mpi_lbadapt_grid_reset)                                                   \
+  CB(mpi_p4est_repart_slave)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -3678,3 +3679,27 @@ void mpi_dd_p4est_write_particle_vtk(int node, int len) {
   dd_p4est_write_particle_vtk(filename);
 #endif
 }
+
+void mpi_p4est_repart_slave(int dummy, int len);
+
+void mpi_p4est_repart(std::string desc, int debug) {
+    std::size_t len = desc.size();
+    if (len > std::numeric_limits<int>::max()) {
+        std::cerr << "Repart command too long." << std::endl;
+        errexit();
+    }
+    int strl = len + 1;
+    mpi_call(mpi_p4est_repart_slave, -1, strl);
+    MPI_Bcast((void *) desc.c_str(), strl, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast((void *) &debug, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    p4est_dd_repartition(desc, debug);
+}
+
+void mpi_p4est_repart_slave(int dummy, int strl) {
+    auto desc = std::unique_ptr<char[]>(new char[strl]);
+    int debug;
+    MPI_Bcast((void *) desc.get(), strl, MPI_CHAR, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&debug, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    p4est_dd_repartition(desc.get(), debug);
+}
+

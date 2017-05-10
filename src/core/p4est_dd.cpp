@@ -14,6 +14,8 @@
 #include <p8est_bits.h>
 #include <p8est_algorithms.h>
 #include <vector>
+#include <chrono>
+#include <boost/iterator/iterator_facade.hpp>
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
@@ -60,6 +62,10 @@ typedef struct {
   int ishell[26]; // local or ghost index of fullshell in p4est
   int rshell[26]; // rank of fullshell cells
 } quad_data_t;
+//--------------------------------------------------------------------------------------------------
+// Datastructure for partitioning holding the number of quads per process
+// Empty as long as tclcommand_repart has not been called.
+static std::vector<p4est_locidx_t> part_nquads;
 //--------------------------------------------------------------------------------------------------
 int dd_p4est_full_shell_neigh(int cell, int neighidx)
 {
@@ -213,7 +219,13 @@ void dd_p4est_create_grid () {
                                              PERIODIC(0), PERIODIC(1), PERIODIC(2));
   p4est = p4est_new_ext (comm_cart, p4est_conn, 0, grid_level, true, 
                          sizeof(quad_data_t), init_fn, NULL);
-  p4est_partition(p4est, 0, NULL);
+  // Repartition uniformly if part_nquads is empty (because not repart has been
+  // done yet). Else use part_nquads as given partitioning.
+  if (part_nquads.size() == 0)
+    p4est_partition(p4est, 0, NULL);
+  else
+    p4est_partition_given(p4est, part_nquads.data());
+
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
   p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
   
@@ -1429,5 +1441,230 @@ void dd_p4est_write_vtk() {
   }
   fclose(h);*/
 }
+
+
 //--------------------------------------------------------------------------------------------------
+// Purely MD Repartitioning functions follow now.
+//-------------------------------------------------------------------------------------------------
+static void
+print_cell_info(const std::string& prefix, const std::string& method)
+{
+  int nc = local_cells.n;
+  int npart = std::accumulate(local_cells.cell,
+                              local_cells.cell + nc,
+                              0,
+                              [](int acc, Cell* c) { return acc + c->n; });
+
+  int pmax, pmin, cmax, cmin;
+  MPI_Reduce(&npart, &pmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
+  MPI_Reduce(&npart, &pmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
+  MPI_Reduce(&nc, &cmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
+  MPI_Reduce(&nc, &cmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
+
+  if (this_node == 0)
+    printf("%s (%s): #Particle (#Cells) max: %i (%i), min: %i (%i)\n",
+           prefix.c_str(), method.c_str(), pmax, cmax, pmin, cmin);
+}
+//--------------------------------------------------------------------------------------------------
+// Metric has to hold num_local_cells many elements.
+// Fills the global std::vector repart_nquads to be used by the next
+// cellsystem re-init in conjunction with p4est_partition_given.
+static void
+repart_calc_nquads(const std::vector<int>& metric, bool debug)
+{
+  if (!metric.size() == num_local_cells) {
+    std::cerr << "Error in provided metric: too few elements." << std::endl;
+    part_nquads.clear();
+    return;
+  }
+
+  part_nquads.resize(n_nodes);
+  std::fill(part_nquads.begin(), part_nquads.end(),
+            static_cast<p4est_locidx_t>(0));
+  // Determine prefix and target load
+  int64_t localsum = std::accumulate(metric.begin(), metric.end(),
+                                     static_cast<int64_t>(0));
+  int64_t sum, prefix = 0; // Initialization is necessary on rank 0!
+  MPI_Allreduce(&localsum, &sum, 1, MPI_INT64_T, MPI_SUM, comm_cart);
+  MPI_Exscan(&localsum, &prefix, 1, MPI_INT64_T, MPI_SUM, comm_cart);
+  int64_t target = sum / n_nodes;
+
+  if (debug) {
+    printf("[%i] NCells: %zu\n", this_node, num_local_cells);
+    printf("[%i] Local : %li\n", this_node, localsum);
+    printf("[%i] Global: %li\n", this_node, sum);
+    printf("[%i] Target: %li\n", this_node, target);
+    printf("[%i] Prefix: %li\n", this_node, prefix);
+  }
+
+  // Determine new process boundaries in local subdomain
+  // Evaluated for its side effect of setting part_nquads.
+  std::accumulate(metric.begin(), metric.end(),
+                  prefix,
+                  [target](int64_t cellpref, int met_i) {
+                    int proc = std::min<int>(cellpref / target, n_nodes - 1);
+                    part_nquads[proc]++;
+                    return cellpref + met_i;
+                  });
+
+  MPI_Allreduce(MPI_IN_PLACE, part_nquads.data(), n_nodes,
+                P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
+
+  if (debug) {
+    printf("[%i] Nquads: %i\n", this_node, part_nquads[this_node]);
+
+    if (this_node == 0) {
+      p4est_gloidx_t totnquads = std::accumulate(part_nquads.begin(),
+                                                 part_nquads.end(),
+                                                 static_cast<p4est_gloidx_t>(0));
+      if (p4est->global_num_quadrants != totnquads) {
+        fprintf(stderr,
+                "[%i] ERROR: totnquads = %li but global_num_quadrants = %li\n",
+                this_node, totnquads, p4est->global_num_quadrants);
+        errexit();
+      }
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------
+// Fills metric with a constant.
+static void
+metric_ncells(std::vector<int>& metric)
+{
+  std::fill(metric.begin(), metric.end(), 1);
+}
+
+// Fills metric with the number of particles per cell.
+static void
+metric_npart(std::vector<int>& metric)
+{
+  std::transform(local_cells.cell,
+                 local_cells.cell + std::distance(metric.begin(), metric.end()),
+                 metric.begin(),
+                 [](const Cell *c) { return c->n; });
+}
+
+// Iterator for iterating over integers (enumerating things while using
+// std::transform)
+class IotaIter
+  : public boost::iterator_facade<IotaIter,
+                                  const int,
+                                  boost::forward_traversal_tag>
+{
+ public:
+    IotaIter(): i(0) {}
+    IotaIter(int i): i(i) {}
+    IotaIter(const IotaIter& other): i(other.i) {}
+
+ private:
+    int i;
+    friend class boost::iterator_core_access;
+
+    void increment() { i++; }
+    bool equal(const IotaIter& other) const { return i == other.i; }
+    const int& dereference() const { return i; }
+};
+
+// Fills metric with the number of distance pairs per cell.
+static void
+metric_ndistpairs(std::vector<int>& metric)
+{
+  // Cell number can't be easily deduced from a copied Cell*/**
+  // Therefore, we use std::transform with two input iterators
+  // and one is an IotaIter.
+  std::transform(local_cells.cell,
+                 local_cells.cell
+                   + std::distance(metric.begin(), metric.end()),
+                 IotaIter(),
+                 metric.begin(),
+                 [](Cell* c, int i) {
+                   // #Particles in neighborhood shell
+                   int nnp = std::accumulate(dd.cell_inter[i].nList,
+                                             dd.cell_inter[i].nList
+                                               + dd.cell_inter[i].n_neighbors,
+                                             0,
+                                             [](int acc,
+                                                const IA_Neighbor& neigh){
+                                               return acc + neigh.pList->n;
+                                             });
+                   return c->n * nnp;
+                 });
+}
+
+static void
+metric_runtime(std::vector<int>& metric)
+{
+  // TODO: Copy linked-cell implementation and measure runtimes.
+  //       Possibly over several time steps, since one iteration might be
+  //       ridiculously cheap.
+  //       There is already a LC function with timing, possibly use this one
+  //       since afair it does not update the particles.
+  std::cerr << "Repart metric 'runtime' not implemented yet." << std::endl;
+  errexit();
+}
+
+// Generator for random integers
+struct Randintgen {
+  Randintgen():
+    mt(std::chrono::high_resolution_clock::now().time_since_epoch().count()),
+    d(1, 1000) {}
+  Randintgen(Randintgen&& other): mt(std::move(other.mt)),
+                                  d(std::move(other.d)) {}
+  int operator()() { return d(mt); }
+private:
+  std::mt19937 mt;
+  std::uniform_int_distribution<int> d;
+};
+
+// Fills metric with random integers
+static void
+metric_rand(std::vector<int>& metric)
+{
+  std::generate(metric.begin(), metric.end(), Randintgen());
+}
+//--------------------------------------------------------------------------------------------------
+// Get the appropriate metric function described in string "desc".
+static std::function<void(std::vector<int>&)>
+p4est_dd_get_metric_func(const std::string& desc)
+{
+  using repart_func = std::function<void(std::vector<int>&)>;
+  static const std::vector<std::pair<std::string, repart_func>> mets = {
+    { "ncells"    , metric_ncells },
+    { "npart"     , metric_npart },
+    { "ndistpairs", metric_ndistpairs },
+    { "runtime"   , metric_runtime },
+    { "rand"      , metric_rand }
+  };
+
+  for (const auto& t: mets) {
+    if (desc == std::get<0>(t)) {
+      return std::get<1>(t);
+    }
+  }
+
+  if (this_node == 0)
+    std::cerr << "No such rebalancing method: " << desc << std::endl;
+  errexit();
+}
+//--------------------------------------------------------------------------------------------------
+// Repartition the MD grd:
+// Evaluate metric and set part_nquads global vector to be used by a
+// reinit of the cellsystem. Afterwards, directly reinits the cellsystem.
+void
+p4est_dd_repartition(const std::string& desc, bool debug)
+{
+  if (desc == "statistics") {
+    print_cell_info("!>>> Statistics", "none");
+    return;
+  }
+
+  std::vector<int> metric(num_local_cells);
+  p4est_dd_get_metric_func(desc)(metric);
+  repart_calc_nquads(metric, debug);
+
+  print_cell_info("!>>> Before Repart", desc);
+  cells_re_init(CELL_STRUCTURE_CURRENT);
+  print_cell_info("!>>> After Repart", desc);
+}
+
 #endif

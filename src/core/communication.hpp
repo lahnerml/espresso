@@ -740,6 +740,8 @@ void mpi_thermalize_cpu(int temp);
  */
 void mpi_mpiio(const char *filename, unsigned fields, int write);
 
+void mpi_p4est_repart(std::string desc, int debug);
+
 /*@}*/
 
 /** \name Event codes for \ref mpi_bcast_event

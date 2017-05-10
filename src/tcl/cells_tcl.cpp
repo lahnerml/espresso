@@ -99,3 +99,14 @@ int tclcommand_cellsystem(ClientData data, Tcl_Interp *interp,
   return gather_runtime_errors(interp, TCL_OK);
 }
 
+int tclcommand_repart(ClientData data, Tcl_Interp *interp,
+              int argc, char **argv)
+{
+  if (argc < 2) {
+    Tcl_AppendResult(interp, "usage: repart <how> [debug]", (char *)NULL);
+    return TCL_ERROR;
+  }
+  mpi_p4est_repart(argv[1], argc > 2 && ARG_IS_S(2, "debug"));
+  return TCL_OK;
+}
+

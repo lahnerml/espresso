@@ -1766,8 +1766,6 @@ void lbadapt_bounce_back(int level) {
 #ifdef D3Q19
 #ifndef PULL
       lb_float population_shift;
-      lb_float local_post_collision_populations[19];
-      lb_float local_modes[19];
 
       if (currCellData->lbfields.boundary) {
         currCellData->lbfluid[1][0] = 0.0;
@@ -1863,14 +1861,6 @@ void lbadapt_bounce_back(int level) {
           } // if (!mesh_iter->neighbor_is_ghost && currCellData->boundary)
 
           // case 2
-              std::memcpy(local_modes, currCellData->modes,
-                          lbmodel.n_veloc * sizeof(lb_float));
-              // No need to weigh modes again as this already happened in the
-              // streaming step
-              for (int i = 0; i < lbmodel.n_veloc; ++i) {
-                local_post_collision_populations[i] =
-                    lbadapt_backTransformation(local_modes, i) * lbmodel.w[i];
-              }
           else if (mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
             if (!currCellData->lbfields.boundary) {
               // calculate population shift
@@ -1884,8 +1874,7 @@ void lbadapt_bounce_back(int level) {
               }
 
               currCellData->lbfluid[1][dir_ESPR] =
-                  local_post_collision_populations[inv[dir_ESPR]] +
-                  population_shift;
+                  currCellData->lbfluid[0][inv[dir_ESPR]] + population_shift;
             } else {
               currCellData->lbfluid[1][dir_ESPR] = 0.0;
             }

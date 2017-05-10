@@ -3232,20 +3232,28 @@ inline void lb_collide_stream() {
    */
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
-  /** TODO: prevent overlap in n_lbsteps
-   */
-  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
-    // level always relates to level of real cells
-    lvl_diff = lbpar.max_refinement_level - level;
+  bool hide_communication = false;
 
+  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+    lvl_diff = lbpar.max_refinement_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
-      lbadapt_collide(level);
-      lbadapt_populate_virtuals(level);
+      if (hide_communication) {
+      // level always relates to level of real cells
+        lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
+        // TODO add .._exchange_data_end here
+        lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
+      }
+      else {
+        lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
+      }
     }
   }
 
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
+  // prevent overflow
+  // TODO Mark grid alteration
+  n_lbsteps %= (1 << (lbpar.max_refinement_level - lbpar.base_level));
 
   // perform second half of subcycling here (process fine before coarse)
   // TODO: which max refinement level is needed?

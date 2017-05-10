@@ -284,12 +284,14 @@ int lbadapt_apply_forces(lb_float *mode, lb_float *force, lb_float h);
  */
 int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m);
 
-/** collision
- * CAUTION: sync ghost data after collision
+/** collision, virtual quadrants are automatically populated if current quadrant
+ * has virtual children, i.e. is adjacent to a refinement boundary
  *
- * \param [in] level   The level on which to perform the collision step
+ * \param [in] level             The level on which to perform the collision
+ *                               step
+ * \param [in] quads_to_collide  Which quads to collide: local, ghost, or both
  */
-void lbadapt_collide(int level);
+void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
 
 /** Populate virtual cells with post-collision values from their respective
  * father cell

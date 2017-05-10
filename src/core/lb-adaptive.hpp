@@ -131,7 +131,7 @@ void lbadapt_patches_populate_halos(int level);
  *                               1 for refinement, 8 for coarsening.
  * \param [in]      outgoing     The actual quadrants that will be replaced.
  * \param [in]      num_incoming The number of quadarants that will be added.
- * \param [in][out] incoming     Quadrants whose data needs to be initialized.
+ * \param [in,out]  incoming     Quadrants whose data needs to be initialized.
  */
 void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
                            int num_outgoing, p8est_quadrant_t *outgoing[],
@@ -142,7 +142,7 @@ void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  * @returns quadrants weight according to subcycling
  */
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
@@ -171,7 +171,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q);
@@ -181,7 +181,7 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q);
@@ -191,7 +191,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                          p8est_quadrant_t *q);
@@ -238,7 +238,7 @@ void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *
- * \param [in][out] datafield  The fluid node that shall be written.
+ * \param [in,out]  datafield  The fluid node that shall be written.
  * \param [in]      rho        The fluids density.
  * \param [in]      j          The fluids velocity.
  * \param [in]      pi         The fluids stress tensor.
@@ -257,7 +257,7 @@ int lbadapt_calc_modes(lb_float populations[2][19], lb_float *mode);
 
 /** Perform MRT Relaxation step
  *
- * \param [in][out] mode  kinematic modes of the fluid.
+ * \param [in,out]  mode  kinematic modes of the fluid.
  * \param [in]      force Force that is applied on the fluid.
  * \param [in]      h     Meshwidth of current cell
  */
@@ -265,13 +265,13 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h);
 
 /** Thermalize modes
  *
- * \param [in][out] mode  The modes to be thermalized.
+ * \param [in,out]  mode  The modes to be thermalized.
  */
 int lbadapt_relax_modes(lb_float *mode);
 
 /** Apply force on fluid.
  *
- * \param [in][out] mode  The modes that the force is applied on.
+ * \param [in,out]  mode  The modes that the force is applied on.
  * \param [in]      force The force that is applied.
  * \param [in]      h     The local mesh width.
  */

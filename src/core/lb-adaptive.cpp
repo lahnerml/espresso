@@ -2163,15 +2163,9 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
                                   data->lbfields.boundary,
                                   data->lbfields.has_force, h, &rho, j, NULL);
 
-#if 1
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
         j[2] = j[2] / rho * h_max / lbpar.tau;
-#else  // 0
-        j[0] = j[0] / rho * h / lbpar.tau;
-        j[1] = j[1] / rho * h / lbpar.tau;
-        j[2] = j[2] / rho * h / lbpar.tau;
-#endif // 0
 
         veloc_ptr = (lb_float *)sc_array_index(
             velocity_values, P8EST_DIM * mesh_iter->current_qid);

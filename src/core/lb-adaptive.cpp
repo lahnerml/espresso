@@ -297,7 +297,7 @@ void lbadapt_init() {
           data = &lbadapt_ghost_data[lvl][p8est_meshiter_get_current_storage_id(
               mesh_iter)];
         }
-        data->boundary = 0;
+        data->lbfields.boundary = 0;
 #ifndef LB_ADAPTIVE_GPU
         init_to_zero(data);
 #else  // LB_ADAPTIVE_GPU
@@ -452,7 +452,7 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_ADAPTIVE_GPU
 
 #ifdef LB_BOUNDARIES
-        data->boundary = 0;
+        data->lbfields.boundary = 0;
 #endif // LB_BOUNDARIES
       }
     }
@@ -1731,7 +1731,7 @@ void lbadapt_collide(int level) {
         has_virtuals = mesh_iter->mesh->virtual_qflags[mesh_iter->current_qid];
       }
 #ifdef LB_BOUNDARIES
-      if (!data->boundary)
+      if (!data->lbfields.boundary)
 #endif // LB_BOUNDARIES
       {
         /* calculate modes locally */
@@ -1816,12 +1816,12 @@ void lbadapt_stream(int level) {
       data =
           &lbadapt_local_data[lvl]
                              [p8est_meshiter_get_current_storage_id(mesh_iter)];
-      if (!data->boundary) {
         if (mesh_iter->current_vid == -1) {
           lbadapt_calc_n_from_modes_push(mesh_iter);
         } else {
           lbadapt_pass_populations(mesh_iter);
         }
+      if (!data->lbfields.boundary) {
       }
     }
   }
@@ -1867,7 +1867,7 @@ void lbadapt_bounce_back(int level) {
       lb_float local_post_collision_populations[19];
       lb_float local_modes[19];
 
-      if (currCellData->boundary) {
+      if (currCellData->lbfields.boundary) {
         currCellData->lbfluid[1][0] = 0.0;
       }
 
@@ -1931,21 +1931,23 @@ void lbadapt_bounce_back(int level) {
           }
 
           // case 1
-          if (!mesh_iter->neighbor_is_ghost && currCellData->boundary) {
-            if (!data->boundary) {
+          if (!mesh_iter->neighbor_is_ghost &&
+              currCellData->lbfields.boundary) {
+            if (!data->lbfields.boundary) {
               // calculate population shift (velocity boundary condition)
               population_shift = 0;
               for (int l = 0; l < 3; ++l) {
                 population_shift -=
                     h_max * h_max * h_max * lbpar.rho[0] * 2 *
                     lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
-                    lb_boundaries[currCellData->boundary - 1].velocity[l] /
+                    lb_boundaries[currCellData->lbfields.boundary - 1]
+                        .velocity[l] /
                     lbmodel.c_sound_sq;
               }
 
               // sum up the force that the fluid applies on the boundary
               for (int l = 0; l < 3; ++l) {
-                lb_boundaries[currCellData->boundary - 1].force[l] +=
+                lb_boundaries[currCellData->lbfields.boundary - 1].force[l] +=
                     (2 * currCellData->lbfluid[1][dir_ESPR] +
                      population_shift) *
                     lbmodel.c[dir_ESPR][l];
@@ -1959,8 +1961,6 @@ void lbadapt_bounce_back(int level) {
           } // if (!mesh_iter->neighbor_is_ghost && currCellData->boundary)
 
           // case 2
-          else if (mesh_iter->neighbor_is_ghost && data->boundary) {
-            if (!currCellData->boundary) {
               std::memcpy(local_modes, currCellData->modes,
                           lbmodel.n_veloc * sizeof(lb_float));
               // No need to weigh modes again as this already happened in the
@@ -1969,13 +1969,15 @@ void lbadapt_bounce_back(int level) {
                 local_post_collision_populations[i] =
                     lbadapt_backTransformation(local_modes, i) * lbmodel.w[i];
               }
+          else if (mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
+            if (!currCellData->lbfields.boundary) {
               // calculate population shift
               population_shift = 0.;
               for (int l = 0; l < 3; l++) {
                 population_shift -=
                     h_max * h_max * h_max * lbpar.rho[0] * 2 *
                     lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
-                    lb_boundaries[data->boundary - 1].velocity[l] /
+                    lb_boundaries[data->lbfields.boundary - 1].velocity[l] /
                     lbmodel.c_sound_sq;
               }
 
@@ -2097,7 +2099,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
             mesh_iter)];
 #ifndef LB_ADAPTIVE_GPU
         /* just grab the value of each cell and pass it into solution vector */
-        bnd = data->boundary;
+        bnd = data->lbfields.boundary;
         bnd_ptr =
             (double *)sc_array_index(boundary_values, mesh_iter->current_qid);
         *bnd_ptr = bnd;
@@ -2156,7 +2158,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
         double avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
 #ifndef LB_ADAPTIVE_GPU
-        if (data->boundary) {
+        if (data->lbfields.boundary) {
           dens = 0;
         } else {
           // clang-format off
@@ -2357,7 +2359,7 @@ void lbadapt_get_boundary_status() {
         double midpoint[3];
         lbadapt_get_midpoint(mesh_iter, midpoint);
 
-        data->boundary = lbadapt_is_boundary(midpoint);
+        data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
         lbadapt_get_front_lower_left(mesh_iter, xyz_quad);
         bool all_boundary = true;
@@ -2519,7 +2521,7 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
 
   /* just grab the u value of each cell and pass it into solution vector
    */
-  bnd = data->boundary;
+  bnd = data->lbfields.boundary;
   bnd_vals[arrayoffset] = bnd;
 #endif // LB_ADAPTIVE_GPU
 }
@@ -2536,7 +2538,7 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
          << "; coords: " << (q->x / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->y / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->z / (1 << (P8EST_MAXLEVEL - q->level)))
-         << "; boundary: " << data->boundary << std::endl
+         << "; boundary: " << data->lbfields.boundary << std::endl
          << " - distributions: pre streaming: ";
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[0][i] << " - ";

@@ -262,7 +262,6 @@ extern LB_FluidNode *lbfields;
 #else // LB_ADAPTIVE
 /** adaptive payload cpu */
 typedef struct lbadapt_payload {
-  int boundary;
   lb_float lbfluid[2][19];
   LB_FluidNode lbfields;
 } lbadapt_payload_t;

@@ -294,10 +294,16 @@ void lbadapt_collide(int level);
 /** Populate virtual cells with post-collision values from their respective
  * father cell
  *
- * \param [in] level   The level of the real cells whose virtual subcells are
- *                     populated.
+ * \param [in] mesh_iter           The currently used mesh-based iterator
+ * \param [in] source_populations  The post-collision populations of host cell
+ *                                 that is to be copied to its 8 virtual
+ *                                 subquadrants.
+ * \param [in] source_boundary     The boundary value set in host cell that is
+ *                                 copied to each virtual subquadrant.
  */
-void lbadapt_populate_virtuals(int level);
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
+                               lb_float source_populations[2][19],
+                               int source_boundary);
 
 /** streaming
  * CAUTION: sync ghost data before streaming

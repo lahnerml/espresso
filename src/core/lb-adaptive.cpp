@@ -200,7 +200,6 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
   for (int i = 0; i < lbmodel.n_veloc; i++) {
     data->lbfluid[0][i] = 0.;
     data->lbfluid[1][i] = 0.;
-    data->modes[i] = 0.;
   }
 
 #ifndef LB_ADAPTIVE_GPU
@@ -1710,10 +1709,12 @@ void lbadapt_collide(int level) {
 #endif // LB_ADAPTIVE_GPU
 
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter =
-      p8est_meshiter_new_ext(p8est, lbadapt_ghost, lbadapt_mesh, level,
-                             P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST,
-                             P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
+  bool has_virtuals;
+
+  lb_float modes[lbmodel.n_veloc];
+  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+      p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+      quads_to_collide, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1722,33 +1723,43 @@ void lbadapt_collide(int level) {
         data = &lbadapt_ghost_data[level - coarsest_level_ghost]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
+        has_virtuals = mesh_iter->mesh->virtual_gflags[mesh_iter->current_qid];
       } else {
         data = &lbadapt_local_data[level - coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
+        has_virtuals = mesh_iter->mesh->virtual_qflags[mesh_iter->current_qid];
       }
 #ifdef LB_BOUNDARIES
       if (!data->boundary)
 #endif // LB_BOUNDARIES
       {
         /* calculate modes locally */
-        lbadapt_calc_modes(data->lbfluid, data->modes);
+        lbadapt_calc_modes(data->lbfluid, modes);
 
         /* deterministic collisions */
-        lbadapt_relax_modes(data->modes, data->lbfields.force, h);
+        lbadapt_relax_modes(modes, data->lbfields.force, h);
 
         /* fluctuating hydrodynamics */
-        if (fluct)
-          lbadapt_thermalize_modes(data->modes);
+        if (fluct) {
+          lbadapt_thermalize_modes(modes);
+        }
 
 /* apply forces */
 #ifdef EXTERNAL_FORCES
-        lbadapt_apply_forces(data->modes, data->lbfields.force, h);
+        lbadapt_apply_forces(modes, data->lbfields.force, h);
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
-        if (data->lbfields.has_force)
-          lbadapt_apply_forces(data->modes, &data->lbfields.force, h);
+        if (data->lbfields.has_force) {
+          lbadapt_apply_forces(modes, &data->lbfields.force, h);
+        }
 #endif // EXTERNAL_FORCES
+
+        lbadapt_calc_pop_from_modes(data->lbfluid[0], modes);
+      }
+      if (has_virtuals) {
+        lbadapt_populate_virtuals(mesh_iter, data->lbfluid,
+                                  data->lbfields.boundary);
       }
     }
   }
@@ -1756,58 +1767,36 @@ void lbadapt_collide(int level) {
 #endif // LB_ADAPTIVE_GPU
 }
 
-void lbadapt_populate_virtuals(int level) {
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
+                               lb_float source_populations[2][19],
+                               int source_boundary) {
 #ifndef LB_ADAPTIVE_GPU
-  int status = 0;
-  int current_sid;
-  int parent_sid;
-  lbadapt_payload_t *current_data, *parent_data;
-  int lvl;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
-      P8EST_TRAVERSE_PARBOUNDINNER);
+  int parent_qid = mesh_iter->current_qid;
+  int virtual_sid;
+  int lvl = 1 + mesh_iter->current_level;
+  lbadapt_payload_t *virtual_data;
 
-  while (status != P8EST_MESHITER_DONE) {
-    status = p8est_meshiter_next(mesh_iter);
-    // virtual quads are local if their parent is local, ghost analogous
-    if (status != P8EST_MESHITER_DONE) {
-      if (!mesh_iter->current_is_ghost) {
-        lvl = level - coarsest_level_local;
+  // virtual quads are local if their parent is local, ghost analogous
+  bool is_ghost = mesh_iter->current_is_ghost;
 
-        parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
-        current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
-
-        parent_data = &lbadapt_local_data[lvl][parent_sid];
-        current_data = &lbadapt_local_data[lvl + 1][current_sid];
-      } else {
-        lvl = level - coarsest_level_ghost;
-
-        parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
-        current_sid = p8est_meshiter_get_current_storage_id(mesh_iter);
-
-        parent_data = &lbadapt_ghost_data[lvl][parent_sid];
-        current_data = &lbadapt_ghost_data[lvl + 1][current_sid];
-      }
-      // copy payload from coarse cell
-      memcpy(current_data, parent_data, sizeof(lbadapt_payload_t));
-
-      // calculate post_collision populations from cell
-      for (int i = 0; i < lbmodel.n_veloc; ++i) {
-        current_data->modes[i] *= (1. / d3q19_modebase[19][i]);
-      }
-
-      for (int i = 0; i < lbmodel.n_veloc; ++i) {
-        current_data->lbfluid[0][i] =
-            lbadapt_backTransformation(current_data->modes, i) * lbmodel.w[i];
-      }
-
-      // synchronize pre- and post-collision values
-      memcpy(current_data->lbfluid[1], current_data->lbfluid[0],
-             lbmodel.n_veloc * sizeof(lb_float));
-    }
+  if (is_ghost) {
+    virtual_sid = mesh_iter->mesh->quad_gvirtual_offset[parent_qid];
+    lvl -= coarsest_level_ghost;
+    virtual_data = &lbadapt_ghost_data[lvl][virtual_sid];
+  } else {
+    virtual_sid = mesh_iter->mesh->quad_qvirtual_offset[parent_qid];
+    lvl -= coarsest_level_local;
+    virtual_data = &lbadapt_local_data[lvl][virtual_sid];
   }
-  p8est_meshiter_destroy(mesh_iter);
+  for (int i = 0; i < P8EST_CHILDREN; ++i) {
+    std::memcpy(virtual_data->lbfluid[0], source_populations[0],
+                lbmodel.n_veloc * sizeof(lb_float));
+    // std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
+    //            lbmodel.n_veloc * sizeof(lb_float));
+    // make sure that boundary is not occupied by some memory clutter
+    virtual_data->lbfields.boundary = source_boundary;
+    ++virtual_data;
+  }
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -2237,6 +2226,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   int level;
   double *veloc_ptr;
   lbadapt_payload_t *data;
+  double modes[19];
 
 #ifdef LB_ADAPTIVE_GPU
   int cells_per_patch =
@@ -2274,8 +2264,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_local_fields(data->lbfluid, data->modes,
-                                  data->lbfields.force, data->boundary,
+        lbadapt_calc_modes(data->lbfluid, modes);
+
+        lbadapt_calc_local_fields(data->lbfluid, modes, data->lbfields.force,
+                                  data->lbfields.boundary,
                                   data->lbfields.has_force, h, &rho, j, NULL);
 
 #if 1
@@ -2552,10 +2544,6 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
   myfile << std::endl << "post streaming: ";
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[1][i] << " - ";
-  }
-  myfile << std::endl << "modes: ";
-  for (int i = 0; i < 19; ++i) {
-    myfile << data->modes[i] << " - ";
   }
   myfile << std::endl << std::endl;
 

@@ -271,6 +271,8 @@ Cell *dd_save_position_to_cell(double pos[3]);
 
 /** Of every two communication rounds, set the first receivers to prefetch and poststore */
 void dd_assign_prefetches(GhostCommunicator *comm);
+
+void calc_link_cell_runtime(int nsteps, std::vector<double>& ts);
 /*@}*/
 
 #endif

@@ -1591,16 +1591,38 @@ metric_ndistpairs(std::vector<int>& metric)
                  });
 }
 
+template <typename T>
+struct Averager {
+    void operator()(T val) { sum += val; count++; }
+    T operator*() { return sum / count; }
+
+private:
+    T sum = T{0};
+    int count = 0;
+};
+
+template <typename T, typename It>
+T average(It first, It last)
+{
+    return *std::for_each(first, last, Averager<T>());
+}
+
+template <typename It>
+typename It::value_type average(It first, It last)
+{
+    return average<typename It::value_type>(first, last);
+}
+
 static void
 metric_runtime(std::vector<int>& metric)
 {
-  // TODO: Copy linked-cell implementation and measure runtimes.
-  //       Possibly over several time steps, since one iteration might be
-  //       ridiculously cheap.
-  //       There is already a LC function with timing, possibly use this one
-  //       since afair it does not update the particles.
-  std::cerr << "Repart metric 'runtime' not implemented yet." << std::endl;
-  errexit();
+    std::vector<double> ts(num_local_cells, 0.0);
+    calc_link_cell_runtime(10, ts);
+    // Factor to make entries larger than 1.
+    double f = 10.0 / average(ts.begin(), ts.end());
+    std::transform(ts.begin(), ts.end(),
+                   metric.begin(),
+                   [f](double d){return static_cast<int>(f * d);});
 }
 
 // Generator for random integers

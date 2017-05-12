@@ -1412,6 +1412,59 @@ void calc_link_cell() {
   rebuild_verletlist = 0;
 }
 
+static void __calc_link_cell_runtime(std::vector<double> ts) {
+  int c, np1, n, np2, i ,j, j_start;
+  Cell *cell;
+  IA_Neighbor *neighbor;
+  Particle *p1, *p2;
+  double dist2, vec21[3];
+
+  /* Loop local cells */
+  for (c = 0; c < local_cells.n; c++) {
+
+    cell = local_cells.cell[c];
+    p1   = cell->part;
+    np1  = cell->n;
+
+    double tstart = MPI_Wtime();
+    /* Loop cell neighbors */
+    for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+      neighbor = &dd.cell_inter[c].nList[n];
+      p2  = neighbor->pList->part;
+      np2 = neighbor->pList->n;
+      /* Loop cell particles */
+      for(i=0; i < np1; i++) {
+	j_start = 0;
+	/* Tasks within cell: bonded forces */
+	if(n == 0) {
+          add_single_particle_force(&p1[i]);
+	  if (rebuild_verletlist)
+	    memcpy(p1[i].l.p_old, p1[i].r.p, 3*sizeof(double));
+
+	  j_start = i+1;
+	}
+	/* Loop neighbor cell particles */
+	for(j = j_start; j < np2; j++) {
+#ifdef EXCLUSIONS
+          if(do_nonbonded(&p1[i], &p2[j]))
+#endif
+	    {
+	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+	      add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
+	    }
+	}
+      }
+    }
+    ts[c] += MPI_Wtime() - tstart;
+  }
+  rebuild_verletlist = 0;
+}
+
+void calc_link_cell_runtime(int nsteps, std::vector<double>& ts) {
+    for (int i = 0; i < nsteps; ++i)
+        __calc_link_cell_runtime(ts);
+}
+
 /************************************************************/
 
 void calculate_link_cell_energies()

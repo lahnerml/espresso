@@ -120,8 +120,8 @@ int cell_nforcepairs(Cell *cell, int c)
   int npairs = 0;
   for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
     IA_Neighbor *neigh = &dd.cell_inter[c].nList[n];
-    for(Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
-      for(Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
+    for (Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
+      for (Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
           p2 < neigh->pList->part + neigh->pList->n; p2++) {
 #ifdef EXCLUSIONS
         if(do_nonbonded(p1, p2))
@@ -150,6 +150,33 @@ metric_nforcepairs(std::vector<int>& metric)
                  cell_nforcepairs);
 }
 
+int cell_nbondedia(Cell *cell, int c)
+{
+  int nbondedia = 0;
+  for (Particle *p = cell->part; p < cell->part + cell->n; p++) {
+    for (int i = 0; i < p->bl.n; ) {
+      int type_num = p->bl.e[i++];
+      Bonded_ia_parameters *iaparams = &bonded_ia_params[type_num];
+      //int type = iaparams->type;
+
+      // This could be incremented conditionally if "type" has a specific value
+      // to only count bonded_ia of a certain type.
+      nbondedia++;
+      i += iaparams->num; // Skip the all partner particle numbers
+    }
+  }
+  return nbondedia;
+}
+
+static void
+metric_nbondedia(std::vector<int>& metric)
+{
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 IotaIter(),
+                 metric.begin(),
+                 cell_nforcepairs);
+}
 
 static void
 metric_runtime(std::vector<int>& metric)
@@ -193,6 +220,7 @@ repart::get_metric_func(const std::string& desc)
     { "npart"      , metric_npart },
     { "ndistpairs" , metric_ndistpairs },
     { "nforcepairs", metric_nforcepairs },
+    { "nbondedia"  , metric_nbondedia },
     { "runtime"    , metric_runtime },
     { "rand"       , metric_rand }
   };

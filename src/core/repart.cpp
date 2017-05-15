@@ -179,6 +179,32 @@ metric_nbondedia(std::vector<double>& metric)
 }
 
 static void
+metric_nghostcells(std::vector<double>& metric)
+{
+    // Reminder: Metric is a vector over local cells.
+    // We simply count the number of ghost cells and
+    // add this cost in equal parts to all local cells
+    double nghostfrac = static_cast<double>(ghost_cells.n) / local_cells.n;
+    std::fill(metric.begin(), metric.end(), nghostfrac);
+}
+
+static void
+metric_nghostpart(std::vector<double>& metric)
+{
+    // Reminder: Metric is a vector over local cells.
+    // We simply count the number of ghost particles and
+    // add this cost in equal parts to all local cells
+    int nghostpart = std::accumulate(ghost_cells.cell,
+                                     ghost_cells.cell + ghost_cells.n,
+                                     0,
+                                     [](int acc, const Cell *c) {
+                                       return acc + c->n;
+                                     });
+    double nghostfrac = static_cast<double>(nghostpart) / local_cells.n;
+    std::fill(metric.begin(), metric.end(), nghostfrac);
+}
+
+static void
 metric_runtime(std::vector<double>& metric)
 {
     std::vector<double> ts(local_cells.n, 0.0);
@@ -221,6 +247,8 @@ repart::get_metric_func(const std::string& desc)
     { "ndistpairs" , metric_ndistpairs },
     { "nforcepairs", metric_nforcepairs },
     { "nbondedia"  , metric_nbondedia },
+    { "nghostcells", metric_nghostcells },
+    { "nghostpart" , metric_nghostpart },
     { "runtime"    , metric_runtime },
     { "rand"       , metric_rand }
   };

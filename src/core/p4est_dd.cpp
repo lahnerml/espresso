@@ -13,14 +13,10 @@
 #include <p8est_extended.h>
 #include <p8est_bits.h>
 #include <p8est_algorithms.h>
-#include <vector>
-#include <chrono>
-#include <boost/iterator/iterator_facade.hpp>
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
-#include "mol_cut.hpp"
-#include "interaction_data.hpp"
+#include "repart.hpp"
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
@@ -1448,31 +1444,11 @@ void dd_p4est_write_vtk() {
 //--------------------------------------------------------------------------------------------------
 // Purely MD Repartitioning functions follow now.
 //-------------------------------------------------------------------------------------------------
-static void
-print_cell_info(const std::string& prefix, const std::string& method)
-{
-  int nc = local_cells.n;
-  int npart = std::accumulate(local_cells.cell,
-                              local_cells.cell + nc,
-                              0,
-                              [](int acc, Cell* c) { return acc + c->n; });
-
-  int pmax, pmin, cmax, cmin;
-  MPI_Reduce(&npart, &pmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
-  MPI_Reduce(&npart, &pmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
-  MPI_Reduce(&nc, &cmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
-  MPI_Reduce(&nc, &cmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
-
-  if (this_node == 0)
-    printf("%s (%s): #Particle (#Cells) max: %i (%i), min: %i (%i)\n",
-           prefix.c_str(), method.c_str(), pmax, cmax, pmin, cmin);
-}
-//--------------------------------------------------------------------------------------------------
 // Metric has to hold num_local_cells many elements.
 // Fills the global std::vector repart_nquads to be used by the next
 // cellsystem re-init in conjunction with p4est_partition_given.
 static void
-repart_calc_nquads(const std::vector<int>& metric, bool debug)
+p4est_dd_repart_calc_nquads(const std::vector<int>& metric, bool debug)
 {
   if (metric.size() != num_local_cells) {
     std::cerr << "Error in provided metric: too few elements." << std::endl;
@@ -1529,185 +1505,6 @@ repart_calc_nquads(const std::vector<int>& metric, bool debug)
   }
 }
 //--------------------------------------------------------------------------------------------------
-// Fills metric with a constant.
-static void
-metric_ncells(std::vector<int>& metric)
-{
-  std::fill(metric.begin(), metric.end(), 1);
-}
-
-// Fills metric with the number of particles per cell.
-static void
-metric_npart(std::vector<int>& metric)
-{
-  std::transform(local_cells.cell,
-                 local_cells.cell + std::distance(metric.begin(), metric.end()),
-                 metric.begin(),
-                 [](const Cell *c) { return c->n; });
-}
-
-// Iterator for iterating over integers (enumerating things while using
-// std::transform)
-class IotaIter
-  : public boost::iterator_facade<IotaIter,
-                                  const int,
-                                  boost::forward_traversal_tag>
-{
- public:
-    IotaIter(): i(0) {}
-    IotaIter(int i): i(i) {}
-    IotaIter(const IotaIter& other): i(other.i) {}
-
- private:
-    int i;
-    friend class boost::iterator_core_access;
-
-    void increment() { i++; }
-    bool equal(const IotaIter& other) const { return i == other.i; }
-    const int& dereference() const { return i; }
-};
-
-
-int cell_ndistpairs(Cell *c, int i)
-{
-  int nnp = std::accumulate(dd.cell_inter[i].nList,
-                            dd.cell_inter[i].nList
-                              + dd.cell_inter[i].n_neighbors,
-                            0,
-                            [](int acc, const IA_Neighbor& neigh){
-                              return acc + neigh.pList->n;
-                            });
-  return c->n * nnp;
-}
-
-// Fills metric with the number of distance pairs per cell.
-static void
-metric_ndistpairs(std::vector<int>& metric)
-{
-  // Cell number can't be easily deduced from a copied Cell*/**
-  // Therefore, we use std::transform with two input iterators
-  // and one is an IotaIter.
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 metric.begin(),
-                 cell_ndistpairs);
-}
-
-int cell_nforcepairs(Cell *cell, int c)
-{
-  int npairs = 0;
-  for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
-    IA_Neighbor *neigh = &dd.cell_inter[c].nList[n];
-    for(Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
-      for(Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
-          p2 < neigh->pList->part + neigh->pList->n; p2++) {
-#ifdef EXCLUSIONS
-        if(do_nonbonded(p1, p2))
-#endif
-        {
-          double vec21[3];
-          double dist = sqrt(distance2vec(p1->r.p, p2->r.p, vec21));
-          IA_parameters *ia_params = get_ia_param(p1->p.type, p2->p.type);
-          if (CUTOFF_CHECK(dist < ia_params->LJ_cut+ia_params->LJ_offset) &&
-              CUTOFF_CHECK(dist > ia_params->LJ_min+ia_params->LJ_offset))
-            npairs++;
-        }
-      }
-    }
-  }
-  return npairs;
-}
-
-static void
-metric_nforcepairs(std::vector<int>& metric)
-{
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 metric.begin(),
-                 cell_nforcepairs);
-}
-
-template <typename T>
-struct Averager {
-    void operator()(T val) { sum += val; count++; }
-    T operator*() { return sum / count; }
-
-private:
-    T sum = T{0};
-    int count = 0;
-};
-
-template <typename T, typename It>
-T average(It first, It last)
-{
-    return *std::for_each(first, last, Averager<T>());
-}
-
-template <typename It>
-typename It::value_type average(It first, It last)
-{
-    return average<typename It::value_type>(first, last);
-}
-
-static void
-metric_runtime(std::vector<int>& metric)
-{
-    std::vector<double> ts(num_local_cells, 0.0);
-    calc_link_cell_runtime(10, ts);
-    // Factor to make entries larger than 1.
-    double f = 10.0 / average(ts.begin(), ts.end());
-    std::transform(ts.begin(), ts.end(),
-                   metric.begin(),
-                   [f](double d){return static_cast<int>(f * d);});
-}
-
-// Generator for random integers
-struct Randintgen {
-  Randintgen():
-    mt(std::chrono::high_resolution_clock::now().time_since_epoch().count()),
-    d(1, 1000) {}
-  Randintgen(Randintgen&& other): mt(std::move(other.mt)),
-                                  d(std::move(other.d)) {}
-  int operator()() { return d(mt); }
-private:
-  std::mt19937 mt;
-  std::uniform_int_distribution<int> d;
-};
-
-// Fills metric with random integers
-static void
-metric_rand(std::vector<int>& metric)
-{
-  std::generate(metric.begin(), metric.end(), Randintgen());
-}
-//--------------------------------------------------------------------------------------------------
-// Get the appropriate metric function described in string "desc".
-static std::function<void(std::vector<int>&)>
-p4est_dd_get_metric_func(const std::string& desc)
-{
-  using repart_func = std::function<void(std::vector<int>&)>;
-  static const std::vector<std::pair<std::string, repart_func>> mets = {
-    { "ncells"     , metric_ncells },
-    { "npart"      , metric_npart },
-    { "ndistpairs" , metric_ndistpairs },
-    { "nforcepairs", metric_nforcepairs },
-    { "runtime"    , metric_runtime },
-    { "rand"       , metric_rand }
-  };
-
-  for (const auto& t: mets) {
-    if (desc == std::get<0>(t)) {
-      return std::get<1>(t);
-    }
-  }
-
-  if (this_node == 0)
-    std::cerr << "No such rebalancing method: " << desc << std::endl;
-  errexit();
-}
-//--------------------------------------------------------------------------------------------------
 // Repartition the MD grd:
 // Evaluate metric and set part_nquads global vector to be used by a
 // reinit of the cellsystem. Afterwards, directly reinits the cellsystem.
@@ -1715,17 +1512,17 @@ void
 p4est_dd_repartition(const std::string& desc, bool debug)
 {
   if (desc == "statistics") {
-    print_cell_info("!>>> Statistics", "none");
+      repart::print_cell_info("!>>> Statistics", "none");
     return;
   }
 
   std::vector<int> metric(num_local_cells);
-  p4est_dd_get_metric_func(desc)(metric);
-  repart_calc_nquads(metric, debug);
+  repart::get_metric_func(desc)(metric);
+  p4est_dd_repart_calc_nquads(metric, debug);
 
-  print_cell_info("!>>> Before Repart", desc);
+  repart::print_cell_info("!>>> Before Repart", desc);
   cells_re_init(CELL_STRUCTURE_CURRENT);
-  print_cell_info("!>>> After Repart", desc);
+  repart::print_cell_info("!>>> After Repart", desc);
 }
 
 #endif

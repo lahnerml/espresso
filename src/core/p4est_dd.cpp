@@ -1591,6 +1591,33 @@ metric_ndistpairs(std::vector<int>& metric)
                  });
 }
 
+static void
+metric_nforcepairs(std::vector<int>& metric)
+{
+  for (int c = 0; c < local_cells.n; c++) {
+    Cell *cell = local_cells.cell[c];
+    for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+      IA_Neighbor *neig = &dd.cell_inter[c].nList[n];
+      for(Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
+	for(Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
+            p2 < neigh->pList->part + neigh->pList->n; p2++) {
+#ifdef EXCLUSIONS
+          if(do_nonbonded(p1, p2))
+#endif
+	  {
+            double vec21[3];
+	    double dist = sqrt(distance2vec(p1->r.p, p2->r.p, vec21));
+            if (CUTOFF_CHECK(dist < ia_params->LJ_cut+ia_params->LJ_offset) &&
+	        CUTOFF_CHECK(dist > ia_params->LJ_min+ia_params->LJ_offset)) {
+              metric[c]++;
+            }
+	  }
+	}
+      }
+    }
+  }
+}
+
 template <typename T>
 struct Averager {
     void operator()(T val) { sum += val; count++; }
@@ -1651,11 +1678,12 @@ p4est_dd_get_metric_func(const std::string& desc)
 {
   using repart_func = std::function<void(std::vector<int>&)>;
   static const std::vector<std::pair<std::string, repart_func>> mets = {
-    { "ncells"    , metric_ncells },
-    { "npart"     , metric_npart },
-    { "ndistpairs", metric_ndistpairs },
-    { "runtime"   , metric_runtime },
-    { "rand"      , metric_rand }
+    { "ncells"     , metric_ncells },
+    { "npart"      , metric_npart },
+    { "ndistpairs" , metric_ndistpairs },
+    { "nforceparis", metric_nforcepairs },
+    { "runtime"    , metric_runtime },
+    { "rand"       , metric_rand }
   };
 
   for (const auto& t: mets) {

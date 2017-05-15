@@ -19,6 +19,8 @@
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
+#include "mol_cut.hpp"
+#include "interaction_data.hpp"
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
@@ -1428,7 +1430,7 @@ void dd_p4est_write_particle_vtk(char *filename) {
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_write_vtk() {
   // write cells to VTK with a given streching
-  p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_dd", box_l[0]/(double)brick_size[0]);
+  //p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_dd", box_l[0]/(double)brick_size[0]);
   
   /*char fname[100];
   sprintf(fname,"cells_conn_%i.list",this_node);
@@ -1472,7 +1474,7 @@ print_cell_info(const std::string& prefix, const std::string& method)
 static void
 repart_calc_nquads(const std::vector<int>& metric, bool debug)
 {
-  if (!metric.size() == num_local_cells) {
+  if (metric.size() != num_local_cells) {
     std::cerr << "Error in provided metric: too few elements." << std::endl;
     part_nquads.clear();
     return;
@@ -1565,6 +1567,19 @@ class IotaIter
     const int& dereference() const { return i; }
 };
 
+
+int cell_ndistpairs(Cell *c, int i)
+{
+  int nnp = std::accumulate(dd.cell_inter[i].nList,
+                            dd.cell_inter[i].nList
+                              + dd.cell_inter[i].n_neighbors,
+                            0,
+                            [](int acc, const IA_Neighbor& neigh){
+                              return acc + neigh.pList->n;
+                            });
+  return c->n * nnp;
+}
+
 // Fills metric with the number of distance pairs per cell.
 static void
 metric_ndistpairs(std::vector<int>& metric)
@@ -1573,49 +1588,45 @@ metric_ndistpairs(std::vector<int>& metric)
   // Therefore, we use std::transform with two input iterators
   // and one is an IotaIter.
   std::transform(local_cells.cell,
-                 local_cells.cell
-                   + std::distance(metric.begin(), metric.end()),
+                 local_cells.cell + local_cells.n,
                  IotaIter(),
                  metric.begin(),
-                 [](Cell* c, int i) {
-                   // #Particles in neighborhood shell
-                   int nnp = std::accumulate(dd.cell_inter[i].nList,
-                                             dd.cell_inter[i].nList
-                                               + dd.cell_inter[i].n_neighbors,
-                                             0,
-                                             [](int acc,
-                                                const IA_Neighbor& neigh){
-                                               return acc + neigh.pList->n;
-                                             });
-                   return c->n * nnp;
-                 });
+                 cell_ndistpairs);
+}
+
+int cell_nforcepairs(Cell *cell, int c)
+{
+  int npairs = 0;
+  for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+    IA_Neighbor *neigh = &dd.cell_inter[c].nList[n];
+    for(Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
+      for(Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
+          p2 < neigh->pList->part + neigh->pList->n; p2++) {
+#ifdef EXCLUSIONS
+        if(do_nonbonded(p1, p2))
+#endif
+        {
+          double vec21[3];
+          double dist = sqrt(distance2vec(p1->r.p, p2->r.p, vec21));
+          IA_parameters *ia_params = get_ia_param(p1->p.type, p2->p.type);
+          if (CUTOFF_CHECK(dist < ia_params->LJ_cut+ia_params->LJ_offset) &&
+              CUTOFF_CHECK(dist > ia_params->LJ_min+ia_params->LJ_offset))
+            npairs++;
+        }
+      }
+    }
+  }
+  return npairs;
 }
 
 static void
 metric_nforcepairs(std::vector<int>& metric)
 {
-  for (int c = 0; c < local_cells.n; c++) {
-    Cell *cell = local_cells.cell[c];
-    for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
-      IA_Neighbor *neig = &dd.cell_inter[c].nList[n];
-      for(Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
-	for(Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
-            p2 < neigh->pList->part + neigh->pList->n; p2++) {
-#ifdef EXCLUSIONS
-          if(do_nonbonded(p1, p2))
-#endif
-	  {
-            double vec21[3];
-	    double dist = sqrt(distance2vec(p1->r.p, p2->r.p, vec21));
-            if (CUTOFF_CHECK(dist < ia_params->LJ_cut+ia_params->LJ_offset) &&
-	        CUTOFF_CHECK(dist > ia_params->LJ_min+ia_params->LJ_offset)) {
-              metric[c]++;
-            }
-	  }
-	}
-      }
-    }
-  }
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 IotaIter(),
+                 metric.begin(),
+                 cell_nforcepairs);
 }
 
 template <typename T>
@@ -1681,7 +1692,7 @@ p4est_dd_get_metric_func(const std::string& desc)
     { "ncells"     , metric_ncells },
     { "npart"      , metric_npart },
     { "ndistpairs" , metric_ndistpairs },
-    { "nforceparis", metric_nforcepairs },
+    { "nforcepairs", metric_nforcepairs },
     { "runtime"    , metric_runtime },
     { "rand"       , metric_rand }
   };

@@ -38,6 +38,36 @@ private:
     int count = 0;
 };
 
+template<typename FwdIt, typename T >
+void addto_fill(FwdIt first, FwdIt last, const T& val)
+{
+    for (; first != last; ++first) {
+        *first += val;
+    }
+}
+
+template<typename InputIt, typename OutputIt, typename UnaryOperation>
+OutputIt addto_transform(InputIt first, InputIt last, OutputIt d_first,
+                       UnaryOperation unary_op)
+{
+    while (first != last) {
+        *d_first++ += unary_op(*first++);
+    }
+    return d_first;
+}
+
+template<typename InputIt1, typename InputIt2,
+         typename OutputIt, typename BinaryOperation>
+OutputIt addto_transform(InputIt1 first1, InputIt1 last1, InputIt2 first2,
+                       OutputIt d_first, BinaryOperation binary_op)
+{
+    while (first1 != last1) {
+        *d_first++ += binary_op(*first1++, *first2++);
+    }
+    return d_first;
+}
+
+
 template <typename T, typename It>
 T average(It first, It last)
 {
@@ -76,17 +106,17 @@ repart::print_cell_info(const std::string& prefix, const std::string& method)
 static void
 metric_ncells(std::vector<double>& metric)
 {
-  std::fill(metric.begin(), metric.end(), 1.0);
+  addto_fill(metric.begin(), metric.end(), 1.0);
 }
 
 // Fills metric with the number of particles per cell.
 static void
 metric_npart(std::vector<double>& metric)
 {
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 metric.begin(),
-                 [](const Cell *c) { return c->n; });
+  addto_transform(local_cells.cell,
+                  local_cells.cell + local_cells.n,
+                  metric.begin(),
+                  [](const Cell *c) { return c->n; });
 }
 
 int cell_ndistpairs(Cell *c, int i)
@@ -108,11 +138,11 @@ metric_ndistpairs(std::vector<double>& metric)
   // Cell number can't be easily deduced from a copied Cell*/**
   // Therefore, we use std::transform with two input iterators
   // and one is an IotaIter.
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 metric.begin(),
-                 cell_ndistpairs);
+  addto_transform(local_cells.cell,
+                  local_cells.cell + local_cells.n,
+                  IotaIter(),
+                  metric.begin(),
+                  cell_ndistpairs);
 }
 
 int cell_nforcepairs(Cell *cell, int c)
@@ -143,11 +173,11 @@ int cell_nforcepairs(Cell *cell, int c)
 static void
 metric_nforcepairs(std::vector<double>& metric)
 {
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 metric.begin(),
-                 cell_nforcepairs);
+  addto_transform(local_cells.cell,
+                  local_cells.cell + local_cells.n,
+                  IotaIter(),
+                  metric.begin(),
+                  cell_nforcepairs);
 }
 
 int cell_nbondedia(Cell *cell, int c)
@@ -171,11 +201,11 @@ int cell_nbondedia(Cell *cell, int c)
 static void
 metric_nbondedia(std::vector<double>& metric)
 {
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 metric.begin(),
-                 cell_nforcepairs);
+  addto_transform(local_cells.cell,
+                  local_cells.cell + local_cells.n,
+                  IotaIter(),
+                  metric.begin(),
+                  cell_nforcepairs);
 }
 
 static void
@@ -185,7 +215,7 @@ metric_nghostcells(std::vector<double>& metric)
     // We simply count the number of ghost cells and
     // add this cost in equal parts to all local cells
     double nghostfrac = static_cast<double>(ghost_cells.n) / local_cells.n;
-    std::fill(metric.begin(), metric.end(), nghostfrac);
+    addto_fill(metric.begin(), metric.end(), nghostfrac);
 }
 
 static void
@@ -201,7 +231,7 @@ metric_nghostpart(std::vector<double>& metric)
                                        return acc + c->n;
                                      });
     double nghostfrac = static_cast<double>(nghostpart) / local_cells.n;
-    std::fill(metric.begin(), metric.end(), nghostfrac);
+    addto_fill(metric.begin(), metric.end(), nghostfrac);
 }
 
 static void
@@ -211,9 +241,9 @@ metric_runtime(std::vector<double>& metric)
     calc_link_cell_runtime(10, ts);
     // Factor to make entries larger than 1.
     double f = 10.0 / average(ts.begin(), ts.end());
-    std::transform(ts.begin(), ts.end(),
-                   metric.begin(),
-                   [f](double d){ return f * d;});
+    addto_transform(ts.begin(), ts.end(),
+                    metric.begin(),
+                    [f](double d){ return f * d;});
 }
 
 // Generator for random integers

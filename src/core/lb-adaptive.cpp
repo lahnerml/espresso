@@ -1544,23 +1544,27 @@ lb_float lbadapt_backTransformation(lb_float *m, int dir) {
   }
 }
 
-void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
+void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
+                              lbadapt_payload_t *currCellData) {
 #ifndef LB_ADAPTIVE_GPU
   // clang-format off
   int inv[] = { 0,
                 2,  1,  4,  3,  6,  5,
                 8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
-  lbadapt_payload_t *data, *currCellData;
-  currCellData =
-      &lbadapt_local_data[mesh_iter->current_level - coarsest_level_local]
-                         [p8est_meshiter_get_current_storage_id(mesh_iter)];
+  lbadapt_payload_t *data;
+
+#ifdef P4EST_ENABLE_DEBUG
+  int neighbor_cnt = 0;
+#endif // P4EST_ENABLE_DEBUG
+
   for (int dir_ESPR = 1; dir_ESPR < lbmodel.n_veloc; ++dir_ESPR) {
     // set neighboring cell information in iterator
     int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
     p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
     if (mesh_iter->neighbor_qid != -1) {
+      ++neighbor_cnt;
       int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
@@ -1586,6 +1590,9 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter) {
       }
     }
   }
+  P4EST_ASSERT((mesh_iter->current_level < finest_level_global) ||
+               (-1 < mesh_iter->current_vid) ||
+               ((lbmodel.n_veloc - 1) == neighbor_cnt));
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1723,7 +1730,7 @@ void lbadapt_stream(int level) {
           &lbadapt_local_data[lvl]
                              [p8est_meshiter_get_current_storage_id(mesh_iter)];
       if (!data->lbfields.boundary) {
-        lbadapt_pass_populations(mesh_iter);
+        lbadapt_pass_populations(mesh_iter, data);
       }
     }
   }

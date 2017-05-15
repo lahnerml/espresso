@@ -1448,7 +1448,7 @@ void dd_p4est_write_vtk() {
 // Fills the global std::vector repart_nquads to be used by the next
 // cellsystem re-init in conjunction with p4est_partition_given.
 static void
-p4est_dd_repart_calc_nquads(const std::vector<int>& metric, bool debug)
+p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
 {
   if (metric.size() != num_local_cells) {
     std::cerr << "Error in provided metric: too few elements." << std::endl;
@@ -1460,26 +1460,25 @@ p4est_dd_repart_calc_nquads(const std::vector<int>& metric, bool debug)
   std::fill(part_nquads.begin(), part_nquads.end(),
             static_cast<p4est_locidx_t>(0));
   // Determine prefix and target load
-  int64_t localsum = std::accumulate(metric.begin(), metric.end(),
-                                     static_cast<int64_t>(0));
-  int64_t sum, prefix = 0; // Initialization is necessary on rank 0!
-  MPI_Allreduce(&localsum, &sum, 1, MPI_INT64_T, MPI_SUM, comm_cart);
-  MPI_Exscan(&localsum, &prefix, 1, MPI_INT64_T, MPI_SUM, comm_cart);
-  int64_t target = sum / n_nodes;
+  double localsum = std::accumulate(metric.begin(), metric.end(), 0.0);
+  double sum, prefix = 0; // Initialization is necessary on rank 0!
+  MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
+  MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
+  double target = sum / n_nodes;
 
   if (debug) {
     printf("[%i] NCells: %zu\n", this_node, num_local_cells);
-    printf("[%i] Local : %li\n", this_node, localsum);
-    printf("[%i] Global: %li\n", this_node, sum);
-    printf("[%i] Target: %li\n", this_node, target);
-    printf("[%i] Prefix: %li\n", this_node, prefix);
+    printf("[%i] Local : %lf\n", this_node, localsum);
+    printf("[%i] Global: %lf\n", this_node, sum);
+    printf("[%i] Target: %lf\n", this_node, target);
+    printf("[%i] Prefix: %lf\n", this_node, prefix);
   }
 
   // Determine new process boundaries in local subdomain
   // Evaluated for its side effect of setting part_nquads.
   std::accumulate(metric.begin(), metric.end(),
                   prefix,
-                  [target](int64_t cellpref, int met_i) {
+                  [target](double cellpref, double met_i) {
                     int proc = std::min<int>(cellpref / target, n_nodes - 1);
                     part_nquads[proc]++;
                     return cellpref + met_i;
@@ -1516,7 +1515,7 @@ p4est_dd_repartition(const std::string& desc, bool debug)
     return;
   }
 
-  std::vector<int> metric(num_local_cells);
+  std::vector<double> metric(num_local_cells);
   repart::get_metric_func(desc)(metric);
   p4est_dd_repart_calc_nquads(metric, debug);
 

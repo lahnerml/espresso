@@ -74,14 +74,14 @@ repart::print_cell_info(const std::string& prefix, const std::string& method)
 
 // Fills metric with a constant.
 static void
-metric_ncells(std::vector<int>& metric)
+metric_ncells(std::vector<double>& metric)
 {
-  std::fill(metric.begin(), metric.end(), 1);
+  std::fill(metric.begin(), metric.end(), 1.0);
 }
 
 // Fills metric with the number of particles per cell.
 static void
-metric_npart(std::vector<int>& metric)
+metric_npart(std::vector<double>& metric)
 {
   std::transform(local_cells.cell,
                  local_cells.cell + local_cells.n,
@@ -103,7 +103,7 @@ int cell_ndistpairs(Cell *c, int i)
 
 // Fills metric with the number of distance pairs per cell.
 static void
-metric_ndistpairs(std::vector<int>& metric)
+metric_ndistpairs(std::vector<double>& metric)
 {
   // Cell number can't be easily deduced from a copied Cell*/**
   // Therefore, we use std::transform with two input iterators
@@ -141,7 +141,7 @@ int cell_nforcepairs(Cell *cell, int c)
 }
 
 static void
-metric_nforcepairs(std::vector<int>& metric)
+metric_nforcepairs(std::vector<double>& metric)
 {
   std::transform(local_cells.cell,
                  local_cells.cell + local_cells.n,
@@ -169,7 +169,7 @@ int cell_nbondedia(Cell *cell, int c)
 }
 
 static void
-metric_nbondedia(std::vector<int>& metric)
+metric_nbondedia(std::vector<double>& metric)
 {
   std::transform(local_cells.cell,
                  local_cells.cell + local_cells.n,
@@ -179,7 +179,7 @@ metric_nbondedia(std::vector<int>& metric)
 }
 
 static void
-metric_runtime(std::vector<int>& metric)
+metric_runtime(std::vector<double>& metric)
 {
     std::vector<double> ts(local_cells.n, 0.0);
     calc_link_cell_runtime(10, ts);
@@ -187,7 +187,7 @@ metric_runtime(std::vector<int>& metric)
     double f = 10.0 / average(ts.begin(), ts.end());
     std::transform(ts.begin(), ts.end(),
                    metric.begin(),
-                   [f](double d){return static_cast<int>(f * d);});
+                   [f](double d){ return f * d;});
 }
 
 // Generator for random integers
@@ -205,16 +205,16 @@ private:
 
 // Fills metric with random integers
 static void
-metric_rand(std::vector<int>& metric)
+metric_rand(std::vector<double>& metric)
 {
   std::generate(metric.begin(), metric.end(), Randintgen());
 }
 
 
-std::function<void(std::vector<int>&)>
+std::function<void(std::vector<double>&)>
 repart::get_metric_func(const std::string& desc)
 {
-  using repart_func = std::function<void(std::vector<int>&)>;
+  using repart_func = std::function<void(std::vector<double>&)>;
   static const std::vector<std::pair<std::string, repart_func>> mets = {
     { "ncells"     , metric_ncells },
     { "npart"      , metric_npart },

@@ -25,7 +25,7 @@ struct metric {
   /** Calculates the metric and returns the weights.
    * \return vector of weights. Length: local_cells.n
    */
-  std::vector<double> operator()();
+  std::vector<double> operator()() const;
 
 private:
   void parse_metric_desc(const std::string& desc);

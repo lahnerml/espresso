@@ -306,7 +306,7 @@ void repart::metric::parse_metric_desc(const std::string& desc) {
   }
 }
 
-std::vector<double> repart::metric::operator()() {
+std::vector<double> repart::metric::operator()() const {
   std::vector<double> w(local_cells.n, 0.0), tmp(local_cells.n);
 
   for (const auto& t: mdesc) {

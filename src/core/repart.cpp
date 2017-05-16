@@ -38,36 +38,6 @@ private:
     int count = 0;
 };
 
-template<typename FwdIt, typename T >
-void addto_fill(FwdIt first, FwdIt last, const T& val)
-{
-    for (; first != last; ++first) {
-        *first += val;
-    }
-}
-
-template<typename InputIt, typename OutputIt, typename UnaryOperation>
-OutputIt addto_transform(InputIt first, InputIt last, OutputIt d_first,
-                       UnaryOperation unary_op)
-{
-    while (first != last) {
-        *d_first++ += unary_op(*first++);
-    }
-    return d_first;
-}
-
-template<typename InputIt1, typename InputIt2,
-         typename OutputIt, typename BinaryOperation>
-OutputIt addto_transform(InputIt1 first1, InputIt1 last1, InputIt2 first2,
-                       OutputIt d_first, BinaryOperation binary_op)
-{
-    while (first1 != last1) {
-        *d_first++ += binary_op(*first1++, *first2++);
-    }
-    return d_first;
-}
-
-
 template <typename T, typename It>
 T average(It first, It last)
 {
@@ -102,21 +72,21 @@ repart::print_cell_info(const std::string& prefix, const std::string& method)
 }
 
 
-// Fills metric with a constant.
+// Fills weights with a constant.
 static void
-metric_ncells(std::vector<double>& metric)
+metric_ncells(std::vector<double>& weights)
 {
-  addto_fill(metric.begin(), metric.end(), 1.0);
+  std::fill(weights.begin(), weights.end(), 1.0);
 }
 
-// Fills metric with the number of particles per cell.
+// Fills weights with the number of particles per cell.
 static void
-metric_npart(std::vector<double>& metric)
+metric_npart(std::vector<double>& weights)
 {
-  addto_transform(local_cells.cell,
-                  local_cells.cell + local_cells.n,
-                  metric.begin(),
-                  [](const Cell *c) { return c->n; });
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 weights.begin(),
+                 [](const Cell *c) { return c->n; });
 }
 
 int cell_ndistpairs(Cell *c, int i)
@@ -131,18 +101,18 @@ int cell_ndistpairs(Cell *c, int i)
   return c->n * nnp;
 }
 
-// Fills metric with the number of distance pairs per cell.
+// Fills weights with the number of distance pairs per cell.
 static void
-metric_ndistpairs(std::vector<double>& metric)
+metric_ndistpairs(std::vector<double>& weights)
 {
   // Cell number can't be easily deduced from a copied Cell*/**
   // Therefore, we use std::transform with two input iterators
   // and one is an IotaIter.
-  addto_transform(local_cells.cell,
-                  local_cells.cell + local_cells.n,
-                  IotaIter(),
-                  metric.begin(),
-                  cell_ndistpairs);
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 IotaIter(),
+                 weights.begin(),
+                 cell_ndistpairs);
 }
 
 int cell_nforcepairs(Cell *cell, int c)
@@ -171,13 +141,13 @@ int cell_nforcepairs(Cell *cell, int c)
 }
 
 static void
-metric_nforcepairs(std::vector<double>& metric)
+metric_nforcepairs(std::vector<double>& weights)
 {
-  addto_transform(local_cells.cell,
-                  local_cells.cell + local_cells.n,
-                  IotaIter(),
-                  metric.begin(),
-                  cell_nforcepairs);
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 IotaIter(),
+                 weights.begin(),
+                 cell_nforcepairs);
 }
 
 int cell_nbondedia(Cell *cell, int c)
@@ -199,29 +169,29 @@ int cell_nbondedia(Cell *cell, int c)
 }
 
 static void
-metric_nbondedia(std::vector<double>& metric)
+metric_nbondedia(std::vector<double>& weights)
 {
-  addto_transform(local_cells.cell,
-                  local_cells.cell + local_cells.n,
-                  IotaIter(),
-                  metric.begin(),
-                  cell_nforcepairs);
+  std::transform(local_cells.cell,
+                 local_cells.cell + local_cells.n,
+                 IotaIter(),
+                 weights.begin(),
+                 cell_nforcepairs);
 }
 
 static void
-metric_nghostcells(std::vector<double>& metric)
+metric_nghostcells(std::vector<double>& weights)
 {
-    // Reminder: Metric is a vector over local cells.
+    // Reminder: Weights is a vector over local cells.
     // We simply count the number of ghost cells and
     // add this cost in equal parts to all local cells
     double nghostfrac = static_cast<double>(ghost_cells.n) / local_cells.n;
-    addto_fill(metric.begin(), metric.end(), nghostfrac);
+    std::fill(weights.begin(), weights.end(), nghostfrac);
 }
 
 static void
-metric_nghostpart(std::vector<double>& metric)
+metric_nghostpart(std::vector<double>& weights)
 {
-    // Reminder: Metric is a vector over local cells.
+    // Reminder: Weights is a vector over local cells.
     // We simply count the number of ghost particles and
     // add this cost in equal parts to all local cells
     int nghostpart = std::accumulate(ghost_cells.cell,
@@ -231,19 +201,19 @@ metric_nghostpart(std::vector<double>& metric)
                                        return acc + c->n;
                                      });
     double nghostfrac = static_cast<double>(nghostpart) / local_cells.n;
-    addto_fill(metric.begin(), metric.end(), nghostfrac);
+    std::fill(weights.begin(), weights.end(), nghostfrac);
 }
 
 static void
-metric_runtime(std::vector<double>& metric)
+metric_runtime(std::vector<double>& weights)
 {
     std::vector<double> ts(local_cells.n, 0.0);
     calc_link_cell_runtime(10, ts);
     // Factor to make entries larger than 1.
     double f = 10.0 / average(ts.begin(), ts.end());
-    addto_transform(ts.begin(), ts.end(),
-                    metric.begin(),
-                    [f](double d){ return f * d;});
+    std::transform(ts.begin(), ts.end(),
+                   weights.begin(),
+                   [f](double d){ return f * d;});
 }
 
 // Generator for random integers
@@ -259,19 +229,21 @@ private:
   std::uniform_int_distribution<int> d;
 };
 
-// Fills metric with random integers
+// Fills weights with random integers
 static void
-metric_rand(std::vector<double>& metric)
+metric_rand(std::vector<double>& weights)
 {
-  std::generate(metric.begin(), metric.end(), Randintgen());
+  std::generate(weights.begin(), weights.end(), Randintgen());
 }
 
 
-std::function<void(std::vector<double>&)>
-repart::get_metric_func(const std::string& desc)
+// Get the appropriate metric function described in string "desc".
+// Throws a std::invalid_argument exception if no such metric is available
+static repart::metric::metric_func
+get_single_metric_func(const std::string& desc)
 {
-  using repart_func = std::function<void(std::vector<double>&)>;
-  static const std::vector<std::pair<std::string, repart_func>> mets = {
+  using desc_func_pair = std::pair<std::string, repart::metric::metric_func>;
+  static const std::vector<desc_func_pair> mets = {
     { "ncells"     , metric_ncells },
     { "npart"      , metric_npart },
     { "ndistpairs" , metric_ndistpairs },
@@ -290,5 +262,62 @@ repart::get_metric_func(const std::string& desc)
   }
 
   throw std::invalid_argument(std::string("No such metric available: ") + desc);
+}
+
+repart::metric::metric(const std::string& desc) {
+  parse_metric_desc(desc);
+}
+
+void repart::metric::parse_metric_desc(const std::string& desc) {
+  std::istringstream is(desc);
+  bool parseadd = desc[0] == '+' || desc[0] == '-';
+
+  while (is.good()) {
+    double factor;
+    char add = '+';
+    char mult;
+    std::string method;
+
+    if (parseadd)
+      is >> add; // Skip this conditionally during the first iteration since
+                 // positive factor does not need to have '+' in fist addend.
+    else
+      parseadd = true;
+    if (!is || (add != '+' && add != '-'))
+      throw std::invalid_argument("Could not parse metric string: Expected +/-.");
+
+    is >> factor;
+    if (!is)
+      throw std::invalid_argument("Could not parse metric string: Expected factor.");
+
+    if (add == '-')
+      factor *= -1;
+
+    is >> mult; // '*'
+    if (!is || mult != '*')
+      throw std::invalid_argument("Could not parse metric string: Expected '*'.");
+
+    // FIXME: Needs space after method name.
+    is >> method;
+    if (!is)
+      throw std::invalid_argument("Could not parse metric string: Expected method name. Space after name is mandatory.");
+
+    mdesc.emplace_back(factor, get_single_metric_func(method));
+  }
+}
+
+std::vector<double> repart::metric::operator()() {
+  std::vector<double> w(local_cells.n, 0.0), tmp(local_cells.n);
+
+  for (const auto& t: mdesc) {
+    double factor = std::get<0>(t);
+    repart::metric::metric_func func = std::get<1>(t);
+
+    func(tmp);
+    // Multiply add to w.
+    std::transform(w.begin(), w.end(), tmp.begin(), w.begin(),
+                   [factor](double acc, double val){ return acc + factor * val; });
+  }
+  return w;
 }
 

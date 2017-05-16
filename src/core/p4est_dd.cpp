@@ -1515,9 +1515,8 @@ p4est_dd_repartition(const std::string& desc, bool debug)
     return;
   }
 
-  std::vector<double> metric(num_local_cells, 0.0);
-  repart::get_metric_func(desc)(metric);
-  p4est_dd_repart_calc_nquads(metric, debug);
+  std::vector<double> weights = repart::metric{desc}();
+  p4est_dd_repart_calc_nquads(weights, debug);
 
   repart::print_cell_info("!>>> Before Repart", desc);
   cells_re_init(CELL_STRUCTURE_CURRENT);

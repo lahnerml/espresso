@@ -8,13 +8,30 @@
 
 namespace repart {
 
+
 // Print general information about cell process mapping
 void print_cell_info(const std::string& prefix, const std::string& method);
 
-// Get the appropriate metric function described in string "desc".
-// Throws a std::invalid_argument exception if no such metric is available
-std::function<void(std::vector<double>&)>
-get_metric_func(const std::string& desc);
+/** Represents a linear combination of single metric functions.
+ */
+struct metric {
+  using metric_func = std::function<void(std::vector<double>&)>;
+
+  /** Constructor. Might throw a std::invalid_argument exception if desc is not understood.
+   * \param desc string to describe the metric, e.g. "2.0*ncells+1.7*nghostpart"
+   */
+  metric(const std::string& desc);
+
+  /** Calculates the metric and returns the weights.
+   * \return vector of weights. Length: local_cells.n
+   */
+  std::vector<double> operator()();
+
+private:
+  void parse_metric_desc(const std::string& desc);
+
+  std::vector<std::pair<double, metric_func>> mdesc;
+};
 
 }
 

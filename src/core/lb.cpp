@@ -3897,14 +3897,17 @@ void calc_particle_lattice_ia() {
     
   if (transfer_momentum) {
 
-    if (lbpar.resend_halo) { /* first MD step after last LB update */
-
-/* exchange halo regions (for fluid-particle coupling) */
 #ifdef LB_ADAPTIVE
-
+    // update ghost layer on all levels
+    for (int level = lbpar.base_level; level <= max_refinement_level; ++level) {
+      p8est_ghostvirt_exchange_data(
+          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+    }
 #else // LB_ADAPTIVE
+    if (lbpar.resend_halo) { /* first MD step after last LB update */
+      /* exchange halo regions (for fluid-particle coupling) */
       halo_communication(&update_halo_comm, (char *)**lbfluid);
-#endif // LB ADAPTIVE
 
 #ifdef ADDITIONAL_CHECKS
       lb_check_halo_regions();
@@ -3913,13 +3916,12 @@ void calc_particle_lattice_ia() {
       /* halo is valid now */
       lbpar.resend_halo = 0;
 
-/* all fields have to be recalculated */
-#ifndef LB_ADAPTIVE
+      /* all fields have to be recalculated */
       for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
         lbfields[i].recalc_fields = 1;
       }
-#endif // LB_ADAPTIVE
     }
+#endif // LB ADAPTIVE
 
     /* draw random numbers for local particles */
     for (int c = 0; c < local_cells.n; c++) {

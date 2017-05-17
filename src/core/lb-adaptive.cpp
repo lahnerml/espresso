@@ -1558,6 +1558,10 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
   int neighbor_cnt = 0;
 #endif // P4EST_ENABLE_DEBUG
 
+  // copy resting population
+  currCellData->lbfluid[1][0] = currCellData->lbfluid[0][0];
+
+  // stream to surrounding cells
   for (int dir_ESPR = 1; dir_ESPR < lbmodel.n_veloc; ++dir_ESPR) {
     // set neighboring cell information in iterator
     int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];

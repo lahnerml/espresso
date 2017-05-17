@@ -1490,6 +1490,16 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
   MPI_Allreduce(MPI_IN_PLACE, part_nquads.data(), n_nodes,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
+  // TODO: Could try to steal quads from neighbors.
+  //       Global reshifting (i.e. stealing from someone else than the direct
+  //       neighbors) is not a good idea since it globally changes the metric.
+  //       Anyways, this is most likely due to a bad quad/proc quotient.
+  if (part_nquads[this_node] == 0) {
+    fprintf(stderr, "[%i] No quads assigned to me. Cannot guarantee to work. Exiting\n", this_node);
+    fprintf(stderr, "[%i] Try changing the metric or reducing the number of processes\n", this_node);
+    errexit();
+  }
+
   if (debug) {
     printf("[%i] Nquads: %i\n", this_node, part_nquads[this_node]);
 

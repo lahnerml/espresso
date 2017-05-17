@@ -1,5 +1,7 @@
 
 #include "repart.hpp"
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <stdexcept>
 #include <boost/iterator/iterator_facade.hpp>
@@ -271,6 +273,12 @@ repart::metric::metric(const std::string& desc) {
 void repart::metric::parse_metric_desc(const std::string& desc) {
   std::istringstream is(desc);
   bool parseadd = desc[0] == '+' || desc[0] == '-';
+
+  // Single metric case
+  if (std::all_of(desc.begin(), desc.end(), ::isalpha)) {
+    mdesc.emplace_back(1.0, get_single_metric_func(desc));
+    return;
+  }
 
   while (is.good()) {
     double factor;

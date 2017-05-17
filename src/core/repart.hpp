@@ -18,7 +18,16 @@ struct metric {
   using metric_func = std::function<void(std::vector<double>&)>;
 
   /** Constructor. Might throw a std::invalid_argument exception if desc is not understood.
-   * \param desc string to describe the metric, e.g. "2.0*ncells+1.7*nghostpart"
+   * Metric description strings are linear combinations of single metrics.
+   * E.g. "2.0*ncells +1.7*nghostpart"
+   * The space after the metric name ("ncell") is mandatory.
+   * Factor, multiplication and addition sign are mandatory. Negative constants
+   * are only allowed for the first factor. For further use subtraction instead
+   * of addition, e.g. "-1.0*ncells -1.7*nghostpart".
+   * Single metric names are also acceptable and interpreted as "1.0<name>".
+   * Valid metrics are: ncells, npart, ndistpairs, nforcepairs, nbondedia,
+   * nghostcells, nghostpart, runtime and rand.
+   * \param desc string to describe the metric
    */
   metric(const std::string& desc);
 

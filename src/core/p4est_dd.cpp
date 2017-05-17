@@ -923,7 +923,10 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
 
   for (int p = 0; p < recvbuf->n; ++p) {
     double op[3] = {recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2]};
-    fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
+    // Sender folds in global case to get the correct receiver rank.
+    // Do not undo this folding here.
+    if (!global_flag)
+      fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
 
     dynsiz += recvbuf->part[p].bl.n;
 #ifdef EXCLUSIONS

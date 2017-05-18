@@ -1198,8 +1198,8 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
     double errmar = 0.5*ROUND_ERROR_PREC * box_l[d];
     if (pos[d] < 0 && pos[d] > -errmar) pfold[d] = 0;
     else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] = pos[d] - 0.5*dd.cell_size[d];
-    else if (pos[d] <= -errmar) return -1;
-    else if (pos[d] >= box_l[d] + errmar) return -1;
+    // In the other two cases ("pos[d] <= -errmar" and
+    // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
   return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0], 
     pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);

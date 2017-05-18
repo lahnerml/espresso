@@ -113,7 +113,14 @@ int allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh, bool local_data) {
   return 0;
 }
 
-template <typename T> int deallocate_levelwise_storage(T ***data) {
+template <typename T>
+/** Deallocate a level-wise data-structure with potentially empty lists of
+ * numerical payload from level 0 .. P8EST_QMAXLEVEL.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param data        Pointer to payload struct
+ */
+int deallocate_levelwise_storage(T ***data) {
   if (*data != NULL) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
       P4EST_FREE((*data)[level]);

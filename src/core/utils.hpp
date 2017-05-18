@@ -28,14 +28,17 @@
  *
 */
 
+#include <cmath>
 #include <exception>
 #include <vector>
-#include <cmath>
 
 #include "config.hpp"
 
 #include "errorhandling.hpp"
 
+#ifdef LB_ADAPTIVE
+#include "p8est_mesh.h"
+#endif // LB_ADAPTIVE
 
 /*************************************************************/
 /** \name Mathematical, physical and chemical constants.     */
@@ -73,11 +76,53 @@
 /*************************************************************/
 /*@{*/
 /** we are only interested in c1 .. c18 */
-const int ci_to_p4est[18] =
-  {1, 0, 3, 2, 5, 4, 17, 14, 15, 16, 13, 10, 11, 12, 9, 6, 7, 8};
+const int ci_to_p4est[18] = {1,  0,  3,  2,  5,  4, 17, 14, 15,
+                             16, 13, 10, 11, 12, 9, 6,  7,  8};
 
-const int p4est_to_ci[18] =
-  {2, 1, 4, 3, 6, 5, 16, 17, 18, 15, 12, 13, 14, 11, 8, 9, 10, 7};
+const int p4est_to_ci[18] = {2,  1,  4,  3,  6,  5, 16, 17, 18,
+                             15, 12, 13, 14, 11, 8, 9,  10, 7};
+
+template <typename T>
+/** Generic function to allocate level-wise data-structure with potentially
+ * empty lists from 0 to P8EST_QMAXLEVEL.
+ *
+ * @param T           Type of numerical payload.
+ * @param data        Pointer to payload struct
+ * @param mesh        Mesh of current p4est.
+ * @param local_data  Bool indicating if local or ghost information is relevant.
+ */
+int allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh, bool local_data) {
+  // make sure data is not yet in used
+  P4EST_ASSERT(*data == NULL);
+
+  // allocate data for each level
+  *data = P4EST_ALLOC(T *, P8EST_QMAXLEVEL);
+
+  int quads_on_level;
+
+  for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
+    quads_on_level =
+        local_data
+            ? (mesh->quad_level + level)->elem_count +
+                  P8EST_CHILDREN * (mesh->virtual_qlevels + level)->elem_count
+            : (mesh->ghost_level + level)->elem_count +
+                  P8EST_CHILDREN * (mesh->virtual_glevels + level)->elem_count;
+    (*data)[level] = P4EST_ALLOC(T, quads_on_level);
+  }
+
+  return 0;
+}
+
+template <typename T> int deallocate_levelwise_storage(T ***data) {
+  if (*data != NULL) {
+    for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
+      P4EST_FREE((*data)[level]);
+    }
+    P4EST_FREE(*data);
+    *data = NULL;
+  }
+  return 0;
+}
 /*@}*/
 #endif // LB_ADAPTIVE
 
@@ -446,8 +491,7 @@ inline void unit_vector(double v[3], double y[3]) {
 }
 
 /** calculates the scalar product of two vectors a nd b */
-template <typename T>
-inline T scalar(T a[3], T b[3]) {
+template <typename T> inline T scalar(T a[3], T b[3]) {
   double d2 = 0.0;
   int i;
   for (i = 0; i < 3; i++)
@@ -866,7 +910,8 @@ inline void print_block(double *data, int start[3], int size[3], int dim[3],
   for (b = 0; b < divide; b++) {
     start1 = b * block1 + start[1];
     for (i0 = start[0] + size[0] - 1; i0 >= start[0]; i0--) {
-      for (i1 = start1; i1 < std::min(start1 + block1, start[1] + size[1]); i1++) {
+      for (i1 = start1; i1 < std::min(start1 + block1, start[1] + size[1]);
+           i1++) {
         for (i2 = start[2]; i2 < start[2] + size[2]; i2++) {
           tmp = data[num + (element * (i2 + dim[2] * (i1 + dim[1] * i0)))];
           if (tmp < 0)

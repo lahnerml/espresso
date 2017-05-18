@@ -111,11 +111,13 @@ void lbadapt_reinit_fluid_per_cell();
  * discretization before re-establishing a proper load-balancing.
  *
  * \param[in]  lb_p4est_old     p4est before grid adaptation.
+ * \param[in]  old_mesh         mesh related to \a lb_p4est_old
  * \param[in]  lb_p4est_new     p4est after grid adaptation.
  * \param[in]  old_local_data   Old, level-wise numerical payload.
  * \param[out] lb_mapped_data   New, flat numerical payload.
  */
 int lbadapt_post_gridadapt_map_data(p8est_t *lb_p4est_old,
+                                    p8est_mesh_t *old_mesh,
                                     p8est_t *lb_p4est_new,
                                     lbadapt_payload_t **old_local_data,
                                     lbadapt_payload_t *lb_mapped_data);

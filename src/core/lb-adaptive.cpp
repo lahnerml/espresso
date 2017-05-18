@@ -434,6 +434,81 @@ void lbadapt_reinit_fluid_per_cell() {
   }
 }
 
+int lbadapt_post_gridadapt_map_data(p8est_t *lb_p4est_old,
+                                    p8est_mesh_t *old_mesh,
+                                    p8est_t *lb_p4est_new,
+                                    lbadapt_payload_t **old_local_data,
+                                    lbadapt_payload_t *lb_mapped_data) {
+  // counters
+  int tid_old = 0, tid_new = 0;
+  int qid_old = 0, qid_new = 0;
+  int tqid_old = 0, tqid_new = 0;
+
+  // trees
+  p8est_tree_t *curr_tree_old =
+      p8est_tree_array_index(lb_p4est_old->trees, tid_old);
+  p8est_tree_t *curr_tree_new =
+      p8est_tree_array_index(lb_p4est_new->trees, tid_new);
+  // quadrants
+  p8est_quadrant_t *curr_quad_old, *curr_quad_new;
+
+  int old_level, old_sid;
+  int new_level;
+  while (qid_old < lb_p4est_old->local_num_quadrants &&
+         qid_new < lb_p4est_new->local_num_quadrants) {
+    // wrap multiple trees
+    if (tqid_old == curr_tree_old->quadrants.elem_count) {
+      ++tid_old;
+      P4EST_ASSERT(tid_old < lb_p4est_old->trees->elem_count);
+      curr_tree_old = p8est_tree_array_index(lb_p4est_old->trees, tid_old);
+      tqid_old = 0;
+    }
+    if (tqid_new == curr_tree_new->quadrants.elem_count) {
+      ++tid_new;
+      P4EST_ASSERT(tid_new < lb_p4est_new->trees->elem_count);
+      curr_tree_new = p8est_tree_array_index(lb_p4est_new->trees, tid_new);
+      tqid_new = 0;
+    }
+
+    // fetch next quadrants in old and new forest and obtain storage id
+    curr_quad_old =
+        p8est_quadrant_array_index(&curr_tree_old->quadrants, tqid_old);
+    old_level = curr_quad_old->level;
+    old_sid = old_mesh->quad_qreal_offset[qid_old];
+
+    curr_quad_new =
+        p8est_quadrant_array_index(&curr_tree_new->quadrants, tqid_new);
+    new_level = curr_quad_new->level;
+
+    // distinguish three cases to properly map data and increase indices
+    if (old_level == new_level) {
+      // old cell has neither been coarsened nor refined
+      std::memcpy(&lb_mapped_data[qid_new], &old_local_data[old_level][old_sid],
+                  sizeof(lbadapt_payload_t));
+      ++qid_old;
+      ++qid_new;
+      ++tqid_old;
+      ++tqid_new;
+    } else if (old_level + 1 == new_level) {
+      // old cell has been coarsened: Is new cell boundary?
+      lb_float new_mp[3];
+      int new_boundary;
+      lbadapt_get_midpoint(lb_p4est_new, tid_new, curr_quad_new, new_mp);
+      new_boundary = lbadapt_is_boundary(new_mp);
+      if (new_boundary) {
+        init_to_zero(&lb_mapped_data[qid_new]);
+      }
+
+    } else if (old_level == new_level + 1) {
+      // old cell has been refined
+
+    } else {
+      SC_ABORT_NOT_REACHED();
+    }
+  }
+  return 0;
+}
+
 int lbadapt_is_boundary(double *pos) {
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;

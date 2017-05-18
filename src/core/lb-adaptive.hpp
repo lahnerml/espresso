@@ -41,8 +41,8 @@
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
-#include "lb.hpp"
 #include "lb-adaptive-gpu.hpp"
+#include "lb.hpp"
 
 /* "global variables" */
 extern p8est_t *p8est;
@@ -106,6 +106,58 @@ void lbadapt_reinit_force_per_cell();
 /** (Re-)initialize the fluid according to the given value of rho
  */
 void lbadapt_reinit_fluid_per_cell();
+
+/** After refine, coarsening and balance locally map data from old to new
+ * discretization before re-establishing a proper load-balancing.
+ *
+ * \param[in]  lb_p4est_old     p4est before grid adaptation.
+ * \param[in]  lb_p4est_new     p4est after grid adaptation.
+ * \param[in]  old_local_data   Old, level-wise numerical payload.
+ * \param[out] lb_mapped_data   New, flat numerical payload.
+ */
+int lbadapt_post_gridadapt_map_data(p8est_t *lb_p4est_old,
+                                    p8est_t *lb_p4est_new,
+                                    lbadapt_payload_t **old_local_data,
+                                    lbadapt_payload_t *lb_mapped_data);
+
+
+/** For re-establishing a proper load balancing after the grid has changed we
+ * need to make sure that the payload is transferred to the respective
+ * processors to which its cells have been migrated.
+ *
+ * @param[in] lb_p4est_pre_part    Adapted p4est before calling p4est_partition.
+ * @param[in] lb_p4est_post_part   Partitioned p4est.
+ * @param[in] lb_mapped_data       Flat numerical payload mapped to adapted
+ *                                 grid.
+ * @param[out] lb_partitioned_data_per_proc   Container for numerical payload of
+ *                                            this rank's quadrants, separated
+ *                                            from which rank it has been
+ *                                            obtained. A flat storage scheme
+ *                                            (i.e. non-level-wise) is used.
+ */
+int lbadapt_post_partition_transfer_data(
+    p8est_t *lb_p4est_pre_part, p8est_t *lb_p4est_post_part,
+    lbadapt_payload_t *lb_mapped_data,
+    lbadapt_payload_t **lb_partitioned_data_per_proc);
+
+/** Restore a level-wise ordering of the numerical payload leaving spaces force
+ * virtual quadrants after all numerical payload of this process has been
+ * collected by all ranks.
+ *
+ * @param[in]  lb_updated_p4est         Partitioned p4est after grid alteration.
+ * @param[in]  lb_updated_ghost         Ghost layer for updated p4est.
+ * @param[in]  lb_updated_mesh          Mesh for updated p4est.
+ * @param[in]  lb_updated_ghostvirt     Extended ghost layer.
+ * @param[in]  lb_partitioned_data_per_proc   Numerical payload of all local
+ *                                            quadrants sorted by rank of
+ *                                            origin.
+ * @param[out] lb_updated_local_data    Newly populated level-wise data.
+ */
+int lbadapt_post_partition_insert_data(
+    p8est_t *lb_updated_p4est, p8est_ghost_t *lb_updated_ghost,
+    p8est_mesh_t *lb_updated_mesh, p8est_ghostvirt_t *lb_updated_ghostvirt,
+    lbadapt_payload_t **lb_partitioned_data_per_proc,
+    lbadapt_payload_t **lb_updated_local_data);
 
 #ifdef LB_BOUNDARIES
 /** Check if current midpoint is part of the boundary

@@ -158,13 +158,9 @@ void lbadapt_allocate_data() {
 
 void lbadapt_release() {
   /** cleanup custom managed payload */
-  if (lbadapt_local_data != NULL) {
-    deallocate_levelwise_storage(&lbadapt_local_data);
-  }
+  deallocate_levelwise_storage(&lbadapt_local_data);
+  deallocate_levelwise_storage(&lbadapt_ghost_data);
 
-  if (lbadapt_ghost_data != NULL) {
-    deallocate_levelwise_storage(&lbadapt_ghost_data);
-  }
 #ifdef LB_ADAPTIVE_GPU
   lbadapt_gpu_deallocate_device_memory();
 #endif // LB_ADAPTIVE_GPU

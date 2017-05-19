@@ -3297,7 +3297,6 @@ inline void lb_collide_stream() {
         if (!lbfields[index].boundary)
 #endif // LB_BOUNDARIES
         {
-
           /* calculate modes locally */
           lb_calc_modes(index, modes);
 

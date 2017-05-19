@@ -2751,9 +2751,9 @@ void mpi_recv_fluid_boundary_flag(int node, int index, int *boundary) {
 
 void mpi_lbadapt_grid_reset(int node, int dummy) {
 #ifdef LB_ADAPTIVE
-  lbadapt_reinit();
-  //lbadapt_reinit_fluid_per_cell();
-  //lbadapt_reinit_force_per_cell();
+  //lbadapt_reinit();
+  lbadapt_reinit_fluid_per_cell();
+  lbadapt_reinit_force_per_cell();
   //printf("Resetting LB fluid\n");
 #endif // LB_ADAPTIVE
 }

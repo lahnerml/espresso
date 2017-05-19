@@ -2302,17 +2302,19 @@ void lb_reinit_parameters() {
     prefactors[i] = 1 << (max_refinement_level - i);
 
     double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
+    //double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
     if (lbpar.viscosity[0] > 0.0) {
       gamma_shear[i] = 1. -
-        2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
-              1.);
+                       2. / (6. * lbpar.viscosity[0] * 
+                                  prefactors[i] * lbpar.tau / (SQR(h)) +
+                             1.);
     }
 
     if (lbpar.bulk_viscosity[0] > 0.0) {
       gamma_bulk[i] = 1. -
-        2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-              (prefactors[i] * SQR(lbpar.agrid)) +
-              1.);
+                      2. / (9. * lbpar.bulk_viscosity[0] *
+                                 prefactors[i] * lbpar.tau / (SQR(h)) +
+                            1.);
     }
   }
 #else
@@ -2995,7 +2997,7 @@ inline void lb_apply_forces(index_t index, double *mode) {
   f = lbfields[index].force;
 
   rho = mode[0] + lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
-
+  
   /* hydrodynamic momentum density is redefined when external forces present */
   u[0] = (mode[1] + 0.5 * f[0]) / rho;
   u[1] = (mode[2] + 0.5 * f[1]) / rho;
@@ -4067,9 +4069,9 @@ void lb_calc_average_rho() {
 
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
-  double *rho;
-  *rho = 0.0;
-  p8est_iterate(p8est, NULL, (void *)rho, lbadapt_calc_local_rho, NULL, NULL,
+  double rho;
+  rho = 0.0;
+  p8est_iterate(p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL, NULL,
                 NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE

@@ -1074,10 +1074,9 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   // int lbadapt_apply_forces(double *mode, double force[3], double h) {
   double rho, u[3], C[6], f[3]; //*f;
 
-  double h_max =
-      (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
+  double h_max = (double)P8EST_QUADRANT_LEN(max_refinement_level) / (double)P8EST_ROOT_LEN;
   int level = log2((double)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-
+  
   // f = lbfields->force;
   f[0] = lbfields->force[0]; // * pow(h, 2) * lbpar.tau * lbpar.tau; // +
                              // lbfields->force_md[0];
@@ -1088,7 +1087,7 @@ int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h) {
   // f = force;
 
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
-
+  
   /* hydrodynamic momentum density is redefined when external forces present
    */
   u[0] = (mode[1] + 0.5 * f[0]) / rho;

@@ -157,13 +157,9 @@ void lbadapt_allocate_data() {
 
 void lbadapt_release() {
   /** cleanup custom managed payload */
-  if (lbadapt_local_data != NULL) {
-    deallocate_levelwise_storage(&lbadapt_local_data);
-  }
+  deallocate_levelwise_storage(&lbadapt_local_data);
+  deallocate_levelwise_storage(&lbadapt_ghost_data);
 
-  if (lbadapt_ghost_data != NULL) {
-    deallocate_levelwise_storage(&lbadapt_ghost_data);
-  }
 #ifdef LB_ADAPTIVE_GPU
   lbadapt_gpu_deallocate_device_memory();
 #endif // LB_ADAPTIVE_GPU
@@ -265,13 +261,11 @@ void lbadapt_init() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
         data->lbfields.boundary = 0;
 #ifndef LB_ADAPTIVE_GPU
@@ -342,13 +336,11 @@ void lbadapt_reinit_force_per_cell() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_set_force(data, level);
@@ -398,13 +390,11 @@ void lbadapt_reinit_fluid_per_cell() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         } else {
-          data =
-              &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-                  mesh_iter)];
+          data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
+              mesh_iter)];
         }
         // convert rho to lattice units
         lb_float rho = lbpar.rho[0] * h_max * h_max * h_max;
@@ -610,8 +600,9 @@ void lbadapt_patches_populate_halos(int level) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
       if (!mesh_iter->current_is_ghost) {
-        data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
+        data = &lbadapt_local_data[level]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
       } else {
         SC_ABORT_NOT_REACHED();
       }
@@ -1623,18 +1614,20 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
       assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
 
       if (mesh_iter->neighbor_is_ghost) {
-        data = &lbadapt_ghost_data[mesh_iter->current_level]
-                                  [p8est_meshiter_get_neighbor_storage_id(
-                                      mesh_iter)];
+        data =
+            &lbadapt_ghost_data[mesh_iter->current_level]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
         if (!data->lbfields.boundary) {
           // invert streaming step only if ghost neighbor is no boundary cell
           currCellData->lbfluid[1][inv[dir_ESPR]] =
               data->lbfluid[0][inv_neigh_dir_ESPR];
         }
       } else {
-        data = &lbadapt_local_data[mesh_iter->current_level]
-                                  [p8est_meshiter_get_neighbor_storage_id(
-                                      mesh_iter)];
+        data =
+            &lbadapt_local_data[mesh_iter->current_level]
+                               [p8est_meshiter_get_neighbor_storage_id(
+                                   mesh_iter)];
         data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
             currCellData->lbfluid[0][dir_ESPR];
       }
@@ -1683,12 +1676,14 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
       if (mesh_iter->current_is_ghost) {
-        data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
+        data = &lbadapt_ghost_data[level]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
         has_virtuals = mesh_iter->mesh->virtual_gflags[mesh_iter->current_qid];
       } else {
-        data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
-            mesh_iter)];
+        data = &lbadapt_local_data[level]
+                                  [p8est_meshiter_get_current_storage_id(
+                                      mesh_iter)];
         has_virtuals = mesh_iter->mesh->virtual_qflags[mesh_iter->current_qid];
       }
 #ifdef LB_BOUNDARIES

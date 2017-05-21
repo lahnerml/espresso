@@ -334,6 +334,7 @@ void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
 void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+int64_t lbadapt_map_pos_to_proc(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
 

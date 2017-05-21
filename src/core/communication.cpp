@@ -197,7 +197,8 @@ static int terminated = 0;
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_dd_p4est_write_particle_vtk)                                          \
-  CB(mpi_lbadapt_grid_reset)
+  CB(mpi_lbadapt_grid_reset)                                                   \
+  CB(mpi_recv_interpolated_velocity_slave)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -2731,6 +2732,31 @@ void mpi_recv_fluid_slave(int node, int index) {
                               &data[0], &data[1], &data[4]);
 #endif
     MPI_Send(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
+  }
+#endif
+}
+
+void mpi_recv_interpolated_velocity (int node, double *p, double *v){
+#ifdef LB_ADAPTIVE
+  if (node == this_node) {
+    lb_lbfluid_get_interpolated_velocity_cells_only(p, v);
+  } else {
+    double data[3] = {p[0], p[1], p[2]};
+    mpi_call(mpi_recv_interpolated_velocity_slave, node, 0);
+    MPI_Send(data, 3, MPI_DOUBLE, node, SOME_TAG, comm_cart);
+    MPI_Recv(v, 3, MPI_DOUBLE, node, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+  }
+#endif
+}
+
+void mpi_recv_interpolated_velocity_slave (int node, int index){
+#ifdef LB_ADAPTIVE
+  if (node == this_node) {
+    double p[3];
+    double data[3];
+    MPI_Recv(p, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
+    lb_lbfluid_get_interpolated_velocity_cells_only(p, data);
+    MPI_Send(data, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
 #endif
 }

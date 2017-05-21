@@ -584,6 +584,8 @@ void mpi_geometric_refinement (int node, int param);
 void mpi_inv_geometric_refinement (int node, int param);
 
 void mpi_exclude_boundary (int node, int param);
+
+void mpi_recv_interpolated_velocity (int node, double *p, double *v);
 #endif // LB_ADAPTIVE
 
 #ifdef DD_P4EST

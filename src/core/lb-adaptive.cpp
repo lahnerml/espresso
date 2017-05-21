@@ -2001,6 +2001,27 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   return dd_p4est_cell_morton_idx(x, y, z);
 }
 
+int64_t lbadapt_map_pos_to_proc(double pos[3]) {
+  double pfold[3] = {pos[0], pos[1], pos[2]};
+  int im[3] = {0, 0, 0}; /* dummy */
+  fold_position(pfold, im);
+  for (int d=0;d<3;++d) {
+    double errmar = 0.5*ROUND_ERROR_PREC * box_l[d];
+    if (pos[d] < 0 && pos[d] > -errmar) pfold[d] = 0;
+    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] = pos[d] - 2*errmar;
+    // In the other two cases ("pos[d] <= -errmar" and
+    // "pos[d] >= box_l[d] + errmar") pfold is correct.
+  }
+  double inv_h_max = (double)(1 << max_refinement_level);
+  int64_t pidx = dd_p4est_cell_morton_idx(pfold[0] * inv_h_max, 
+                                          pfold[1] * inv_h_max, pfold[2] * inv_h_max);
+  for (int i = 1; i < n_nodes; ++i) {
+    p8est_quadrant_t *q = &p8est->global_first_position[i];
+    if (lbadapt_get_global_idx(q, q->p.which_tree) > pidx) return i - 1;
+  }
+  return n_nodes - 1;
+}
+
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree, int displace[3]) {
   int x, y, z;
   double xyz[3];

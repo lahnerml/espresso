@@ -208,6 +208,21 @@ int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
                                            p8est_t *p4est_new, T *data_mapped,
                                            std::vector<T> **data_partitioned);
 
+template <typename T>
+/** After all local data has been received insert in newly allocated level-wise
+ * data structure.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_new   p4est after partitioning.
+ * @param mesh_new    Lookup tables referring to \a p4est_new
+ * @param data_partitioned  Partitioned data, sorted by rank of origin. Vector
+ *                          needs to be MPI_Size long.
+ * @param data_levelwise  Level-wise numerical payload.
+ * @return int
+ */
+int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t mesh_new,
+                               std::vector<T> **data_partitioned,
+                               T **data_levelwise);
 /*@}*/
 #endif // LB_ADAPTIVE
 

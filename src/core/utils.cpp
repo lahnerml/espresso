@@ -214,3 +214,45 @@ int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
 
   return 0;
 }
+
+template <typename T>
+int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+                               std::vector<T> **data_partitioned,
+                               T **data_levelwise) {
+  int size = p4est_new->mpisize;
+  // counters
+  int tid = 0;
+  int qid = 0;
+  int tqid = 0;
+
+  // trees
+  p8est_tree_t *curr_tree = p8est_tree_array_index(p4est_new->trees, tid);
+  // quadrants
+  p8est_quadrant_t *curr_quad;
+
+  int level, sid;
+
+  for (int p = 0; p < size; ++p) {
+    for (int q = 0; q < data_partitioned[p]->size(); ++q) {
+      // wrap multiple trees
+      if (tqid == curr_tree->quadrants.elem_count) {
+        ++tid;
+        P4EST_ASSERT(tid < p4est_new->trees->elem_count);
+        curr_tree = p8est_tree_array_index(p4est_new->trees, tid);
+        tqid = 0;
+      }
+      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
+      level = curr_quad->level;
+      sid = mesh_new->quad_qreal_offset[qid];
+      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p]->at(q),
+                  sizeof(T));
+      ++tqid;
+      ++qid;
+    }
+  }
+
+  // verify that all real quadrants have been processed
+  P4EST_ASSERT(qid == mesh_new->local_num_quadrants);
+
+  return 0;
+}

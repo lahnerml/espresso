@@ -146,9 +146,9 @@ template <typename T>
  * @param data_new    Numerical payload of new quadrant.
  * @return int
  */
-int data_restriction (p8est_t *p4est_old, p8est_t *p4est_new,
-                      p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
-                      int which_tree, T* data_old, T* data_new);
+int data_restriction(p8est_t *p4est_old, p8est_t *p4est_new,
+                     p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
+                     int which_tree, T *data_old, T *data_new);
 
 /** Skeleton for interpolating data.
  *
@@ -166,7 +166,7 @@ int data_restriction (p8est_t *p4est_old, p8est_t *p4est_new,
 template <typename T>
 int data_interpolation(p8est_t *p4est_old, p8est_t *p4est_new,
                        p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
-                       int which_tree, T* data_old, T* data_new);
+                       int which_tree, T *data_old, T *data_new);
 
 template <typename T>
 /** Generic mapping function from custom-managed level-wise data to a temporary
@@ -186,7 +186,8 @@ template <typename T>
  *                                   payload is supposed to be filled with 0.
  */
 int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
-  p8est_t *p4est_new, T **local_data_levelwise, T *mapped_data_flat);
+                            p8est_t *p4est_new, T **local_data_levelwise,
+                            T *mapped_data_flat);
 
 template <typename T>
 /** Generic function to re-establish a proper load balacing after the grid has
@@ -204,8 +205,7 @@ template <typename T>
  * @return int
  */
 int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
-                                           p8est_t *p4est_new,
-                                           T *data_mapped,
+                                           p8est_t *p4est_new, T *data_mapped,
                                            std::vector<T> **data_partitioned);
 
 /*@}*/

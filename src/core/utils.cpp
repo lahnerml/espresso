@@ -101,3 +101,116 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
   return 0;
 }
 
+template <typename T>
+int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
+                                           p8est_t *p4est_new, T *data_mapped,
+                                           std::vector<T> **data_partitioned) {
+  int rank = p4est_old->mpirank;
+  int size = p4est_old->mpisize;
+  int lb_old_local = p4est_old->global_first_quadrant[rank];
+  int ub_old_local = p4est_old->global_first_quadrant[rank + 1];
+  int lb_new_local = p4est_new->global_first_quadrant[rank];
+  int ub_new_local = p4est_new->global_first_quadrant[rank + 1];
+  int lb_old_remote = 0;
+  int ub_old_remote = 0;
+  int lb_new_remote = 0;
+  int ub_new_remote = 0;
+  int data_length = 0;
+  int send_offset = 0;
+
+  int mpiret;
+  sc_MPI_Request *r;
+  sc_array_t *requests;
+  requests = sc_array_new(sizeof(sc_MPI_Request));
+
+  // determine from which processors we receive quadrants
+  /** there are 5 cases to distinguish
+   * 1. no quadrants of neighbor need to be received; neighbor rank < rank
+   * 2. some quadrants of neighbor need to be received; neighbor rank < rank
+   * 3. all quadrants of neighbor need to be received from neighbor
+   * 4. some quadrants of neighbor need to be received; neighbor rank > rank
+   * 5. no quadrants of neighbor need to be received; neighbor rank > rank
+   */
+  for (int p = 0; p < size; ++p) {
+    lb_old_remote = ub_old_remote;
+    ub_old_remote = p4est_old->global_first_quadrant[p + 1];
+
+    if ((ub_old_remote <= lb_new_local) || (ub_new_local < lb_old_remote)) {
+      // cases 1 and 5
+      data_length = 0;
+    } else if ((lb_new_local >= lb_old_remote) &&
+               (lb_new_local < ub_old_remote) &&
+               (ub_new_local > lb_old_remote) &&
+               (ub_new_local < ub_old_remote)) {
+      // case 2
+      data_length = ub_old_remote - lb_new_local;
+    } else if ((lb_new_local <= lb_old_remote) &&
+               (lb_new_local < ub_old_remote) &&
+               (ub_new_local > lb_old_remote) &&
+               (ub_new_local >= ub_old_remote)) {
+      // case 3
+      data_length = ub_old_remote - lb_old_remote;
+    } else if ((lb_new_local < lb_old_remote) &&
+               (lb_new_local < ub_old_remote) &&
+               (ub_new_local > lb_old_remote) &&
+               (ub_new_local <= ub_old_remote)) {
+      // case 4
+      data_length = ub_new_local - lb_old_remote;
+    } else {
+      SC_ABORT_NOT_REACHED();
+    }
+    // allocate receive buffer and wait for messages
+    data_partitioned[p] = new std::vector<T>(data_length);
+    r = (sc_MPI_Request *)sc_array_push(requests);
+    mpiret = sc_MPI_Irecv((void *)data_partitioned[p]->begin(),
+                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
+                          p4est_new->mpicomm, r);
+    SC_CHECK_MPI(mpiret);
+  }
+
+  // send respective quadrants to other processors
+  for (int p = 0; p < size; ++p) {
+    lb_new_remote = ub_new_remote;
+    ub_new_remote = p4est_new->global_first_quadrant[p + 1];
+
+    if ((ub_old_local <= lb_new_remote) || (ub_new_remote < lb_old_local)) {
+      // cases 1 and 5
+      data_length = 0;
+    } else if ((lb_new_remote >= lb_old_local) &&
+               (lb_new_remote < ub_old_local) &&
+               (ub_new_remote > lb_old_local) &&
+               (ub_new_remote < ub_old_local)) {
+      // case 2
+      data_length = ub_old_local - lb_new_remote;
+    } else if ((lb_new_remote <= lb_old_local) &&
+               (lb_new_remote < ub_old_local) &&
+               (ub_new_remote > lb_old_local) &&
+               (ub_new_remote >= ub_old_local)) {
+      // case 3
+      data_length = ub_old_local - lb_old_local;
+    } else if ((lb_new_remote < lb_old_local) &&
+               (lb_new_remote < ub_old_local) &&
+               (ub_new_remote > lb_old_local) &&
+               (ub_new_remote <= ub_old_local)) {
+      // case 4
+      data_length = ub_new_remote - lb_old_local;
+    } else {
+      SC_ABORT_NOT_REACHED();
+    }
+    r = (sc_MPI_Request *)sc_array_push(requests);
+    mpiret = sc_MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
+                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
+                          p4est_new->mpicomm, r);
+    SC_CHECK_MPI(mpiret);
+    send_offset += data_length;
+  }
+
+  /** Wait for communication to finish */
+  mpiret =
+      sc_MPI_Waitall(requests->elem_count, (sc_MPI_Request *)requests->array,
+                     sc_MPI_STATUSES_IGNORE);
+  SC_CHECK_MPI(mpiret);
+  sc_array_destroy(requests);
+
+  return 0;
+}

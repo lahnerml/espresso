@@ -188,6 +188,26 @@ template <typename T>
 int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
   p8est_t *p4est_new, T **local_data_levelwise, T *mapped_data_flat);
 
+template <typename T>
+/** Generic function to re-establish a proper load balacing after the grid has
+ * changed. Transfer data to the respective processors according to new
+ * partition table.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_old   p4est before calling p4est_partition.
+ * @param p4est_new   p4est after calling p4est_partition.
+ * @param data_mapped Mapped data, result of calling post_gridadapt_map_data.
+ * @param data_partitioned  Partitioned data, sorted by rank of origin. Vector
+ *                          needs to be MPI_Size long, individual subvectors
+ *                          will be allocated by the function and they will be
+ *                          used as receive buffers.
+ * @return int
+ */
+int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
+                                           p8est_t *p4est_new,
+                                           T *data_mapped,
+                                           std::vector<T> **data_partitioned);
+
 /*@}*/
 #endif // LB_ADAPTIVE
 

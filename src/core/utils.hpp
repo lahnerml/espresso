@@ -37,6 +37,7 @@
 #include "errorhandling.hpp"
 
 #ifdef LB_ADAPTIVE
+#include "p8est.h"
 #include "p8est_mesh.h"
 #endif // LB_ADAPTIVE
 
@@ -130,6 +131,63 @@ int deallocate_levelwise_storage(T ***data) {
   }
   return 0;
 }
+
+template <typename T>
+/** Skeleton for restricting data.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_old   p4est before grid change
+ * @param p4est_new   p4est after grid change
+ * @param quad_old    Current quad in old p4est
+ * @param quad_new    Current quad in new p4est
+ * @param which_tree  Current tree
+ * @param data_old    Numerical payload of old quadrant from which \a data_new
+ *                    will be generated.
+ * @param data_new    Numerical payload of new quadrant.
+ * @return int
+ */
+int data_restriction (p8est_t *p4est_old, p8est_t *p4est_new,
+                      p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
+                      int which_tree, T* data_old, T* data_new);
+
+/** Skeleton for interpolating data.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_old   p4est before grid change
+ * @param p4est_new   p4est after grid change
+ * @param quad_old    Current quad in old p4est
+ * @param quad_new    Current quad in new p4est
+ * @param which_tree  Current tree
+ * @param data_old    Numerical payload of old quadrant from which \a data_new
+ *                    will be generated.
+ * @param data_new    Numerical payload of new quadrant.
+ * @return int
+ */
+template <typename T>
+int data_interpolation(p8est_t *p4est_old, p8est_t *p4est_new,
+                       p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
+                       int which_tree, T* data_old, T* data_new);
+
+template <typename T>
+/** Generic mapping function from custom-managed level-wise data to a temporary
+ * flat data storage.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_old   p4est before refining, coarsening, and balancing.
+ * @param mesh_old    Lookup tables for \a p4est_old.
+ * @param p4est_new   p4est after refining, coarsening, and balancing.
+ * @param local_data_levelwise   Level-wise numerical payload, corresponds to
+ *                               \a p4est_old
+ * @param mapped_data_flat  Already allocated container for temporarily storing
+ *                          mapped data from old to new grid before re-
+ *                          establishing a good load-balancing. corresponding
+ *                          to \a p4est_new.
+ *                          CAUTION: Needs to be allocated and all numerical
+ *                                   payload is supposed to be filled with 0.
+ */
+int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
+  p8est_t *p4est_new, T **local_data_levelwise, T *mapped_data_flat);
+
 /*@}*/
 #endif // LB_ADAPTIVE
 

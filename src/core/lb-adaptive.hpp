@@ -107,6 +107,7 @@ void lbadapt_reinit_force_per_cell();
  */
 void lbadapt_reinit_fluid_per_cell();
 
+#if 0
 /** After refine, coarsening and balance locally map data from old to new
  * discretization before re-establishing a proper load-balancing.
  *
@@ -160,6 +161,7 @@ int lbadapt_post_partition_insert_data(
     p8est_mesh_t *lb_updated_mesh, p8est_ghostvirt_t *lb_updated_ghostvirt,
     lbadapt_payload_t **lb_partitioned_data_per_proc,
     lbadapt_payload_t **lb_updated_local_data);
+#endif // 0
 
 #ifdef LB_BOUNDARIES
 /** Check if current midpoint is part of the boundary

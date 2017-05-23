@@ -68,6 +68,12 @@
 #include "thermostat.hpp"
 #include "utils.hpp"
 
+#include "call_trace.hpp"
+
+#ifdef DD_P4EST
+#include <p4est_to_p8est.h>
+#endif
+
 /** whether the thermostat has to be reinitialized before integration */
 static int reinit_thermo = 1;
 static int reinit_electrostatics = 0;
@@ -82,6 +88,8 @@ static int reinit_particle_comm_gpu = 1;
 
 /** Function is executed by all processes */
 void on_program_start() {
+  CALL_TRACE();
+
   EVENT_TRACE(fprintf(stderr, "%d: on_program_start\n", this_node));
 
 /* tell Electric fence that we do realloc(0) on purpose. */
@@ -109,6 +117,15 @@ void on_program_start() {
   /* calculate initial minimal number of cells (see tclcallback_min_num_cells)
    */
   min_num_cells = calc_processor_min_num_cells();
+
+#ifdef DD_P4EST
+  //sc_init (comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
+  sc_init (comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
+  //p4est_init (NULL, SC_LP_PRODUCTION);
+  //sc_init(MPI_COMM_WORLD, 1, 1, NULL, SC_LP_PRODUCTION);
+  //p4est_init(NULL, SC_LP_VERBOSE);
+  p4est_init(NULL, SC_LP_PRODUCTION);
+#endif
 
   /* initially go for domain decomposition */
   dd_topology_init(&local_cells);
@@ -353,6 +370,8 @@ void on_coulomb_change() {
 }
 
 void on_short_range_ia_change() {
+  CALL_TRACE();
+
   EVENT_TRACE(fprintf(stderr, "%d: on_short_range_ia_changes\n", this_node));
   invalidate_obs();
 
@@ -545,6 +564,8 @@ void on_temperature_change() {
 }
 
 void on_parameter_change(int field) {
+  CALL_TRACE();
+
   EVENT_TRACE(fprintf(stderr, "%d: on_parameter_change %s\n", this_node,
                       fields[field].name));
 

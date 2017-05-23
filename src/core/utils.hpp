@@ -226,6 +226,9 @@ int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t mesh_new,
 /*@}*/
 #endif // LB_ADAPTIVE
 
+// Comute a Morton index for a cell using its coordinates
+int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
+
 /************************************************
  * data types
  ************************************************/

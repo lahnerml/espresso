@@ -25,12 +25,13 @@
  *
  */
 
-#ifndef _LB_ADAPTIVE_H
-#define _LB_ADAPTIVE_H
+#ifndef LB_ADAPTIVE_H
+#define LB_ADAPTIVE_H
 
 #ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
 #include <p8est.h>
+#include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
@@ -43,6 +44,7 @@
 
 #include "lb-adaptive-gpu.hpp"
 #include "lb.hpp"
+#include "utils.hpp"
 
 /* "global variables" */
 extern p8est_t *p8est;
@@ -57,6 +59,7 @@ extern int finest_level_local;
 extern int coarsest_level_ghost;
 extern int finest_level_ghost;
 extern int finest_level_global;
+extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
                                                  //        z_min, z_max
@@ -106,62 +109,6 @@ void lbadapt_reinit_force_per_cell();
 /** (Re-)initialize the fluid according to the given value of rho
  */
 void lbadapt_reinit_fluid_per_cell();
-
-#if 0
-/** After refine, coarsening and balance locally map data from old to new
- * discretization before re-establishing a proper load-balancing.
- *
- * \param[in]  lb_p4est_old     p4est before grid adaptation.
- * \param[in]  old_mesh         mesh related to \a lb_p4est_old
- * \param[in]  lb_p4est_new     p4est after grid adaptation.
- * \param[in]  old_local_data   Old, level-wise numerical payload.
- * \param[out] lb_mapped_data   New, flat numerical payload.
- */
-int lbadapt_post_gridadapt_map_data(p8est_t *lb_p4est_old,
-                                    p8est_mesh_t *old_mesh,
-                                    p8est_t *lb_p4est_new,
-                                    lbadapt_payload_t **old_local_data,
-                                    lbadapt_payload_t *lb_mapped_data);
-
-
-/** For re-establishing a proper load balancing after the grid has changed we
- * need to make sure that the payload is transferred to the respective
- * processors to which its cells have been migrated.
- *
- * @param[in] lb_p4est_pre_part    Adapted p4est before calling p4est_partition.
- * @param[in] lb_p4est_post_part   Partitioned p4est.
- * @param[in] lb_mapped_data       Flat numerical payload mapped to adapted
- *                                 grid.
- * @param[out] lb_partitioned_data_per_proc   Container for numerical payload of
- *                                            this rank's quadrants, separated
- *                                            from which rank it has been
- *                                            obtained. A flat storage scheme
- *                                            (i.e. non-level-wise) is used.
- */
-int lbadapt_post_partition_transfer_data(
-    p8est_t *lb_p4est_pre_part, p8est_t *lb_p4est_post_part,
-    lbadapt_payload_t *lb_mapped_data,
-    lbadapt_payload_t **lb_partitioned_data_per_proc);
-
-/** Restore a level-wise ordering of the numerical payload leaving spaces force
- * virtual quadrants after all numerical payload of this process has been
- * collected by all ranks.
- *
- * @param[in]  lb_updated_p4est         Partitioned p4est after grid alteration.
- * @param[in]  lb_updated_ghost         Ghost layer for updated p4est.
- * @param[in]  lb_updated_mesh          Mesh for updated p4est.
- * @param[in]  lb_updated_ghostvirt     Extended ghost layer.
- * @param[in]  lb_partitioned_data_per_proc   Numerical payload of all local
- *                                            quadrants sorted by rank of
- *                                            origin.
- * @param[out] lb_updated_local_data    Newly populated level-wise data.
- */
-int lbadapt_post_partition_insert_data(
-    p8est_t *lb_updated_p4est, p8est_ghost_t *lb_updated_ghost,
-    p8est_mesh_t *lb_updated_mesh, p8est_ghostvirt_t *lb_updated_ghostvirt,
-    lbadapt_payload_t **lb_partitioned_data_per_proc,
-    lbadapt_payload_t **lb_updated_local_data);
-#endif // 0
 
 #ifdef LB_BOUNDARIES
 /** Check if current midpoint is part of the boundary
@@ -407,6 +354,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values);
  */
 void lbadapt_get_boundary_status();
 
+int lbadapt_calc_local_fields(double populations[2][19], double mode[19],
+                              double force[3], int boundary, int has_force,
+                              double h, double *rho, double *j, double *pi);
+
 /** Calculate local density from pre-collision moments
  *
  * \param [in]  mesh_iter    mesh-based iterator
@@ -421,6 +372,16 @@ void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho);
  */
 void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j);
 
+int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+int64_t lbadapt_map_pos_to_proc(double pos[3]);
+int64_t lbadapt_map_pos_to_quad(double pos[3]);
+int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
+
+int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
+                                  double delta[20], int level[20]);
+int lbadapt_interpolate_pos_ghost(double pos[3], lbadapt_payload_t *nodes[20],
+                                  double delta[20], int level[20]);
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 
@@ -433,5 +394,4 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 
 #endif // LB_ADAPTIVE
-
-#endif // _LB_ADAPTIVE_H
+#endif // LB_ADAPTIVE_H

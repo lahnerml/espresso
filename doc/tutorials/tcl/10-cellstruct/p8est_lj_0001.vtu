@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<VTKFile type="UnstructuredGrid" version="0.1" compressor="vtkZLibDataCompressor" byte_order="LittleEndian">
+  <UnstructuredGrid>
+    <Piece NumberOfPoints="72" NumberOfCells="9">
+      <Points>
+        <DataArray type="Float32" Name="Position" NumberOfComponents="3" format="binary">
+          AQAAAACAAABgAwAA0AAAAA==eNp1ksERg0AMA4ea+DIx1dDDvVMFV9PRkR/BowiJDHmdR4hDXtH3aZ3ndxxjLNv2uuZ+6sfIS+fcv/6+t6C/Zvqpc4Y+lvJBx1x6PafOmf56n37cBT91zszDezgzj76bl44dM7RvhvbN0L5pLOpslo9coCsr/PA2yw0/9X87P/FyFs7OuTjHO6N7Z/2hb+/Su/de/T/wjn+ZPvXhrL0b5+49eQfYD0ywE7uYVjKpU13AL8bsAn7q6gJ+8SMr+KmLFfNkKE+G8mQoT8YHLSSHeA==
+        </DataArray>
+      </Points>
+      <Cells>
+        <DataArray type="Int32" Name="connectivity" format="binary">
+          AQAAAACAAAAgAQAAeAAAAA==eNoNw4dWQQEAANBnZ0SyIyOzYVOhkIr//yP3nnODIAhCho0YNWbchDcmTZk2461Zc96Z996CRUuWrVi15oN1Gz7atGXbjk927dl34NCRz7746ptjJ06dOXfh0pVr3/3w041bd3757d6DR388+euf/569eAXNHQn9
+        </DataArray>
+        <DataArray type="Int32" Name="offsets" format="binary">
+          AQAAAACAAAAkAAAAIAAAAA==eNrjYGBgEABiCSBWAGINIDYAYgsgdgBiDyAGABTEAWk=
+        </DataArray>
+        <DataArray type="UInt8" Name="types" format="binary">
+          AQAAAACAAAAJAAAACwAAAA==eNrj5oYCAAH4AGQ=
+        </DataArray>
+      </Cells>
+      <CellData Scalars="treeid,level,mpirank,localid">
+        <DataArray type="Int32" Name="treeid" format="binary">
+          AQAAAACAAAAkAAAAIAAAAA==eNrjZGBg4AJibiDmAWJeIOYDYn4gFgBiQSAGAAhYAHY=
+        </DataArray>
+        <DataArray type="UInt8" Name="level" format="binary">
+          AQAAAACAAAAJAAAACwAAAA==eNpjYIACAAAJAAE=
+        </DataArray>
+        <DataArray type="Int32" Name="mpirank" format="binary">
+          AQAAAACAAAAkAAAADgAAAA==eNpjZGBgYCSAAQDYAAo=
+        </DataArray>
+        <DataArray type="Int32" Name="localid" format="binary">
+          AQAAAACAAAAkAAAAHwAAAA==eNoNwwESADAEwLAaxv9frLkLQPg5XW5/j9cHAgQAJQ==
+        </DataArray>
+      </CellData>
+    </Piece>
+  </UnstructuredGrid>
+</VTKFile>

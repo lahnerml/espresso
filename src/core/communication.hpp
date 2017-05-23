@@ -536,6 +536,12 @@ void mpi_bcast_constraint(int del_num);
  */
 void mpi_lbadapt_grid_init (int node, int level);
 
+/** resets an adaptive grid
+ *
+ * @param [in] node the node on which this function is called
+ */
+void mpi_lbadapt_grid_reset (int node, int dummy);
+
 /** Call for parallel IO of boundary
  *
  * @param [in] node the node on which this function is called
@@ -583,9 +589,6 @@ void mpi_rand_refinement (int node, int maxLevel);
  */
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
 
-/** Call non-recursive refinement function for all quadrants whose z-coordinate
- * is smaller than 0.5.
- */
 void mpi_reg_refinement (int node, int param=0);
 
 /** Call recursive geometric refinement function, i.e. all quadrants that are
@@ -598,8 +601,18 @@ void mpi_inv_geometric_refinement (int node, int param);
 /** Ignore boundary with given index in geometric refinement function.
  */
 void mpi_exclude_boundary (int node, int param);
+
+void mpi_recv_interpolated_velocity (int node, double *p, double *v);
 #endif // LB_ADAPTIVE
 
+#ifdef DD_P4EST
+/** Call for parallel IO of particle
+ *
+ * @param [in] node the node on which this function is called
+ * @param [in] len length of the filename to receive
+ */
+void mpi_dd_p4est_write_particle_vtk(int node, int len);
+#endif
 
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */

@@ -326,6 +326,10 @@ void lb_reinit_parameters();
 /** (Re-)initializes the fluid. */
 void lb_reinit_fluid();
 
+#ifdef LB_ADAPTIVE
+void lb_release_fluid();
+#endif // LB_ADAPTIVE
+
 /** deallocate lb fluid */
 void lb_release();
 
@@ -378,7 +382,9 @@ void calc_particle_lattice_ia();
 /** calculates the fluid velocity at a given position of the
  * lattice. Note that it can lead to undefined behaviour if the
  * position is not within the local lattice. */
+int lb_lbfluid_get_interpolated_velocity_cells_only(double *p, double *v);
 int lb_lbfluid_get_interpolated_velocity(double* p, double* v);
+int lb_lbfluid_get_interpolated_velocity(double* p, double* v, bool ghost);
 
 inline void lb_calc_local_fields(index_t index, double *rho, double *j, double *pi);
 

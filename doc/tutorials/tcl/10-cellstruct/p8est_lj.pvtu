@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<VTKFile type="PUnstructuredGrid" version="0.1" compressor="vtkZLibDataCompressor" byte_order="LittleEndian">
+  <PUnstructuredGrid GhostLevel="0">
+    <PPoints>
+      <PDataArray type="Float32" Name="Position" NumberOfComponents="3" format="binary"/>
+    </PPoints>
+    <PCellData Scalars="treeid,level,mpirank,localid">
+      <PDataArray type="Int32" Name="treeid" format="binary"/>
+      <PDataArray type="UInt8" Name="level" format="binary"/>
+      <PDataArray type="Int32" Name="mpirank" format="binary"/>
+      <PDataArray type="Int32" Name="localid" format="binary"/>
+    </PCellData>
+    <Piece Source="p8est_lj_0000.vtu"/>
+  </PUnstructuredGrid>
+</VTKFile>

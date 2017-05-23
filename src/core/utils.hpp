@@ -150,6 +150,7 @@ int data_restriction(p8est_t *p4est_old, p8est_t *p4est_new,
                      p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
                      int which_tree, T *data_old, T *data_new);
 
+template <typename T>
 /** Skeleton for interpolating data.
  *
  * @param T           Data-type of numerical payload.
@@ -163,7 +164,6 @@ int data_restriction(p8est_t *p4est_old, p8est_t *p4est_new,
  * @param data_new    Numerical payload of new quadrant.
  * @return int
  */
-template <typename T>
 int data_interpolation(p8est_t *p4est_old, p8est_t *p4est_new,
                        p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
                        int which_tree, T *data_old, T *data_new);

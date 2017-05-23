@@ -135,30 +135,10 @@ int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
     lb_old_remote = ub_old_remote;
     ub_old_remote = p4est_old->global_first_quadrant[p + 1];
 
-    if ((ub_old_remote <= lb_new_local) || (ub_new_local < lb_old_remote)) {
-      // cases 1 and 5
-      data_length = 0;
-    } else if ((lb_new_local >= lb_old_remote) &&
-               (lb_new_local < ub_old_remote) &&
-               (ub_new_local > lb_old_remote) &&
-               (ub_new_local < ub_old_remote)) {
-      // case 2
-      data_length = ub_old_remote - lb_new_local;
-    } else if ((lb_new_local <= lb_old_remote) &&
-               (lb_new_local < ub_old_remote) &&
-               (ub_new_local > lb_old_remote) &&
-               (ub_new_local >= ub_old_remote)) {
-      // case 3
-      data_length = ub_old_remote - lb_old_remote;
-    } else if ((lb_new_local < lb_old_remote) &&
-               (lb_new_local < ub_old_remote) &&
-               (ub_new_local > lb_old_remote) &&
-               (ub_new_local <= ub_old_remote)) {
-      // case 4
-      data_length = ub_new_local - lb_old_remote;
-    } else {
-      SC_ABORT_NOT_REACHED();
-    }
+    data_length = std::max(0,
+                           std::min(ub_old_remote, ub_new_local) -
+                               std::max(lb_old_remote, ub_new_local));
+
     // allocate receive buffer and wait for messages
     data_partitioned[p] = new std::vector<T>(data_length);
     r = (sc_MPI_Request *)sc_array_push(requests);
@@ -173,30 +153,10 @@ int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
     lb_new_remote = ub_new_remote;
     ub_new_remote = p4est_new->global_first_quadrant[p + 1];
 
-    if ((ub_old_local <= lb_new_remote) || (ub_new_remote < lb_old_local)) {
-      // cases 1 and 5
-      data_length = 0;
-    } else if ((lb_new_remote >= lb_old_local) &&
-               (lb_new_remote < ub_old_local) &&
-               (ub_new_remote > lb_old_local) &&
-               (ub_new_remote < ub_old_local)) {
-      // case 2
-      data_length = ub_old_local - lb_new_remote;
-    } else if ((lb_new_remote <= lb_old_local) &&
-               (lb_new_remote < ub_old_local) &&
-               (ub_new_remote > lb_old_local) &&
-               (ub_new_remote >= ub_old_local)) {
-      // case 3
-      data_length = ub_old_local - lb_old_local;
-    } else if ((lb_new_remote < lb_old_local) &&
-               (lb_new_remote < ub_old_local) &&
-               (ub_new_remote > lb_old_local) &&
-               (ub_new_remote <= ub_old_local)) {
-      // case 4
-      data_length = ub_new_remote - lb_old_local;
-    } else {
-      SC_ABORT_NOT_REACHED();
-    }
+    data_length = std::max(0,
+                           std::min(ub_old_local, ub_new_remote) -
+                               std::max(lb_old_local, ub_new_remote));
+
     r = (sc_MPI_Request *)sc_array_push(requests);
     mpiret = sc_MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
                           data_length * sizeof(T), sc_MPI_BYTE, p, 0,

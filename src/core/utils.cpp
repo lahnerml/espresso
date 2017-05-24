@@ -62,8 +62,9 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
     // distinguish three cases to properly map data and increase indices
     if (level_old == level_new) {
       // old cell has neither been coarsened nor refined
-      memcpy(&mapped_data_flat[qid_new],
-             &local_data_levelwise[level_old][sid_old], sizeof(T));
+      data_transfer(p4est_old, p4est_new, curr_quad_old, curr_quad_new, tid_old,
+                    &local_data_levelwise[level_old][sid_old],
+                    &mapped_data_flat[qid_new]);
       ++qid_old;
       ++qid_new;
       ++tqid_old;
@@ -71,7 +72,8 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
     } else if (level_old + 1 == level_new) {
       // old cell has been coarsened
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
-        data_restriction(&local_data_levelwise[level_old][sid_old],
+        data_restriction(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
+                         tid_old, &local_data_levelwise[level_old][sid_old],
                          &mapped_data_flat[qid_new]);
         ++sid_old;
         ++tqid_old;
@@ -82,7 +84,8 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
     } else if (level_old == level_new + 1) {
       // old cell has been refined
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
-        data_interpolation(&local_data_levelwise[level_old][sid_old],
+        data_interpolation(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
+                           tid_old, &local_data_levelwise[level_old][sid_old],
                            &mapped_data_flat[qid_new]);
         ++tqid_new;
         ++qid_new;

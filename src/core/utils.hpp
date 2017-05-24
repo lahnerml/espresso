@@ -133,6 +133,24 @@ int deallocate_levelwise_storage(T ***data) {
 }
 
 template <typename T>
+/** Skeleton for copying data.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param p4est_old   p4est before grid change
+ * @param p4est_new   p4est after grid change
+ * @param quad_old    Current quad in old p4est
+ * @param quad_new    Current quad in new p4est
+ * @param which_tree  Current tree
+ * @param data_old    Numerical payload of old quadrant from which \a data_new
+ *                    will be generated.
+ * @param data_new    Numerical payload of new quadrant.
+ * @return int
+ */
+int data_transfer(p8est_t *p4est_old, p8est_t *p4est_new,
+                  p8est_quadrant_t *quad_old, p8est_quadrant_t *quad_new,
+                  int which_tree, T *data_old, T *data_new);
+
+template <typename T>
 /** Skeleton for restricting data.
  *
  * @param T           Data-type of numerical payload.

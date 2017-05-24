@@ -2756,6 +2756,7 @@ void mpi_recv_fluid_slave(int node, int index) {
 
 void mpi_recv_interpolated_velocity(int node, double *p, double *v) {
 #ifdef LB_ADAPTIVE
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     lb_lbfluid_get_interpolated_velocity_cells_only(p, v);
   } else {
@@ -2764,11 +2765,13 @@ void mpi_recv_interpolated_velocity(int node, double *p, double *v) {
     MPI_Send(data, 3, MPI_DOUBLE, node, SOME_TAG, comm_cart);
     MPI_Recv(v, 3, MPI_DOUBLE, node, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
   }
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB_ADAPTIVE
 }
 
 void mpi_recv_interpolated_velocity_slave(int node, int index) {
 #ifdef LB_ADAPTIVE
+#ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
     double p[3];
     double data[3];
@@ -2776,6 +2779,7 @@ void mpi_recv_interpolated_velocity_slave(int node, int index) {
     lb_lbfluid_get_interpolated_velocity_cells_only(p, data);
     MPI_Send(data, 3, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
+#endif // !LB_ADAPTIVE_GPU
 #endif
 }
 

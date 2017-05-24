@@ -271,14 +271,15 @@ void lbadapt_init() {
               &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
                   mesh_iter)];
         }
-        data->lbfields.boundary = 0;
 #ifndef LB_ADAPTIVE_GPU
+        data->lbfields.boundary = 0;
         init_to_zero(data);
 #else  // LB_ADAPTIVE_GPU
         for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE_HALO; ++patch_z) {
           for (int patch_y = 0; patch_y < LBADAPT_PATCHSIZE_HALO; ++patch_y) {
             for (int patch_x = 0; patch_x < LBADAPT_PATCHSIZE_HALO; ++patch_x) {
               init_to_zero(&data->patch[patch_x][patch_y][patch_z]);
+              data->patch[patch_x][patch_y][patch_z].boundary = 0;
             }
           }
         }
@@ -411,6 +412,9 @@ void lbadapt_reinit_fluid_per_cell() {
         lb_float pi[6] = {0., 0., 0., 0., 0., 0.};
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
+#ifdef LB_BOUNDARIES
+        data->lbfields.boundary = 0;
+#endif // LB_BOUNDARIES
 #else  // LB_ADAPTIVE_GPU
         for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
           for (int patch_y = 1; patch_y <= LBADAPT_PATCHSIZE; ++patch_y) {
@@ -418,18 +422,28 @@ void lbadapt_reinit_fluid_per_cell() {
               lbadapt_calc_n_from_rho_j_pi(
                   data->patch[patch_x][patch_y][patch_z].lbfluid, rho, j, pi,
                   h);
+              data->patch[patch_x][patch_y][patch_z].boundary = 0;
             }
           }
         }
 #endif // LB_ADAPTIVE_GPU
-
-#ifdef LB_BOUNDARIES
-        data->lbfields.boundary = 0;
-#endif // LB_BOUNDARIES
       }
     }
     p8est_meshiter_destroy(mesh_iter);
   }
+}
+
+template <>
+int data_transfer<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
+                                     p8est_quadrant_t *quad_old,
+                                     p8est_quadrant_t *quad_new, int which_tree,
+                                     lbadapt_payload_t *data_old,
+                                     lbadapt_payload_t *data_new) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME Port to GPU
+  std::memcpy(data_new, data_old, sizeof(lbadapt_payload_t));
+#endif // LB_ADAPTIVE_GPU
+  return 0;
 }
 
 template <>
@@ -439,11 +453,13 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
                                         int which_tree,
                                         lbadapt_payload_t *data_old,
                                         lbadapt_payload_t *data_new) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME Port to GPU
   // verify that level is correct
   P4EST_ASSERT(quad_new->level == quad_old->level + 1);
 
   // check boundary status.
-  lb_float new_mp[3];
+  double new_mp[3];
   int new_boundary;
   lbadapt_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
   new_boundary = lbadapt_is_boundary(new_mp);
@@ -463,6 +479,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   // TODO: Can this be optimized? E.g. by has_force flag?
   lbadapt_set_force(data_new, quad_new->level);
 
+#endif // !LB_ADAPTIVE_GPU
   return 0;
 }
 
@@ -471,6 +488,7 @@ int data_interpolation<lbadapt_payload_t>(
     p8est_t *p4est_old, p8est_t *p4est_new, p8est_quadrant_t *quad_old,
     p8est_quadrant_t *quad_new, int which_tree, lbadapt_payload_t *data_old,
     lbadapt_payload_t *data_new) {
+#ifndef LB_ADAPTIVE_GPU
   // verify that level is correct
   P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
 
@@ -490,6 +508,7 @@ int data_interpolation<lbadapt_payload_t>(
   // re-initialize force
   lbadapt_set_force(data_new, quad_new->level);
 
+#endif // !LB_ADAPTIVE_GPU
   return 0;
 }
 
@@ -886,8 +905,13 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   // 0.6 instead of 0.5 for stability reasons
   double half_length = 0.6 * sqrt(3) * ((double)base / (double)root);
 
-  double midpoint[3];
+  lb_float midpoint[3];
   lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+
+  double mp[3];
+  mp[0] = midpoint[0];
+  mp[1] = midpoint[1];
+  mp[2] = midpoint[2];
 
   double dist, dist_tmp, dist_vec[3];
   dist = DBL_MAX;
@@ -904,39 +928,39 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     switch (lb_boundaries[n].type) {
     case LB_BOUNDARY_WAL:
-      calculate_wall_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_wall_dist((Particle *)NULL, mp, (Particle *)NULL,
                           &lb_boundaries[n].c.wal, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_SPH:
-      calculate_sphere_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_sphere_dist((Particle *)NULL, mp, (Particle *)NULL,
                             &lb_boundaries[n].c.sph, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_CYL:
-      calculate_cylinder_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_cylinder_dist((Particle *)NULL, mp, (Particle *)NULL,
                               &lb_boundaries[n].c.cyl, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_RHOMBOID:
-      calculate_rhomboid_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_rhomboid_dist((Particle *)NULL, mp, (Particle *)NULL,
                               &lb_boundaries[n].c.rhomboid, &dist_tmp,
                               dist_vec);
       break;
 
     case LB_BOUNDARY_POR:
-      calculate_pore_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_pore_dist((Particle *)NULL, mp, (Particle *)NULL,
                           &lb_boundaries[n].c.pore, &dist_tmp, dist_vec);
       break;
 
     case LB_BOUNDARY_STOMATOCYTE:
-      calculate_stomatocyte_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_stomatocyte_dist((Particle *)NULL, mp, (Particle *)NULL,
                                  &lb_boundaries[n].c.stomatocyte, &dist_tmp,
                                  dist_vec);
       break;
 
     case LB_BOUNDARY_HOLLOW_CONE:
-      calculate_hollow_cone_dist((Particle *)NULL, midpoint, (Particle *)NULL,
+      calculate_hollow_cone_dist((Particle *)NULL, mp, (Particle *)NULL,
                                  &lb_boundaries[n].c.hollow_cone, &dist_tmp,
                                  dist_vec);
       break;
@@ -2640,7 +2664,9 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx, pos[0], pos[1],
             pos[2]);
+#ifdef DD_P4EST
     fprintf(stderr, "belongs to MD process %i\n", dd_p4est_pos_to_proc(pos));
+#endif // DD_P4EST
     errexit();
     return -1;
   }

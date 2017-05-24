@@ -4,7 +4,7 @@
 //--------------------------------------------------------------------------------------------------
 #ifdef LEES_EDWARDS
 #error "p4est and Lees-Edwards are not compatible yet."
-#endif
+#endif // LEES_EDWARDS
 //--------------------------------------------------------------------------------------------------
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
@@ -1661,4 +1661,4 @@ void dd_p4est_write_vtk() {
   fclose(h);*/
 }
 //--------------------------------------------------------------------------------------------------
-#endif
+#endif // DD_P4EST

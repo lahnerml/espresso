@@ -37,8 +37,10 @@
 #include "errorhandling.hpp"
 
 #ifdef LB_ADAPTIVE
+#ifndef __CUDACC__
 #include "p8est.h"
 #include "p8est_mesh.h"
+#endif // __CUDACC__
 #endif // LB_ADAPTIVE
 
 /*************************************************************/
@@ -83,6 +85,7 @@ const int ci_to_p4est[18] = {1,  0,  3,  2,  5,  4, 17, 14, 15,
 const int p4est_to_ci[18] = {2,  1,  4,  3,  6,  5, 16, 17, 18,
                              15, 12, 13, 14, 11, 8, 9,  10, 7};
 
+#ifndef __CUDACC__
 template <typename T>
 /** Generic function to allocate level-wise data-structure with potentially
  * empty lists from 0 to P8EST_QMAXLEVEL.
@@ -246,6 +249,7 @@ int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t mesh_new,
 
 // Comute a Morton index for a cell using its coordinates
 int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
+#endif // __CUDACC__
 
 /************************************************
  * data types

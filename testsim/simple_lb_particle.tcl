@@ -15,7 +15,7 @@ setmd box_l $boxl $boxl 1
 #part 0 pos 1.9 1.9 0.5 q 0.0 type 0 v 0.1 0 0 ext_force 0.00 0 0 fix 1 1 1
 part 0 pos 2.0 1.9 0.5 q 0.0 type 0 v 0 0 0 ;#ext_force 0.01 0 0
 
-set base 3
+set base 2
 set mlvl 3
 set wall 0.5
 
@@ -36,40 +36,40 @@ set prefac [expr pow(2, $mlvl - 1)]
 thermostat lb 0
 setmd time_step [expr $dt/$prefac]
 
-#puts "Mindist: [analyze mindist]"
-#minimize_energy 10.0 100 0.1 0.01
-#kill_particle_motion
-#kill_particle_forces
-#puts "Mindist: [analyze mindist]"
+puts "Mindist: [analyze mindist]"
+minimize_energy 10.0 100 0.1 0.01
+kill_particle_motion
+kill_particle_forces
+puts "Mindist: [analyze mindist]"
 
 lbadapt-init $base
 lbadapt_set_max_level $mlvl
 
 lbfluid cpu agrid $agrid dens 1. visc 0.032 tau [expr $dt/$prefac] friction 0.5 ext_force 0.01 0.0 0.0
 
-lbboundary wall dist $wall normal 0 1 0 
-lbboundary wall dist [expr -$boxl + $wall] normal 0 -1 0 
+lbboundary wall dist $wall normal 0 1 0
+lbboundary wall dist [expr -$boxl + $wall] normal 0 -1 0
 
-#lbadapt-geom-ref
+lbadapt-geom-ref
 
-#lbfluid print vtk boundary boundary.vtk
+lbfluid print vtk boundary boundary.vtk
 
 lbadapt-reset-fluid
 
-lbfluid print vtk velocity  lb_0.vtk
-md_vtk md_0.vtk
+#lbfluid print vtk velocity  lb_0.vtk
+#md_vtk md_0.vtk
 
 for { set i 0 } { $i < $iter } { incr i } {
-  #md_vtk "md_part_$i.vtk"
-  #lbfluid print vtk velocity  "lb_field_$i.vtk"
+  md_vtk "md_part_$i.vtk"
+  lbfluid print vtk velocity  "lb_field_$i.vtk"
   integrate [expr $iteri*int($prefac)]
   puts -nonewline "run $i at time=[setmd time]\r"
   flush stdout
 }
 
-#lbfluid print vtk velocity  "lb_field_$iter.vtk"
-lbfluid print vtk velocity  lb_1.vtk
-#md_vtk "md_part_$iter.vtk"
-md_vtk md_1.vtk
+lbfluid print vtk velocity  "lb_field_$iter.vtk"
+#lbfluid print vtk velocity  lb_1.vtk
+md_vtk "md_part_$iter.vtk"
+#md_vtk md_1.vtk
 
 exit

@@ -3591,6 +3591,8 @@ void lattice_boltzmann_update() {
  */
 inline void lb_viscous_coupling(Particle *p, double force[3],
                                 bool ghost = false) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME port to GPU
   int x, y, z;
 #ifndef LB_ADAPTIVE
   index_t node_index[8];
@@ -3619,7 +3621,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
   double h = lbpar.agrid;
   double h_max = lbpar.agrid;
-#else
+#else  // !LB_ADAPTIVE
   if (ghost) {
     dcnt = lbadapt_interpolate_pos_ghost(p->r.p, node_index, delta, level);
   } else {
@@ -3629,7 +3631,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     return;
   double h = 1.0 / (double)(1 << level[0]);
   double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
-#endif
+#endif // !LB_ADAPTIVE
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
     fprintf(stderr, "%d: OPT: LB delta=(%.3f,%.3f,%.3f,%.3f,%.3f,%.3f) "
@@ -3675,11 +3677,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
              (velocity[1] / time_step - interpolated_u[1] - p->p.mu_E[1]);
   force[2] = -lbpar.friction[0] *
              (velocity[2] / time_step - interpolated_u[2] - p->p.mu_E[2]);
-#else
+#else // LB_ELECTROHYDRODYNAMICS
   force[0] = -lbpar.friction[0] * (velocity[0] / time_step - interpolated_u[0]);
   force[1] = -lbpar.friction[0] * (velocity[1] / time_step - interpolated_u[1]);
   force[2] = -lbpar.friction[0] * (velocity[2] / time_step - interpolated_u[2]);
-#endif
+#endif // LB_ELECTROHYDRODYNAMICS
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
     fprintf(stderr, "%d: OPT: LB f_drag = (%.6e,%.3e,%.3e)\n", this_node,
@@ -3722,7 +3724,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       }
     }
   }
-#else
+#else // !LB_ADAPTIVE
   for (x = 0; x < dcnt; ++x) {
     if (n_lbsteps % (1 << (lbpar.max_refinement_level - level[x])) == 0) {
       local_f = node_index[x]->lbfields.force;
@@ -3735,7 +3737,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       local_f[2] += delta[x] * delta_j[2] / level_fact;
     }
   }
-#endif
+#endif // !LB_ADAPTIVE
 
 // map_position_to_lattice: position ... not inside a local plaquette in ...
 #ifdef ENGINE
@@ -3764,10 +3766,10 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 // velocity
 #ifndef LB_ADAPTIVE
     lblattice.map_position_to_lattice(source_position, node_index, delta);
-#else
+#else  // !LB_ADAPTIVE
     dcnt = lbadapt_interpolate_pos_adapt(source_position, node_index, delta,
                                          level);
-#endif
+#endif  // !LB_ADAPTIVE
 
     lb_lbfluid_get_interpolated_velocity(source_position, p->swim.v_source);
 
@@ -3794,7 +3796,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
         }
       }
     }
-#else
+#else  // !LB_ADAPTIVE
     for (x = 0; x < dcnt; ++x) {
       if (n_lbsteps % (1 << (max_refinement_level - level[x])) == 0) {
         local_f = node_index[x]->lbfields.force;
@@ -3805,12 +3807,15 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
         local_f[2] += delta[x] * delta_j[2] / level_fact;
       }
     }
-#endif
+#endif  // !LB_ADAPTIVE
   }
-#endif
+#endif // ENGINE
+#endif // !LB_ADAPTIVE_GPU
 }
 
 int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME Port to gpu
 #ifdef LB_ADAPTIVE
   lbadapt_payload_t *node_index[20], *data;
   double delta[20];
@@ -3860,24 +3865,32 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
   v[0] *= h_max / lbpar.tau;
   v[1] *= h_max / lbpar.tau;
   v[2] *= h_max / lbpar.tau;
-#endif
+#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE_GPU
   return 0;
 }
 
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME Port to GPU
   return lb_lbfluid_get_interpolated_velocity(p, v, false);
+#else  // !LB_ADAPTIVE_GPU
+  return -1;
+#endif // !LB_ADAPTIVE_GPU
 }
 
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME Port to GPU
 #ifndef LB_ADAPTIVE
   index_t node_index[8], index;
   double delta[6];
-#else
+#else  // !LB_ADAPTIVE
   lbadapt_payload_t *node_index[20], *data;
   double delta[20];
   int dcnt;
   int level[20];
-#endif
+#endif  // !LB_ADAPTIVE
   double local_rho, local_j[3], interpolated_u[3];
   double modes[19];
   int x, y, z;
@@ -3922,7 +3935,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   lblattice.map_position_to_lattice(pos, node_index, delta);
   double h = lbpar.agrid;
   double h_max = h;
-#else
+#else  // !LB_ADAPTIVE
   if (ghost) {
     dcnt = lbadapt_interpolate_pos_ghost(pos, node_index, delta, level);
   } else {
@@ -3930,7 +3943,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   }
   double h = 1.0 / (double)(1 << level[0]);
   double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
-#endif
+#endif  // !LB_ADAPTIVE
 
   /* calculate fluid velocity at particle's position
      this is done by linear interpolation
@@ -4032,6 +4045,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   v[0] *= h_max / lbpar.tau;
   v[1] *= h_max / lbpar.tau;
   v[2] *= h_max / lbpar.tau;
+#endif // !LB_ADAPTIVE_GPU
 
   return 0;
 }
@@ -4078,6 +4092,7 @@ void calc_particle_lattice_ia() {
   if (transfer_momentum) {
 
 #ifdef LB_ADAPTIVE
+#ifdef DD_P4EST
     // update ghost layer on all levels
     for (int level = lbpar.base_level; level <= lbpar.max_refinement_level;
          ++level) {
@@ -4085,6 +4100,7 @@ void calc_particle_lattice_ia() {
           p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
     }
+#endif // DD_P4EST
 #else // LB_ADAPTIVE
     if (lbpar.resend_halo) { /* first MD step after last LB update */
       /* exchange halo regions (for fluid-particle coupling) */
@@ -4110,7 +4126,7 @@ void calc_particle_lattice_ia() {
       p = cell->part;
       np = cell->n;
       for (int i = 0; i < np; i++) {
-#ifdef GAUSSRANDOM
+#if defined(GAUSSRANDOM)
         p[i].lc.f_random[0] = lb_coupl_pref2 * gaussian_random();
         p[i].lc.f_random[1] = lb_coupl_pref2 * gaussian_random();
         p[i].lc.f_random[2] = lb_coupl_pref2 * gaussian_random();
@@ -4136,7 +4152,7 @@ void calc_particle_lattice_ia() {
     ghost_communicator(&cell_structure.ghost_lbcoupling_comm);
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
-#endif
+#endif // ENGINE
 
     /* local cells */
     for (int c = 0; c < local_cells.n; c++) {
@@ -4149,7 +4165,7 @@ void calc_particle_lattice_ia() {
 #ifdef IMMERSED_BOUNDARY
         // Virtual particles for IBM must not be coupled
         if (!ifParticleIsVirtual(&p[i]))
-#endif
+#endif // IMMERSED_BOUNDARY
         {
           lb_viscous_coupling(&p[i], force);
           // printf ("%i : c%i p%i %lf %lf
@@ -4191,7 +4207,7 @@ void calc_particle_lattice_ia() {
 #ifdef IMMERSED_BOUNDARY
           // Virtual particles for IBM must not be coupled
           if (!ifParticleIsVirtual(&p[i]))
-#endif
+#endif // IMMERSED_BOUNDARY
           {
             lb_viscous_coupling(&p[i], force);
           }
@@ -4204,7 +4220,8 @@ void calc_particle_lattice_ia() {
         }
       }
     }
-#else
+#else  // !LB_ADAPTIVE
+#ifdef DD_P4EST
     /* ghost cells */
     for (int c = 0; c < ghost_cells.n; c++) {
       cell = ghost_cells.cell[c];
@@ -4224,7 +4241,7 @@ void calc_particle_lattice_ia() {
 #ifdef IMMERSED_BOUNDARY
         // Virtual particles for IBM must not be coupled
         if (!ifParticleIsVirtual(&p[i]))
-#endif
+#endif // IMMERSED_BOUNDARY
         {
           lb_viscous_coupling(&p[i], force, true);
         }
@@ -4236,6 +4253,7 @@ void calc_particle_lattice_ia() {
         });
       }
     }
+#endif // DD_P4EST
 #endif // LB_ADAPTIVE
   }
 }

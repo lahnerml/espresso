@@ -1594,6 +1594,7 @@ void dd_p4est_partition(p4est_t *p4est) {
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
   p4est_locidx_t sum = 0;
+
   for (int i = 0; i < n_nodes; ++i)
     sum += num_quad_per_proc_global[i];
   if (sum < p4est->global_num_quadrants) {
@@ -1605,7 +1606,10 @@ void dd_p4est_partition(p4est_t *p4est) {
                     num_quad_per_proc_global[this_node]));
 
   // Repartition with the computed distribution
-  p4est_partition_given(p4est, num_quad_per_proc_global);
+  int shipped = p4est_partition_given(p4est, num_quad_per_proc_global);
+  P4EST_GLOBAL_PRODUCTIONF(
+      "Done " P4EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
+      (long long)shipped, shipped * 100. / dd.p4est->global_num_quadrants);
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

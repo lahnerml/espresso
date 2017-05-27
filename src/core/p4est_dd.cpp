@@ -1478,15 +1478,8 @@ void dd_p4est_partition(p4est_t *p4est) {
         break;
       }
     }*/
-    num_quad_per_proc[dd_p4est_pos_to_proc(xyz)] += 1;
+    ++tqid;
   }
-  CELL_TRACE(printf("%i : repartition %i cells: ", this_node,
-                    p4est->local_num_quadrants));
-  for (int i = 0; i < n_nodes; ++i) {
-    CELL_TRACE(printf("%i ", num_quad_per_proc[i]));
-  }
-
-  CELL_TRACE(printf("\n"));
 
   // Geather this information over all processes
   MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes,

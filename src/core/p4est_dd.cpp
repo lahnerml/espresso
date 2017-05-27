@@ -284,13 +284,13 @@ void dd_p4est_create_grid() {
 #endif // !LB_ADAPTIVE
   }
 
-  // geather cell neighbors
+  // gather cell neighbors
   std::vector<uint64_t> quads;
   std::vector<local_shell_t> shell;
   quads.clear();
   shell.clear();
 
-  // Loop all local cells to geather information for those
+  // Loop all local cells to gather information for those
   for (int i = 0; i < p4est->local_num_quadrants; ++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est, p4est_mesh, i);
     quad_data_t *data = (quad_data_t *)(q->p.user_data);
@@ -298,8 +298,8 @@ void dd_p4est_create_grid() {
     p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y,
                            q->z, xyz);
     uint64_t ql =
-        1
-        << p4est_tree_array_index(p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
+        1 << p4est_tree_array_index(p4est->trees,
+                                    p4est_mesh->quad_to_tree[i])->maxlevel;
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
@@ -315,7 +315,7 @@ void dd_p4est_create_grid() {
     ls.coord[1] = y;
     ls.coord[2] = z;
     ls.p_cnt = 0;
-    // Geather all inforamtion about neighboring cells
+    // Gather all inforamtion about neighboring cells
     for (int n = 0; n < 26; ++n) {
       ls.neighbor[n] = -1;
       sc_array_t *ne, *ni;
@@ -1481,7 +1481,7 @@ void dd_p4est_partition(p4est_t *p4est) {
     ++tqid;
   }
 
-  // Geather this information over all processes
+  // Gather this information over all processes
   MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 

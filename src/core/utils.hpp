@@ -28,6 +28,7 @@
  *
 */
 
+#include <array>
 #include <cmath>
 #include <exception>
 #include <vector>
@@ -1063,6 +1064,11 @@ inline void print_block(double *data, int start[3], int size[3], int dim[3],
  *  \param pos2 Position two.
 */
 inline double distance(double pos1[3], double pos2[3]) {
+  return sqrt(SQR(pos1[0] - pos2[0]) + SQR(pos1[1] - pos2[1]) +
+              SQR(pos1[2] - pos2[2]));
+}
+
+inline double distance(std::array<double, 3> pos1, std::array<double, 3> pos2) {
   return sqrt(SQR(pos1[0] - pos2[0]) + SQR(pos1[1] - pos2[1]) +
               SQR(pos1[2] - pos2[2]));
 }

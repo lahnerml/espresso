@@ -26,7 +26,7 @@
 #include <mpi.h>
 #ifdef OPEN_MPI
 #include <dlfcn.h>
-#endif
+#endif // OPEN_MPI
 
 #include <boost/mpi.hpp>
 #include <boost/serialization/array.hpp>

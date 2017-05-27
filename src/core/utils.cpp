@@ -19,7 +19,8 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
                             p8est_t *p4est_new, T **local_data_levelwise,
                             T *mapped_data_flat) {
   // counters
-  int tid_old = 0, tid_new = 0;
+  int tid_old = p4est_old->first_local_tree;
+  int tid_new = p4est_new->first_local_tree;
   int qid_old = 0, qid_new = 0;
   int tqid_old = 0, tqid_new = 0;
 
@@ -184,7 +185,7 @@ int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t *mesh_new,
                                T **data_levelwise) {
   int size = p4est_new->mpisize;
   // counters
-  int tid = 0;
+  int tid = p4est_new->first_local_tree;
   int qid = 0;
   int tqid = 0;
 

@@ -163,6 +163,10 @@ int dd_p4est_cellsize_optimal() {
 //--------------------------------------------------------------------------------------------------
 // Creates a forest with box_l trees in each direction
 int dd_p4est_cellsize_even() {
+#ifdef LB_ADAPTIVE
+  P4EST_ASSERT(0 <= max_range && max_range <= 1.0);
+#endif // LB_ADAPTIVE
+
   brick_size[0] = box_l[0];
   brick_size[1] = box_l[1];
   brick_size[2] = box_l[2];
@@ -174,7 +178,7 @@ int dd_p4est_cellsize_even() {
   if (cnt < 1)
     cnt = 1;
 
-  while ((cnt & 1) == 0) {
+  while (cnt) {
     ++lvl;
     cnt >>= 1;
   }

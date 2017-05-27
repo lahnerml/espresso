@@ -243,9 +243,10 @@ void dd_p4est_create_grid() {
                     p4est->first_local_tree, p4est->last_local_tree,
                     p4est->local_num_quadrants));
 
-  // create space filling inforamtion about first quads per node from p4est
+  // create space filling information about first quads per node from p4est
   p4est_space_idx = new int[n_nodes + 1];
   for (int i = 0; i <= n_nodes; ++i) {
+#ifndef LB_ADAPTIVE
     p4est_quadrant_t *q = &p4est->global_first_position[i];
     // p4est_quadrant_t c;
     if (i < n_nodes) {
@@ -278,6 +279,9 @@ void dd_p4est_create_grid() {
       CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i - 1],
                         p4est_space_idx[i] - 1));
     }
+#else  // !LB_ADAPTIVE
+    p4est_space_idx[i] = p4est->global_first_quadrant[i];
+#endif // !LB_ADAPTIVE
   }
 
   // geather cell neighbors

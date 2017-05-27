@@ -220,6 +220,50 @@ int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t *mesh_new,
 
   return 0;
 }
+
+void get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
+                          p8est_quadrant_t *q, double xyz[3]) {
+  int base = P8EST_QUADRANT_LEN(q->level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+  }
+}
+
+void get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
+  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+  }
+}
+
+void get_front_lower_left(p8est_meshiter_t *mesh_iter, double *xyz) {
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+}
+
+void get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
+                                  p8est_quadrant_t *q, double *xyz) {
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+}
+
+
 //--------------------------------------------------------------------------------------------------
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the

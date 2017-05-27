@@ -461,7 +461,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   // check boundary status.
   double new_mp[3];
   int new_boundary;
-  lbadapt_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  get_midpoint(p4est_new, which_tree, quad_new, new_mp);
   new_boundary = lbadapt_is_boundary(new_mp);
 
   if (new_boundary) {
@@ -495,7 +495,7 @@ int data_interpolation<lbadapt_payload_t>(
   // check boundary status.
   lb_float new_mp[3];
   int new_boundary;
-  lbadapt_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  get_midpoint(p4est_new, which_tree, quad_new, new_mp);
   new_boundary = lbadapt_is_boundary(new_mp);
 
   if (new_boundary) {
@@ -802,7 +802,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
   lb_float midpoint[3];
-  lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+  get_midpoint(p8est, which_tree, q, midpoint);
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
       (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -822,7 +822,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float half_length = 0.6 * sqrt(3) * ((lb_float)base / (lb_float)root);
 
   lb_float midpoint[3];
-  lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+  get_midpoint(p8est, which_tree, q, midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -906,7 +906,7 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   double half_length = 0.6 * sqrt(3) * ((double)base / (double)root);
 
   lb_float midpoint[3];
-  lbadapt_get_midpoint(p8est, which_tree, q, midpoint);
+  get_midpoint(p8est, which_tree, q, midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -983,55 +983,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 /*** HELPER FUNCTIONS ***/
-void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, lb_float xyz[3]) {
-  int base = P8EST_QUADRANT_LEN(q->level);
-  int root = P8EST_ROOT_LEN;
-  lb_float half_length = ((lb_float)base / (lb_float)root) * 0.5;
-  double tmp[3];
-
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         tmp);
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] = tmp[i] + half_length;
-  }
-}
-
-void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
-  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
-  int root = P8EST_ROOT_LEN;
-  lb_float half_length = ((lb_float)base / (lb_float)root) * 0.5;
-
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  double tmp[3];
-  p8est_qcoord_to_vertex(p8est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, tmp);
-
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] = tmp[i] + half_length;
-  }
-}
-
-void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float *xyz) {
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  double tmp[3];
-  p8est_qcoord_to_vertex(p8est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, tmp);
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] = tmp[i];
-  }
-}
-
-void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, double *xyz) {
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
-}
-
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
                                  lb_float *j, lb_float *pi, lb_float h) {
   int i;
@@ -2291,11 +2242,11 @@ void lbadapt_get_boundary_status() {
 
 #ifndef LB_ADAPTIVE_GPU
         double midpoint[3];
-        lbadapt_get_midpoint(mesh_iter, midpoint);
+        get_midpoint(mesh_iter, midpoint);
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
-        lbadapt_get_front_lower_left(mesh_iter, xyz_quad);
+        get_front_lower_left(mesh_iter, xyz_quad);
         bool all_boundary = true;
 
         for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {

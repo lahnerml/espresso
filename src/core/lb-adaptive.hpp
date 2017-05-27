@@ -200,44 +200,6 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                          p8est_quadrant_t *q);
 
 /*** HELPER FUNCTIONS ***/
-/* Geometry */
-/** Get the coordinates of the midpoint of a quadrant.
- *
- * \param [in]  p8est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
- */
-void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, lb_float xyz[3]);
-
-/** Get the coordinates of the midpoint of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the midpoint of the current
- *                         quadrant that mesh_iter is pointing to.
- */
-void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
-
-/** Get the coordinates of the front lower left corner of a quadrant.
- *
- * \param [in]  p8est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
- */
-void lbadapt_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, double xyz[3]);
-
-/** Get the coordinates of the front lower left corner of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the front lower left corner
- *                         of the current quadrant that mesh_iter is pointing
- *                         to.
- */
-void lbadapt_get_front_lower_left(p8est_meshiter_t *mesh_iter, lb_float xyz[3]);
-
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *

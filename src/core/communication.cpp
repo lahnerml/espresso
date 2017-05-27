@@ -3204,7 +3204,7 @@ void mpi_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
   // clang-format off
   p8est_refine_ext(p8est,                // forest
-                   1,                    // no recursive refinement
+                   1,                    // recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
                    NULL,                 // init data
@@ -3215,6 +3215,7 @@ void mpi_geometric_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
 // clang-format on
+
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
@@ -3248,7 +3249,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
   // clang-format off
   p8est_refine_ext(p8est,                // forest
-                   1,                    // no recursive refinement
+                   1,                    // recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_inv_geometric,    // return true to refine cell
                    NULL,                 // init data

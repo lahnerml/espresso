@@ -2832,11 +2832,16 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         NULL       /* user pointer */);
   // clang-format on
 
+#ifdef DD_P4EST
+  dd_p4est_partition(p8est);
+#endif // DD_P4EST
+
   // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
   lbadapt_mesh =
       p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
   lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
 
@@ -2848,19 +2853,6 @@ void mpi_lbadapt_grid_init(int node, int level) {
   finest_level_global = level;
   lbpar.base_level = level;
   lbpar.max_refinement_level = level;
-
-#ifdef DD_P4EST
-  dd_p4est_partition(p8est, lbadapt_mesh, conn);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
-#endif // DD_P4EST
-
 #endif // LB_ADAPTIVE
 }
 
@@ -3179,34 +3171,23 @@ void mpi_reg_refinement(int node, int param) {
                     NULL);               // replace data
 // clang-format on
 
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
 #ifdef DD_P4EST
-  p8est_mesh_destroy(lbadapt_mesh);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  dd_p4est_partition(p8est, lbadapt_mesh, conn);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
-#else  // DD_P4EST
-  p8est_partition(p8est, 0, lbadapt_partition_weight);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  dd_p4est_partition(p8est);
 #endif // DD_P4EST
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
+
   finest_level_global = lbadapt_get_global_maxlevel();
 
   // FIXME: Implement mapping between two trees
@@ -3234,31 +3215,18 @@ void mpi_geometric_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
 // clang-format on
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  p8est_mesh_destroy(lbadapt_mesh);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  dd_p4est_partition(p8est, lbadapt_mesh, conn);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
-#else  // DD_P4EST
-  p8est_partition(p8est, 0, lbadapt_partition_weight);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  dd_p4est_partition(p8est);
 #endif // DD_P4EST
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = p8est->local_num_quadrants;
@@ -3291,31 +3259,18 @@ void mpi_inv_geometric_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
 // clang-format on
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  p8est_mesh_destroy(lbadapt_mesh);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  dd_p4est_partition(p8est, lbadapt_mesh, conn);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
-#else  // DD_P4EST
-  p8est_partition(p8est, 0, lbadapt_partition_weight);
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
+  dd_p4est_partition(p8est);
 #endif // DD_P4EST
+
+  lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh =
+      p8est_mesh_new_ext(p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt = p8est_ghostvirt_new(p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = p8est->local_num_quadrants;

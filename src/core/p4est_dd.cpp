@@ -1422,23 +1422,45 @@ int dd_p4est_pos_to_proc(double pos[3]) {
 }
 //--------------------------------------------------------------------------------------------------
 // Repartitions the given p4est, such that process boundaries do not intersect
-// the partition of the
-// p4est_dd grid. This only works if both grids have a common p4est_connectivity
-// and the given forest
-// is on the same or finer level.
-void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh,
-                        p4est_connectivity_t *conn) {
-  p4est_locidx_t num_quad_per_proc[n_nodes];
-  p4est_locidx_t num_quad_per_proc_global[n_nodes];
-  for (int i = 0; i < n_nodes; ++i)
-    num_quad_per_proc[i] = 0;
+// the partition of the p4est_dd grid.
+// This only works if both grids have a common p4est_connectivity and the given
+// forest is on the same or finer level.
+void dd_p4est_partition(p4est_t *p4est) {
+  p4est_locidx_t num_quad_per_proc[p4est->mpisize];
+  p4est_locidx_t num_quad_per_proc_global[p4est->mpisize];
+  for (int p = 0; p < p4est->mpisize; ++p) {
+    num_quad_per_proc[p] = 0;
+    num_quad_per_proc_global[p] = 0;
+  }
+
+  int tid = p4est->first_local_tree;
+  int tqid = 0;
+  // trees
+  p8est_tree_t *curr_tree;
+  // quadrants
+  p8est_quadrant_t *curr_quad;
+
+  if (0 < p4est->local_num_quadrants) {
+    curr_tree = p8est_tree_array_index(p4est->trees, tid);
+  }
 
   // Check for each of the quadrants of the given p4est, to which MD cell it
   // maps
-  for (int i = 0; i < p4est->local_num_quadrants; ++i) {
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est, mesh, i);
-    double xyz[3];
-    p4est_qcoord_to_vertex(conn, mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+  for (int qid = 0; qid < p4est->local_num_quadrants; ++qid) {
+    // wrap multiple trees
+    if (tqid == curr_tree->quadrants.elem_count) {
+      ++tid;
+      P4EST_ASSERT(tid < p4est->trees->elem_count);
+      curr_tree = p8est_tree_array_index(p4est->trees, tid);
+      tqid = 0;
+    }
+    if (0 < curr_tree->quadrants.elem_count) {
+      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
+      double xyz[3];
+      p4est_qcoord_to_vertex(p4est->connectivity, tid, curr_quad->x,
+                             curr_quad->y, curr_quad->z, xyz);
+      ++num_quad_per_proc[dd_p4est_pos_to_proc(xyz)];
+    }
     /*int64_t idx = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
                                            xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
                                            //dd_p4est_pos_morton_idx(xyz);

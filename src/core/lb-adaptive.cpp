@@ -31,11 +31,11 @@
 #include "lb-boundaries.hpp"
 #include "lb-d3q19.hpp"
 #include "lb.hpp"
+#include "p4est_dd.hpp"
+#include "p4est_utils.hpp"
 #include "random.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
-
-#include "p4est_dd.hpp"
 
 #include <algorithm>
 #include <assert.h>
@@ -2448,7 +2448,7 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   y = xyz[1] * (1 << lbpar.max_refinement_level);
   z = xyz[2] * (1 << lbpar.max_refinement_level);
 
-  return dd_p4est_cell_morton_idx(x, y, z);
+  return p4est_cell_morton_idx(x, y, z);
 }
 
 int64_t lbadapt_map_pos_to_proc(double pos[3]) {
@@ -2465,7 +2465,7 @@ int64_t lbadapt_map_pos_to_proc(double pos[3]) {
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
   double inv_h_max = (double)(1 << lbpar.max_refinement_level);
-  int64_t pidx = dd_p4est_cell_morton_idx(
+  int64_t pidx = p4est_cell_morton_idx(
       pfold[0] * inv_h_max, pfold[1] * inv_h_max, pfold[2] * inv_h_max);
   for (int i = 1; i < n_nodes; ++i) {
     p8est_quadrant_t *q = &p8est->global_first_position[i];
@@ -2500,7 +2500,7 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
   if (z < 0)
     z += ub;
 
-  return dd_p4est_cell_morton_idx(x, y, z);
+  return p4est_cell_morton_idx(x, y, z);
 }
 
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
@@ -2515,7 +2515,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   xid = (pos[0]) * (1 << lbpar.max_refinement_level);
   yid = (pos[1]) * (1 << lbpar.max_refinement_level);
   zid = (pos[2]) * (1 << lbpar.max_refinement_level);
-  int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
+  int64_t pidx = p4est_cell_morton_idx(xid, yid, zid);
   int64_t qidx, zlvlfill;
   for (size_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
@@ -2539,7 +2539,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   xid = (pos[0]) * (1 << lbpar.max_refinement_level);
   yid = (pos[1]) * (1 << lbpar.max_refinement_level);
   zid = (pos[2]) * (1 << lbpar.max_refinement_level);
-  int64_t pidx = dd_p4est_cell_morton_idx(xid, yid, zid);
+  int64_t pidx = p4est_cell_morton_idx(xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;
   for (int z = -1; z <= 1; z += 2) {
@@ -2552,7 +2552,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
         zid = (pos[2] + z * box_l[2] * ROUND_ERROR_PREC) *
               (1 << lbpar.max_refinement_level);
         ret[cnt] = -1;
-        sidx[cnt++] = dd_p4est_cell_morton_idx(xid, yid, zid);
+        sidx[cnt++] = p4est_cell_morton_idx(xid, yid, zid);
       }
     }
   }

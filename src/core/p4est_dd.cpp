@@ -9,6 +9,8 @@
 #include "call_trace.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
+#include "p4est_utils.hpp"
+
 #include <p4est_to_p8est.h>
 #include <p8est_algorithms.h>
 #include <p8est_bits.h>
@@ -256,7 +258,7 @@ void dd_p4est_create_grid() {
       // c.x = xyz[0]*(1<<grid_level);
       // c.y = xyz[1]*(1<<grid_level);
       // c.z = xyz[2]*(1<<grid_level);
-      p4est_space_idx[i] = dd_p4est_cell_morton_idx(xyz[0] * (1 << grid_level),
+      p4est_space_idx[i] = p4est_cell_morton_idx(xyz[0] * (1 << grid_level),
                                                     xyz[1] * (1 << grid_level),
                                                     xyz[2] * (1 << grid_level));
     } else {
@@ -357,7 +359,7 @@ void dd_p4est_create_grid() {
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
-    // fprintf(h,"%i %li %ix%ix%i ",i,dd_p4est_cell_morton_idx(x,y,z),
+    // fprintf(h,"%i %li %ix%ix%i ",i,p4est_cell_morton_idx(x,y,z),
     // shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
 
     // Loop all 27 cells in the fullshell
@@ -880,7 +882,7 @@ int dd_p4est_pos_to_qid_global(double pos[3]) {
     qpos[i] = tmp[i] * nq;
     P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
   }
-  int qid = dd_p4est_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
+  int qid = p4est_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
 
 #if 0
   fprintf(stderr, "[p%i] mapped pos %lf %lf %lf to qid %i in tree %i\n",
@@ -1029,7 +1031,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
     // if (scale_pos[0] != p4est_shell[i].coord[0]) continue;
     // if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
     // if (scale_pos[2] != p4est_shell[i].coord[2]) continue;
-    if (pidx == dd_p4est_cell_morton_idx(p4est_shell[i].coord[0],
+    if (pidx == p4est_cell_morton_idx(p4est_shell[i].coord[0],
                                          p4est_shell[i].coord[1],
                                          p4est_shell[i].coord[2]))
       break;
@@ -1492,7 +1494,7 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
     // In the other two cases ("pos[d] <= -errmar" and
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
-  return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
+  return p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
                                   pfold[1] * dd.inv_cell_size[1],
                                   pfold[2] * dd.inv_cell_size[2]);
 }
@@ -1577,7 +1579,7 @@ void dd_p4est_partition(p4est_t *p4est) {
       int proc = dd_p4est_pos_to_proc(xyz);
       ++num_quad_per_proc[proc];
     }
-    /*int64_t idx = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
+    /*int64_t idx = p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
                                            xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
                                            //dd_p4est_pos_morton_idx(xyz);
     for (int n=1;n<=n_nodes;++n) {

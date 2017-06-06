@@ -180,10 +180,7 @@ int dd_p4est_cellsize_even() {
   if (cnt < 1)
     cnt = 1;
 
-  while (cnt) {
-    ++lvl;
-    cnt >>= 1;
-  }
+  lvl = Utils::log_two_rounded(cnt);
 
   grid_size[0] = brick_size[0] << lvl;
   grid_size[1] = brick_size[1] << lvl;

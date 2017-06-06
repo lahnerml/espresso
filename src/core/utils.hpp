@@ -139,6 +139,18 @@ template <unsigned n, typename T> inline T int_pow(T x) {
   }
 }
 
+template <typename T>
+inline int log_two_rounded (T x) {
+  int lvl = 0;
+  static_assert(std::is_integral<T>::value,
+                "This version of logarithm can only be used for integer types\n");
+  while (x > 1) {
+    ++lvl;
+    x >>= 1;
+  }
+  return lvl;
+}
+
 /** used instead of realloc.
     Makes sure that resizing to zero FREEs pointer */
 template <typename T> inline T *realloc(T *old, size_t size) {

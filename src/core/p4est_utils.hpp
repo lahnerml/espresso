@@ -305,5 +305,19 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
                                            T **data_levelwise);
 /*@}*/
 
+/*****************************************************************************/
+/** \name Partition different p4ests                                         */
+/*****************************************************************************/
+/*@{*/
+/** Partition two different p4ests such that their partition boundaries match.
+ *
+ * @param[in]  p4est_ref   p4est with reference partition boundaries.
+ * @param[out] p4est_mod   p4est to be modified such that its boundaries match
+ *                         those of \a p4est_ref
+ */
+void p4est_utils_partition_multiple_forests(p8est_t *p4est_ref,
+                                            p8est_t *p4est_mod);
+/*@}*/
+
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

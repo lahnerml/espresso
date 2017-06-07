@@ -12,7 +12,6 @@
 #include "p4est_utils.hpp"
 
 #include <p4est_to_p8est.h>
-#include <p8est_algorithms.h>
 #include <p8est_bits.h>
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
@@ -1522,81 +1521,6 @@ int dd_p4est_pos_to_proc(double pos[3]) {
           pos[0], pos[1], pos[2]);
   errexit();
 #endif // LB_ADAPTIVE
-}
-//--------------------------------------------------------------------------------------------------
-// Repartitions the given p4est, such that process boundaries do not intersect
-// the partition of the p4est_dd grid.
-// This only works if both grids have a common p4est_connectivity and the given
-// forest is on the same or finer level.
-void dd_p4est_partition(p4est_t *p4est) {
-  p4est_locidx_t num_quad_per_proc[p4est->mpisize];
-  p4est_locidx_t num_quad_per_proc_global[p4est->mpisize];
-  for (int p = 0; p < p4est->mpisize; ++p) {
-    num_quad_per_proc[p] = 0;
-    num_quad_per_proc_global[p] = 0;
-  }
-
-  int tid = p4est->first_local_tree;
-  int tqid = 0;
-  // trees
-  p8est_tree_t *curr_tree;
-  // quadrants
-  p8est_quadrant_t *curr_quad;
-
-  if (0 < p4est->local_num_quadrants) {
-    curr_tree = p8est_tree_array_index(p4est->trees, tid);
-  }
-
-  // Check for each of the quadrants of the given p4est, to which MD cell it
-  // maps
-  for (int qid = 0; qid < p4est->local_num_quadrants; ++qid) {
-    // wrap multiple trees
-    if (tqid == curr_tree->quadrants.elem_count) {
-      ++tid;
-      P4EST_ASSERT(tid < p4est->trees->elem_count);
-      curr_tree = p8est_tree_array_index(p4est->trees, tid);
-      tqid = 0;
-    }
-    if (0 < curr_tree->quadrants.elem_count) {
-      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
-      double xyz[3];
-      p4est_utils_get_front_lower_left(p4est, tid, curr_quad, xyz);
-      int proc = dd_p4est_pos_to_proc(xyz);
-      ++num_quad_per_proc[proc];
-    }
-    /*int64_t idx = p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
-                                           xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
-                                           //dd_p4est_pos_morton_idx(xyz);
-    for (int n=1;n<=n_nodes;++n) {
-      if (p4est_space_idx[n] > idx) {
-        num_quad_per_proc[n - 1] += 1;
-        break;
-      }
-    }*/
-    ++tqid;
-  }
-
-  // Gather this information over all processes
-  MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes,
-                P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
-
-  p4est_locidx_t sum = 0;
-
-  for (int i = 0; i < n_nodes; ++i)
-    sum += num_quad_per_proc_global[i];
-  if (sum < p4est->global_num_quadrants) {
-    printf("%i : quadrants lost while partitioning\n", this_node);
-    return;
-  }
-
-  CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,
-                    num_quad_per_proc_global[this_node]));
-
-  // Repartition with the computed distribution
-  int shipped = p4est_partition_given(p4est, num_quad_per_proc_global);
-  P4EST_GLOBAL_PRODUCTIONF(
-      "Done " P4EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
-      (long long)shipped, shipped * 100. / dd.p4est->global_num_quadrants);
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

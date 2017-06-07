@@ -58,10 +58,4 @@ void dd_p4est_write_particle_vtk(char *filename);
 
 // Writes the MD grid as VTK file
 void dd_p4est_write_vtk();
-
-#ifdef DD_P4EST
-// Repartition a given p4est along the MD grid, so that processor domain boundaries are aligned
-void dd_p4est_partition(p4est_t *p4est);
-#endif
-
 #endif

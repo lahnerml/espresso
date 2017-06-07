@@ -75,6 +75,7 @@
 #include "overlap.hpp"
 #include "p3m.hpp"
 #include "p4est_dd.hpp"
+#include "p4est_utils.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
 #include "reaction.hpp"
@@ -2833,7 +2834,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   // clang-format on
 
 #ifdef DD_P4EST
-  dd_p4est_partition(p8est);
+  p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
   // build initial versions of ghost, mesh, and ghost_virt
@@ -3176,7 +3177,7 @@ void mpi_reg_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  dd_p4est_partition(p8est);
+  p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
@@ -3221,7 +3222,7 @@ void mpi_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  dd_p4est_partition(p8est);
+  p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);
@@ -3265,7 +3266,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  dd_p4est_partition(p8est);
+  p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(p8est, P8EST_CONNECT_CORNER);

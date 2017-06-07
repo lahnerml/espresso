@@ -1,10 +1,12 @@
 #include "p4est_utils.hpp"
 
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
-#if (defined(LB_ADAPTIVE) || defined (DD_P4EST))
+#include "debug.hpp"
 
 #include <array>
 #include <cstring>
+#include <p8est_algorithms.h>
 #include <vector>
 
 int p4est_utils_pos_to_proc(p8est_t *p4est, double pos[3]) { return 0; }
@@ -253,6 +255,74 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
   P4EST_ASSERT(qid == mesh_new->local_num_quadrants);
 
   return 0;
+}
+
+void p4est_utils_partition_multiple_forests(p8est_t *p4est_ref,
+                                            p8est_t *p4est_mod) {
+  P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
+  P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
+  P4EST_ASSERT(p8est_connectivity_is_equal(p4est_ref->connectivity,
+                                           p4est_mod->connectivity));
+
+  p4est_locidx_t num_quad_per_proc[p4est_ref->mpisize];
+  p4est_locidx_t num_quad_per_proc_global[p4est_ref->mpisize];
+  for (int p = 0; p < p4est_mod->mpisize; ++p) {
+    num_quad_per_proc[p] = 0;
+    num_quad_per_proc_global[p] = 0;
+  }
+
+  int tid = p4est_mod->first_local_tree;
+  int tqid = 0;
+  // trees
+  p8est_tree_t *curr_tree;
+  // quadrants
+  p8est_quadrant_t *curr_quad;
+
+  if (0 < p4est_mod->local_num_quadrants) {
+    curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
+  }
+
+  // Check for each of the quadrants of the given p4est, to which MD cell it
+  // maps
+  for (int qid = 0; qid < p4est_mod->local_num_quadrants; ++qid) {
+    // wrap multiple trees
+    if (tqid == curr_tree->quadrants.elem_count) {
+      ++tid;
+      P4EST_ASSERT(tid < p4est_mod->trees->elem_count);
+      curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
+      tqid = 0;
+    }
+    if (0 < curr_tree->quadrants.elem_count) {
+      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
+      double xyz[3];
+      p4est_utils_get_front_lower_left(p4est_mod, tid, curr_quad, xyz);
+      int proc = p4est_utils_pos_to_proc(p4est_ref, xyz);
+      ++num_quad_per_proc[proc];
+    }
+    ++tqid;
+  }
+
+  // Gather this information over all processes
+  MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, p4est_mod->mpisize,
+                P4EST_MPI_LOCIDX, MPI_SUM, p4est_mod->mpicomm);
+
+  p4est_locidx_t sum = 0;
+
+  for (int i = 0; i < p4est_mod->mpisize; ++i)
+    sum += num_quad_per_proc_global[i];
+  if (sum < p4est_mod->global_num_quadrants) {
+    printf("%i : quadrants lost while partitioning\n", this_node);
+    return;
+  }
+
+  CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,
+                    num_quad_per_proc_global[this_node]));
+
+  // Repartition with the computed distribution
+  int shipped = p8est_partition_given(p4est_mod, num_quad_per_proc_global);
+  P4EST_GLOBAL_PRODUCTIONF(
+      "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
+      (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
 }
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

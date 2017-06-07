@@ -121,10 +121,10 @@ void dd_p4est_free() {
   dd.p4est_shell = NULL;
 }
 //--------------------------------------------------------------------------------------------------
-static inline int count_trailing_zeros(int x)
-{
+static inline int count_trailing_zeros(int x) {
   int z = 0;
-  for (; (x & 1) == 0; x >>= 1) z++;
+  for (; (x & 1) == 0; x >>= 1)
+    z++;
   return z;
 }
 
@@ -243,8 +243,8 @@ void dd_p4est_create_grid() {
       // c.y = xyz[1]*(1<<grid_level);
       // c.z = xyz[2]*(1<<grid_level);
       p4est_space_idx[i] = p4est_cell_morton_idx(xyz[0] * (1 << grid_level),
-                                                    xyz[1] * (1 << grid_level),
-                                                    xyz[2] * (1 << grid_level));
+                                                 xyz[1] * (1 << grid_level),
+                                                 xyz[2] * (1 << grid_level));
     } else {
       /*c.x = 1<<grid_level;
       while (c.x < grid_size[0]) c.x <<= 1;
@@ -284,8 +284,8 @@ void dd_p4est_create_grid() {
     p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y,
                            q->z, xyz);
     uint64_t ql =
-        1 << p4est_tree_array_index(p4est->trees,
-                                    p4est_mesh->quad_to_tree[i])->maxlevel;
+        1
+        << p4est_tree_array_index(p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
@@ -1016,8 +1016,8 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
     // if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
     // if (scale_pos[2] != p4est_shell[i].coord[2]) continue;
     if (pidx == p4est_cell_morton_idx(p4est_shell[i].coord[0],
-                                         p4est_shell[i].coord[1],
-                                         p4est_shell[i].coord[2]))
+                                      p4est_shell[i].coord[1],
+                                      p4est_shell[i].coord[2]))
       break;
   }
 #endif // LB_ADAPTIVE
@@ -1479,8 +1479,8 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
   return p4est_utils_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
-                                  pfold[1] * dd.inv_cell_size[1],
-                                  pfold[2] * dd.inv_cell_size[2]);
+                                     pfold[1] * dd.inv_cell_size[1],
+                                     pfold[2] * dd.inv_cell_size[2]);
 }
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position

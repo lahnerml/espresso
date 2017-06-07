@@ -2680,7 +2680,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
   if (node == this_node) {
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, rho, j, pi);
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
     int quad;
     int lvl = 0;
     for (int64_t i = 0; i < p8est->local_num_quadrants; ++i) {
@@ -2693,8 +2693,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
       lvl = q->level;
     }
     lbadapt_payload_t *data =
-        &lbadapt_local_data[lvl]
-                           [lbadapt_mesh->quad_qreal_offset[quad]];
+        &lbadapt_local_data[lvl][lbadapt_mesh->quad_qreal_offset[quad]];
     lb_float modes[19];
     lbadapt_calc_modes(data->lbfluid, modes);
     lbadapt_calc_local_fields(data->lbfluid, modes, data->lbfields.force,
@@ -2728,7 +2727,7 @@ void mpi_recv_fluid_slave(int node, int index) {
     double data[10];
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, &data[0], &data[1], &data[4]);
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
     int quad;
     int lvl = 0;
     for (int64_t i = 0; i < p8est->local_num_quadrants; ++i) {
@@ -2741,8 +2740,7 @@ void mpi_recv_fluid_slave(int node, int index) {
       lvl = q->level;
     }
     lbadapt_payload_t *dat =
-        &lbadapt_local_data[lvl]
-                           [lbadapt_mesh->quad_qreal_offset[quad]];
+        &lbadapt_local_data[lvl][lbadapt_mesh->quad_qreal_offset[quad]];
     lb_float modes[19];
     lbadapt_calc_modes(dat->lbfluid, modes);
     lbadapt_calc_local_fields(dat->lbfluid, modes, dat->lbfields.force,
@@ -2831,7 +2829,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
                         0,         /* data size */
                         NULL,      /* init function */
                         NULL       /* user pointer */);
-  // clang-format on
+// clang-format on
 
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(dd.p4est, p8est);
@@ -2846,7 +2844,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
 
-  // regular grid
+// regular grid
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
@@ -3170,7 +3168,7 @@ void mpi_reg_refinement(int node, int param) {
                     P8EST_CONNECT_CORNER, // connection type
                     NULL,                // init data
                     NULL);               // replace data
-// clang-format on
+  // clang-format on
 
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
@@ -3215,7 +3213,7 @@ void mpi_geometric_refinement(int node, int param) {
                     P8EST_CONNECT_CORNER,  // connection type
                     NULL,                // init data
                     NULL);               // replace data
-// clang-format on
+  // clang-format on
 
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
@@ -3260,7 +3258,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
                     P8EST_CONNECT_CORNER,  // connection type
                     NULL,                // init data
                     NULL);               // replace data
-// clang-format on
+  // clang-format on
   p8est_ghostvirt_destroy(lbadapt_ghost_virt);
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);

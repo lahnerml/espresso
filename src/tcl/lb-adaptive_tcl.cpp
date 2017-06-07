@@ -285,8 +285,6 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 
 int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp, int argc,
                            char **argv) {
-  int bnd_index;
-
   if (argc != 1) {
     Tcl_AppendResult(interp, "Resetting the grid takes no parameters",
                      (char *)NULL);

@@ -125,7 +125,6 @@ void dd_p4est_free() {
 // Compute the grid- and bricksize according to box_l and maxrange
 int dd_p4est_cellsize_optimal() {
   int ncells[3] = {1, 1, 1};
-  int lvl = 0;
 
   // compute number of cells
   if (max_range > ROUND_ERROR_PREC * box_l[0]) {
@@ -139,6 +138,7 @@ int dd_p4est_cellsize_optimal() {
   grid_size[2] = ncells[2];
 
   // divide all dimensions by biggest common power of 2
+  int lvl = 0;
   while (((ncells[0] | ncells[1] | ncells[2]) & 1) == 0) {
     ++lvl;
     ncells[0] >>= 1;

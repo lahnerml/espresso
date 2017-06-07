@@ -148,6 +148,18 @@ template <unsigned n, typename T> inline T int_pow(T x) {
   }
 }
 
+/** For positive numbers, returns the log to basis two rounded down.
+ * Returns 0 for negative numbers.
+ */
+template <typename T>
+inline int nat_log2_floor(T x) {
+  static_assert(std::is_integral<T>::value,
+                "This version of logarithm can only be used for integer types\n");
+  int lvl = 0;
+  for (; x > 1; x >>= 1) lvl++;
+  return lvl;
+}
+
 /** used instead of realloc.
     Makes sure that resizing to zero FREEs pointer */
 template <typename T> inline T *realloc(T *old, size_t size) {

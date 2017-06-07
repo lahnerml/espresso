@@ -124,41 +124,31 @@ void dd_p4est_free() {
 //--------------------------------------------------------------------------------------------------
 // Compute the grid- and bricksize according to box_l and maxrange
 int dd_p4est_cellsize_optimal() {
-  int cnt[3];
+  int ncells[3] = {1, 1, 1};
   int lvl = 0;
 
   // compute number of cells
-  cnt[0] = cnt[1] = cnt[2] = 1;
-  if (max_range > ROUND_ERROR_PREC) {
-    if (box_l[0] > max_range)
-      cnt[0] = box_l[0] / max_range;
-    if (box_l[1] > max_range)
-      cnt[1] = box_l[1] / max_range;
-    if (box_l[2] > max_range)
-      cnt[2] = box_l[2] / max_range;
-    if (cnt[0] < 1)
-      cnt[0] = 1;
-    if (cnt[1] < 1)
-      cnt[1] = 1;
-    if (cnt[2] < 1)
-      cnt[2] = 1;
+  if (max_range > ROUND_ERROR_PREC * box_l[0]) {
+    ncells[0] = std::max<int>(box_l[0] / max_range, 1);
+    ncells[1] = std::max<int>(box_l[1] / max_range, 1);
+    ncells[2] = std::max<int>(box_l[2] / max_range, 1);
   }
 
-  grid_size[0] = cnt[0];
-  grid_size[1] = cnt[1];
-  grid_size[2] = cnt[2];
+  grid_size[0] = ncells[0];
+  grid_size[1] = ncells[1];
+  grid_size[2] = ncells[2];
 
   // divide all dimensions by biggest common power of 2
-  while (((cnt[0] | cnt[1] | cnt[2]) & 1) == 0) {
+  while (((ncells[0] | ncells[1] | ncells[2]) & 1) == 0) {
     ++lvl;
-    cnt[0] >>= 1;
-    cnt[1] >>= 1;
-    cnt[2] >>= 1;
+    ncells[0] >>= 1;
+    ncells[1] >>= 1;
+    ncells[2] >>= 1;
   }
 
-  brick_size[0] = cnt[0];
-  brick_size[1] = cnt[1];
-  brick_size[2] = cnt[2];
+  brick_size[0] = ncells[0];
+  brick_size[1] = ncells[1];
+  brick_size[2] = ncells[2];
 
   return lvl; // return the level of the grid
 }
@@ -173,13 +163,11 @@ int dd_p4est_cellsize_even() {
   brick_size[1] = box_l[1];
   brick_size[2] = box_l[2];
 
-  int cnt = 1;
-  if (max_range > ROUND_ERROR_PREC)
-    cnt = 1.0 / max_range;
-  if (cnt < 1)
-    cnt = 1;
+  int ncells = 1;
+  if (max_range > ROUND_ERROR_PREC * box_l[0])
+    ncells = std::max<int>(1.0 / max_range, 1);
 
-  int lvl = Utils::nat_log2_floor(cnt);
+  int lvl = Utils::nat_log2_floor(ncells);
 
   grid_size[0] = brick_size[0] << lvl;
   grid_size[1] = brick_size[1] << lvl;

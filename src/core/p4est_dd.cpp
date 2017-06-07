@@ -174,13 +174,12 @@ int dd_p4est_cellsize_even() {
   brick_size[2] = box_l[2];
 
   int cnt = 1;
-  int lvl = 0;
   if (max_range > ROUND_ERROR_PREC)
     cnt = 1.0 / max_range;
   if (cnt < 1)
     cnt = 1;
 
-  lvl = Utils::log_two_rounded(cnt);
+  int lvl = Utils::nat_log2_floor(cnt);
 
   grid_size[0] = brick_size[0] << lvl;
   grid_size[1] = brick_size[1] << lvl;

@@ -867,7 +867,7 @@ int dd_p4est_pos_to_qid_global(double pos[3]) {
     qpos[i] = tmp[i] * nq;
     P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
   }
-  int qid = p4est_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
+  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
 
 #if 0
   fprintf(stderr, "[p%i] mapped pos %lf %lf %lf to qid %i in tree %i\n",
@@ -1479,7 +1479,7 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
     // In the other two cases ("pos[d] <= -errmar" and
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
-  return p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
+  return p4est_utils_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
                                   pfold[1] * dd.inv_cell_size[1],
                                   pfold[2] * dd.inv_cell_size[2]);
 }
@@ -1560,7 +1560,7 @@ void dd_p4est_partition(p4est_t *p4est) {
     if (0 < curr_tree->quadrants.elem_count) {
       curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
       double xyz[3];
-      get_front_lower_left(p4est, tid, curr_quad, xyz);
+      p4est_utils_get_front_lower_left(p4est, tid, curr_quad, xyz);
       int proc = dd_p4est_pos_to_proc(xyz);
       ++num_quad_per_proc[proc];
     }

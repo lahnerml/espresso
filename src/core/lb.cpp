@@ -1482,14 +1482,14 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     double rho;
     double j[3];
     double pi[6];
-    int64_t index = p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+    int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
       p8est_quadrant_t *q = &p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
-          p4est_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
+           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
                                    xyz[1] * (1 << lbpar.max_refinement_level),
                                    xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {
@@ -1550,14 +1550,14 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     double rho;
     double j[3];
     double pi[6];
-    int64_t index = p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+    int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
       p8est_quadrant_t *q = &p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
-          p4est_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
+           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
                                    xyz[1] * (1 << lbpar.max_refinement_level),
                                    xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {
@@ -1733,14 +1733,14 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     double rho;
     double j[3];
     double pi[6];
-    int64_t index = p4est_cell_morton_idx(ind[0], ind[1], ind[2]);
+    int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
       p8est_quadrant_t *q = &p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
-          p4est_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
+           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
                                    xyz[1] * (1 << lbpar.max_refinement_level),
                                    xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {

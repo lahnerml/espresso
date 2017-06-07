@@ -1,11 +1,14 @@
 #ifndef P4EST_UTILS_HPP
 #define P4EST_UTILS_HPP
 
-#include <stdint.h>
+#include "utils.hpp"
 
-// #if defined (LB_ADAPTIVE) || defined (DD_P4EST)
+#if (defined(LB_ADAPTIVE) || defined (DD_P4EST))
+
 #include <p8est.h>
 #include <p8est_mesh.h>
+#include <p8est_meshiter.h>
+#include <stdint.h>
 #include <vector>
 
 /*****************************************************************************/
@@ -18,15 +21,14 @@
  * @param pos       Spatial coordinate to map.
  * @return int      Rank responsible for that position in space.
  */
-int p4est_pos_to_proc (p8est_t * p4est, double pos[3]);
-
+int p4est_utils_pos_to_proc(p8est_t *p4est, double pos[3]);
 
 /** Compute a Morton index for a cell using its coordinates
  *
  * @param x, y, z   Spatial coordinates.
  * @return int64_t  Morton index for cell.
  */
-int64_t p4est_cell_morton_idx(int x, int y, int z);
+int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Calculate a cell index for a given position. This index may or may not be
  * the same as a p4est quadrant index.
@@ -36,7 +38,83 @@ int64_t p4est_cell_morton_idx(int x, int y, int z);
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_pos_morton_idx(p8est_t * p4est, double pos[3]);
+int64_t p4est_utils_pos_morton_idx(p8est_t *p4est, double pos[3]);
+/*@}*/
+
+/*****************************************************************************/
+/** \name Geometric helper functions                                         */
+/*****************************************************************************/
+/*@{*/
+/** Get the coordinates of the midpoint of a quadrant.
+ *
+ * \param [in]  p8est    the forest
+ * \param [in]  which_tree the tree in the forest containing \a q
+ * \param [in]  q      the quadrant
+ * \param [out] xyz    the coordinates of the midpoint of \a q
+ */
+inline void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
+                                     p8est_quadrant_t *q, double xyz[3]) {
+  int base = P8EST_QUADRANT_LEN(q->level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+  }
+}
+
+/** Get the coordinates of the midpoint of a quadrant
+ *
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the midpoint of the current
+ *                         quadrant that mesh_iter is pointing to.
+ */
+inline void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
+  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+  }
+}
+
+/** Get the coordinates of the front lower left corner of a quadrant.
+ *
+ * \param [in]  p8est    the forest
+ * \param [in]  which_tree the tree in the forest containing \a q
+ * \param [in]  q      the quadrant
+ * \param [out] xyz    the coordinates of the midpoint of \a q
+ */
+inline void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
+                                             double *xyz) {
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+}
+
+/** Get the coordinates of the front lower left corner of a quadrant
+ *
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the front lower left corner
+ *                         of the current quadrant that mesh_iter is pointing
+ *                         to.
+ */
+inline void p4est_utils_get_front_lower_left(p8est_t *p8est,
+                                             p4est_topidx_t which_tree,
+                                             p8est_quadrant_t *q, double *xyz) {
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+}
 /*@}*/
 
 /*****************************************************************************/
@@ -67,7 +145,8 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-int allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh, bool local_data) {
+int p4est_utils_allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh,
+                                           bool local_data) {
   // make sure data is not yet in used
   P4EST_ASSERT(*data == NULL);
 
@@ -96,7 +175,7 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-int deallocate_levelwise_storage(T ***data) {
+int p4est_utils_deallocate_levelwise_storage(T ***data) {
   if (*data != NULL) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
       P4EST_FREE((*data)[level]);
@@ -183,9 +262,11 @@ template <typename T>
  *                          CAUTION: Needs to be allocated and all numerical
  *                                   payload is supposed to be filled with 0.
  */
-int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
-                            p8est_t *p4est_new, T **local_data_levelwise,
-                            T *mapped_data_flat);
+int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
+                                        p8est_mesh_t *mesh_old,
+                                        p8est_t *p4est_new,
+                                        T **local_data_levelwise,
+                                        T *mapped_data_flat);
 
 template <typename T>
 /** Generic function to re-establish a proper load balacing after the grid has
@@ -202,9 +283,9 @@ template <typename T>
  *                          used as receive buffers.
  * @return int
  */
-int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
-                                           p8est_t *p4est_new, T *data_mapped,
-                                           std::vector<T> **data_partitioned);
+int p4est_utils_post_gridadapt_data_partition_transfer(
+    p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
+    std::vector<T> **data_partitioned);
 
 template <typename T>
 /** After all local data has been received insert in newly allocated level-wise
@@ -218,10 +299,11 @@ template <typename T>
  * @param data_levelwise  Level-wise numerical payload.
  * @return int
  */
-int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t mesh_new,
-                               std::vector<T> **data_partitioned,
-                               T **data_levelwise);
+int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
+                                           p8est_mesh_t mesh_new,
+                                           std::vector<T> **data_partitioned,
+                                           T **data_levelwise);
 /*@}*/
 
-// #endif // defined (LB_ADAPTIVE) || (DD_P4EST)
+#endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

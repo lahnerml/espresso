@@ -1,15 +1,56 @@
 #include "p4est_utils.hpp"
 
-// #if defined (LB_ADAPTIVE) || defined (DD_P4EST)
+
+#if (defined(LB_ADAPTIVE) || defined (DD_P4EST))
 
 #include <array>
 #include <cstring>
-#include <p8est_meshiter.h>
+#include <vector>
+
+int p4est_utils_pos_to_proc(p8est_t *p4est, double pos[3]) { return 0; }
+
+int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
+  // p4est_quadrant_t c;
+  // c.x = x; c.y = y; c.z = z;
+  /*if (x < 0 || x >= grid_size[0])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
+  if (y < 0 || y >= grid_size[1])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
+  if (z < 0 || z >= grid_size[2])
+    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";*/
+
+  int64_t idx = 0;
+  int64_t pos = 1;
+
+  for (int i = 0; i < 21; ++i) {
+    if ((x & 1))
+      idx += pos;
+    x >>= 1;
+    pos <<= 1;
+    if ((y & 1))
+      idx += pos;
+    y >>= 1;
+    pos <<= 1;
+    if ((z & 1))
+      idx += pos;
+    z >>= 1;
+    pos <<= 1;
+  }
+
+  return idx;
+
+  // c.level = P4EST_QMAXLEVEL;
+  // return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL);
+}
+
+int64_t p4est_utils_pos_morton_idx(p8est_t *p4est, double pos[3]) { return 0; }
 
 template <typename T>
-int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
-                            p8est_t *p4est_new, T **local_data_levelwise,
-                            T *mapped_data_flat) {
+int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
+                                        p8est_mesh_t *mesh_old,
+                                        p8est_t *p4est_new,
+                                        T **local_data_levelwise,
+                                        T *mapped_data_flat) {
   // counters
   int tid_old = p4est_old->first_local_tree;
   int tid_new = p4est_new->first_local_tree;
@@ -98,9 +139,9 @@ int post_gridadapt_map_data(p8est_t *p4est_old, p8est_mesh_t *mesh_old,
 }
 
 template <typename T>
-int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
-                                           p8est_t *p4est_new, T *data_mapped,
-                                           std::vector<T> **data_partitioned) {
+int p4est_utils_post_gridadapt_data_partition_transfer(
+    p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
+    std::vector<T> **data_partitioned) {
   int rank = p4est_old->mpirank;
   int size = p4est_old->mpisize;
   int lb_old_local = p4est_old->global_first_quadrant[rank];
@@ -172,9 +213,10 @@ int post_gridadapt_data_partition_transfer(p8est_t *p4est_old,
 }
 
 template <typename T>
-int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t *mesh_new,
-                               std::vector<T> **data_partitioned,
-                               T **data_levelwise) {
+int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
+                                           p8est_mesh_t *mesh_new,
+                                           std::vector<T> **data_partitioned,
+                                           T **data_levelwise) {
   int size = p4est_new->mpisize;
   // counters
   int tid = p4est_new->first_local_tree;
@@ -213,84 +255,4 @@ int post_gridadapt_insert_data(p8est_t *p4est_new, p8est_mesh_t *mesh_new,
   return 0;
 }
 
-void get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, double xyz[3]) {
-  int base = P8EST_QUADRANT_LEN(q->level);
-  int root = P8EST_ROOT_LEN;
-  double half_length = ((double)base / (double)root) * 0.5;
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
-  }
-}
-
-void get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
-  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
-  int root = P8EST_ROOT_LEN;
-  double half_length = ((double)base / (double)root) * 0.5;
-
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
-
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
-  }
-}
-
-void get_front_lower_left(p8est_meshiter_t *mesh_iter, double *xyz) {
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
-}
-
-void get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, double *xyz) {
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
-}
-
-
-//--------------------------------------------------------------------------------------------------
-// Returns the morton index for given cartesian coordinates.
-// Note: This is not the index of the p4est quadrants. But the ordering is the
-// same.
-int64_t p4est_cell_morton_idx(int x, int y, int z) {
-  // p4est_quadrant_t c;
-  // c.x = x; c.y = y; c.z = z;
-  /*if (x < 0 || x >= grid_size[0])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (y < 0 || y >= grid_size[1])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (z < 0 || z >= grid_size[2])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";*/
-
-  int64_t idx = 0;
-  int64_t pos = 1;
-
-  for (int i = 0; i < 21; ++i) {
-    if ((x & 1))
-      idx += pos;
-    x >>= 1;
-    pos <<= 1;
-    if ((y & 1))
-      idx += pos;
-    y >>= 1;
-    pos <<= 1;
-    if ((z & 1))
-      idx += pos;
-    z >>= 1;
-    pos <<= 1;
-  }
-
-  return idx;
-  // c.level = P4EST_QMAXLEVEL;
-  // return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL);
-}
-
-// #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
+#endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

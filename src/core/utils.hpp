@@ -788,46 +788,6 @@ inline void lu_solve_system(double **A, int n, int *perms, double *b) {
 /** \name Three dimensional grid operations                  */
 /*************************************************************/
 /*@{*/
-#if ((defined LB_ADAPTIVE) || (defined DD_P4EST))
-/* Geometry */
-/** Get the coordinates of the midpoint of a quadrant.
- *
- * \param [in]  p8est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
- */
-void get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, double xyz[3]);
-
-/** Get the coordinates of the midpoint of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the midpoint of the current
- *                         quadrant that mesh_iter is pointing to.
- */
-void get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
-
-/** Get the coordinates of the front lower left corner of a quadrant.
- *
- * \param [in]  p8est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
- */
-void get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
-                                  p8est_quadrant_t *q, double xyz[3]);
-
-/** Get the coordinates of the front lower left corner of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the front lower left corner
- *                         of the current quadrant that mesh_iter is pointing
- *                         to.
- */
-void get_front_lower_left(p8est_meshiter_t *mesh_iter, double xyz[3]);
-#endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
-
 /** get the linear index from the position (a,b,c) in a 3D grid
  *  of dimensions adim[]. returns linear index.
  *

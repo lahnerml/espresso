@@ -86,12 +86,12 @@ inline void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   }
 }
 
-/** Get the coordinates of the front lower left corner of a quadrant.
+/** Get the coordinates of the front lower left corner of a quadrant
  *
- * \param [in]  p8est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the front lower left corner
+ *                         of the current quadrant that mesh_iter is pointing
+ *                         to.
  */
 inline void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
                                              double *xyz) {
@@ -102,12 +102,12 @@ inline void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
                          q->x, q->y, q->z, xyz);
 }
 
-/** Get the coordinates of the front lower left corner of a quadrant
+/** Get the coordinates of the front lower left corner of a quadrant.
  *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the front lower left corner
- *                         of the current quadrant that mesh_iter is pointing
- *                         to.
+ * \param [in]  p8est    the forest
+ * \param [in]  which_tree the tree in the forest containing \a q
+ * \param [in]  q      the quadrant
+ * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 inline void p4est_utils_get_front_lower_left(p8est_t *p8est,
                                              p4est_topidx_t which_tree,

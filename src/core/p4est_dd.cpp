@@ -809,79 +809,6 @@ void dd_p4est_init_cell_interaction() {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-// function is local due to locality of tree->quadrants_offset
-int dd_p4est_pos_to_qid_global(double pos[3]) {
-  // find correct tree
-  int tid = -1;
-  for (int t = 0; t < dd.p4est->connectivity->num_trees; ++t) {
-    std::array<double, 3> c[P4EST_CHILDREN];
-    for (int ci = 0; ci < P4EST_CHILDREN; ++ci) {
-      int v = dd.p4est->connectivity->tree_to_vertex[t * P4EST_CHILDREN + ci];
-      c[ci][0] = dd.p4est->connectivity->vertices[P4EST_DIM * v + 0];
-      c[ci][1] = dd.p4est->connectivity->vertices[P4EST_DIM * v + 1];
-      c[ci][2] = dd.p4est->connectivity->vertices[P4EST_DIM * v + 2];
-    }
-    std::array<double, 3> pos_min = {0., 0., 0.};
-    std::array<double, 3> pos_max = {box_l[0], box_l[1], box_l[2]};
-    int idx_min, idx_max;
-    double dist;
-    double dist_min = DBL_MAX;
-    double dist_max = DBL_MAX;
-    for (int ci = 0; ci < P4EST_CHILDREN; ++ci) {
-      dist = distance(c[ci], pos_min);
-      if (dist < dist_min) {
-        dist_min = dist;
-        idx_min = ci;
-      }
-      dist = distance(c[ci], pos_max);
-      if (dist < dist_max) {
-        dist_max = dist;
-        idx_max = ci;
-      }
-    }
-
-    if ((c[idx_min][0] <= pos[0]) && (c[idx_min][1] <= pos[1]) &&
-        (c[idx_min][2] <= pos[2]) && (pos[0] < c[idx_max][0]) &&
-        (pos[1] < c[idx_max][1]) && (pos[2] < c[idx_max][2])) {
-      P4EST_ASSERT(-1 == tid);
-      tid = t;
-    }
-#if 0
-    p4est_tree_t *tt = p4est_tree_array_index(dd.p4est->trees, t);
-    fprintf (stderr, "[p%i] tree %i: tree quadrants offset: %i\n",
-      dd.p4est->mpirank, t, tt->quadrants_offset);
-#endif // 0
-  }
-  // all trees have same level
-  p4est_tree_t *tree =
-      p4est_tree_array_index(dd.p4est->trees, dd.p4est->first_local_tree);
-  int level = tree->maxlevel;
-
-  double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
-                   pos[2] - (int)pos[2]};
-  int nq = 1 << level;
-  int nq_per_tree = nq * nq * nq;
-  int qpos[3];
-  for (int i = 0; i < 3; ++i) {
-    qpos[i] = tmp[i] * nq;
-    P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
-  }
-  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
-
-#if 0
-  fprintf(stderr, "[p%i] mapped pos %lf %lf %lf to qid %i in tree %i\n",
-          dd.p4est->mpirank, pos[0], pos[1], pos[2], qid, tid);
-#endif // 0
-
-  qid += nq_per_tree * tid;
-  return qid;
-}
-
-int dd_p4est_pos_to_qid_local(double pos[3]) {
-  int idx = dd_p4est_pos_to_qid_global(pos);
-  idx -= dd.p4est->global_first_quadrant[dd.p4est->mpirank];
-  return idx;
-}
 
 Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   CALL_TRACE();
@@ -899,7 +826,7 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   int i;
 #ifdef LB_ADAPTIVE
   // FIXME check extended domain size
-  i = dd_p4est_pos_to_qid_local(pos);
+  i = p4est_utils_pos_morton_idx_local(dd.p4est, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 #else  // LB_ADAPTIVE
   int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
@@ -992,7 +919,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
   // by the error bounds
   int i;
 #ifdef LB_ADAPTIVE
-  i = dd_p4est_pos_to_qid_local(pos);
+  i = p4est_utils_pos_morton_idx_local(dd.p4est, pos);
 #if 0
   fprintf(stderr, "[p%i] pos %lf %lf %lf mapped to quad %i\n",
           dd.p4est->mpirank, pos[0], pos[1], pos[2], i);
@@ -1181,7 +1108,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf,
               this_node, recvbuf->part[p].p.identity, global_flag, from,
               recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1],
               recvbuf->part[p].r.p[2],
-              dd_p4est_pos_morton_idx(recvbuf->part[p].r.p),
+              p4est_utils_pos_morton_idx_local(dd.p4est, recvbuf->part[p].r.p),
               dd_p4est_pos_to_proc(recvbuf->part[p].r.p), op[0], op[1], op[2]);
       errexit();
     }
@@ -1483,44 +1410,8 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
                                      pfold[2] * dd.inv_cell_size[2]);
 }
 //--------------------------------------------------------------------------------------------------
-// Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
-#ifdef LB_ADAPTIVE
-  int qid = dd_p4est_pos_to_qid_global(pos);
-
-  std::vector<int> search_space(p4est_space_idx, p4est_space_idx + n_nodes);
-  std::vector<int>::iterator it =
-      std::lower_bound(search_space.begin(), search_space.end(), qid);
-  int p = std::distance(search_space.begin(), it);
-
-  if (it != search_space.begin())
-    --p;
-  P4EST_ASSERT(0 <= p && p < n_nodes);
-
-#if 0
-  fprintf(stderr, "[p%i] mapped pos %lf %lf %lf to qid %i on proc %i\n",
-          dd.p4est->mpirank, pos[0], pos[1], pos[2], qid, p);
-  fprintf(stderr, "[p%i] qid %i is quad %li on p %i\n", dd.p4est->mpirank, qid,
-          qid - dd.p4est->global_first_quadrant[p], p);
-#endif // 0
-  return p;
-#else  // LB_ADAPTIVE
-  // compute morton index of cell to which this position belongs
-  int64_t idx = dd_p4est_pos_morton_idx(pos);
-  // Note: Since p4est_space_idx is a ordered list, it is possible to do a
-  // binary search here.
-  // Doing so would reduce the complexity from O(N) to O(log(N))
-  if (idx >= 0) {
-    for (int i = 1; i <= n_nodes; ++i) {
-      // compare the first cell of a process with this cell
-      if (p4est_space_idx[i] > idx)
-        return i - 1;
-    }
-  }
-  fprintf(stderr, "Could not resolve the proc of particle %lf %lf %lf\n",
-          pos[0], pos[1], pos[2]);
-  errexit();
-#endif // LB_ADAPTIVE
+  return p4est_utils_pos_to_proc(dd.p4est, pos);
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

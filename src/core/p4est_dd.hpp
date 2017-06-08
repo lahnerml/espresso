@@ -48,7 +48,7 @@ void dd_p4est_global_exchange_part(ParticleList* cp);
 // Map a position to a global processor index
 int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)
-int64_t dd_p4est_pos_morton_idx(double pos[3]);
+// int64_t dd_p4est_pos_morton_idx(double pos[3]);
 
 // Handles everything that needs to be done on a geometry change
 void dd_p4est_on_geometry_change(int flags);

@@ -12,6 +12,24 @@
 #include <vector>
 
 /*****************************************************************************/
+/** \name Generic helper functions                                           */
+/*****************************************************************************/
+typedef struct {
+  p8est_t * p4est;
+  p4est_locidx_t *tree_quadrant_offset_synced;
+} p4est_utils_synced_tree_boundary_t;
+
+static std::vector<p4est_utils_synced_tree_boundary_t> * tb = 0;
+
+/** For algorithms like mapping a position to a quadrant to work we need a
+ * synchronized version of the quadrant offsets of each tree.
+ *
+ * @param p4ests     List of all p4ests in the current simulation
+ * @return int
+ */
+int p4est_utils_prepare (std::vector<p8est_t*> p4ests);
+
+/*****************************************************************************/
 /** \name Mapping geometric positions                                        */
 /*****************************************************************************/
 /*@{*/
@@ -30,15 +48,25 @@ int p4est_utils_pos_to_proc(p8est_t *p4est, double pos[3]);
  */
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
-/** Calculate a cell index for a given position. This index may or may not be
- * the same as a p4est quadrant index.
+/** Calculate a global cell index for a given position. This index is no p4est
+ * quadrant index.
  *
  * @param p4est     p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx(p8est_t *p4est, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_global(p8est_t *p4est, double pos[3]);
+
+/** Calculate a local cell index for a given position. This index is no p4est
+ * quadrant index.
+ *
+ * @param p4est     p4est whose domain decomposition is to be used.
+ * @param pos       Spatial coordinate to map.
+ *
+ * @return int      Morton index for a cell corresponding to pos.
+ */
+int64_t p4est_utils_pos_morton_idx_local(p8est_t *p4est, double pos[3]);
 /*@}*/
 
 /*****************************************************************************/

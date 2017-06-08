@@ -36,11 +36,11 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
     // fill element to insert
     insert_elem.p4est = p4est;
     insert_elem.tree_quadrant_offset_synced = (p4est_locidx_t *)calloc(
-        p4ests.at(i)->trees->elem_count, sizeof(p4est_locidx_t));
+        p4est->trees->elem_count, sizeof(p4est_locidx_t));
 
     // allocate a local send buffer to insert local quadrant offsets
     int *local_tree_offsets = (p4est_locidx_t *)calloc(
-        p4ests.at(i)->trees->elem_count, sizeof(p4est_locidx_t));
+        p4est->trees->elem_count, sizeof(p4est_locidx_t));
 
     // fetch last tree index from last processor
     int last_tree_prev_rank = -1;

@@ -1488,10 +1488,10 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
       p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx =
-           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
-                                   xyz[1] * (1 << lbpar.max_refinement_level),
-                                   xyz[2] * (1 << lbpar.max_refinement_level));
+      int64_t qidx = p4est_utils_cell_morton_idx(
+          xyz[0] * (1 << lbpar.max_refinement_level),
+          xyz[1] * (1 << lbpar.max_refinement_level),
+          xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {
         proc -= 1;
         break;
@@ -1556,10 +1556,10 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
       p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx =
-           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
-                                   xyz[1] * (1 << lbpar.max_refinement_level),
-                                   xyz[2] * (1 << lbpar.max_refinement_level));
+      int64_t qidx = p4est_utils_cell_morton_idx(
+          xyz[0] * (1 << lbpar.max_refinement_level),
+          xyz[1] * (1 << lbpar.max_refinement_level),
+          xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {
         break;
       }
@@ -1739,10 +1739,10 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
       p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx =
-           p4est_utils_cell_morton_idx(xyz[0] * (1 << lbpar.max_refinement_level),
-                                   xyz[1] * (1 << lbpar.max_refinement_level),
-                                   xyz[2] * (1 << lbpar.max_refinement_level));
+      int64_t qidx = p4est_utils_cell_morton_idx(
+          xyz[0] * (1 << lbpar.max_refinement_level),
+          xyz[1] * (1 << lbpar.max_refinement_level),
+          xyz[2] * (1 << lbpar.max_refinement_level));
       if (qidx > index) {
         break;
       }
@@ -3598,12 +3598,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #ifndef LB_ADAPTIVE
   index_t node_index[8];
   double delta[6];
-#else
+#else  // !LB_ADAPTIVE
   lbadapt_payload_t *node_index[20];
   double delta[20];
   double dcnt = 0;
   int level[20];
-#endif
+#endif // !LB_ADAPTIVE
   double *local_f, interpolated_u[3], delta_j[3];
 
 #ifdef EXTERNAL_FORCES
@@ -3614,7 +3614,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
               p->f.f[1], p->f.f[2]);
     });
   }
-#endif
+#endif // EXTERNAL_FORCES
 
 /* determine elementary lattice cell surrounding the particle
    and the relative position of the particle in this cell */
@@ -3678,7 +3678,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
              (velocity[1] / time_step - interpolated_u[1] - p->p.mu_E[1]);
   force[2] = -lbpar.friction[0] *
              (velocity[2] / time_step - interpolated_u[2] - p->p.mu_E[2]);
-#else // LB_ELECTROHYDRODYNAMICS
+#else  // LB_ELECTROHYDRODYNAMICS
   force[0] = -lbpar.friction[0] * (velocity[0] / time_step - interpolated_u[0]);
   force[1] = -lbpar.friction[0] * (velocity[1] / time_step - interpolated_u[1]);
   force[2] = -lbpar.friction[0] * (velocity[2] / time_step - interpolated_u[2]);
@@ -3725,7 +3725,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       }
     }
   }
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
   for (x = 0; x < dcnt; ++x) {
     if (n_lbsteps % (1 << (lbpar.max_refinement_level - level[x])) == 0) {
       local_f = node_index[x]->lbfields.force;
@@ -3770,7 +3770,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #else  // !LB_ADAPTIVE
     dcnt = lbadapt_interpolate_pos_adapt(source_position, node_index, delta,
                                          level);
-#endif  // !LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 
     lb_lbfluid_get_interpolated_velocity(source_position, p->swim.v_source);
 
@@ -3808,7 +3808,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
         local_f[2] += delta[x] * delta_j[2] / level_fact;
       }
     }
-#endif  // !LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
   }
 #endif // ENGINE
 #endif // !LB_ADAPTIVE_GPU
@@ -3816,7 +3816,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 
 int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
 #ifndef LB_ADAPTIVE_GPU
-  // FIXME Port to gpu
+// FIXME Port to gpu
 #ifdef LB_ADAPTIVE
   lbadapt_payload_t *node_index[20], *data;
   double delta[20];
@@ -3882,7 +3882,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v) {
 
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
 #ifndef LB_ADAPTIVE_GPU
-  // FIXME Port to GPU
+// FIXME Port to GPU
 #ifndef LB_ADAPTIVE
   index_t node_index[8], index;
   double delta[6];
@@ -3891,7 +3891,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   double delta[20];
   int dcnt;
   int level[20];
-#endif  // !LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
   double local_rho, local_j[3], interpolated_u[3];
   double modes[19];
   int x, y, z;
@@ -3944,7 +3944,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   }
   double h = 1.0 / (double)(1 << level[0]);
   double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
-#endif  // !LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 
   /* calculate fluid velocity at particle's position
      this is done by linear interpolation
@@ -4102,7 +4102,7 @@ void calc_particle_lattice_ia() {
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
     }
 #endif // DD_P4EST
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
     if (lbpar.resend_halo) { /* first MD step after last LB update */
       /* exchange halo regions (for fluid-particle coupling) */
       halo_communication(&update_halo_comm, (char *)**lbfluid);
@@ -4221,7 +4221,7 @@ void calc_particle_lattice_ia() {
         }
       }
     }
-#else  // !LB_ADAPTIVE
+#else // !LB_ADAPTIVE
 #ifdef DD_P4EST
     /* ghost cells */
     for (int c = 0; c < ghost_cells.n; c++) {
@@ -4271,8 +4271,8 @@ void lb_calc_average_rho() {
 #ifdef LB_ADAPTIVE
   double rho;
   rho = 0.0;
-  p8est_iterate(lb_p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL, NULL,
-                NULL);
+  p8est_iterate(lb_p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL,
+                NULL, NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   index_t index;

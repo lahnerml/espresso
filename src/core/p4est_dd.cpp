@@ -11,6 +11,10 @@
 #include "ghosts.hpp"
 #include "p4est_utils.hpp"
 
+#ifdef LB_ADAPTIVE
+#include "lb-adaptive.hpp"
+#endif // LB_ADAPTIVE
+
 #include <p4est_to_p8est.h>
 #include <p8est_bits.h>
 #include <p8est_extended.h>
@@ -221,6 +225,16 @@ void dd_p4est_create_grid() {
   p4est = p4est_new_ext(comm_cart, p4est_conn, 0, grid_level, true,
                         sizeof(quad_data_t), init_fn, NULL);
   p4est_partition(p4est, 0, NULL);
+
+  std::vector<p4est_t *> forests;
+  forests.push_back(p4est);
+#ifdef LB_ADAPTIVE
+  if (p8est != 0) {
+    forests.push_back(p8est);
+  }
+#endif // LB_ADAPTIVE
+  p4est_utils_prepare(forests);
+
   p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
   p4est_mesh =
       p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);

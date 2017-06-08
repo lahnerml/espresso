@@ -2832,6 +2832,10 @@ void mpi_lbadapt_grid_init(int node, int level) {
 // clang-format on
 
 #ifdef DD_P4EST
+  std::vector<p4est_t*> forests;
+  forests.push_back(dd.p4est);
+  forests.push_back(p8est);
+  p4est_utils_prepare(forests);
   p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
@@ -3175,6 +3179,10 @@ void mpi_reg_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
+  std::vector<p4est_t*> forests;
+  forests.push_back(dd.p4est);
+  forests.push_back(p8est);
+  p4est_utils_prepare(forests);
   p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
@@ -3220,6 +3228,10 @@ void mpi_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
+  std::vector<p4est_t*> forests;
+  forests.push_back(dd.p4est);
+  forests.push_back(p8est);
+  p4est_utils_prepare(forests);
   p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 
@@ -3264,6 +3276,10 @@ void mpi_inv_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
+  std::vector<p4est_t*> forests;
+  forests.push_back(dd.p4est);
+  forests.push_back(p8est);
+  p4est_utils_prepare(forests);
   p4est_utils_partition_multiple_forests(dd.p4est, p8est);
 #endif // DD_P4EST
 

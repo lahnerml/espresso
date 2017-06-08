@@ -13,7 +13,7 @@
 #include <p8est_algorithms.h>
 #include <vector>
 
-std::vector<p4est_utils_synced_tree_boundary_t> * tb = 0;
+std::vector<p4est_utils_synced_tree_boundary_t> *tb = 0;
 
 int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
   if (tb == 0) {
@@ -39,8 +39,8 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
         p4est->trees->elem_count, sizeof(p4est_locidx_t));
 
     // allocate a local send buffer to insert local quadrant offsets
-    int *local_tree_offsets = (p4est_locidx_t *)calloc(
-        p4est->trees->elem_count, sizeof(p4est_locidx_t));
+    int *local_tree_offsets = (p4est_locidx_t *)calloc(p4est->trees->elem_count,
+                                                       sizeof(p4est_locidx_t));
 
     // fetch last tree index from last processor
     int last_tree_prev_rank = -1;
@@ -438,7 +438,7 @@ void p4est_utils_partition_multiple_forests(p8est_t *p4est_ref,
   P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
   P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
   P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,
-                                           p4est_mod->connectivity));
+                                                p4est_mod->connectivity));
 
   p4est_locidx_t num_quad_per_proc[p4est_ref->mpisize];
   p4est_locidx_t num_quad_per_proc_global[p4est_ref->mpisize];

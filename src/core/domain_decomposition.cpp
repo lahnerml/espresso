@@ -58,7 +58,7 @@ le_dd_comms_manager le_mgr;
 #endif
 DomainDecomposition dd = { 1, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, NULL
 #ifdef DD_P4EST
- , NULL, NULL, NULL, NULL, NULL
+ , nullptr, nullptr, {}
 #endif
 };
 
@@ -1069,13 +1069,6 @@ void dd_topology_init(CellPList *old) {
 void dd_topology_release() {
   CALL_TRACE();
   
-#ifndef P4EST_NOCHANGE
-
-  // delete all the p4est stuff
-  dd_p4est_free();
-  
-#endif
-
   int i,j;
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
   /* release cell interactions */

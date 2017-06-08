@@ -16,9 +16,6 @@
 //#define P4EST_NOCHANGE
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
-// Free the memory and all p4est related stuff
-void dd_p4est_free ();
-
 // Creates the irregular DD using p4est
 void dd_p4est_create_grid ();
 // Compute communication partners for this node and fill internal lists

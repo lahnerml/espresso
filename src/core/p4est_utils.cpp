@@ -437,7 +437,7 @@ void p4est_utils_partition_multiple_forests(p8est_t *p4est_ref,
                                             p8est_t *p4est_mod) {
   P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
   P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
-  P4EST_ASSERT(p8est_connectivity_is_equal(p4est_ref->connectivity,
+  P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,
                                            p4est_mod->connectivity));
 
   p4est_locidx_t num_quad_per_proc[p4est_ref->mpisize];

@@ -13,6 +13,8 @@
 #include <p8est_algorithms.h>
 #include <vector>
 
+std::vector<p4est_utils_synced_tree_boundary_t> * tb = 0;
+
 int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
   if (tb == 0) {
     tb = new std::vector<p4est_utils_synced_tree_boundary_t>();

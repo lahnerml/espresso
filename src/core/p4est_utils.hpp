@@ -19,7 +19,7 @@ typedef struct {
   p4est_locidx_t *tree_quadrant_offset_synced;
 } p4est_utils_synced_tree_boundary_t;
 
-static std::vector<p4est_utils_synced_tree_boundary_t> * tb = 0;
+extern std::vector<p4est_utils_synced_tree_boundary_t> * tb;
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.

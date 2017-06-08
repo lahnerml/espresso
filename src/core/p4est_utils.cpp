@@ -6,6 +6,7 @@
 #include "domain_decomposition.hpp"
 #include "p4est_dd.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstdlib>
 #include <cstring>
@@ -70,6 +71,11 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
                   p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
                   p4est->mpicomm);
     tb->push_back(insert_elem);
+
+    // ensure monotony
+    P4EST_ASSERT(std::is_sorted(insert_elem.tree_quadrant_offset_synced,
+                                insert_elem.tree_quadrant_offset_synced +
+                                    p4est->trees->elem_count));
 
     // cleanup
     free(local_tree_offsets);

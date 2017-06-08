@@ -67,7 +67,7 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
     }
     // synchronize offsets and insert into tb vector
     MPI_Allreduce(local_tree_offsets, insert_elem.tree_quadrant_offset_synced,
-                  p4est->trees->elem_count, MPI_INT64_T, MPI_MAX,
+                  p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
                   p4est->mpicomm);
     tb->push_back(insert_elem);
 

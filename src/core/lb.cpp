@@ -686,11 +686,11 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   /* perform master IO routine here. */
   sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   boundary = sc_array_new_size(sizeof(double), num_cells);
 
@@ -698,7 +698,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -835,11 +835,11 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
   sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   density = sc_array_new_size(sizeof(double), num_cells);
 
@@ -847,7 +847,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, *filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, *filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -969,11 +969,11 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
   velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
@@ -981,7 +981,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
   p8est_vtk_context_set_scale(context, 1);
 
   /* begin writing the output files */
@@ -1485,7 +1485,7 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
@@ -1553,7 +1553,7 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
@@ -1736,7 +1736,7 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
       double xyz[3];
       p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx =
@@ -3325,7 +3325,7 @@ inline void lb_collide_stream() {
 
     // ghost exchange
     p8est_ghostvirt_exchange_data(
-        p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+        lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
         (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
   }
 #else  // LB_ADAPTIVE_GPU
@@ -3387,7 +3387,7 @@ inline void lb_collide_stream() {
       // TODO: do not use convenience function here
       // (exchange_data_begin)
       p8est_ghostvirt_exchange_data(
-          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
     }
   }
@@ -4098,7 +4098,7 @@ void calc_particle_lattice_ia() {
     for (int level = lbpar.base_level; level <= lbpar.max_refinement_level;
          ++level) {
       p8est_ghostvirt_exchange_data(
-          p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
           (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
     }
 #endif // DD_P4EST
@@ -4271,7 +4271,7 @@ void lb_calc_average_rho() {
 #ifdef LB_ADAPTIVE
   double rho;
   rho = 0.0;
-  p8est_iterate(p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL, NULL,
+  p8est_iterate(lb_p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL, NULL,
                 NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE

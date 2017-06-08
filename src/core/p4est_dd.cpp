@@ -229,8 +229,8 @@ void dd_p4est_create_grid() {
   std::vector<p4est_t *> forests;
   forests.push_back(p4est);
 #ifdef LB_ADAPTIVE
-  if (p8est != 0) {
-    forests.push_back(p8est);
+  if (lb_p8est != 0) {
+    forests.push_back(lb_p8est);
   }
 #endif // LB_ADAPTIVE
   p4est_utils_prepare(forests);

@@ -4231,7 +4231,6 @@ void calc_particle_lattice_ia() {
 
       if (dd.p4est_shell[local_cells.n + c].p_cnt > 0)
         continue;
-      double bound = 1.0 / (2 << coarsest_level_local);
 
       for (int i = 0; i < np; i++) {
         ONEPART_TRACE(if (p[i].p.identity == check_id) {

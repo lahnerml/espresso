@@ -54,11 +54,6 @@ extern p8est_ghostvirt_t *lbadapt_ghost_virt;
 extern p8est_mesh_t *lbadapt_mesh;
 extern lbadapt_payload_t **lbadapt_local_data;
 extern lbadapt_payload_t **lbadapt_ghost_data;
-extern int coarsest_level_local;
-extern int finest_level_local;
-extern int coarsest_level_ghost;
-extern int finest_level_ghost;
-extern int finest_level_global;
 extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
@@ -115,10 +110,6 @@ void lbadapt_reinit_fluid_per_cell();
  */
 int lbadapt_is_boundary(double pos[3]);
 #endif // LB_BOUNDARIES
-
-/** Get maxlevel of p4est
- */
-int lbadapt_get_global_maxlevel();
 
 #ifdef LB_ADAPTIVE_GPU
 /** Populate the halos of patches of a specific level

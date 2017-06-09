@@ -14,21 +14,21 @@
 #include <p8est_algorithms.h>
 #include <vector>
 
-std::vector<p4est_utils_synced_tree_boundary_t> *tb = 0;
+std::vector<p4est_utils_forest_info_t> *forest_info = 0;
 
 int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
-  if (tb == 0) {
-    tb = new std::vector<p4est_utils_synced_tree_boundary_t>();
+  if (forest_info == 0) {
+    forest_info = new std::vector<p4est_utils_forest_info_t>();
   } else {
-    for (int i = 0; i < tb->size(); ++i) {
-      free(tb->at(i).tree_quadrant_offset_synced);
+    for (int i = 0; i < forest_info->size(); ++i) {
+      free(forest_info->at(i).tree_quadrant_offset_synced);
     }
-    tb->clear();
+    forest_info->clear();
   }
 
   p8est_t *p4est;
   p8est_tree_t *tree;
-  p4est_utils_synced_tree_boundary_t insert_elem;
+  p4est_utils_forest_info_t insert_elem;
 
   for (int i = 0; i < p4ests.size(); ++i) {
     // fetch p4est from list of p4ests
@@ -38,6 +38,12 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
     insert_elem.p4est = p4est;
     insert_elem.tree_quadrant_offset_synced = (p4est_locidx_t *)calloc(
         p4est->trees->elem_count, sizeof(p4est_locidx_t));
+    // only set bounds
+    insert_elem.coarsest_level_local = 0;
+    insert_elem.finest_level_local = -1;
+    insert_elem.finest_level_global = -1;
+    insert_elem.coarsest_level_ghost = 0;
+    insert_elem.finest_level_ghost = 0;
 
     // allocate a local send buffer to insert local quadrant offsets
     int *local_tree_offsets = (p4est_locidx_t *)calloc(p4est->trees->elem_count,
@@ -55,22 +61,33 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
     }
     // only fill local send buffer if current process is not empty
     if (p4est->local_num_quadrants != 0) {
-      // set start index; if first tree is not completetly owned by current
+      // set start index; if first tree is not completetly owned by
+      // current
       // process it will set a wrong quadrant offset
       int start_idx = (p4est->first_local_tree == last_tree_prev_rank)
                           ? p4est->first_local_tree + 1
                           : p4est->first_local_tree;
-      for (int i = start_idx; i <= p4est->last_local_tree; ++i) {
+      for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
         tree = p8est_tree_array_index(p4est->trees, i);
-        local_tree_offsets[i] = tree->quadrants_offset +
-                                p4est->global_first_quadrant[p4est->mpirank];
+        if (start_idx <= i) {
+          local_tree_offsets[i] = tree->quadrants_offset +
+                                  p4est->global_first_quadrant[p4est->mpirank];
+        }
+        /* get local max level */
+        if (insert_elem.finest_level_local < tree->maxlevel) {
+          insert_elem.finest_level_local = tree->maxlevel;
+        }
       }
     }
-    // synchronize offsets and insert into tb vector
+    // synchronize offsets and level and insert into forest_info vector
     MPI_Allreduce(local_tree_offsets, insert_elem.tree_quadrant_offset_synced,
                   p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
                   p4est->mpicomm);
-    tb->push_back(insert_elem);
+    MPI_Allreduce(&insert_elem.finest_level_local,
+                  &insert_elem.finest_level_global, 1, MPI_INT32_T, MPI_MAX,
+                  p4est->mpicomm);
+    insert_elem.finest_level_ghost = insert_elem.finest_level_global;
+    forest_info->push_back(insert_elem);
 
     // ensure monotony
     P4EST_ASSERT(std::is_sorted(insert_elem.tree_quadrant_offset_synced,

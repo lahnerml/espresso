@@ -68,11 +68,6 @@ p8est_mesh_t *lbadapt_mesh;
 lbadapt_payload_t **lbadapt_local_data = NULL;
 lbadapt_payload_t **lbadapt_ghost_data = NULL;
 int lb_conn_brick[3] = {0, 0, 0};
-int coarsest_level_local;
-int finest_level_local;
-int coarsest_level_ghost;
-int finest_level_ghost;
-int finest_level_global;
 double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
                                             DBL_MAX, DBL_MIN, DBL_MAX};
 
@@ -103,35 +98,11 @@ double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
 
 /*** SETUP ***/
 void lbadapt_allocate_data() {
-  int level;
-  coarsest_level_local = -1;
-  finest_level_local = -1;
-  coarsest_level_ghost = -1;
-  finest_level_ghost = -1;
 
-  /** local cells */
-  for (level = 0; level < P8EST_MAXLEVEL; ++level) {
-#ifdef LB_ADAPTIVE_GPU
-    local_num_real_quadrants_level[level] =
-        (lbadapt_mesh->quad_level + level)->elem_count;
-    local_num_virt_quadrants_level[level] =
-        (lbadapt_mesh->virtual_qlevels + level)->elem_count;
-#endif // LB_ADAPTIVE_GPU
+  p4est_utils_allocate_levelwise_storage(&lbadapt_local_data, lbadapt_mesh,
+                                         true);
 
-    if ((((lbadapt_mesh->quad_level + level)->elem_count > 0) ||
-         ((lbadapt_mesh->virtual_qlevels + level)->elem_count > 0)) &&
-        coarsest_level_local == -1) {
-      coarsest_level_local = level;
-    }
-    if ((coarsest_level_local != -1) &&
-        (((lbadapt_mesh->quad_level + level)->elem_count > 0) ||
-         ((lbadapt_mesh->virtual_qlevels + level)->elem_count > 0))) {
-      finest_level_local = level;
-    }
-  }
-
-  p4est_utils_allocate_levelwise_storage(&lbadapt_local_data, lbadapt_mesh, true);
-
+  int coarsest_level_ghost = -1;
   /** ghost */
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
@@ -139,17 +110,13 @@ void lbadapt_allocate_data() {
         coarsest_level_ghost == -1) {
       coarsest_level_ghost = level;
     }
-    if ((coarsest_level_ghost != -1) &&
-        (((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
-         ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0))) {
-      finest_level_ghost = level;
-    }
   }
   if (coarsest_level_ghost == -1) {
     lbadapt_ghost_data = NULL;
     return;
   } else {
-    p4est_utils_allocate_levelwise_storage(&lbadapt_ghost_data, lbadapt_mesh, false);
+    p4est_utils_allocate_levelwise_storage(&lbadapt_ghost_data, lbadapt_mesh,
+                                           false);
   }
 
 #ifdef LB_ADAPTIVE_GPU
@@ -573,27 +540,6 @@ int lbadapt_is_boundary(double *pos) {
   } else {
     return 0;
   }
-}
-
-int lbadapt_get_global_maxlevel() {
-  int i;
-  int local_res = -1;
-  int global_res;
-  p8est_tree_t *tree;
-
-  /* get local max level */
-  for (i = lb_p8est->first_local_tree; i <= lb_p8est->last_local_tree; ++i) {
-    tree = p8est_tree_array_index(lb_p8est->trees, i);
-    if (local_res < tree->maxlevel) {
-      local_res = tree->maxlevel;
-    }
-  }
-
-  /* synchronize and return obtained result */
-  sc_MPI_Allreduce(&local_res, &global_res, 1, sc_MPI_INT, sc_MPI_MAX,
-                   lb_p8est->mpicomm);
-
-  return global_res;
 }
 
 #ifdef LB_ADAPTIVE_GPU
@@ -1972,6 +1918,7 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
+  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
   int status;
   int level;
   double bnd, *bnd_ptr;
@@ -1982,7 +1929,8 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 #endif // LB_ADAPTIVE_GPU
 
   /* get boundary status */
-  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+  for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
+       ++level) {
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -2020,6 +1968,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
+  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
   int status;
   int level;
   double dens, *dens_ptr;
@@ -2036,7 +1985,8 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
                    (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
-  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+  for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
+       ++level) {
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
@@ -2118,6 +2068,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
+  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
   int status;
   int level;
   double *veloc_ptr;
@@ -2134,7 +2085,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
-  for (level = coarsest_level_local; level <= finest_level_local; ++level) {
+  for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
+       ++level) {
     status = 0;
     p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
         lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,

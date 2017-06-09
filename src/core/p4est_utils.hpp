@@ -3,7 +3,7 @@
 
 #include "utils.hpp"
 
-#if (defined(LB_ADAPTIVE) || defined (DD_P4EST))
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
 #include <p8est.h>
 #include <p8est_mesh.h>
@@ -15,11 +15,16 @@
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
 typedef struct {
-  p8est_t * p4est;
+  p8est_t *p4est;
   p4est_locidx_t *tree_quadrant_offset_synced;
-} p4est_utils_synced_tree_boundary_t;
+  int coarsest_level_local;
+  int finest_level_local;
+  int finest_level_global;
+  int coarsest_level_ghost;
+  int finest_level_ghost;
+} p4est_utils_forest_info_t;
 
-extern std::vector<p4est_utils_synced_tree_boundary_t> * tb;
+extern std::vector<p4est_utils_forest_info_t> *forest_info;
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.

@@ -2853,7 +2853,6 @@ void mpi_lbadapt_grid_init(int node, int level) {
   local_num_quadrants = lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
-  finest_level_global = level;
   lbpar.base_level = level;
   lbpar.max_refinement_level = level;
 #endif // LB_ADAPTIVE
@@ -3195,8 +3194,6 @@ void mpi_reg_refinement(int node, int param) {
   local_num_quadrants = lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
-  finest_level_global = lbadapt_get_global_maxlevel();
-
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3244,8 +3241,6 @@ void mpi_geometric_refinement(int node, int param) {
   local_num_quadrants = lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
-  finest_level_global = lbadapt_get_global_maxlevel();
-
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3291,7 +3286,6 @@ void mpi_inv_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIGVE_GPU
-  finest_level_global = lbadapt_get_global_maxlevel();
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();

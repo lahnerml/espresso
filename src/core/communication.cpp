@@ -342,10 +342,6 @@ void mpi_stop() {
   // stop worker nodes
   mpi_call(mpi_stop_slave, -1, 0);
 
-#ifdef DD_P4EST
-  dd_p4est_free();
-#endif // DD_P4EST
-
 #ifdef LB_ADAPTIVE
   lb_release();
   // shutdown p4est if it was used
@@ -375,10 +371,6 @@ void mpi_stop() {
 
 void mpi_stop_slave(int node, int param) {
   COMM_TRACE(fprintf(stderr, "%d: exiting\n", this_node));
-
-#ifdef DD_P4EST
-  dd_p4est_free();
-#endif // DD_P4EST
 
 #ifdef LB_ADAPTIVE
   lb_release();

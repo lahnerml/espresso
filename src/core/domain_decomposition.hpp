@@ -86,7 +86,7 @@ typedef struct {
   int rank; // Rank of the communication partner
   int cnt;  // number of cells to communicate
   int dir;  // Bitmask for communication direction. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-  int *idx; // List of cell indexes
+  std::vector<int> idx; // List of cell indexes
 } comm_t;
 
 #endif
@@ -132,6 +132,44 @@ typedef struct {
   IA_Neighbor *nList;
 } IA_Neighbor_List;
 
+#ifdef DD_P4EST
+namespace std
+{
+  template<>
+  struct default_delete<p4est_t>
+  {
+    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_ghost_t>
+  {
+    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_mesh_t>
+  {
+    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_connectivity_t>
+  {
+    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
+  };
+}
+
+// Don't use it. Can lead to nasty bugs.
+template <typename T>
+struct castable_unique_ptr: public std::unique_ptr<T> {
+  using Base = std::unique_ptr<T>;
+  constexpr castable_unique_ptr(): Base() {}
+  constexpr castable_unique_ptr(nullptr_t n): Base(n) {}
+  castable_unique_ptr(T* p): Base(p) {}
+  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
+  operator T*() const { return this->get(); }
+  operator void *() const { return this->get(); }
+};
+#endif
+
 /** Structure containing the information about the cell grid used for domain decomposition. */
 typedef struct {
   /** flag for using Verlet List */
@@ -148,11 +186,9 @@ typedef struct {
   /** Array containing information about the interactions between the cells. */
   IA_Neighbor_List *cell_inter;
 #ifdef DD_P4EST
-  p4est_t *p4est; // the forest
-  p4est_ghost_t *p4est_ghost; // the forest's ghost layer
-  p4est_mesh_t *p4est_mesh; // the forest's mesh information
-  p4est_connectivity_t *p4est_conn; // the topology on which the forest is build
-  local_shell_t *p4est_shell; // inforamtion about all cells on this node (same order as cells)
+  castable_unique_ptr<p4est_t> p4est; // the forest
+  castable_unique_ptr<p4est_connectivity_t> p4est_conn; // the topology on which the forest is build
+  std::vector<local_shell_t> p4est_shell; // inforamtion about all cells on this node (same order as cells)
 #endif
 }  DomainDecomposition;
 

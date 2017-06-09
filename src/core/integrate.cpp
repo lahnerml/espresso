@@ -230,6 +230,7 @@ void integrate_ensemble_init() {
 void integrate_vv(int n_steps, int reuse_forces) {
   /* Prepare the Integrator */
   on_integration_start();
+
 #ifdef IMMERSED_BOUNDARY
   // Here we initialize volume conservation
   // This function checks if the reference volumes have been set and if
@@ -287,13 +288,15 @@ void integrate_vv(int n_steps, int reuse_forces) {
     thermo_heat_up();
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
     transfer_momentum = 0;
     if (lattice_switch & LATTICE_LB && this_node == 0)
       runtimeWarning("Recalculating forces, so the LB coupling forces are not "
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
                      "sampling.\n");
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 0;
     if (lattice_switch & LATTICE_LB_GPU && this_node == 0)
@@ -301,15 +304,19 @@ void integrate_vv(int n_steps, int reuse_forces) {
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
                      "sampling.\n");
-#endif
+#endif // LB_GPU
+
     force_calc();
+
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
       rescale_forces();
 #ifdef ROTATION
       convert_initial_torques();
 #endif
     }
+
     thermo_cool_down();
+
 #ifdef MULTI_TIMESTEP
 #ifdef NPT
     if (smaller_time_step > 0. && integ_switch == INTEG_METHOD_NPT_ISO)
@@ -355,7 +362,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
     }
   }
   fprintf(stderr, "%i : particle index wrong: %i listed, %i local, %i ghost\n", this_node, cnt_lp, cnt_cp, cnt_gp);
-#endif
+#endif // 0
 #ifdef COLLISION_DETECTION
     handle_collisions();
 #endif
@@ -487,11 +494,13 @@ void integrate_vv(int n_steps, int reuse_forces) {
    v(t+0.5*dt) ) */
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
     transfer_momentum = 1;
-#endif
+#endif // !LB_ADAPTIVE_GPU
+#endif // LB
 #ifdef LB_GPU
     transfer_momentum_gpu = 1;
-#endif
+#endif // LB_GPU
 
     force_calc();
 
@@ -503,8 +512,8 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #ifdef LB_GPU
     if (lattice_switch & LATTICE_LB_GPU)
       IBM_ForcesIntoFluid_GPU();
-#endif
-#endif
+#endif // LB_GPU
+#endif // IMMERSED_BOUNDARY
 
 #ifdef CATALYTIC_REACTIONS
     integrate_reaction();
@@ -556,12 +565,12 @@ void integrate_vv(int n_steps, int reuse_forces) {
       if (ek_initialized) {
         ek_integrate();
       } else {
-#endif
+#endif // ELECTROKINETICS
         if (lattice_switch & LATTICE_LB_GPU)
           lattice_boltzmann_update_gpu();
 #ifdef ELECTROKINETICS
       }
-#endif
+#endif // ELECTROKINETICS
     }
 #endif // LB_GPU
 

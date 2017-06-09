@@ -25,7 +25,6 @@
 /** Struct to hold information relevant to Espresso
    about GPUs. Should contain only fixed length plain
    old datatypes, as it is intended for MPI communication */
-
 struct EspressoGpuDevice {
   /* Local CUDA device id */
   int id;
@@ -109,4 +108,4 @@ int cuda_get_device_props(const int dev, EspressoGpuDevice &d);
 /** current error message of CUDA. */
 extern const char *cuda_error;
 
-#endif
+#endif // CUDA_INIT_H

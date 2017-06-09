@@ -528,7 +528,8 @@ void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3]);
 void mpi_bcast_constraint(int del_num);
 
 #ifdef LB_ADAPTIVE
-/** initialize adaptive grid
+/** initialize adaptive grid.
+ * If LB_ADAPTIVE_GPU is set, a CUDA device is reserved here.
  *
  * @param [in] node the node on which this function is called
  * @param [in] level refine grid uniformly up to this level
@@ -562,6 +563,12 @@ void mpi_lbadapt_vtk_print_density (int node, int len);
  */
 void mpi_lbadapt_vtk_print_velocity(int node, int len);
 
+#ifdef LB_ADAPTIVE_GPU
+/** Visualize how threads and blocks are distributed in patches
+ */
+void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len);
+#endif // LB_ADAPTIVE_GPU
+
 /** Set maximum refinement level
  * 
  * @param [in] node   The node on which this function is called (all)
@@ -569,8 +576,13 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len);
  */
 void mpi_lbadapt_set_max_level (int node, int l_max);
 
+/** Call non-recursive uniform refinement function, i.e. all quadrants are
+ * refined exactly once.
+ */
 void mpi_unif_refinement (int node, int level);
 
+/** Call non-recursive random refinement function. Probability is 50%.
+ */
 void mpi_rand_refinement (int node, int maxLevel);
 
 /** Call broadcast routine to populate 6 coordinates
@@ -579,11 +591,18 @@ void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
 
 void mpi_reg_refinement (int node, int param=0);
 
+/** Call recursive geometric refinement function, i.e. all quadrants that are
+ * touching a boundary are recursively refined until l_max.
+ */
 void mpi_geometric_refinement (int node, int param);
 
 void mpi_inv_geometric_refinement (int node, int param);
 
+/** Ignore boundary with given index in geometric refinement function.
+ */
 void mpi_exclude_boundary (int node, int param);
+
+void mpi_recv_interpolated_velocity (int node, double *p, double *v);
 #endif // LB_ADAPTIVE
 
 #ifdef DD_P4EST

@@ -208,7 +208,9 @@ espressoSystemInterface.update();
 #endif
 
 #ifdef LB
+#ifndef LB_ADAPTIVE_GPU
   if (lattice_switch & LATTICE_LB) calc_particle_lattice_ia() ;
+#endif // LB_ADAPTIVE_GPU
 #endif
 
 #ifdef COMFORCE

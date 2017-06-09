@@ -31,6 +31,7 @@
 #include "global.hpp"
 #include "interaction_data.hpp"
 #include "lb.hpp"
+#include "lb-adaptive-gpu.hpp"
 #include "npt.hpp"
 #include "parser.hpp"
 #include "pressure_tcl.hpp"

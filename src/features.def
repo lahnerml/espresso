@@ -37,6 +37,7 @@ CATALYTIC_REACTIONS
 MULTI_TIMESTEP        requires not GAUSSRANDOMCUT and not GAUSSRANDOM
 ENGINE                          implies ROTATION, EXTERNAL_FORCES
 CONFIGTEMP
+DD_P4EST
 
 /* Rotation */
 ROTATION
@@ -88,6 +89,7 @@ INTER_DPD
 LB
 LB_GPU                          requires CUDA
 LB_ADAPTIVE                     implies LB
+LB_ADAPTIVE_GPU                 implies LB, LB_ADAPTIVE
 LB_BOUNDARIES                   implies LB, CONSTRAINTS
 LB_BOUNDARIES_GPU               implies LB_GPU, CONSTRAINTS
 LB_ELECTROHYDRODYNAMICS         implies LB

@@ -28,14 +28,22 @@
  *
 */
 
+#include <array>
+#include <cmath>
 #include <exception>
 #include <vector>
-#include <cmath>
 
 #include "config.hpp"
 
 #include "errorhandling.hpp"
 
+#ifdef LB_ADAPTIVE
+#ifndef __CUDACC__
+#include "p8est.h"
+#include "p8est_mesh.h"
+#include "p8est_meshiter.h"
+#endif // __CUDACC__
+#endif // LB_ADAPTIVE
 
 /*************************************************************/
 /** \name Mathematical, physical and chemical constants.     */
@@ -66,23 +74,6 @@
 #define ES_DOUBLE_SPACE 27
 
 /*@}*/
-
-#ifdef LB_ADAPTIVE
-/*************************************************************/
-/** \name mapping from c_i to p4est and vice versa.          */
-/*************************************************************/
-/*@{*/
-/** we are only interested in c1 .. c18 */
-const int ci_to_p4est[18] =
-  {1, 0, 3, 2, 5, 4, 17, 14, 15, 16, 13, 10, 11, 12, 9, 6, 7, 8};
-
-const int p4est_to_ci[18] =
-  {2, 1, 4, 3, 6, 5, 16, 17, 18, 15, 12, 13, 14, 11, 8, 9, 10, 7};
-/*@}*/
-#endif // LB_ADAPTIVE
-
-// Comute a Morton index for a cell using its coordinates
-int64_t dd_p4est_cell_morton_idx(int x, int y, int z);
 
 /************************************************
  * data types
@@ -146,6 +137,18 @@ template <unsigned n, typename T> inline T int_pow(T x) {
       return x * int_pow<(n - 1) / 2, T>(x * x);
     }
   }
+}
+
+/** For positive numbers, returns the log to basis two rounded down.
+ * Returns 0 for negative numbers.
+ */
+template <typename T>
+inline int nat_log2_floor(T x) {
+  static_assert(std::is_integral<T>::value,
+                "This version of logarithm can only be used for integer types\n");
+  int lvl = 0;
+  for (; x > 1; x >>= 1) lvl++;
+  return lvl;
 }
 
 /** used instead of realloc.
@@ -449,7 +452,7 @@ inline void unit_vector(double v[3], double y[3]) {
 }
 
 /** calculates the scalar product of two vectors a nd b */
-inline double scalar(double a[3], double b[3]) {
+template <typename T> inline T scalar(T a[3], T b[3]) {
   double d2 = 0.0;
   int i;
   for (i = 0; i < 3; i++)
@@ -785,7 +788,6 @@ inline void lu_solve_system(double **A, int n, int *perms, double *b) {
 /** \name Three dimensional grid operations                  */
 /*************************************************************/
 /*@{*/
-
 /** get the linear index from the position (a,b,c) in a 3D grid
  *  of dimensions adim[]. returns linear index.
  *
@@ -868,7 +870,8 @@ inline void print_block(double *data, int start[3], int size[3], int dim[3],
   for (b = 0; b < divide; b++) {
     start1 = b * block1 + start[1];
     for (i0 = start[0] + size[0] - 1; i0 >= start[0]; i0--) {
-      for (i1 = start1; i1 < std::min(start1 + block1, start[1] + size[1]); i1++) {
+      for (i1 = start1; i1 < std::min(start1 + block1, start[1] + size[1]);
+           i1++) {
         for (i2 = start[2]; i2 < start[2] + size[2]; i2++) {
           tmp = data[num + (element * (i2 + dim[2] * (i1 + dim[1] * i0)))];
           if (tmp < 0)
@@ -895,6 +898,11 @@ inline void print_block(double *data, int start[3], int size[3], int dim[3],
  *  \param pos2 Position two.
 */
 inline double distance(double pos1[3], double pos2[3]) {
+  return sqrt(SQR(pos1[0] - pos2[0]) + SQR(pos1[1] - pos2[1]) +
+              SQR(pos1[2] - pos2[2]));
+}
+
+inline double distance(std::array<double, 3> pos1, std::array<double, 3> pos2) {
   return sqrt(SQR(pos1[0] - pos2[0]) + SQR(pos1[1] - pos2[1]) +
               SQR(pos1[2] - pos2[2]));
 }

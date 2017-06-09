@@ -48,7 +48,7 @@ void dd_p4est_global_exchange_part(ParticleList* cp);
 // Map a position to a global processor index
 int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)
-int64_t dd_p4est_pos_morton_idx(double pos[3]);
+// int64_t dd_p4est_pos_morton_idx(double pos[3]);
 
 // Handles everything that needs to be done on a geometry change
 void dd_p4est_on_geometry_change(int flags);
@@ -58,10 +58,4 @@ void dd_p4est_write_particle_vtk(char *filename);
 
 // Writes the MD grid as VTK file
 void dd_p4est_write_vtk();
-
-#ifdef DD_P4EST
-// Repartition a given p4est along the MD grid, so that processor domain boundaries are aligned
-void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn);
-#endif
-
 #endif

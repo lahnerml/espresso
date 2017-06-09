@@ -49,7 +49,7 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
 
   /* check input for semantic correctness */
   if ((level > 18) || (level < 0)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+    Tcl_AppendResult(interp, "allowed refinement levels are [0, 18]\n",
                      (char *)NULL);
     return TCL_ERROR;
   }
@@ -81,7 +81,7 @@ int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
   }
 
   /* check input for semantic correctness */
-  if ((level > 18) || (level < 0)) {
+  if ((level > 18) || (level < 1)) {
     Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
                      (char *)NULL);
     return TCL_ERROR;
@@ -166,68 +166,47 @@ int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
   if (argc == 7) {
     if (!ARG_IS_D(1, coords_for_regional_refinement[0])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
     if (!ARG_IS_D(2, coords_for_regional_refinement[1])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
     if (!ARG_IS_D(3, coords_for_regional_refinement[2])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
     if (!ARG_IS_D(4, coords_for_regional_refinement[3])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
     if (!ARG_IS_D(5, coords_for_regional_refinement[4])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
     if (!ARG_IS_D(6, coords_for_regional_refinement[5])) {
       Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                               "type and meaning:\n",
-                       (char *)NULL);
-      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                       (char *)NULL);
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
       return TCL_ERROR;
     }
-  } else {
-    Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
-                             "type and meaning:\n",
-                     (char *)NULL);
-    Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char *)NULL);
-    Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n",
-                     (char *)NULL);
-    return TCL_ERROR;
   }
-
   mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
   mpi_bcast_parameters_for_regional_refinement(0, 0);
 
@@ -306,8 +285,6 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 
 int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp, int argc,
                            char **argv) {
-  int bnd_index;
-
   if (argc != 1) {
     Tcl_AppendResult(interp, "Resetting the grid takes no parameters",
                      (char *)NULL);
@@ -319,4 +296,18 @@ int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp, int argc,
 
   return TCL_OK;
 }
+
+#ifdef LB_ADAPTIVE_GPU
+int tclcommand_gpu_show_utilization(ClientData data, Tcl_Interp *interp,
+                                     int argc, char **argv) {
+  int res;
+  res = lbadapt_print_gpu_utilization(argv[1]);
+
+  if (res == 0) {
+    return TCL_OK;
+  } else {
+    return TCL_ERROR;
+  }
+}
+#endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE

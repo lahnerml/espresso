@@ -22,6 +22,9 @@
     Main file of Espresso. Initialization of tcl interpreter.
 */
 /* first, since we need the TK define */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif // _GNU_SOURCE
 #include "utils.hpp"
 #ifdef TK
 #include <tk.h>
@@ -29,12 +32,14 @@
 #include "initialize_interpreter.hpp"
 #include "initialize.hpp"
 #include "communication.hpp"
+#include <fenv.h>
 
 int main(int argc, char **argv)
 {
   /* first thing to do: fire up MPI */
   mpi_init(&argc, &argv);
 
+  //feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW | FE_UNDERFLOW);
   on_program_start();
 
   if (this_node == 0) {

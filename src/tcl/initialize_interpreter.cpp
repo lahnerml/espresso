@@ -219,6 +219,9 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt-inv-geom-ref", tclcommand_set_inv_geom_ref);
   REGISTER_COMMAND("lbadapt-exclude-bnd-from-geom-ref", tclcommand_excl_bnd_idx_geom_ref);
   REGISTER_COMMAND("lbadapt-reset-fluid", tclcommand_reset_fluid);
+#ifdef LB_ADAPTIVE_GPU
+  REGISTER_COMMAND("lbadapt-show-gpu-util", tclcommand_gpu_show_utilization);
+#endif // LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
   /* here */
   REGISTER_COMMAND("replacestdchannel", tclcommand_replacestdchannel);

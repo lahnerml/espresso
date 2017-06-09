@@ -20,7 +20,7 @@
 */
 /** \file lb-adaptive.hpp
  *
- * Adaptive Lattice Boltzmann Scheme using CPU.
+ * Adaptive Lattice Boltzmann Scheme.
  * Header file for \ref lb-adaptive.cpp.
  *
  */
@@ -30,6 +30,7 @@
 
 #ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
+#include <p8est.h>
 #include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
@@ -41,6 +42,7 @@
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
 
+#include "lb-adaptive-gpu.hpp"
 #include "lb.hpp"
 #include "utils.hpp"
 
@@ -92,14 +94,13 @@ extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
  */
 void lbadapt_init();
 
-/** setup function for lbadapt_payload_t by setting some values
- *  to 0
+/** function to deallocate fluid storage
  */
-void lbadapt_reinit();
+void lbadapt_release();
 
-/** Init lb parameters
+/** reinitialize lb-parameters from user input
  */
-// void lbadapt_reinit_parameters();
+void lbadapt_reinit_parameters();
 
 /** Init cell-local force values
  */
@@ -109,9 +110,21 @@ void lbadapt_reinit_force_per_cell();
  */
 void lbadapt_reinit_fluid_per_cell();
 
+#ifdef LB_BOUNDARIES
+/** Check if current midpoint is part of the boundary
+ */
+int lbadapt_is_boundary(double pos[3]);
+#endif // LB_BOUNDARIES
+
 /** Get maxlevel of p4est
  */
 int lbadapt_get_global_maxlevel();
+
+#ifdef LB_ADAPTIVE_GPU
+/** Populate the halos of patches of a specific level
+ */
+void lbadapt_patches_populate_halos(int level);
+#endif // LB_ADAPTIVE_GPU
 
 /** interpolating function
  *
@@ -121,7 +134,7 @@ int lbadapt_get_global_maxlevel();
  *                               1 for refinement, 8 for coarsening.
  * \param [in]      outgoing     The actual quadrants that will be replaced.
  * \param [in]      num_incoming The number of quadarants that will be added.
- * \param [in][out] incoming     Quadrants whose data needs to be initialized.
+ * \param [in,out]  incoming     Quadrants whose data needs to be initialized.
  */
 void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
                            int num_outgoing, p8est_quadrant_t *outgoing[],
@@ -132,7 +145,7 @@ void lbadapt_replace_quads(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  * @returns quadrants weight according to subcycling
  */
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
@@ -161,7 +174,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q);
@@ -171,7 +184,7 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q);
@@ -181,42 +194,23 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
- * \param [in] quadrant    The Quadrant.
+ * \param [in] q           The Quadrant.
  */
 int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                          p8est_quadrant_t *q);
 
 /*** HELPER FUNCTIONS ***/
-/* Geometry */
-/** Get the coordinates of the midpoint of a quadrant.
- *
- * \param [in]  p4est    the forest
- * \param [in]  which_tree the tree in the forest containing \a q
- * \param [in]  q      the quadrant
- * \param [out] xyz    the coordinates of the midpoint of \a q
- */
-void lbadapt_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                          p8est_quadrant_t *q, double xyz[3]);
-
-/** Get the coordinates of the midpoint of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the midpoint of the current
- *                         quadrant that mesh_iter is pointing to.
- */
-void lbadapt_get_midpoint(p8est_meshiter_t *mesh_iter, double xyz[3]);
-
 /* LBM */
 /** Calculate equilibrium distribution from given fluid parameters
  *
- * \param [in][out] datafield  The fluid node that shall be written.
+ * \param [in,out]  datafield  The fluid node that shall be written.
  * \param [in]      rho        The fluids density.
  * \param [in]      j          The fluids velocity.
  * \param [in]      pi         The fluids stress tensor.
  * \param [in]      h          The local mesh-width.
  */
-int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
-                                 double *pi, double h);
+int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
+                                 lb_float *j, lb_float *pi, lb_float h);
 
 /** Calculate modes for MRT scheme
  *
@@ -224,52 +218,59 @@ int lbadapt_calc_n_from_rho_j_pi(double datafield[2][19], double rho, double *j,
  * \param     [out] mode        The resulting modes to be relaxed in a later
  * step.
  */
-int lbadapt_calc_modes(double populations[2][19], double *mode);
+int lbadapt_calc_modes(lb_float populations[2][19], lb_float *mode);
 
 /** Perform MRT Relaxation step
  *
- * \param [in][out] mode  kinematic modes of the fluid.
+ * \param [in,out]  mode  kinematic modes of the fluid.
  * \param [in]      force Force that is applied on the fluid.
  * \param [in]      h     Meshwidth of current cell
  */
-int lbadapt_relax_modes(double *mode, double *force, double h);
+int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h);
 
 /** Thermalize modes
  *
- * \param [in][out] mode  The modes to be thermalized.
+ * \param [in,out]  mode  The modes to be thermalized.
  */
-int lbadapt_relax_modes(double *mode);
+int lbadapt_relax_modes(lb_float *mode);
 
 /** Apply force on fluid.
  *
- * \param [in][out] mode  The modes that the force is applied on.
+ * \param [in,out]  mode  The modes that the force is applied on.
  * \param [in]      force The force that is applied.
  * \param [in]      h     The local mesh width.
  */
-int lbadapt_apply_forces(double *mode, LB_FluidNode *lbfields, double h);
-// int lbadapt_apply_forces(double *mode, double force[3], double h);
+int lbadapt_apply_forces(lb_float *mode, lb_float *force, lb_float h);
 
 /** Transfer modes back to populations
  *
  * \param     [out] populations  The resulting particle densities.
  * \param [in]      m            The modes.
  */
-int lbadapt_calc_pop_from_modes(double *populations, double *m);
+int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m);
 
-/** collision
- * CAUTION: sync ghost data after collision
+/** collision, virtual quadrants are automatically populated if current quadrant
+ * has virtual children, i.e. is adjacent to a refinement boundary
  *
- * \param [in] level   The level on which to perform the collision step
+ * \param [in] level             The level on which to perform the collision
+ *                               step
+ * \param [in] quads_to_collide  Which quads to collide: local, ghost, or both
  */
-void lbadapt_collide(int level);
+void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
 
 /** Populate virtual cells with post-collision values from their respective
  * father cell
  *
- * \param [in] level   The level of the real cells whose virtual subcells are
- *                     populated.
+ * \param [in] mesh_iter           The currently used mesh-based iterator
+ * \param [in] source_populations  The post-collision populations of host cell
+ *                                 that is to be copied to its 8 virtual
+ *                                 subquadrants.
+ * \param [in] source_boundary     The boundary value set in host cell that is
+ *                                 copied to each virtual subquadrant.
  */
-void lbadapt_populate_virtuals(int level);
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
+                               lb_float source_populations[2][19],
+                               int source_boundary);
 
 /** streaming
  * CAUTION: sync ghost data before streaming
@@ -324,16 +325,17 @@ int lbadapt_calc_local_fields(double populations[2][19], double mode[19],
  * \param [in]  mesh_iter    mesh-based iterator
  * \param [out] rho          density
  */
-void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, double *rho);
+void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho);
 
 /** Calculate local fluid velocity from pre-collision moments
  *
  * \param [in]  mesh_iter    mesh-based iterator
  * \param [out] j            velocity
  */
-void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, double *j);
+void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j);
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+int64_t lbadapt_map_pos_to_proc(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
 
@@ -352,5 +354,6 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data);
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
+
 #endif // LB_ADAPTIVE
 #endif // LB_ADAPTIVE_H

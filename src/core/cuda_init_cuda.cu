@@ -22,7 +22,6 @@
 #include "cuda_init.hpp"
 #include "cuda_utils.hpp"
 
-
 #ifdef CUDA
 
 #include <cuda.h>
@@ -37,6 +36,11 @@ const char *cuda_error;
 
 void cuda_init()
 {
+#ifdef LB_ADAPTIVE_GPU
+  int nGPUs;
+  CUDA_CALL (cudaGetDeviceCount(&nGPUs));
+  CUDA_CALL (cudaSetDevice(this_node % nGPUs));
+#endif // LB_ADAPTIVE_GPU
   cudaStreamCreate(&stream[0]);
 }
 

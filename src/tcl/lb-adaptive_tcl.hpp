@@ -19,6 +19,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "parser.hpp"
 
@@ -51,4 +52,8 @@ int tclcommand_excl_bnd_idx_geom_ref(ClientData data, Tcl_Interp *interp,
 
 int tclcommand_reset_fluid(ClientData data, Tcl_Interp *interp,
                             int argc, char **argv);
+
+int tclcommand_gpu_show_utilization(ClientData data, Tcl_Interp *interp,
+                                     int argc, char **argv);
+
 #endif // LB_ADAPTIVE_TCL

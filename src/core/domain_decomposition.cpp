@@ -1114,18 +1114,17 @@ void dd_exchange_and_sort_particles (int global_flag) {
     // Go through all local particles and move those not on node to the sendbuf
     for (int c = 0; c < local_cells.n; c++) {
       Cell *pl = local_cells.cell[c];
-      int np   = local_cells.cell[c]->n;
-      for (int p = 0; p < np; p++) {
-        //fold_position(pl->part[p].r.p, pl->part[p].l.i);
+      for (int p = 0; p < pl->n; p++) {
+        fold_position(pl->part[p].r.p, pl->part[p].l.i);
         Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
         if (nc == NULL) { // Belongs to other node
           int pid = pl->part[p].p.identity;
           move_indexed_particle(&sendbuf, pl, p);
           local_particles[pid] = NULL;
-          if(p < np) p -= 1;
+          if(p < pl->n) p -= 1;
         } else if(nc != pl) { // Still on node but particle belongs to other cell
           move_indexed_particle(nc, pl, p);
-          if(p < np) p -= 1;
+          if(p < pl->n) p -= 1;
         }
         // Else not required since particle in cell it belongs to
       }

@@ -2445,6 +2445,8 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   zid = (pos[2]) * (1 << lbpar.max_refinement_level);
   int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
   int64_t qidx, zlvlfill;
+  // idea: iterate through all ghost quadrants and check if searched position
+  //       is contained in current ghost quadrant. if yes, return ghost index
   for (size_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
     qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
@@ -2681,7 +2683,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   if (abs(dsum) > ROUND_ERROR_PREC)
     printf("%le\n", dsum);
   if (ncnt > 20)
-    printf("to many neighbours\n");
+    printf("too many neighbours\n");
   return ncnt;
 }
 

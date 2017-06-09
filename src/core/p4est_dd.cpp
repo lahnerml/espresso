@@ -138,6 +138,13 @@ int dd_p4est_cellsize_even () {
 void dd_p4est_create_grid () {
   //printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
+  // Clear old data to prevent it from being used accidentally
+  comm_rank.clear();
+  comm_proc.clear();
+  comm_recv.clear();
+  comm_send.clear();
+  p4est_space_idx.clear();
+  dd.p4est_shell.clear();
 #ifdef LB_ADAPTIVE
   // the adaptive LB has a strange grid, thus we have to do something similar here
   if (max_range < 1.0)

@@ -500,25 +500,26 @@ void dd_p4est_comm() {
   CALL_TRACE();
 
   // List of cell idx marked for send/recv for each process
-  std::vector<int> send_idx[n_nodes];
-  std::vector<int> recv_idx[n_nodes];
+  std::vector<std::vector<int>> send_idx(n_nodes), recv_idx(n_nodes);
   // List of all directions for those communicators encoded in a bitmask
-  std::vector<uint64_t> send_tag[n_nodes];
-  std::vector<uint64_t> recv_tag[n_nodes];
+  std::vector<std::vector<uint64_t>> send_tag(n_nodes);
+  std::vector<std::vector<uint64_t>> recv_tag(n_nodes);
   // Or-Sum (Union) over the lists above
-  uint64_t send_cnt_tag[n_nodes];
-  uint64_t recv_cnt_tag[n_nodes];
+  std::vector<uint64_t> send_cnt_tag(n_nodes);
+  std::vector<uint64_t> recv_cnt_tag(n_nodes);
   // Number of cells for each communication (rank and direction)
-  int send_cnt[n_nodes][64];
-  int recv_cnt[n_nodes][64];
-
+  // 64 different direction (64 = 2^6, where 6 = |{x_l, x_r, y_l, y_r, z_l, z_r}|)
+  std::vector<std::array<int, 64>> send_cnt(n_nodes);
+  std::vector<std::array<int, 64>> recv_cnt(n_nodes);
+  
   // Total number of send and recv
   int num_send = 0;
   int num_recv = 0;
-  // Is 1 for a process if there is any communication, 0 if none
-  int8_t num_send_flag[n_nodes];
-  int8_t num_recv_flag[n_nodes];
 
+  // Is 1 for a process if there is any communication, 0 if none
+  std::vector<int8_t> num_send_flag(n_nodes);
+  std::vector<int8_t> num_recv_flag(n_nodes);
+  
   // Prepare all lists
   num_comm_proc = 0;
   if (comm_proc)
@@ -1187,18 +1188,16 @@ static void dd_resort_particles() {
 
 void dd_p4est_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
-  ParticleList *sendbuf, *recvbuf;
-  std::vector<int> *sendbuf_dyn, *recvbuf_dyn;
   std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(num_comm_proc, 0);
-
-  sendbuf = new ParticleList[num_comm_proc];
-  recvbuf = new ParticleList[num_comm_proc];
-  sendbuf_dyn = new std::vector<int>[num_comm_proc];
-  recvbuf_dyn = new std::vector<int>[num_comm_proc];
-
-  for (int i = 0; i < num_comm_proc; ++i) {
+  
+  std::vector<ParticleList> sendbuf(num_comm_proc);
+  std::vector<ParticleList> recvbuf(num_comm_proc);
+  std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc);
+  std::vector<std::vector<int>> recvbuf_dyn(num_comm_proc);
+    
+  for (int i=0;i<num_comm_proc;++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
     // Invoke the recv thread for number of particles from all neighbouring
@@ -1207,8 +1206,9 @@ void dd_p4est_exchange_and_sort_particles() {
   }
 
   // Fill the send buffers with particles that leave the local domain
-  dd_p4est_fill_sendbuf(sendbuf, sendbuf_dyn);
-
+  dd_p4est_fill_sendbuf(sendbuf.data(), sendbuf_dyn.data());
+  
+  
   // send number of particles, particles, and particle data
   for (int i = 0; i < num_comm_proc; ++i) {
     int nsend = sendbuf[i].n;
@@ -1274,14 +1274,7 @@ void dd_p4est_exchange_and_sort_particles() {
     }
     realloc_particlelist(&sendbuf[i], 0);
     realloc_particlelist(&recvbuf[i], 0);
-    sendbuf_dyn[i].clear();
-    recvbuf_dyn[i].clear();
   }
-
-  delete[] sendbuf;
-  delete[] recvbuf;
-  delete[] sendbuf_dyn;
-  delete[] recvbuf_dyn;
 
 #ifdef ADDITIONAL_CHECKS
   check_particle_consistency();
@@ -1290,8 +1283,8 @@ void dd_p4est_exchange_and_sort_particles() {
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_global_exchange_part(ParticleList *pl) {
   // Prepare send/recv buffers to ALL processes
-  ParticleList sendbuf[n_nodes], recvbuf[n_nodes];
-  std::vector<int> sendbuf_dyn[n_nodes], recvbuf_dyn[n_nodes];
+  std::vector<ParticleList> sendbuf(n_nodes), recvbuf(n_nodes);
+  std::vector<std::vector<int>> sendbuf_dyn(n_nodes), recvbuf_dyn(n_nodes);
   std::vector<MPI_Request> sreq(3 * n_nodes, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(n_nodes, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(n_nodes, 0);

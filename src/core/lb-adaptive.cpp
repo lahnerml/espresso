@@ -1545,7 +1545,8 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
       }
     }
   }
-  P4EST_ASSERT((mesh_iter->current_level < finest_level_global) ||
+  P4EST_ASSERT((mesh_iter->current_level <
+                forest_info->at(adaptive_LB).finest_level_global) ||
                (-1 < mesh_iter->current_vid) ||
                ((lbmodel.n_veloc - 1) == neighbor_cnt));
 #endif // LB_ADAPTIVE_GPU

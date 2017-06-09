@@ -2836,7 +2836,7 @@ void mpi_lbadapt_grid_init(int node, int level) {
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
-  p4est_utils_partition_multiple_forests(dd.p4est, lb_p8est);
+  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
 #endif // DD_P4EST
 
   // build initial versions of ghost, mesh, and ghost_virt
@@ -3182,7 +3182,8 @@ void mpi_reg_refinement(int node, int param) {
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
-  p4est_utils_partition_multiple_forests(dd.p4est, lb_p8est);
+
+  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
@@ -3229,7 +3230,8 @@ void mpi_geometric_refinement(int node, int param) {
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
-  p4est_utils_partition_multiple_forests(dd.p4est, lb_p8est);
+
+  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
@@ -3275,7 +3277,8 @@ void mpi_inv_geometric_refinement(int node, int param) {
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
-  p4est_utils_partition_multiple_forests(dd.p4est, lb_p8est);
+
+  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);

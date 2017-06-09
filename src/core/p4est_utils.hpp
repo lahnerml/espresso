@@ -14,6 +14,8 @@
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
+enum forest_order { short_range, adaptive_LB };
+
 typedef struct {
   p8est_t *p4est;
   p4est_locidx_t *tree_quadrant_offset_synced;
@@ -32,7 +34,7 @@ extern std::vector<p4est_utils_forest_info_t> *forest_info;
  * @param p4ests     List of all p4ests in the current simulation
  * @return int
  */
-int p4est_utils_prepare (std::vector<p8est_t*> p4ests);
+int p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 
 /*****************************************************************************/
 /** \name Mapping geometric positions                                        */
@@ -40,11 +42,11 @@ int p4est_utils_prepare (std::vector<p8est_t*> p4ests);
 /*@{*/
 /** Map position to mpi rank
  *
- * @param p4est     p4est whose domain decomposition is to be used.
+ * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
  * @return int      Rank responsible for that position in space.
  */
-int p4est_utils_pos_to_proc(p8est_t *p4est, double pos[3]);
+int p4est_utils_pos_to_proc(forest_order forest, double pos[3]);
 
 /** Compute a Morton index for a cell using its coordinates
  *
@@ -56,22 +58,42 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 /** Calculate a global cell index for a given position. This index is no p4est
  * quadrant index.
  *
- * @param p4est     p4est whose domain decomposition is to be used.
+ * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_global(p8est_t *p4est, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]);
 
 /** Calculate a local cell index for a given position. This index is no p4est
  * quadrant index.
  *
- * @param p4est     p4est whose domain decomposition is to be used.
+ * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_local(p8est_t *p4est, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]);
+
+/** Find quadrant index for a given position among local quadrants
+ *
+ * @param forest    p4est whose domain decomposition is to be used.
+ * @param pos       Spatial coordinate to map.
+ *
+ * @return int      Quadrant index of quadrant containing pos
+ */
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]);
+
+/** Find quadrant index for a given position among ghost quadrants
+ *
+ * @param forest    p4est whose domain decomposition is to be used.
+ * @param ghost     Ghost layer for p4est
+ * @param pos       Spatial coordinate to map.
+ *
+ * @return int      Quadrant index of quadrant containing pos
+ */
+p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
+                                         p8est_ghost_t *ghost, double pos[3]);
 /*@}*/
 
 /*****************************************************************************/
@@ -348,8 +370,8 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
  * @param[out] p4est_mod   p4est to be modified such that its boundaries match
  *                         those of \a p4est_ref
  */
-void p4est_utils_partition_multiple_forests(p8est_t *p4est_ref,
-                                            p8est_t *p4est_mod);
+void p4est_utils_partition_multiple_forests(forest_order reference,
+                                            forest_order modify);
 /*@}*/
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

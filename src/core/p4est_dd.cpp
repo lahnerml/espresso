@@ -787,37 +787,27 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_position_to_cell(double pos[3]) {
-#ifdef ADDITIONAL_CHECKS
-  runtimeErrorMsg() << "function " << __FUNCTION__ << " in " << __FILE__ 
-    << "[" << __LINE__ << "] is not implemented";
-#endif
   CALL_TRACE();
   
   // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain
   // by the error bounds
-  
-  int i;
-  //int scale_pos[3];
-  
-  int64_t pidx = dd_p4est_pos_morton_idx(pos);
-  
-  /*for (int d=0;d<3;++d) {
-    scale_pos[d] = pos[d]*dd.inv_cell_size[d];
-    
-    if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
-    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
-  }*/
-    
-  for (i=0;i<num_local_cells;++i) {
-    //if (scale_pos[0] != p4est_shell[i].coord[0]) continue;
-    //if (scale_pos[1] != p4est_shell[i].coord[1]) continue;
-    //if (scale_pos[2] != p4est_shell[i].coord[2]) continue;
-    if (pidx == dd_p4est_cell_morton_idx(p4est_shell[i].coord[0],p4est_shell[i].coord[1],p4est_shell[i].coord[2]))
-      break;
-  }
-  
-  if (i < num_local_cells) return &cells[i];
-  return NULL;
+
+  auto shellidxcomp = [](const local_shell_t& s, int64_t idx) {
+    int64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
+                                            s.coord[1],
+                                            s.coord[2]);
+    return sidx < idx;
+  };
+
+  int i = std::distance(p4est_shell,
+                        std::lower_bound(p4est_shell,
+                                         p4est_shell + num_local_cells,
+                                         dd_p4est_pos_morton_idx(pos),
+                                         shellidxcomp));
+  if (i < num_local_cells)
+    return &cells[i];
+  else
+    return NULL;
 }
 //--------------------------------------------------------------------------------------------------
 // Checks all particles and resorts them to local cells or sendbuffers

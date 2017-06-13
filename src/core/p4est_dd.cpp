@@ -243,7 +243,7 @@ void dd_p4est_create_grid() {
                         p4est_space_idx[i] - 1));
     }
 #else  // !LB_ADAPTIVE
-    p4est_space_idx[i] = p4est->global_first_quadrant[i];
+    p4est_space_idx[i] = dd.p4est->global_first_quadrant[i];
 #endif // !LB_ADAPTIVE
   }
 

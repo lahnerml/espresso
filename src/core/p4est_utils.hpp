@@ -15,7 +15,7 @@
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
-enum class forest_order { short_range, adaptive_LB };
+enum class forest_order { short_range = 0, adaptive_LB };
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
@@ -42,7 +42,7 @@ extern std::vector<p4est_utils_forest_info_t> forest_info;
  * @param p4ests     List of all p4ests in the current simulation
  * @return int
  */
-int p4est_utils_prepare(std::vector<p8est_t *> p4ests);
+void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 
 /*****************************************************************************/
 /** \name Mapping geometric positions                                        */

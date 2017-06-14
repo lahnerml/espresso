@@ -15,69 +15,71 @@
 #include <p8est_bits.h>
 #include <p8est_search.h>
 #include <vector>
+#include <iterator>
 
 std::vector<p4est_utils_forest_info_t> forest_info;
 
-int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
-  forest_info.clear();
+static p4est_utils_forest_info_t
+p4est_to_forest_info(p4est_t *p4est){
+  // fill element to insert
+  p4est_utils_forest_info_t insert_elem(p4est);
 
-  for (int i = 0; i < p4ests.size(); ++i) {
-    // fetch p4est from list of p4ests
-    p4est_t *p4est = p4ests.at(i);
+  // allocate a local send buffer to insert local quadrant offsets
+  std::vector<int> local_tree_offsets(p4est->trees->elem_count);
 
-    // fill element to insert
-    p4est_utils_forest_info_t insert_elem(p4est);
-
-    // allocate a local send buffer to insert local quadrant offsets
-    std::vector<int> local_tree_offsets(p4est->trees->elem_count);
-
-    // fetch last tree index from last processor
-    int last_tree_prev_rank = -1;
-    if (p4est->mpirank != p4est->mpisize - 1) {
-      MPI_Send(&p4est->last_local_tree, 1, MPI_INT32_T, p4est->mpirank + 1,
-               p4est->mpirank, p4est->mpicomm);
-    }
-    if (p4est->mpirank != 0) {
-      MPI_Recv(&last_tree_prev_rank, 1, MPI_INT32_T, p4est->mpirank - 1,
-               p4est->mpirank - 1, p4est->mpicomm, MPI_STATUS_IGNORE);
-    }
-    // only fill local send buffer if current process is not empty
-    if (p4est->local_num_quadrants != 0) {
-      // set start index; if first tree is not completetly owned by
-      // current
-      // process it will set a wrong quadrant offset
-      int start_idx = (p4est->first_local_tree == last_tree_prev_rank)
-                          ? p4est->first_local_tree + 1
-                          : p4est->first_local_tree;
-      for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
-        p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
-        if (start_idx <= i) {
-          local_tree_offsets[i] = tree->quadrants_offset +
-                                  p4est->global_first_quadrant[p4est->mpirank];
-        }
-        /* get local max level */
-        if (insert_elem.finest_level_local < tree->maxlevel) {
-          insert_elem.finest_level_local = tree->maxlevel;
-        }
+  // fetch last tree index from last processor
+  int last_tree_prev_rank = -1;
+  if (p4est->mpirank != p4est->mpisize - 1) {
+    MPI_Send(&p4est->last_local_tree, 1, MPI_INT32_T, p4est->mpirank + 1,
+             p4est->mpirank, p4est->mpicomm);
+  }
+  if (p4est->mpirank != 0) {
+    MPI_Recv(&last_tree_prev_rank, 1, MPI_INT32_T, p4est->mpirank - 1,
+             p4est->mpirank - 1, p4est->mpicomm, MPI_STATUS_IGNORE);
+  }
+  // only fill local send buffer if current process is not empty
+  if (p4est->local_num_quadrants != 0) {
+    // set start index; if first tree is not completely owned by
+    // current
+    // process it will set a wrong quadrant offset
+    int start_idx = (p4est->first_local_tree == last_tree_prev_rank)
+                        ? p4est->first_local_tree + 1
+                        : p4est->first_local_tree;
+    for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
+      p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
+      if (start_idx <= i) {
+        local_tree_offsets[i] = tree->quadrants_offset +
+                                p4est->global_first_quadrant[p4est->mpirank];
+      }
+      /* get local max level */
+      if (insert_elem.finest_level_local < tree->maxlevel) {
+        insert_elem.finest_level_local = tree->maxlevel;
       }
     }
-    // synchronize offsets and level and insert into forest_info vector
-    MPI_Allreduce(local_tree_offsets.data(),
-                  insert_elem.tree_quadrant_offset_synced.data(),
-                  p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
-                  p4est->mpicomm);
-    MPI_Allreduce(&insert_elem.finest_level_local,
-                  &insert_elem.finest_level_global, 1, MPI_INT32_T, MPI_MAX,
-                  p4est->mpicomm);
-    insert_elem.finest_level_ghost = insert_elem.finest_level_global;
-
-    // ensure monotony
-    P4EST_ASSERT(std::is_sorted(std::begin(tree_quadrant_offset_synced),
-                                std::end(tree_quadrant_offset_synced)));
-
-    forest_info.push_back(std::move(insert_elem));
   }
-  return 0;
+  // synchronize offsets and level and insert into forest_info vector
+  MPI_Allreduce(local_tree_offsets.data(),
+                insert_elem.tree_quadrant_offset_synced.data(),
+                p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
+                p4est->mpicomm);
+  MPI_Allreduce(&insert_elem.finest_level_local,
+                &insert_elem.finest_level_global, 1, MPI_INT32_T, MPI_MAX,
+                p4est->mpicomm);
+  insert_elem.finest_level_ghost = insert_elem.finest_level_global;
+
+  // ensure monotony
+  P4EST_ASSERT(std::is_sorted(std::begin(tree_quadrant_offset_synced),
+                              std::end(tree_quadrant_offset_synced)));
+
+  return insert_elem;
+}
+
+void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
+  forest_info.clear();
+
+  std::transform(std::begin(p4ests), std::end(p4ests),
+                 std::back_inserter(forest_info),
+                 p4est_to_forest_info);
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {

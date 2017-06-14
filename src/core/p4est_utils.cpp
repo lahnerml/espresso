@@ -107,14 +107,15 @@ int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
   p8est_t *p4est = forest_info->at(forest).p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
-  std::vector<int> search_space(p4est->global_first_quadrant,
-                                p4est->global_first_quadrant + p4est->mpisize);
-  std::vector<int>::iterator it =
-      std::lower_bound(search_space.begin(), search_space.end(), qid);
-  int p = std::distance(search_space.begin(), it);
+  int p = qid == 0
+                ? 0
+                : std::distance(p4est->global_first_quadrant,
+                                std::lower_bound(
+                                    p4est->global_first_quadrant,
+                                    p4est->global_first_quadrant +
+                                        p4est->trees->elem_count,
+                                    qid)) - 1;
 
-  if (it != search_space.begin())
-    --p;
   P4EST_ASSERT(0 <= p && p < p4est->mpisize);
 
 #if 0

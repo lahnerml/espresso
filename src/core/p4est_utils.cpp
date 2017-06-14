@@ -84,12 +84,12 @@ int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
   p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
-  int p = qid == 0
+  int p = (qid == 0)
               ? 0
               : std::distance(p4est->global_first_quadrant,
                               std::lower_bound(p4est->global_first_quadrant,
                                                p4est->global_first_quadrant +
-                                                   p4est->trees->elem_count,
+                                                   p4est->mpisize,
                                                qid)) -
                     1;
 

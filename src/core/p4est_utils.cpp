@@ -288,6 +288,8 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
 
   index += tree->quadrants_offset;
 
+  P4EST_ASSERT(0 <= index && index < p4est->local_num_quadrants);
+
   return index;
 }
 
@@ -304,6 +306,8 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
   p8est_quadrant_t *quad = p4est_quadrant_array_index(&ghost->ghosts, index);
   P4EST_ASSERT(p8est_quadrant_overlaps(&q, quad));
 #endif // P4EST_ENABLE_DEBUG
+
+  P4EST_ASSERT(0 <= index && index < ghost->ghosts.elem_count);
 
   return index;
 }

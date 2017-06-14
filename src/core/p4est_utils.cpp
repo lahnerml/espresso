@@ -248,17 +248,21 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]) {
   return idx;
 }
 
-int p4est_utils_find_qid_prepare(forest_order forest, double pos[3], p8est_tree_t **tree, p8est_quadrant_t * q) {
+int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
+                                 p8est_tree_t **tree, p8est_quadrant_t *q) {
   p4est_utils_forest_info_t current_p4est = forest_info->at(forest);
   p8est_t *p4est = current_p4est.p4est;
 
   int64_t qid = p4est_utils_pos_morton_idx_global(forest, pos);
-  int tid = qid == 0 ? 0 :
-      std::distance(current_p4est.tree_quadrant_offset_synced,
-                    std::lower_bound(current_p4est.tree_quadrant_offset_synced,
-                                     current_p4est.tree_quadrant_offset_synced +
-                                         p4est->trees->elem_count,
-                                     qid)) - 1;
+  int tid = qid == 0
+                ? 0
+                : std::distance(current_p4est.tree_quadrant_offset_synced,
+                                std::lower_bound(
+                                    current_p4est.tree_quadrant_offset_synced,
+                                    current_p4est.tree_quadrant_offset_synced +
+                                        p4est->trees->elem_count,
+                                    qid)) -
+                      1;
   int64_t tree_offset = current_p4est.tree_quadrant_offset_synced[tid];
   int64_t local_qid = qid - tree_offset;
 

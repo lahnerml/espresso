@@ -1546,7 +1546,8 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     }
   }
   P4EST_ASSERT((mesh_iter->current_level <
-                forest_info->at(adaptive_LB).finest_level_global) ||
+                forest_info[static_cast<int>(forest_order::adaptive_LB)]
+                    .finest_level_global) ||
                (-1 < mesh_iter->current_vid) ||
                ((lbmodel.n_veloc - 1) == neighbor_cnt));
 #endif // LB_ADAPTIVE_GPU
@@ -1919,7 +1920,8 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
-  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
+  p4est_utils_forest_info_t forest =
+      forest_info[static_cast<int>(forest_order::adaptive_LB)];
   int status;
   int level;
   double bnd, *bnd_ptr;
@@ -1969,7 +1971,8 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
-  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
+  p4est_utils_forest_info_t forest =
+      forest_info[static_cast<int>(forest_order::adaptive_LB)];
   int status;
   int level;
   double dens, *dens_ptr;
@@ -2069,7 +2072,8 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
-  p4est_utils_forest_info_t forest = forest_info->at(adaptive_LB);
+  p4est_utils_forest_info_t forest =
+      forest_info[static_cast<int>(forest_order::adaptive_LB)];
   int status;
   int level;
   double *veloc_ptr;

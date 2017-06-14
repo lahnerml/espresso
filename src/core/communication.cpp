@@ -2824,18 +2824,20 @@ void mpi_lbadapt_grid_init(int node, int level) {
 // clang-format on
 
 #ifdef DD_P4EST
-  std::vector<p4est_t*> forests;
+  std::vector<p4est_t *> forests;
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
-  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
 #endif // DD_P4EST
 
   // build initial versions of ghost, mesh, and ghost_virt
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
 
   lbadapt_local_data = NULL;
   lbadapt_ghost_data = NULL;
@@ -3170,18 +3172,20 @@ void mpi_reg_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  std::vector<p4est_t*> forests;
+  std::vector<p4est_t *> forests;
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
 
-  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = lb_p8est->local_num_quadrants;
@@ -3218,18 +3222,20 @@ void mpi_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  std::vector<p4est_t*> forests;
+  std::vector<p4est_t *> forests;
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
 
-  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = lb_p8est->local_num_quadrants;
@@ -3265,18 +3271,20 @@ void mpi_inv_geometric_refinement(int node, int param) {
   p8est_ghost_destroy(lbadapt_ghost);
 
 #ifdef DD_P4EST
-  std::vector<p4est_t*> forests;
+  std::vector<p4est_t *> forests;
   forests.push_back(dd.p4est);
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
 
-  p4est_utils_partition_multiple_forests(short_range, adaptive_LB);
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
 #endif // DD_P4EST
 
   lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh =
-      p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1, P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt = p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
 
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = lb_p8est->local_num_quadrants;

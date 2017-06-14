@@ -1589,7 +1589,7 @@ int lb_lbfluid_get_interpolated_velocity_global(double *p, double *v) {
 #ifdef LB_ADAPTIVE
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(p, im);
-  int node = p4est_utils_pos_to_proc(adaptive_LB, p);
+  int node = p4est_utils_pos_to_proc(forest_order::adaptive_LB, p);
   mpi_recv_interpolated_velocity(node, p, v);
 #else // LB_ADAPTIVE
   double local_v[3] = {0, 0, 0},

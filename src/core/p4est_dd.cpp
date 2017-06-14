@@ -197,6 +197,7 @@ void dd_p4est_create_grid() {
     forests.push_back(lb_p8est);
   }
 #endif // LB_ADAPTIVE
+  p4est_utils_prepare(forests);
 
   castable_unique_ptr<p4est_ghost_t> p4est_ghost =
       p4est_ghost_new(dd.p4est, P8EST_CONNECT_CORNER);

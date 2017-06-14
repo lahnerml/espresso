@@ -11,7 +11,7 @@
 
 // P4EST_NOCHANGE is used for debugging
 #ifndef DD_P4EST
-#define P4EST_NOCHANGE 
+#define P4EST_NOCHANGE
 #endif
 //#define P4EST_NOCHANGE
 int dd_p4est_full_shell_neigh(int cell, int neighidx);

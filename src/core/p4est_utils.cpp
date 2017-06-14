@@ -16,40 +16,20 @@
 #include <p8est_search.h>
 #include <vector>
 
-std::vector<p4est_utils_forest_info_t> *forest_info = 0;
+std::vector<p4est_utils_forest_info_t> forest_info;
 
 int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
-  if (forest_info == 0) {
-    forest_info = new std::vector<p4est_utils_forest_info_t>();
-  } else {
-    for (int i = 0; i < forest_info->size(); ++i) {
-      free(forest_info->at(i).tree_quadrant_offset_synced);
-    }
-    forest_info->clear();
-  }
-
-  p8est_t *p4est;
-  p8est_tree_t *tree;
-  p4est_utils_forest_info_t insert_elem;
+  forest_info.clear();
 
   for (int i = 0; i < p4ests.size(); ++i) {
     // fetch p4est from list of p4ests
-    p4est = p4ests.at(i);
+    p4est_t *p4est = p4ests.at(i);
 
     // fill element to insert
-    insert_elem.p4est = p4est;
-    insert_elem.tree_quadrant_offset_synced = (p4est_locidx_t *)calloc(
-        p4est->trees->elem_count, sizeof(p4est_locidx_t));
-    // only set bounds
-    insert_elem.coarsest_level_local = 0;
-    insert_elem.finest_level_local = -1;
-    insert_elem.finest_level_global = -1;
-    insert_elem.coarsest_level_ghost = 0;
-    insert_elem.finest_level_ghost = 0;
+    p4est_utils_forest_info_t insert_elem(p4est);
 
     // allocate a local send buffer to insert local quadrant offsets
-    int *local_tree_offsets = (p4est_locidx_t *)calloc(p4est->trees->elem_count,
-                                                       sizeof(p4est_locidx_t));
+    std::vector<int> local_tree_offsets(p4est->trees->elem_count);
 
     // fetch last tree index from last processor
     int last_tree_prev_rank = -1;
@@ -70,7 +50,7 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
                           ? p4est->first_local_tree + 1
                           : p4est->first_local_tree;
       for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
-        tree = p8est_tree_array_index(p4est->trees, i);
+        p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
         if (start_idx <= i) {
           local_tree_offsets[i] = tree->quadrants_offset +
                                   p4est->global_first_quadrant[p4est->mpirank];
@@ -82,29 +62,26 @@ int p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
       }
     }
     // synchronize offsets and level and insert into forest_info vector
-    MPI_Allreduce(local_tree_offsets, insert_elem.tree_quadrant_offset_synced,
+    MPI_Allreduce(local_tree_offsets.data(),
+                  insert_elem.tree_quadrant_offset_synced.data(),
                   p4est->trees->elem_count, MPI_INT32_T, MPI_MAX,
                   p4est->mpicomm);
     MPI_Allreduce(&insert_elem.finest_level_local,
                   &insert_elem.finest_level_global, 1, MPI_INT32_T, MPI_MAX,
                   p4est->mpicomm);
     insert_elem.finest_level_ghost = insert_elem.finest_level_global;
-    forest_info->push_back(insert_elem);
 
     // ensure monotony
-    P4EST_ASSERT(std::is_sorted(insert_elem.tree_quadrant_offset_synced,
-                                insert_elem.tree_quadrant_offset_synced +
-                                    p4est->trees->elem_count));
+    P4EST_ASSERT(std::is_sorted(std::begin(tree_quadrant_offset_synced),
+                                std::end(tree_quadrant_offset_synced)));
 
-    // cleanup
-    free(local_tree_offsets);
+    forest_info.push_back(std::move(insert_elem));
   }
   return 0;
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
-#ifdef LB_ADAPTIVE
-  p8est_t *p4est = forest_info->at(forest).p4est;
+  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
   std::vector<int> search_space(p4est->global_first_quadrant,
@@ -117,30 +94,7 @@ int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
     --p;
   P4EST_ASSERT(0 <= p && p < p4est->mpisize);
 
-#if 0
-  fprintf(stderr, "[p%i] mapped pos %lf %lf %lf to qid %i on proc %i\n",
-          dd.p4est->mpirank, pos[0], pos[1], pos[2], qid, p);
-  fprintf(stderr, "[p%i] qid %i is quad %li on p %i\n", dd.p4est->mpirank, qid,
-          qid - dd.p4est->global_first_quadrant[p], p);
-#endif // 0
   return p;
-#else  // LB_ADAPTIVE
-  // compute morton index of cell to which this position belongs
-  int64_t idx = dd_p4est_pos_morton_idx(pos);
-  // Note: Since p4est_space_idx is a ordered list, it is possible to do a
-  // binary search here.
-  // Doing so would reduce the complexity from O(N) to O(log(N))
-  if (idx >= 0) {
-    for (int i = 1; i <= n_nodes; ++i) {
-      // compare the first cell of a process with this cell
-      if (p4est_space_idx[i] > idx)
-        return i - 1;
-    }
-  }
-  fprintf(stderr, "Could not resolve the proc of particle %lf %lf %lf\n",
-          pos[0], pos[1], pos[2]);
-  errexit();
-#endif // LB_ADAPTIVE
 }
 
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
@@ -217,7 +171,7 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
 }
 
 int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
-  p4est_utils_forest_info_t current_p4est = forest_info->at(forest);
+  p4est_utils_forest_info_t current_p4est = forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
   // find correct tree
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
@@ -242,7 +196,7 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
 }
 
 int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]) {
-  p8est_t *p4est = forest_info->at(forest).p4est;
+  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int idx = p4est_utils_pos_morton_idx_global(forest, pos);
   idx -= p4est->global_first_quadrant[p4est->mpirank];
   return idx;
@@ -250,19 +204,17 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]) {
 
 int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
                                  p8est_tree_t **tree, p8est_quadrant_t *q) {
-  p4est_utils_forest_info_t current_p4est = forest_info->at(forest);
+  p4est_utils_forest_info_t& current_p4est = forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
   int64_t qid = p4est_utils_pos_morton_idx_global(forest, pos);
   int tid = qid == 0
                 ? 0
-                : std::distance(current_p4est.tree_quadrant_offset_synced,
+                : std::distance(std::begin(current_p4est.tree_quadrant_offset_synced),
                                 std::lower_bound(
-                                    current_p4est.tree_quadrant_offset_synced,
-                                    current_p4est.tree_quadrant_offset_synced +
-                                        p4est->trees->elem_count,
-                                    qid)) -
-                      1;
+                                  std::begin(current_p4est.tree_quadrant_offset_synced),
+                                  std::end(current_p4est.tree_quadrant_offset_synced),
+                                  qid)) - 1;
   int64_t tree_offset = current_p4est.tree_quadrant_offset_synced[tid];
   int64_t local_qid = qid - tree_offset;
 
@@ -275,7 +227,7 @@ int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
   return 0;
 }
 p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
-  p4est_utils_forest_info_t current_p4est = forest_info->at(forest);
+  p4est_utils_forest_info_t& current_p4est = forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
   p8est_tree_t *tree;
@@ -528,8 +480,8 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
 
 void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify) {
-  p8est_t *p4est_ref = forest_info->at(reference).p4est;
-  p8est_t *p4est_mod = forest_info->at(modify).p4est;
+  p8est_t *p4est_ref = forest_info.at(static_cast<int>(reference)).p4est;
+  p8est_t *p4est_mod = forest_info.at(static_cast<int>(modify)).p4est;
   P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
   P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
   P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,

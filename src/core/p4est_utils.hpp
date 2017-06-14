@@ -5,6 +5,7 @@
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
+#include <p4est_to_p8est.h>
 #include <p8est.h>
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
@@ -14,19 +15,26 @@
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
-enum forest_order { short_range, adaptive_LB };
+enum class forest_order { short_range, adaptive_LB };
 
-typedef struct {
-  p8est_t *p4est;
-  p4est_locidx_t *tree_quadrant_offset_synced;
+struct p4est_utils_forest_info_t {
+  p4est_t *p4est;
+  std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
   int coarsest_level_local;
   int finest_level_local;
   int finest_level_global;
   int coarsest_level_ghost;
   int finest_level_ghost;
-} p4est_utils_forest_info_t;
 
-extern std::vector<p4est_utils_forest_info_t> *forest_info;
+  p4est_utils_forest_info_t(p4est_t *p4est)
+      : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
+        coarsest_level_local(0), finest_level_local(-1), finest_level_global(-1),
+        coarsest_level_ghost(), finest_level_ghost(0)
+  {
+  }
+};
+
+extern std::vector<p4est_utils_forest_info_t> forest_info;
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.

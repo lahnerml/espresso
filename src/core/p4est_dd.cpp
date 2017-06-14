@@ -22,6 +22,7 @@
 #include <p8est_mesh.h>
 #include <p8est_vtk.h>
 #include <vector>
+
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
@@ -771,7 +772,7 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   int i;
 #ifdef LB_ADAPTIVE
   // FIXME check extended domain size
-  i = p4est_utils_pos_morton_idx_local(short_range, pos);
+  i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 #else  // LB_ADAPTIVE
   int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
@@ -864,7 +865,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
   // by the error bounds 
   int i;
 #ifdef LB_ADAPTIVE
-  i = p4est_utils_pos_morton_idx_local(short_range, pos);
+  i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
 #if 0
   fprintf(stderr, "[p%i] pos %lf %lf %lf mapped to quad %i\n",
           dd.p4est->mpirank, pos[0], pos[1], pos[2], i);
@@ -1053,7 +1054,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf,
               this_node, recvbuf->part[p].p.identity, global_flag, from,
               recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1],
               recvbuf->part[p].r.p[2],
-              p4est_utils_pos_morton_idx_local(short_range, recvbuf->part[p].r.p),
+              p4est_utils_pos_morton_idx_local(forest_order::short_range, recvbuf->part[p].r.p),
               dd_p4est_pos_to_proc(recvbuf->part[p].r.p), op[0], op[1], op[2]);
       errexit();
     }
@@ -1349,7 +1350,7 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
-  return p4est_utils_pos_to_proc(short_range, pos);
+  return p4est_utils_pos_to_proc(forest_order::short_range, pos);
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

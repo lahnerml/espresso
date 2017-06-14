@@ -43,6 +43,10 @@ static size_t num_cells = 0;
 static size_t num_local_cells = 0;
 static size_t num_ghost_cells = 0;
 //--------------------------------------------------------------------------------------------------
+int dd_p4est_num_trees_in_dir(int dir) {
+  return brick_size[dir];
+}
+//--------------------------------------------------------------------------------------------------
 static const int neighbor_lut[3][3][3] =
     { // Mapping from [z][y][x] to p4est neighbor index
         {{18, 6, 19}, {10, 4, 11}, {20, 7, 21}},
@@ -221,9 +225,9 @@ void dd_p4est_create_grid() {
       // c.x = xyz[0]*(1<<grid_level);
       // c.y = xyz[1]*(1<<grid_level);
       // c.z = xyz[2]*(1<<grid_level);
-      p4est_space_idx[i] = p4est_cell_morton_idx(xyz[0] * (1 << grid_level),
-                                                 xyz[1] * (1 << grid_level),
-                                                 xyz[2] * (1 << grid_level));
+      p4est_space_idx[i] = p4est_utils_cell_morton_idx(xyz[0] * (1 << grid_level),
+                                                       xyz[1] * (1 << grid_level),
+                                                       xyz[2] * (1 << grid_level));
     } else {
       /*c.x = 1<<grid_level;
       while (c.x < grid_size[0]) c.x <<= 1;
@@ -321,7 +325,7 @@ void dd_p4est_create_grid() {
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
-    // fprintf(h,"%i %li %ix%ix%i ",i,p4est_cell_morton_idx(x,y,z),
+    // fprintf(h,"%i %li %ix%ix%i ",i,p4est_utils_cell_morton_idx(x,y,z),
     // shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
 
     // Loop all 27 cells in the fullshell
@@ -854,46 +858,15 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
 }
 //--------------------------------------------------------------------------------------------------
 Cell *dd_p4est_position_to_cell(double pos[3]) {
-#ifdef ADDITIONAL_CHECKS
-  runtimeErrorMsg() << "function " << __FUNCTION__ << " in " << __FILE__ << "["
-                    << __LINE__ << "] is not implemented";
-#endif
   CALL_TRACE();
 
   // Does the same as dd_p4est_save_position_to_cell but does not extend the
   // local domain
   // by the error bounds 
-  int i;
-#ifdef LB_ADAPTIVE
-  i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
-#if 0
-  fprintf(stderr, "[p%i] pos %lf %lf %lf mapped to quad %i\n",
-          dd.p4est->mpirank, pos[0], pos[1], pos[2], i);
-#endif // 0
+  
+  int i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
-#else  // LB_ADAPTIVE
-  // int scale_pos[3];
 
-  int64_t pidx = dd_p4est_pos_morton_idx(pos);
-
-  /*for (int d=0;d<3;++d) {
-    scale_pos[d] = pos[d]*dd.inv_cell_size[d];
-
-    if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
-    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] =
-  grid_size[d] - 1;
-  }*/
-
-  for (i = 0; i < num_local_cells; ++i) {
-    // if (scale_pos[0] != dd.p4est_shell[i].coord[0]) continue;
-    // if (scale_pos[1] != dd.p4est_shell[i].coord[1]) continue;
-    // if (scale_pos[2] != dd.p4est_shell[i].coord[2]) continue;
-    if (pidx == p4est_cell_morton_idx(dd.p4est_shell[i].coord[0],
-                                      dd.p4est_shell[i].coord[1],
-                                      dd.p4est_shell[i].coord[2]))
-      break;
-  }
-#endif // LB_ADAPTIVE
   if (i < num_local_cells)
     return &cells[i];
   return NULL;

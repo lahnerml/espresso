@@ -14,6 +14,7 @@
 #define P4EST_NOCHANGE
 #endif
 //#define P4EST_NOCHANGE
+int dd_p4est_num_trees_in_dir(int dir);
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Creates the irregular DD using p4est

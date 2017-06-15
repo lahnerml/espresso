@@ -14,6 +14,11 @@
 #define P4EST_NOCHANGE
 #endif
 //#define P4EST_NOCHANGE
+
+/** Returns the number of trees in dimension "d".
+ * \param d dimension 0 <= d <= 2
+ */
+int dd_p4est_num_trees_in_dir(int d);
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Creates the irregular DD using p4est

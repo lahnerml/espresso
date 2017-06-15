@@ -141,6 +141,15 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
       c[ci][0] = p4est->connectivity->vertices[P4EST_DIM * v + 0];
       c[ci][1] = p4est->connectivity->vertices[P4EST_DIM * v + 1];
       c[ci][2] = p4est->connectivity->vertices[P4EST_DIM * v + 2];
+
+#ifndef LB_ADAPTIVE
+      // Ugly hack: manually scale the tree by box_l
+      if (p4est == forest_info[0].p4est) {
+        c[ci][0] *= box_l[0] / dd_p4est_num_trees_in_dir(0);
+        c[ci][1] *= box_l[1] / dd_p4est_num_trees_in_dir(1);
+        c[ci][2] *= box_l[2] / dd_p4est_num_trees_in_dir(2);
+      }
+#endif
     }
     std::array<double, 3> pos_min = {0., 0., 0.};
     std::array<double, 3> pos_max = {box_l[0], box_l[1], box_l[2]};
@@ -181,13 +190,20 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
   p8est_tree_t *tree = p4est_tree_array_index(p4est->trees, tid);
   int level = tree->maxlevel;
 
-  double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
-                   pos[2] - (int)pos[2]};
-  int nq = 1 << level;
   int qpos[3];
-  for (int i = 0; i < 3; ++i) {
-    qpos[i] = tmp[i] * nq;
-    P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+  if (forest == forest_order::short_range) {
+      // This is basically the same as below but also works in the case of
+      // pure MD (without LB_ADAPTIVE) if box_l > 1.
+      for (int i = 0; i < 3; ++i)
+        qpos[i] = pos[i] * dd.inv_cell_size[i];
+  } else {
+      double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
+                       pos[2] - (int)pos[2]};
+      int nq = 1 << level;
+      for (int i = 0; i < 3; ++i) {
+        qpos[i] = tmp[i] * nq;
+        P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+      }
   }
 
   int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]);

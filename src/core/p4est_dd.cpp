@@ -43,8 +43,12 @@ static size_t num_cells = 0;
 static size_t num_local_cells = 0;
 static size_t num_ghost_cells = 0;
 //--------------------------------------------------------------------------------------------------
-int dd_p4est_num_trees_in_dir(int dir) {
-  return brick_size[dir];
+int dd_p4est_num_trees_in_dir(int d) {
+  if (d < 0 || d > 2) {
+    fprintf(stderr, "%s called with dimension < 0 or > 2.\n", __FUNCTION__);
+    errexit();
+  }
+  return brick_size[d];
 }
 //--------------------------------------------------------------------------------------------------
 static const int neighbor_lut[3][3][3] =

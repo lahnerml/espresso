@@ -28,9 +28,8 @@ struct p4est_utils_forest_info_t {
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
-        coarsest_level_local(0), finest_level_local(-1), finest_level_global(-1),
-        coarsest_level_ghost(), finest_level_ghost(0)
-  {
+        coarsest_level_local(0), finest_level_local(-1),
+        finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
   }
 };
 
@@ -40,7 +39,6 @@ extern std::vector<p4est_utils_forest_info_t> forest_info;
  * synchronized version of the quadrant offsets of each tree.
  *
  * @param p4ests     List of all p4ests in the current simulation
- * @return int
  */
 void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 
@@ -65,6 +63,9 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Calculate a global cell index for a given position. This index is no p4est
  * quadrant index.
+ * CAUTION: This only works for a regular grid. Use
+ *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
+ *          adaptively refined grids.
  *
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
@@ -75,6 +76,9 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]);
 
 /** Calculate a local cell index for a given position. This index is no p4est
  * quadrant index.
+ * CAUTION: This only works for a regular grid. Use
+ *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
+ *          adaptively refined grids.
  *
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.

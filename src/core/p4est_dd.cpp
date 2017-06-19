@@ -28,16 +28,21 @@
 //--------------------------------------------------------------------------------------------------
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
-static std::vector<int> p4est_space_idx; // n_nodes + 1 elements, storing the first Morton index of local cell
+static std::vector<int> p4est_space_idx; // n_nodes + 1 elements, storing the
+                                         // first Morton index of local cell
 static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
-static std::vector<comm_t> comm_send;  // Internal send lists, idx maps to local cells
-static std::vector<comm_t> comm_recv;  // Internal recv lists, idx maps to ghost cells
-static int num_comm_send = 0;     // Number of send lists
-static int num_comm_recv = 0;     // Number of recc lists (should be euqal to send lists)
-static std::vector<int> comm_proc;     // Number of communicators per Process
-static std::vector<int> comm_rank;     // Communication partner index for a certain communication
-static int num_comm_proc = 0;     // Total Number of bidirectional communications
+static std::vector<comm_t>
+    comm_send; // Internal send lists, idx maps to local cells
+static std::vector<comm_t>
+    comm_recv;                // Internal recv lists, idx maps to ghost cells
+static int num_comm_send = 0; // Number of send lists
+static int num_comm_recv =
+    0; // Number of recc lists (should be euqal to send lists)
+static std::vector<int> comm_proc; // Number of communicators per Process
+static std::vector<int>
+    comm_rank; // Communication partner index for a certain communication
+static int num_comm_proc = 0; // Total Number of bidirectional communications
 //--------------------------------------------------------------------------------------------------
 static size_t num_cells = 0;
 static size_t num_local_cells = 0;
@@ -200,7 +205,7 @@ void dd_p4est_create_grid() {
   }
   p4est_partition(dd.p4est, 0, NULL);
 
-  std::vector<p4est_t *> forests = { dd.p4est };
+  std::vector<p4est_t *> forests = {dd.p4est};
 #ifdef LB_ADAPTIVE
   if (lb_p8est != 0) {
     forests.push_back(lb_p8est);
@@ -213,15 +218,16 @@ void dd_p4est_create_grid() {
   castable_unique_ptr<p4est_mesh_t> p4est_mesh =
       p4est_mesh_new_ext(dd.p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
 
-  CELL_TRACE(printf("%i : %i %i-%i %i\n",
-    this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants));
+  CELL_TRACE(printf("%i : %i %i-%i %i\n", this_node, periodic,
+                    p4est->first_local_tree, p4est->last_local_tree,
+                    p4est->local_num_quadrants));
 
   // create space filling inforamtion about first quads per node from p4est
   p4est_space_idx.resize(n_nodes + 1);
   for (int i = 0; i <= n_nodes; ++i) {
 #ifndef LB_ADAPTIVE
     p4est_quadrant_t *q = &dd.p4est->global_first_position[i];
-    //p4est_quadrant_t c;
+    // p4est_quadrant_t c;
     if (i < n_nodes) {
       double xyz[3];
       p4est_qcoord_to_vertex(dd.p4est_conn, q->p.which_tree, q->x, q->y, q->z,
@@ -252,7 +258,7 @@ void dd_p4est_create_grid() {
       CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i - 1],
                         p4est_space_idx[i] - 1));
     }
-#else  // !LB_ADAPTIVE
+#else // !LB_ADAPTIVE
     p4est_space_idx[i] = dd.p4est->global_first_quadrant[i];
 #endif // !LB_ADAPTIVE
   }
@@ -264,12 +270,12 @@ void dd_p4est_create_grid() {
   shell.clear();
 
   // Loop all local cells to gather information for those
-  for (int i=0 ; i < dd.p4est->local_num_quadrants; ++i) {
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(dd.p4est,p4est_mesh,i);
-    quad_data_t *data = (quad_data_t*)(q->p.user_data);
+  for (int i = 0; i < dd.p4est->local_num_quadrants; ++i) {
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(dd.p4est, p4est_mesh, i);
+    quad_data_t *data = (quad_data_t *)(q->p.user_data);
     double xyz[3];
-    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y,
-                           q->z, xyz);
+    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x,
+                           q->y, q->z, xyz);
     uint64_t ql =
         1
         << p4est_tree_array_index(dd.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
@@ -322,10 +328,11 @@ void dd_p4est_create_grid() {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(dd.p4est, p4est_mesh, i);
     quad_data_t *data = (quad_data_t *)(q->p.user_data);
     double xyz[3];
-    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y,
-                           q->z, xyz);
+    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x,
+                           q->y, q->z, xyz);
     uint64_t ql = 1 << p4est_tree_array_index(dd.p4est->trees,
-                                        p4est_mesh->quad_to_tree[i])->maxlevel;
+                                              p4est_mesh->quad_to_tree[i])
+                                                  ->maxlevel;
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
@@ -444,7 +451,7 @@ void dd_p4est_create_grid() {
   num_cells = (size_t)quads.size();
   num_local_cells = (size_t)dd.p4est->local_num_quadrants;
   num_ghost_cells = num_cells - (size_t)dd.p4est->local_num_quadrants;
-  
+
   dd.p4est_shell = std::move(shell);
 
   CELL_TRACE(printf("%d : %ld, %ld, %ld\n", this_node, num_cells,
@@ -478,15 +485,16 @@ void dd_p4est_comm() {
   std::vector<uint64_t> send_cnt_tag(n_nodes, 0);
   std::vector<uint64_t> recv_cnt_tag(n_nodes, 0);
   // Number of cells for each communication (rank and direction)
-  // 64 different direction (64 = 2^6, where 6 = |{x_l, x_r, y_l, y_r, z_l, z_r}|)
+  // 64 different direction (64 = 2^6, where 6 = |{x_l, x_r, y_l, y_r, z_l,
+  // z_r}|)
   std::vector<std::array<int, 64>> send_cnt(n_nodes);
   std::vector<std::array<int, 64>> recv_cnt(n_nodes);
 
-  for (auto& a: send_cnt)
+  for (auto &a : send_cnt)
     a.fill(0);
-  for (auto& a: recv_cnt)
+  for (auto &a : recv_cnt)
     a.fill(0);
-  
+
   // Total number of send and recv
   int num_send = 0;
   int num_recv = 0;
@@ -494,11 +502,11 @@ void dd_p4est_comm() {
   // Is 1 for a process if there is any communication, 0 if none
   std::vector<int8_t> num_send_flag(n_nodes, 0);
   std::vector<int8_t> num_recv_flag(n_nodes, 0);
-  
+
   // Prepare all lists
   num_comm_proc = 0;
   comm_proc.resize(n_nodes, -1);
-  
+
   // create send and receive list
   // char fname[100];
   // sprintf(fname,"cells_conn_%i.list",this_node);
@@ -510,20 +518,23 @@ void dd_p4est_comm() {
       int irank = dd.p4est_shell[i].rank;
       int pos = 0;
       // find position to add new element (keep order)
-      while (pos < recv_idx[irank].size() && 
+      while (pos < recv_idx[irank].size() &&
              dd.p4est_shell[recv_idx[irank][pos]].idx <= dd.p4est_shell[i].idx)
         pos++;
 
       if (pos >= recv_idx[irank].size()) { // Add to end of vector
         recv_idx[irank].push_back(i);
         recv_tag[irank].push_back(1L << dd.p4est_shell[i].boundary);
-      // insert if this cell has not been added yet
-      } else if (dd.p4est_shell[recv_idx[irank][pos]].idx != dd.p4est_shell[i].idx) {
+        // insert if this cell has not been added yet
+      } else if (dd.p4est_shell[recv_idx[irank][pos]].idx !=
+                 dd.p4est_shell[i].idx) {
         recv_idx[irank].insert(recv_idx[irank].begin() + pos, i);
-        recv_tag[irank].insert(recv_tag[irank].begin() + pos, 1L << dd.p4est_shell[i].boundary);
-      // update diraction info for communication if already added but for other direction
+        recv_tag[irank].insert(recv_tag[irank].begin() + pos,
+                               1L << dd.p4est_shell[i].boundary);
+        // update diraction info for communication if already added but for
+        // other direction
       } else {
-        recv_tag[irank][pos] |= 1L << dd.p4est_shell[i].boundary;        
+        recv_tag[irank][pos] |= 1L << dd.p4est_shell[i].boundary;
       }
       // count what happend above
       recv_cnt[irank][dd.p4est_shell[i].boundary] += 1;
@@ -531,7 +542,8 @@ void dd_p4est_comm() {
         ++num_recv;
         recv_cnt_tag[irank] |= 1L << dd.p4est_shell[i].boundary;
       }
-      //recv_cnt[dd.p4est_shell[i].rank].insert(recv_cnt[dd.p4est_shell[i].rank].begin() + pos, i); //dd.p4est_shell[i].idx);
+      // recv_cnt[dd.p4est_shell[i].rank].insert(recv_cnt[dd.p4est_shell[i].rank].begin()
+      // + pos, i); //dd.p4est_shell[i].idx);
       if (num_recv_flag[irank] == 0) {
         //++num_recv;
         comm_proc[irank] = num_comm_proc;
@@ -541,13 +553,15 @@ void dd_p4est_comm() {
     }
     // is mirror cell (at domain boundary)? -> add to send list
     if (dd.p4est_shell[i].shell == 1) {
-      //for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
+      // for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
       // loop fullshell
       for (int n = 0; n < 26; ++n) {
         int nidx = dd.p4est_shell[i].neighbor[n];
         int nrank = dd.p4est_shell[nidx].rank;
-        if (nidx < 0 || nrank < 0) continue; // invalid neighbor
-        if (dd.p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
+        if (nidx < 0 || nrank < 0)
+          continue; // invalid neighbor
+        if (dd.p4est_shell[nidx].shell != 2)
+          continue; // no need to send to local cell
         // check if this is the first time to add this mirror cell
         if (!send_tag[nrank].empty() &&
             send_idx[nrank].back() == i) { // already added
@@ -561,7 +575,8 @@ void dd_p4est_comm() {
         }
         // count what happend
         send_cnt[nrank][dd.p4est_shell[nidx].boundary] += 1;
-        if ((send_cnt_tag[nrank] & (1L << dd.p4est_shell[nidx].boundary)) == 0) {
+        if ((send_cnt_tag[nrank] & (1L << dd.p4est_shell[nidx].boundary)) ==
+            0) {
           ++num_send;
           send_cnt_tag[nrank] |= 1L << dd.p4est_shell[nidx].boundary;
         }
@@ -571,10 +586,11 @@ void dd_p4est_comm() {
         }
       }
     }
-    //fprintf(h,"%i %i:%li (%i) %i %i [ ",i,dd.p4est_shell[i].rank,dd.p4est_shell[i].idx,dd.p4est_shell[i].p_cnt,
+    // fprintf(h,"%i %i:%li (%i) %i %i [
+    // ",i,dd.p4est_shell[i].rank,dd.p4est_shell[i].idx,dd.p4est_shell[i].p_cnt,
     //  dd.p4est_shell[i].shell,dd.p4est_shell[i].boundary);
-    //for (int n=0;n<26;++n) fprintf(h,"%i ",dd.p4est_shell[i].neighbor[n]);
-    //fprintf(h,"]\n");
+    // for (int n=0;n<26;++n) fprintf(h,"%i ",dd.p4est_shell[i].neighbor[n]);
+    // fprintf(h,"]\n");
   }
   // fclose(h);
   /*sprintf(fname,"send_%i.list",this_node);
@@ -599,7 +615,7 @@ void dd_p4est_comm() {
   comm_recv.resize(num_recv);
   comm_send.resize(num_send);
   comm_rank.resize(num_comm_proc);
-  
+
   // Parse all bitmasks and fill the actual lists
   for (int n = 0, s_cnt = 0, r_cnt = 0; n < n_nodes; ++n) {
     if (comm_proc[n] >= 0)
@@ -808,7 +824,7 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   }
 
   // Loop all cells and break if containing cell is found
-  for (i=0;i<num_local_cells;++i) {
+  for (i = 0; i < num_local_cells; ++i) {
     if ((dd.p4est_shell[i].boundary & 1)) {
       if (scale_pos_l[0] < dd.p4est_shell[i].coord[0])
         continue;
@@ -866,8 +882,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
 
   // Does the same as dd_p4est_save_position_to_cell but does not extend the
   // local domain
-  // by the error bounds 
-  
+  // by the error bounds
   int i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 
@@ -889,7 +904,7 @@ void dd_p4est_fill_sendbuf(ParticleList *sendbuf,
   for (int i = 0; i < num_local_cells; ++i) {
     Cell *cell = local_cells.cell[i];
     local_shell_t *shell = &dd.p4est_shell[i];
-    
+
     for (int d = 0; d < 3; ++d) {
       cell_lc[d] = dd.cell_size[d] * (double)shell->coord[d];
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
@@ -962,7 +977,8 @@ void dd_p4est_fill_sendbuf(ParticleList *sendbuf,
             CELL_TRACE(fprintf(stderr, "%d: dd_ex_and_sort_p: send part %d\n",
                                this_node, part->p.identity));
 
-            if (dd.p4est_shell[nidx].rank != this_node) { // It is a remote process
+            if (dd.p4est_shell[nidx].rank !=
+                this_node) { // It is a remote process
               // copy data to sendbuf according to rank
               int li = comm_proc[dd.p4est_shell[nidx].rank];
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e,
@@ -1031,7 +1047,8 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf,
               this_node, recvbuf->part[p].p.identity, global_flag, from,
               recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1],
               recvbuf->part[p].r.p[2],
-              p4est_utils_pos_morton_idx_local(forest_order::short_range, recvbuf->part[p].r.p),
+              p4est_utils_pos_morton_idx_local(forest_order::short_range,
+                                               recvbuf->part[p].r.p),
               dd_p4est_pos_to_proc(recvbuf->part[p].r.p), op[0], op[1], op[2]);
       errexit();
     }
@@ -1099,13 +1116,13 @@ void dd_p4est_exchange_and_sort_particles() {
   std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(num_comm_proc, 0);
-  
+
   std::vector<ParticleList> sendbuf(num_comm_proc);
   std::vector<ParticleList> recvbuf(num_comm_proc);
   std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc);
   std::vector<std::vector<int>> recvbuf_dyn(num_comm_proc);
-    
-  for (int i=0;i<num_comm_proc;++i) {
+
+  for (int i = 0; i < num_comm_proc; ++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
     // Invoke the recv thread for number of particles from all neighbouring
@@ -1115,8 +1132,7 @@ void dd_p4est_exchange_and_sort_particles() {
 
   // Fill the send buffers with particles that leave the local domain
   dd_p4est_fill_sendbuf(sendbuf.data(), sendbuf_dyn.data());
-  
-  
+
   // send number of particles, particles, and particle data
   for (int i = 0; i < num_comm_proc; ++i) {
     int nsend = sendbuf[i].n;

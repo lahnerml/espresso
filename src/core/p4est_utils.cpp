@@ -135,6 +135,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
 int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
   int tid = -1;
   for (int t = 0; t < p4est->connectivity->num_trees; ++t) {
+    // collect corners of tree
     std::array<double, 3> c[P4EST_CHILDREN];
     for (int ci = 0; ci < P4EST_CHILDREN; ++ci) {
       int v = p4est->connectivity->tree_to_vertex[t * P4EST_CHILDREN + ci];
@@ -151,6 +152,8 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
       }
 #endif
     }
+
+    // find lower left and upper right corner of forest
     std::array<double, 3> pos_min = {0., 0., 0.};
     std::array<double, 3> pos_max = {box_l[0], box_l[1], box_l[2]};
     int idx_min, idx_max;
@@ -170,13 +173,18 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
       }
     }
 
+    // if position is between lower left and upper right corner of forest this
+    // is the right tree
     if ((c[idx_min][0] <= pos[0]) && (c[idx_min][1] <= pos[1]) &&
         (c[idx_min][2] <= pos[2]) && (pos[0] < c[idx_max][0]) &&
         (pos[1] < c[idx_max][1]) && (pos[2] < c[idx_max][2])) {
+      // ensure trees do not overlap
       P4EST_ASSERT(-1 == tid);
       tid = t;
     }
   }
+  // ensure that we found a tree
+  P4EST_ASSERT(tid != -1);
   return tid;
 }
 

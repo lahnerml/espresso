@@ -192,27 +192,30 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
   p4est_utils_forest_info_t current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
+
   // find correct tree
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
-
-  p8est_tree_t *tree = p4est_tree_array_index(p4est->trees, tid);
-  int level = tree->maxlevel;
-
+  int level = current_p4est.finest_level_global;
   int qpos[3];
+#ifndef LB_ADAPTIVE
   if (forest == forest_order::short_range) {
-      // This is basically the same as below but also works in the case of
-      // pure MD (without LB_ADAPTIVE) if box_l > 1.
-      for (int i = 0; i < 3; ++i)
-        qpos[i] = pos[i] * dd.inv_cell_size[i];
-  } else {
-      double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
-                       pos[2] - (int)pos[2]};
-      int nq = 1 << level;
-      for (int i = 0; i < 3; ++i) {
-        qpos[i] = tmp[i] * nq;
-        P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
-      }
+    // This is basically the same as below but also works in the case of
+    // pure MD (without LB_ADAPTIVE) if box_l > 1.
+    for (int i = 0; i < 3; ++i) {
+      qpos[i] = pos[i] * dd.inv_cell_size[i];
+    }
+  } else
+#else  // !LB_ADAPTIVE
+  {
+    double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
+                     pos[2] - (int)pos[2]};
+    int nq = 1 << level;
+    for (int i = 0; i < P8EST_DIM; ++i) {
+      qpos[i] = tmp[i] * nq;
+      P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+    }
   }
+#endif // !LB_ADAPTIVE
 
   int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
 
@@ -230,10 +233,11 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]) {
 
 int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
                                  p8est_tree_t **tree, p8est_quadrant_t *q) {
-  p4est_utils_forest_info_t &current_p4est =
+  p4est_utils_forest_info_t current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
+  // FIXME: This does not yield a valid combination of qid and tid.
   int64_t qid = p4est_utils_pos_morton_idx_global(forest, pos);
   int tid =
       qid == 0
@@ -250,13 +254,14 @@ int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
   *tree = p4est_tree_array_index(p4est->trees, tid);
   // create an artificial quadrant based on p4est_utils_pos_morton_idx_global
   P4EST_QUADRANT_INIT(q);
-  q->level = (*tree)->maxlevel;
+  q->level = current_p4est.finest_level_global;
   p8est_quadrant_set_morton(q, q->level, local_qid);
 
   return 0;
 }
+
 p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
-  p4est_utils_forest_info_t &current_p4est =
+  p4est_utils_forest_info_t current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 

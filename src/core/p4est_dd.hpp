@@ -17,6 +17,7 @@
 
 /** Returns the number of trees in dimension "d".
  * \param d dimension 0 <= d <= 2
+ *        0 .. x, 1 .. y, 2 .. z
  */
 int dd_p4est_num_trees_in_dir(int d);
 int dd_p4est_full_shell_neigh(int cell, int neighidx);

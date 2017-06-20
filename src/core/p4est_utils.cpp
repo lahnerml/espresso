@@ -94,19 +94,15 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
-  int max_level = forest_info.at(static_cast<int>(forest)).finest_level_global;
-  std::vector<int64_t> *procidx = &forest_info.at(static_cast<int>(forest)).first_quad_morton_idx;
-#ifdef LB_ADAPTIVE
-#endif
-  int qid = p4est_utils_cell_morton_idx(pos[0]*(1<<max_level),
-                                        pos[1]*(1<<max_level),
-                                        pos[2]*(1<<max_level));
+  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
+  int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
   int p = (qid == 0)
               ? 0
-              : std::distance(procidx->begin(),
-                              std::upper_bound(procidx->begin(),
-                                               procidx->end(),
+              : std::distance(p4est->global_first_quadrant,
+                              std::upper_bound(p4est->global_first_quadrant,
+                                               p4est->global_first_quadrant +
+                                                   p4est->mpisize,
                                                qid)) -
                     1;
 

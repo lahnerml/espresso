@@ -52,7 +52,7 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
  * @param pos       Spatial coordinate to map.
  * @return int      Rank responsible for that position in space.
  */
-int p4est_utils_pos_to_proc(forest_order forest, double pos[3]);
+int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]);
 
 /** Compute a Morton index for a cell using its coordinates
  *
@@ -72,7 +72,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]);
 
 /** Calculate a local cell index for a given position. This index is no p4est
  * quadrant index.
@@ -85,7 +85,8 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]);
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]);
+
 
 /** Find quadrant index for a given position among local quadrants
  *
@@ -94,7 +95,7 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]);
  *
  * @return int      Quadrant index of quadrant containing pos
  */
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]);
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]);
 
 /** Find quadrant index for a given position among ghost quadrants
  *
@@ -105,7 +106,7 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]);
  * @return int      Quadrant index of quadrant containing pos
  */
 p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
-                                         p8est_ghost_t *ghost, double pos[3]);
+                                         p8est_ghost_t *ghost, const double pos[3]);
 /*@}*/
 
 /*****************************************************************************/

@@ -81,7 +81,7 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
                  std::back_inserter(forest_info), p4est_to_forest_info);
 }
 
-int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
+int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
   p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
@@ -121,7 +121,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
   return idx;
 }
 
-int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
+int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
   int tid = -1;
   for (int t = 0; t < p4est->connectivity->num_trees; ++t) {
     // collect corners of tree
@@ -177,7 +177,7 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {
   return tid;
 }
 
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]) {
   p4est_utils_forest_info_t& current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
@@ -210,7 +210,7 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
   return qid;
 }
 
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]) {
+int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]) {
   p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int idx = p4est_utils_pos_morton_idx_global(forest, pos);
   idx -= p4est->global_first_quadrant[p4est->mpirank];
@@ -239,7 +239,7 @@ int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
   return 0;
 }
 
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
   p8est_tree_t *tree;
   p8est_quadrant_t q;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &q);
@@ -260,7 +260,7 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
 }
 
 p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
-                                         p8est_ghost_t *ghost, double pos[3]) {
+                                         p8est_ghost_t *ghost, const double pos[3]) {
   p8est_tree_t *tree;
   p8est_quadrant_t q;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &q);

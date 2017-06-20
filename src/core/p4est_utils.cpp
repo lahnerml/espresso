@@ -185,6 +185,7 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
   int level = current_p4est.finest_level_global;
   int qpos[3];
+
 #ifndef LB_ADAPTIVE
   if (forest == forest_order::short_range) {
     // This is basically the same as below but also works in the case of
@@ -193,21 +194,17 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]) {
       qpos[i] = pos[i] * dd.inv_cell_size[i];
     }
   } else
-#else  // !LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
   {
-    double tmp[3] = {pos[0] - (int)pos[0], pos[1] - (int)pos[1],
-                     pos[2] - (int)pos[2]};
     int nq = 1 << level;
     for (int i = 0; i < P8EST_DIM; ++i) {
-      qpos[i] = tmp[i] * nq;
+      qpos[i] = (pos[i] - (int) pos[i]) * nq;
       P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
     }
   }
-#endif // !LB_ADAPTIVE
 
-  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]);
-
-  qid += current_p4est.tree_quadrant_offset_synced[tid];
+  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2])
+            + current_p4est.tree_quadrant_offset_synced[tid];
 
   return qid;
 }

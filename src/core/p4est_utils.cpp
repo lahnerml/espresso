@@ -56,6 +56,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
       }
     }
   }
+    
   // synchronize offsets and level and insert into forest_info vector
   MPI_Allreduce(local_tree_offsets.data(),
                 insert_elem.tree_quadrant_offset_synced.data(),
@@ -70,6 +71,17 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   P4EST_ASSERT(
       std::is_sorted(std::begin(insert_elem.tree_quadrant_offset_synced),
                      std::end(insert_elem.tree_quadrant_offset_synced)));
+                     
+  for (int i = 0; i < p4est->mpisize; ++i) {
+    p4est_quadrant_t *q = &p4est->global_first_position[i];
+    double xyz[3];
+    p4est_qcoord_to_vertex(p4est->connectivity,q->p.which_tree,q->x,q->y,q->z,xyz);
+    int64_t midx = p4est_utils_cell_morton_idx(xyz[0]*(1<<insert_elem.finest_level_global),
+                                               xyz[1]*(1<<insert_elem.finest_level_global),
+                                               xyz[2]*(1<<insert_elem.finest_level_global));
+    insert_elem.first_quad_morton_idx.push_back(midx);
+  }
+  insert_elem.first_quad_morton_idx.push_back(std::numeric_limits<int64_t>::max());
 
   return insert_elem;
 }
@@ -82,15 +94,19 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
-  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
-  int qid = p4est_utils_pos_morton_idx_global(forest, pos);
+  int max_level = forest_info.at(static_cast<int>(forest)).finest_level_global;
+  std::vector<int64_t> *procidx = &forest_info.at(static_cast<int>(forest)).first_quad_morton_idx;
+#ifdef LB_ADAPTIVE
+#endif
+  int qid = p4est_utils_cell_morton_idx(pos[0]*(1<<max_level),
+                                        pos[1]*(1<<max_level),
+                                        pos[2]*(1<<max_level));
 
   int p = (qid == 0)
               ? 0
-              : std::distance(p4est->global_first_quadrant,
-                              std::lower_bound(p4est->global_first_quadrant,
-                                               p4est->global_first_quadrant +
-                                                   p4est->mpisize,
+              : std::distance(procidx->begin(),
+                              std::upper_bound(procidx->begin(),
+                                               procidx->end(),
                                                qid)) -
                     1;
 

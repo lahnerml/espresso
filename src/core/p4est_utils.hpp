@@ -20,6 +20,7 @@ enum class forest_order { short_range = 0, adaptive_LB };
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
+  std::vector<int64_t> first_quad_morton_idx;
   int coarsest_level_local;
   int finest_level_local;
   int finest_level_global;

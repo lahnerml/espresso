@@ -753,7 +753,7 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   int i;
 #ifdef LB_ADAPTIVE
   // FIXME check extended domain size
-  i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
+  i = p4est_utils_pos_qid_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 #else  // LB_ADAPTIVE
   int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
@@ -840,7 +840,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
   // Does the same as dd_p4est_save_position_to_cell but does not extend the
   // local domain
   // by the error bounds
-  int i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
+  int i = p4est_utils_pos_qid_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 
   if (i < num_local_cells)
@@ -1004,7 +1004,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf,
               this_node, recvbuf->part[p].p.identity, global_flag, from,
               recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1],
               recvbuf->part[p].r.p[2],
-              p4est_utils_pos_morton_idx_local(forest_order::short_range,
+              p4est_utils_pos_qid_local(forest_order::short_range,
                                                recvbuf->part[p].r.p),
               dd_p4est_pos_to_proc(recvbuf->part[p].r.p), op[0], op[1], op[2]);
       errexit();

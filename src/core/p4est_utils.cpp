@@ -227,15 +227,8 @@ int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
 
   // FIXME: This does not yield a valid combination of qid and tid.
   int64_t qid = p4est_utils_pos_morton_idx_global(forest, pos);
-  int tid =
-      qid == 0
-          ? 0
-          : std::distance(
-                std::begin(current_p4est.tree_quadrant_offset_synced),
-                std::lower_bound(
-                    std::begin(current_p4est.tree_quadrant_offset_synced),
-                    std::end(current_p4est.tree_quadrant_offset_synced), qid)) -
-                1;
+  int tid = p4est_utils_map_pos_to_tree(p4est, pos);
+
   int64_t tree_offset = current_p4est.tree_quadrant_offset_synced[tid];
   int64_t local_qid = qid - tree_offset;
 

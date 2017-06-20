@@ -28,8 +28,6 @@
 //--------------------------------------------------------------------------------------------------
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
-static std::vector<int> p4est_space_idx; // n_nodes + 1 elements, storing the
-                                         // first Morton index of local cell
 static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
 static std::vector<comm_t>
@@ -158,7 +156,6 @@ void dd_p4est_create_grid() {
   comm_proc.clear();
   comm_recv.clear();
   comm_send.clear();
-  p4est_space_idx.clear();
   dd.p4est_shell.clear();
 #ifdef LB_ADAPTIVE
   // the adaptive LB has a strange grid, thus we have to do something similar
@@ -222,46 +219,6 @@ void dd_p4est_create_grid() {
                     p4est->first_local_tree, p4est->last_local_tree,
                     p4est->local_num_quadrants));
 
-  // create space filling inforamtion about first quads per node from p4est
-  p4est_space_idx.resize(n_nodes + 1);
-  for (int i = 0; i <= n_nodes; ++i) {
-#ifndef LB_ADAPTIVE
-    p4est_quadrant_t *q = &dd.p4est->global_first_position[i];
-    // p4est_quadrant_t c;
-    if (i < n_nodes) {
-      double xyz[3];
-      p4est_qcoord_to_vertex(dd.p4est_conn, q->p.which_tree, q->x, q->y, q->z,
-                             xyz);
-      // c.x = xyz[0]*(1<<grid_level);
-      // c.y = xyz[1]*(1<<grid_level);
-      // c.z = xyz[2]*(1<<grid_level);
-      p4est_space_idx[i] = p4est_utils_cell_morton_idx(xyz[0] * (1 << grid_level),
-                                                       xyz[1] * (1 << grid_level),
-                                                       xyz[2] * (1 << grid_level));
-    } else {
-      /*c.x = 1<<grid_level;
-      while (c.x < grid_size[0]) c.x <<= 1;
-      c.y = 0;
-      c.z = 0;*/
-      int64_t tmp = 1 << grid_level;
-      while (tmp < grid_size[0])
-        tmp <<= 1;
-      while (tmp < grid_size[1])
-        tmp <<= 1;
-      while (tmp < grid_size[2])
-        tmp <<= 1;
-      p4est_space_idx[i] = tmp * tmp * tmp;
-    }
-    // c.level = P4EST_QMAXLEVEL;
-    // p4est_space_idx[i] = p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
-    if (i == this_node + 1) {
-      CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i - 1],
-                        p4est_space_idx[i] - 1));
-    }
-#else // !LB_ADAPTIVE
-    p4est_space_idx[i] = dd.p4est->global_first_quadrant[i];
-#endif // !LB_ADAPTIVE
-  }
 
   // gather cell neighbors
   std::vector<uint64_t> quads;

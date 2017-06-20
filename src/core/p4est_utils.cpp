@@ -586,7 +586,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 
   if (sum < p4est_mod->global_num_quadrants) {
     printf("%i : quadrants lost while partitioning\n", this_node);
-    return;
+    errexit();
   }
 
   CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,

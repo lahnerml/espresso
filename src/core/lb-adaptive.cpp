@@ -2438,6 +2438,7 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
 
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
+  int idx_a, idx_b;
   int xid, yid, zid;
   for (int d = 0; d < 3; ++d) {
     if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
@@ -2457,9 +2458,12 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
     qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
     zlvlfill = 1 << (3 * (lbpar.max_refinement_level - q->level));
     if (qidx <= pidx && pidx < qidx + zlvlfill)
-      return i;
+      idx_a = i;
   }
-  return -1;
+  idx_b =
+    p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, lbadapt_ghost, pos);
+  P4EST_ASSERT(idx_a == idx_b);
+  return idx_b;
 }
 
 int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
@@ -2471,6 +2475,10 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
+
+  int idx_a = p4est_utils_pos_qid_local(forest_order::adaptive_LB, pos);
+  return idx_a;
+
   xid = (pos[0]) * (1 << lbpar.max_refinement_level);
   yid = (pos[1]) * (1 << lbpar.max_refinement_level);
   zid = (pos[2]) * (1 << lbpar.max_refinement_level);
@@ -2496,7 +2504,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]);
     if (qidx > pidx)
       return i - 1;
-    for (int j = 0; j < 8; ++j)
+    for (int j = 0; j < P8EST_CHILDREN; ++j)
       if (qidx > sidx[j])
         ret[j] = i - 1;
   }
@@ -2508,7 +2516,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
       tmp <<= 1;
     while (tmp < (box_l[2] * (1 << lbpar.max_refinement_level)))
       tmp <<= 1;
-    qidx == tmp *tmp *tmp;
+    qidx = tmp * tmp * tmp;
   } else {
     q = &lb_p8est->global_first_position[this_node + 1];
     qidx = lbadapt_get_global_idx(q, q->p.which_tree);
@@ -2516,7 +2524,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   if (pidx < qidx) {
     return lb_p8est->local_num_quadrants - 1;
   } else {
-    for (int j = 0; j < 8; ++j) {
+    for (int j = 0; j < P8EST_CHILDREN; ++j) {
       if (sidx[j] < qidx)
         ret[j] = lb_p8est->local_num_quadrants - 1;
       if (ret[j] >= 0)

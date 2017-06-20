@@ -501,12 +501,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
   P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,
                                                 p4est_mod->connectivity));
 
-  p4est_locidx_t num_quad_per_proc[p4est_ref->mpisize];
-  p4est_locidx_t num_quad_per_proc_global[p4est_ref->mpisize];
-  for (int p = 0; p < p4est_mod->mpisize; ++p) {
-    num_quad_per_proc[p] = 0;
-    num_quad_per_proc_global[p] = 0;
-  }
+  std::vector<p4est_locidx_t> num_quad_per_proc(p4est_ref->mpisize, 0);
+  std::vector<p4est_locidx_t> num_quad_per_proc_global(p4est_ref->mpisize, 0);
 
   int tid = p4est_mod->first_local_tree;
   int tqid = 0;
@@ -540,13 +536,13 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
   }
 
   // Gather this information over all processes
-  MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, p4est_mod->mpisize,
-                P4EST_MPI_LOCIDX, MPI_SUM, p4est_mod->mpicomm);
+  MPI_Allreduce(num_quad_per_proc.data(), num_quad_per_proc_global.data(),
+                p4est_mod->mpisize, P4EST_MPI_LOCIDX, MPI_SUM,
+                p4est_mod->mpicomm);
 
-  p4est_locidx_t sum = 0;
+  p4est_locidx_t sum = std::accumulate(std::begin(num_quad_per_proc_global),
+                                       std::end(num_quad_per_proc_global), 0);
 
-  for (int i = 0; i < p4est_mod->mpisize; ++i)
-    sum += num_quad_per_proc_global[i];
   if (sum < p4est_mod->global_num_quadrants) {
     printf("%i : quadrants lost while partitioning\n", this_node);
     return;
@@ -556,7 +552,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                     num_quad_per_proc_global[this_node]));
 
   // Repartition with the computed distribution
-  int shipped = p8est_partition_given(p4est_mod, num_quad_per_proc_global);
+  int shipped = p8est_partition_given(p4est_mod,
+                                      num_quad_per_proc_global.data());
   P4EST_GLOBAL_PRODUCTIONF(
       "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
       (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);

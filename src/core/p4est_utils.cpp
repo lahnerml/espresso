@@ -240,10 +240,6 @@ int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
 }
 
 p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
-  p4est_utils_forest_info_t current_p4est =
-      forest_info.at(static_cast<int>(forest));
-  p8est_t *p4est = current_p4est.p4est;
-
   p8est_tree_t *tree;
   p8est_quadrant_t q;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &q);
@@ -258,7 +254,7 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]) {
 
   index += tree->quadrants_offset;
 
-  P4EST_ASSERT(0 <= index && index < p4est->local_num_quadrants);
+  P4EST_ASSERT(0 <= index && index < forest_info.at(static_cast<int>(forest)).p4est->local_num_quadrants);
 
   return index;
 }

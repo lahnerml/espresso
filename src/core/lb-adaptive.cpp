@@ -1521,7 +1521,9 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
     if (mesh_iter->neighbor_qid != -1) {
+#ifdef P4EST_ENABLE_DEBUG
       ++neighbor_cnt;
+#endif
       int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);

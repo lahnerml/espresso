@@ -88,7 +88,7 @@ int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
   int p = (qid == 0)
               ? 0
               : std::distance(p4est->global_first_quadrant,
-                              std::lower_bound(p4est->global_first_quadrant,
+                              std::upper_bound(p4est->global_first_quadrant,
                                                p4est->global_first_quadrant +
                                                    p4est->mpisize,
                                                qid)) -
@@ -274,7 +274,7 @@ int p4est_utils_find_qid_prepare(forest_order forest, const double pos[3],
   return 0;
 }
 
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
+/*p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
   p8est_tree_t *tree;
   p8est_quadrant_t q;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &q);
@@ -285,6 +285,51 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3
 #ifdef P4EST_ENABLE_DEBUG
   p8est_quadrant_t *quad = p4est_quadrant_array_index(&tree->quadrants, index);
   P4EST_ASSERT(p8est_quadrant_overlaps(&q, quad));
+#endif // P4EST_ENABLE_DEBUG
+
+  index += tree->quadrants_offset;
+
+  P4EST_ASSERT(0 <= index && index < forest_info.at(static_cast<int>(forest)).p4est->local_num_quadrants);
+
+  return index;
+}*/
+
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
+  p4est_utils_forest_info_t& current_p4est =
+      forest_info.at(static_cast<int>(forest));
+  p8est_t *p4est = current_p4est.p4est;
+
+  // find correct tree
+  int tid = p4est_utils_map_pos_to_tree(p4est, pos);
+  int level = current_p4est.finest_level_global;
+  p4est_tree_t *tree = p4est_tree_array_index(p4est->trees, tid);
+  
+  double first_pos[3];
+  int shifted_pos[3];
+  p4est_qcoord_to_vertex(p4est->connectivity, tid, 0, 0, 0, first_pos);
+  
+  p4est_quadrant_t pquad;
+  int64_t pidx;
+#ifdef LB_ADAPTIVE
+  // Trees have a base length of 1
+  shifted_pos[0] = (pos[0] - first_pos[0])*(1<<level);
+  shifted_pos[1] = (pos[1] - first_pos[1])*(1<<level);
+  shifted_pos[2] = (pos[2] - first_pos[2])*(1<<level);
+#else
+  // Trees might not have a base lenngth of 1
+  shifted_pos[0] = (pos[0]*dd_p4est_num_trees_in_dir(0)/box_l[0] - first_pos[0])*(1<<level);
+  shifted_pos[1] = (pos[1]*dd_p4est_num_trees_in_dir(1)/box_l[1] - first_pos[1])*(1<<level);
+  shifted_pos[2] = (pos[2]*dd_p4est_num_trees_in_dir(2)/box_l[2] - first_pos[2])*(1<<level);
+#endif
+  pidx = p4est_utils_cell_morton_idx(shifted_pos[0], shifted_pos[1], shifted_pos[2]);
+  p4est_quadrant_set_morton(&pquad, level, pidx);
+  
+  p4est_locidx_t index = p8est_find_lower_bound_overlap(
+      &tree->quadrants, &pquad, 0.5 * tree->quadrants.elem_count);
+
+#ifdef P4EST_ENABLE_DEBUG
+  p8est_quadrant_t *quad = p4est_quadrant_array_index(&tree->quadrants, index);
+  P4EST_ASSERT(p8est_quadrant_overlaps(&pquad, quad));
 #endif // P4EST_ENABLE_DEBUG
 
   index += tree->quadrants_offset;
@@ -576,7 +621,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 
   if (sum < p4est_mod->global_num_quadrants) {
     printf("%i : quadrants lost while partitioning\n", this_node);
-    return;
+    errexit();
   }
 
   CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,
@@ -588,6 +633,23 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
   P4EST_GLOBAL_PRODUCTIONF(
       "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
       (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
+}
+
+int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx, p4est_quadrant_t *quad[]) {
+  p4est_t *cmp = (p4est_t*)p4est->user_pointer;
+  p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
+  for (int i = 0; i < tree->quadrants.elem_count; ++i) {
+    p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
+    if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level) return 0;
+  }
+  return 1;
+}
+
+p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
+  p4est_t *fct = p4est_copy(t2, 0);
+  fct->user_pointer = (void*)t1;
+  p4est_coarsen(fct, 1, fct_coarsen_cb, NULL);
+  return fct;
 }
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

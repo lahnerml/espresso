@@ -399,5 +399,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
+p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
+
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

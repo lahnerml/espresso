@@ -738,98 +738,10 @@ void dd_p4est_init_cell_interaction() {
 //--------------------------------------------------------------------------------------------------
 
 Cell *dd_p4est_save_position_to_cell(double pos[3]) {
-  CALL_TRACE();
-
-  // Mapping a position to the local domain is not as easy since the domain is
-  // not a cube
-  // Loop over all cells and check if position is inside cell
-
-  // Note: Since the local cells are sorted along a space filling curve. The
-  // List can be used as
-  // search tree. But for simplicity reasons this is not implemendet yet. It
-  // would reduce
-  // the complexity from O(N) to O(log(N)).
-
-  int i;
-#ifdef LB_ADAPTIVE
-  // FIXME check extended domain size
-  i = p4est_utils_pos_qid_local(forest_order::short_range, pos);
-  P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
-#else  // LB_ADAPTIVE
-  int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
-
-  // To check the extended domain create the shifted positions
-  for (int d = 0; d < 3; ++d) {
-    scale_pos[d] = pos[d] * dd.inv_cell_size[d];
-    scale_pos_l[d] =
-        (pos[d] + ROUND_ERROR_PREC * box_l[d]) * dd.inv_cell_size[d];
-    scale_pos_h[d] =
-        (pos[d] - ROUND_ERROR_PREC * box_l[d]) * dd.inv_cell_size[d];
-
-    if (!PERIODIC(d) && scale_pos[d] < 0)
-      scale_pos[d] = 0;
-    if (!PERIODIC(d) && scale_pos_l[d] < 0)
-      scale_pos_l[d] = 0;
-    if (!PERIODIC(d) && scale_pos_h[d] < 0)
-      scale_pos_h[d] = 0;
-    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d])
-      scale_pos[d] = grid_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_l[d] >= grid_size[d])
-      scale_pos_l[d] = grid_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_h[d] >= grid_size[d])
-      scale_pos_h[d] = grid_size[d] - 1;
-  }
-
-  // Loop all cells and break if containing cell is found
-  for (i = 0; i < num_local_cells; ++i) {
-    if ((dd.p4est_shell[i].boundary & 1)) {
-      if (scale_pos_l[0] < dd.p4est_shell[i].coord[0])
-        continue;
-    } else {
-      if (scale_pos[0] < dd.p4est_shell[i].coord[0])
-        continue;
-    }
-    if ((dd.p4est_shell[i].boundary & 2)) {
-      if (scale_pos_h[0] > dd.p4est_shell[i].coord[0])
-        continue;
-    } else {
-      if (scale_pos[0] > dd.p4est_shell[i].coord[0])
-        continue;
-    }
-    if ((dd.p4est_shell[i].boundary & 4)) {
-      if (scale_pos_l[1] < dd.p4est_shell[i].coord[1])
-        continue;
-    } else {
-      if (scale_pos[1] < dd.p4est_shell[i].coord[1])
-        continue;
-    }
-    if ((dd.p4est_shell[i].boundary & 8)) {
-      if (scale_pos_h[1] > dd.p4est_shell[i].coord[1])
-        continue;
-    } else {
-      if (scale_pos[1] > dd.p4est_shell[i].coord[1])
-        continue;
-    }
-    if ((dd.p4est_shell[i].boundary & 16)) {
-      if (scale_pos_l[2] < dd.p4est_shell[i].coord[2])
-        continue;
-    } else {
-      if (scale_pos[2] < dd.p4est_shell[i].coord[2])
-        continue;
-    }
-    if ((dd.p4est_shell[i].boundary & 32)) {
-      if (scale_pos_h[2] > dd.p4est_shell[i].coord[2])
-        continue;
-    } else {
-      if (scale_pos[2] > dd.p4est_shell[i].coord[2])
-        continue;
-    }
-    break;
-  }
-#endif // LB_ADAPTIVE
+  int64_t i = p4est_utils_pos_quad_ext(forest_order::short_range, pos);
 
   // return the index
-  if (i < num_local_cells)
+  if (i > 0 && i < num_local_cells)
     return &cells[i];
   return NULL;
 }
@@ -840,7 +752,7 @@ Cell *dd_p4est_position_to_cell(double pos[3]) {
   // Does the same as dd_p4est_save_position_to_cell but does not extend the
   // local domain
   // by the error bounds
-  int i = p4est_utils_pos_qid_local(forest_order::short_range, pos);
+  int i = p4est_utils_pos_morton_idx_local(forest_order::short_range, pos);
   P4EST_ASSERT(0 <= i && i < dd.p4est->local_num_quadrants);
 
   if (i < num_local_cells)
@@ -1004,7 +916,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf,
               this_node, recvbuf->part[p].p.identity, global_flag, from,
               recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1],
               recvbuf->part[p].r.p[2],
-              p4est_utils_pos_qid_local(forest_order::short_range,
+              p4est_utils_pos_morton_idx_local(forest_order::short_range,
                                                recvbuf->part[p].r.p),
               dd_p4est_pos_to_proc(recvbuf->part[p].r.p), op[0], op[1], op[2]);
       errexit();

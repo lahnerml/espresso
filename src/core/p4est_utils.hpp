@@ -87,6 +87,18 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[
  */
 int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]);
 
+/** Get the index of a position in the by ROUND_ERROR_PREC extended local domain.
+ * If pos is in the local domain, returns the same as
+ * \ref p4est_utils_pos_morton_idx_local. Otherwise tries if by ROUND_ERROR_PREC
+ * shifted copies of pos lie inside the local domain. If so, returns the
+ * quad id. If no shifted image lies inside the local box, returns -1.
+ *
+ * @param forest    p4est whose domain decomposition is to be used.
+ * @param pos       spatial coordinate to map.
+ *
+ * @return int      Quadrant index of quadrant containing pos or one of its shifted counterparts
+ */
+int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]);
 
 /** Find quadrant index for a given position among local quadrants
  *

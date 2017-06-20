@@ -217,7 +217,42 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3
   return idx;
 }
 
-int p4est_utils_find_qid_prepare(forest_order forest, double pos[3],
+
+static inline bool is_valid_local_quad(const p8est *p4est, int64_t quad) {
+  return quad >= 0 && quad < p4est->local_num_quadrants;
+}
+
+#define RETURN_IF_VALID_QUAD(q, fo) \
+  do { \
+    int64_t qid = q; \
+    if (is_valid_local_quad(forest_info[static_cast<int>(fo)].p4est, qid)) \
+      return qid; \
+  } while(0)
+
+int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
+  // Try pos itself
+  RETURN_IF_VALID_QUAD(p4est_utils_pos_morton_idx_local(forest, pos), forest);
+
+  // If pos is outside of the local domain try the bounding box enlarged
+  // ROUND_ERROR_PREC
+  for (int i = -1; i <= 1; i += 2) {
+    for (int j = -1; j <= 1; j += 2) {
+      for (int k = -1; k <= 1; k += 2) {
+        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
+                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
+                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
+
+        RETURN_IF_VALID_QUAD(p4est_utils_pos_morton_idx_local(forest, spos),
+                             forest);
+
+      }
+    }
+  }
+
+  return -1;
+}
+
+int p4est_utils_find_qid_prepare(forest_order forest, const double pos[3],
                                  p8est_tree_t **tree, p8est_quadrant_t *q) {
   p4est_utils_forest_info_t& current_p4est =
       forest_info.at(static_cast<int>(forest));

@@ -1517,7 +1517,7 @@ void
 p4est_dd_repartition(const std::string& desc, bool debug)
 {
   if (desc == "statistics") {
-      repart::print_cell_info("!>>> Statistics", "none");
+    repart::print_cell_info("!>>> Statistics", "none");
     return;
   }
 

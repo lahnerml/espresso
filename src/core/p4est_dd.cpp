@@ -1215,67 +1215,8 @@ int dd_p4est_pos_to_proc(double pos[3]) {
   return p4est_utils_pos_to_proc(forest_order::short_range, pos);
 }
 //--------------------------------------------------------------------------------------------------
-// This is basically a copy of the dd_on_geometry_change
 void dd_p4est_on_geometry_change(int flags) {
-
-  /* check that the CPU domains are still sufficiently large. */
-  for (int i = 0; i < 3; i++)
-    if (box_l[i] < max_range) {
-      runtimeErrorMsg() << "box_l in direction " << i << " is too small";
-    }
-
-  /* A full resorting is necessary if the grid has changed. We simply
-     don't have anything fast for this case. Probably also not
-     necessary. */
-  if ((flags & CELL_FLAG_GRIDCHANGED)) {
-    CELL_TRACE(
-        fprintf(stderr, "%d: dd_on_geometry_change full redo\n", this_node));
-    cells_re_init(CELL_STRUCTURE_CURRENT);
-    return;
-  }
-
-  /* otherwise, re-set our geometrical dimensions which have changed
-     (in addition to the general ones that \ref grid_changed_box_l
-     takes care of) */
-  for (int i = 0; i < 3; i++) {
-    dd.cell_size[i] = box_l[i] / (double)grid_size[i];
-    dd.inv_cell_size[i] = 1.0 / dd.cell_size[i];
-  }
-
-  double min_cell_size =
-      std::min(std::min(dd.cell_size[0], dd.cell_size[1]), dd.cell_size[2]);
-  max_skin = min_cell_size - max_cut;
-
-  // printf("%i : cellsize %lfx%lfx%lf\n", this_node,  dd.cell_size[0],
-  // dd.cell_size[1], dd.cell_size[2]);
-
-  CELL_TRACE(fprintf(stderr, "%d: dd_on_geometry_change: max_range = %f, "
-                             "min_cell_size = %f, max_skin = %f\n",
-                     this_node, max_range, min_cell_size, max_skin));
-
-  if (max_range > min_cell_size) {
-    /* if new box length leads to too small cells, redo cell structure
-       using smaller number of cells. */
-    cells_re_init(CELL_STRUCTURE_DOMDEC);
-    return;
-  }
-
-  /* If we are not in a hurry, check if we can maybe optimize the cell
-     system by using smaller cells. */
-  if (!(flags & CELL_FLAG_FAST)) {
-    int i;
-    for (i = 0; i < 3; i++) {
-      int poss_size = (int)floor(box_l[i] / max_range);
-      if (poss_size > grid_size[i])
-        break;
-    }
-    if (i < 3) {
-      /* new range/box length allow smaller cells, redo cell structure,
-         possibly using smaller number of cells. */
-      cells_re_init(CELL_STRUCTURE_DOMDEC);
-      return;
-    }
-  }
+  cells_re_init(CELL_STRUCTURE_CURRENT);
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_write_particle_vtk(char *filename) {

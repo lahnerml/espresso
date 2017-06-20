@@ -252,8 +252,10 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
   return -1;
 }
 
-int p4est_utils_find_qid_prepare(forest_order forest, const double pos[3],
-                                 p8est_tree_t **tree, p8est_quadrant_t *q) {
+static int p4est_utils_find_qid_prepare(forest_order forest,
+                                        const double pos[3],
+                                        p8est_tree_t **tree,
+                                        p8est_quadrant_t *q) {
   p4est_utils_forest_info_t& current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;

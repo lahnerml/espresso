@@ -99,15 +99,6 @@ int p4est_utils_pos_to_proc(forest_order forest, double pos[3]) {
 }
 
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
-  // p4est_quadrant_t c;
-  // c.x = x; c.y = y; c.z = z;
-  /*if (x < 0 || x >= grid_size[0])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (y < 0 || y >= grid_size[1])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";
-  if (z < 0 || z >= grid_size[2])
-    runtimeErrorMsg() << x << "x" << y << "x" << z << " no valid cell";*/
-
   int64_t idx = 0;
   int64_t pos = 1;
 
@@ -127,9 +118,6 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
   }
 
   return idx;
-
-  // c.level = P4EST_QMAXLEVEL;
-  // return p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL);
 }
 
 int p4est_utils_map_pos_to_tree(p4est_t *p4est, double pos[3]) {

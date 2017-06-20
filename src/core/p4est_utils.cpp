@@ -564,4 +564,21 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
       (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
 }
 
+int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx, p4est_quadrant_t *quad[]) {
+  p4est_t *cmp = (p4est_t*)p4est->user_pointer;
+  p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
+  for (int i = 0; i < tree->quadrants.elem_count; ++i) {
+    p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
+    if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level) return 0;
+  }
+  return 1;
+}
+
+p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
+  p4est_t *fct = p4est_copy(t2, 0);
+  fct->user_pointer = (void*)t1;
+  p4est_coarsen(fct, 1, fct_coarsen_cb, NULL);
+  return fct;
+}
+
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

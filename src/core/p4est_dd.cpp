@@ -1188,28 +1188,6 @@ void dd_p4est_global_exchange_part(ParticleList *pl) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-// Maps a position to the cartesian grid and returns the morton index of this
-// coordinates
-// Note: the global morton index returned here is NOT equal to the local cell
-// index!!!
-int64_t dd_p4est_pos_morton_idx(double pos[3]) {
-  double pfold[3] = {pos[0], pos[1], pos[2]};
-  int im[3] = {0, 0, 0}; /* dummy */
-  fold_position(pfold, im);
-  for (int d = 0; d < 3; ++d) {
-    double errmar = 0.5 * ROUND_ERROR_PREC * box_l[d];
-    if (pos[d] < 0 && pos[d] > -errmar)
-      pfold[d] = 0;
-    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar)
-      pfold[d] = pos[d] - 0.5 * dd.cell_size[d];
-    // In the other two cases ("pos[d] <= -errmar" and
-    // "pos[d] >= box_l[d] + errmar") pfold is correct.
-  }
-  return p4est_utils_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
-                                     pfold[1] * dd.inv_cell_size[1],
-                                     pfold[2] * dd.inv_cell_size[2]);
-}
-//--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
   return p4est_utils_pos_to_proc(forest_order::short_range, pos);

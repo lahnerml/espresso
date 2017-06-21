@@ -17,7 +17,12 @@
 #include <p8est_search.h>
 #include <vector>
 
-std::vector<p4est_utils_forest_info_t> forest_info;
+static std::vector<p4est_utils_forest_info_t> forest_info;
+
+const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo) {
+  // Use at() here because forest_info might not have been initialized yet.
+  return forest_info.at(static_cast<int>(fo));
+}
 
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   // fill element to insert

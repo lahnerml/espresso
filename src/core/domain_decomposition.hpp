@@ -162,7 +162,7 @@ template <typename T>
 struct castable_unique_ptr: public std::unique_ptr<T> {
   using Base = std::unique_ptr<T>;
   constexpr castable_unique_ptr(): Base() {}
-  constexpr castable_unique_ptr(nullptr_t n): Base(n) {}
+  constexpr castable_unique_ptr(std::nullptr_t n): Base(n) {}
   castable_unique_ptr(T* p): Base(p) {}
   castable_unique_ptr(Base&& other): Base(std::move(other)) {}
   operator T*() const { return this->get(); }

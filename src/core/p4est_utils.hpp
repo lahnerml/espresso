@@ -74,19 +74,6 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  */
 int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]);
 
-/** Calculate a local cell index for a given position. This index is no p4est
- * quadrant index.
- * CAUTION: This only works for a regular grid. Use
- *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
- *          adaptively refined grids.
- *
- * @param forest    p4est whose domain decomposition is to be used.
- * @param pos       Spatial coordinate to map.
- *
- * @return int      Morton index for a cell corresponding to pos.
- */
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]);
-
 /** Get the index of a position in the by ROUND_ERROR_PREC extended local domain.
  * If pos is in the local domain, returns the same as
  * \ref p4est_utils_pos_morton_idx_local. Otherwise tries if by ROUND_ERROR_PREC

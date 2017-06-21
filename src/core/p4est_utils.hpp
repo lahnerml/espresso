@@ -34,7 +34,13 @@ struct p4est_utils_forest_info_t {
   }
 };
 
-extern std::vector<p4est_utils_forest_info_t> forest_info;
+/** Returns a const reference to the forest_info of "fo".
+ * Throws a std::out_of_range if the forest_info of "fo" has not been created
+ * yet.
+ *
+ * @param fo specifier which forest_info to return
+ */
+const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo);
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.

@@ -66,10 +66,30 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
                 p4est->mpicomm);
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
 
+  // calculate Morton-Index normed w.r.t finest level global
+  p8est_tree_t *tree = nullptr;
+  if (0 < p4est->local_num_quadrants) {
+    tree = p8est_tree_array_index(p4est->trees, p4est->first_local_tree);
+  }
+  std::vector<p4est_gloidx_t> local_first_quadrant(p4est->mpisize, 0);
+  local_first_quadrant[p4est->mpirank] =
+      (0 != p4est->local_num_quadrants)
+          ? (p4est->first_local_tree *
+                 (1 << P8EST_DIM * insert_elem.finest_level_global) +
+             p8est_quadrant_linear_id(
+                 p8est_quadrant_array_index(&tree->quadrants, 0),
+                 insert_elem.finest_level_global))
+          : std::numeric_limits<p4est_gloidx_t>::min();
+  MPI_Allreduce(local_first_quadrant.data(),
+                insert_elem.global_first_quadrant_norm_level.data(),
+                p4est->mpisize, P4EST_MPI_GLOIDX, MPI_MAX, p4est->mpicomm);
   // ensure monotony
   P4EST_ASSERT(
       std::is_sorted(std::begin(insert_elem.tree_quadrant_offset_synced),
                      std::end(insert_elem.tree_quadrant_offset_synced)));
+  P4EST_ASSERT(
+      std::is_sorted(std::begin(insert_elem.global_first_quadrant_norm_level),
+                     std::end(insert_elem.global_first_quadrant_norm_level)));
 
   return insert_elem;
 }
@@ -82,17 +102,19 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
-  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
+  p4est_utils_forest_info_t current_forest =
+      forest_info.at(static_cast<int>(forest));
+  p8est_t *p4est = current_forest.p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
   int p = (qid == 0)
               ? 0
-              : std::distance(p4est->global_first_quadrant,
-                              std::upper_bound(p4est->global_first_quadrant,
-                                               p4est->global_first_quadrant +
-                                                   p4est->mpisize,
-                                               qid)) -
-                    1;
+              : std::distance(
+                    current_forest.global_first_quadrant_norm_level.begin(),
+                    std::upper_bound(
+                        current_forest.global_first_quadrant_norm_level.begin(),
+                        current_forest.global_first_quadrant_norm_level.end(),
+                        qid)) - 1;
 
   P4EST_ASSERT(0 <= p && p < p4est->mpisize);
 
@@ -642,7 +664,8 @@ int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx, p4est_quadrant_t *qu
   p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
   for (int i = 0; i < tree->quadrants.elem_count; ++i) {
     p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
-    if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level) return 0;
+    if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level)
+      return 0;
   }
   return 1;
 }

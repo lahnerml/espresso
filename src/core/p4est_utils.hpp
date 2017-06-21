@@ -20,6 +20,7 @@ enum class forest_order { short_range = 0, adaptive_LB };
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
+  std::vector<p4est_gloidx_t> global_first_quadrant_norm_level;
   int coarsest_level_local;
   int finest_level_local;
   int finest_level_global;
@@ -28,6 +29,7 @@ struct p4est_utils_forest_info_t {
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
+        global_first_quadrant_norm_level(p4est->mpisize),
         coarsest_level_local(0), finest_level_local(-1),
         finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
   }

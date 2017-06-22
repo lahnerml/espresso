@@ -729,7 +729,7 @@ Cell *dd_p4est_save_position_to_cell(double pos[3]) {
   int64_t i = p4est_utils_pos_quad_ext(forest_order::short_range, pos);
 
   // return the index
-  if (i > 0 && i < num_local_cells)
+  if (i >= 0 && i < num_local_cells)
     return &cells[i];
   return NULL;
 }

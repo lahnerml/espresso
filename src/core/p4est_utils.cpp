@@ -160,11 +160,9 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
 
 #ifndef LB_ADAPTIVE
       // Ugly hack: manually scale the tree by box_l
-      if (p4est == forest_info[0].p4est) {
-        c[ci][0] *= box_l[0] / dd_p4est_num_trees_in_dir(0);
-        c[ci][1] *= box_l[1] / dd_p4est_num_trees_in_dir(1);
-        c[ci][2] *= box_l[2] / dd_p4est_num_trees_in_dir(2);
-      }
+      c[ci][0] *= box_l[0] / dd_p4est_num_trees_in_dir(0);
+      c[ci][1] *= box_l[1] / dd_p4est_num_trees_in_dir(1);
+      c[ci][2] *= box_l[2] / dd_p4est_num_trees_in_dir(2);
 #endif
     }
 

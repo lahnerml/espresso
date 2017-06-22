@@ -147,7 +147,11 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
   return idx;
 }
 
-int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
+/**
+ * CAUTION: If LB_ADAPTIVE is not set, all p4ests will be scaled by the side
+ *          length of the p4est instance used for short-ranged MD.
+ */
+static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
   int tid = -1;
   for (int t = 0; t < p4est->connectivity->num_trees; ++t) {
     // collect corners of tree
@@ -159,7 +163,8 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
       c[ci][2] = p4est->connectivity->vertices[P4EST_DIM * v + 2];
 
 #ifndef LB_ADAPTIVE
-      // Ugly hack: manually scale the tree by box_l
+      // As pure MD allows for box_l != 1.0, "pos" will be in [0,box_l) and
+      // not in [0,1). So manually scale the trees to fill [0,box_l).
       c[ci][0] *= box_l[0] / dd_p4est_num_trees_in_dir(0);
       c[ci][1] *= box_l[1] / dd_p4est_num_trees_in_dir(1);
       c[ci][2] *= box_l[2] / dd_p4est_num_trees_in_dir(2);

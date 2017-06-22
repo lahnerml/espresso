@@ -148,6 +148,24 @@ int dd_p4est_cellsize_even() {
   return lvl; // Return level > 0 if max_range <= 0.5
 }
 //--------------------------------------------------------------------------------------------------
+int dd_p4est_boundary_flags(int xi, int yi, int zi)
+{
+  int res = 0;
+  if (xi == 0 && yi == 1 && zi == 1)
+    res |= 1;
+  if (xi == 2 && yi == 1 && zi == 1)
+    res |= 2;
+  if (xi == 1 && yi == 0 && zi == 1)
+    res |= 4;
+  if (xi == 1 && yi == 2 && zi == 1)
+    res |= 8;
+  if (xi == 1 && yi == 1 && zi == 0)
+    res |= 16;
+  if (xi == 1 && yi == 1 && zi == 2)
+    res |= 32;
+  return res;
+}
+
 void dd_p4est_create_grid() {
   // printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
@@ -334,18 +352,8 @@ void dd_p4est_create_grid() {
               ls.boundary |= 16;
             if (PERIODIC(2) && (z + zi) == grid_size[2] + 1)
               ls.boundary |= 32;
-            if (xi == 0 && yi == 1 && zi == 1)
-              shell[i].boundary |= 1;
-            if (xi == 2 && yi == 1 && zi == 1)
-              shell[i].boundary |= 2;
-            if (xi == 1 && yi == 0 && zi == 1)
-              shell[i].boundary |= 4;
-            if (xi == 1 && yi == 2 && zi == 1)
-              shell[i].boundary |= 8;
-            if (xi == 1 && yi == 1 && zi == 0)
-              shell[i].boundary |= 16;
-            if (xi == 1 && yi == 1 && zi == 2)
-              shell[i].boundary |= 32;
+
+            shell[i].boundary |= dd_p4est_boundary_flags(xi, yi, zi);
             // Link the new cell to a local cell
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = shell.size();
             ls.coord[0] = int(x + xi) - 1;
@@ -372,18 +380,7 @@ void dd_p4est_create_grid() {
               // of the current local cell, since they are neighbors
               shell[i].shell = 1; // this local cell is at domain boundary
               // Update boundary info
-              if (xi == 0 && yi == 1 && zi == 1)
-                shell[i].boundary |= 1;
-              if (xi == 2 && yi == 1 && zi == 1)
-                shell[i].boundary |= 2;
-              if (xi == 1 && yi == 0 && zi == 1)
-                shell[i].boundary |= 4;
-              if (xi == 1 && yi == 2 && zi == 1)
-                shell[i].boundary |= 8;
-              if (xi == 1 && yi == 1 && zi == 0)
-                shell[i].boundary |= 16;
-              if (xi == 1 && yi == 1 && zi == 2)
-                shell[i].boundary |= 32;
+              shell[i].boundary |= dd_p4est_boundary_flags(xi, yi, zi);
             }
             // Link it as neighbor
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;

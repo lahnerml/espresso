@@ -22,6 +22,9 @@
 #include <p8est_mesh.h>
 #include <p8est_vtk.h>
 #include <vector>
+#include <tuple>
+
+typedef std::tuple<uint64_t, uint64_t, uint64_t> Index3D;
 
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
@@ -85,12 +88,11 @@ int dd_p4est_full_shell_neigh(int cell, int neighidx) {
 //-----------------------------------------------------------------------------------------
 // Init Callback for internal structure
 static void init_fn(p4est_t *p4est, p4est_topidx_t tree, p4est_quadrant_t *q) {
-  ((quad_data_t *)(q->p.user_data))->rank = this_node;
-  ((quad_data_t *)(q->p.user_data))->lidx = -1;
-  for (int i = 0; i < 26; ++i) {
-    ((quad_data_t *)(q->p.user_data))->ishell[i] = -1;
-    ((quad_data_t *)(q->p.user_data))->rshell[i] = -1;
-  }
+  quad_data_t& qd = *static_cast<quad_data_t *>(q->p.user_data);
+  qd.rank = this_node;
+  qd.lidx = -1;
+  std::fill(std::begin(qd.ishell), std::end(qd.ishell), -1);
+  std::fill(std::begin(qd.rshell), std::end(qd.rshell), -1);
 }
 //--------------------------------------------------------------------------------------------------
 static inline int count_trailing_zeros(int x) {
@@ -106,21 +108,17 @@ int dd_p4est_cellsize_optimal() {
 
   // compute number of cells
   if (max_range > ROUND_ERROR_PREC * box_l[0]) {
-    ncells[0] = std::max<int>(box_l[0] / max_range, 1);
-    ncells[1] = std::max<int>(box_l[1] / max_range, 1);
-    ncells[2] = std::max<int>(box_l[2] / max_range, 1);
+    std::transform(std::begin(box_l), std::end(box_l), std::begin(ncells),
+                   [](double box){ return std::max<int>(box / max_range, 1);});
   }
 
-  grid_size[0] = ncells[0];
-  grid_size[1] = ncells[1];
-  grid_size[2] = ncells[2];
+  std::copy(std::begin(ncells), std::end(ncells), std::begin(grid_size));
 
   // divide all dimensions by biggest common power of 2
   int lvl = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
 
-  brick_size[0] = ncells[0] >> lvl;
-  brick_size[1] = ncells[1] >> lvl;
-  brick_size[2] = ncells[2] >> lvl;
+  std::transform(std::begin(ncells), std::end(ncells), std::begin(brick_size),
+                 [lvl](int nc){ return nc >> lvl; });
 
   return lvl; // return the level of the grid
 }
@@ -131,9 +129,8 @@ int dd_p4est_cellsize_even() {
   P4EST_ASSERT(0 <= max_range && max_range <= 1.0);
 #endif // LB_ADAPTIVE
 
-  brick_size[0] = box_l[0];
-  brick_size[1] = box_l[1];
-  brick_size[2] = box_l[2];
+  std::transform(std::begin(box_l), std::end(box_l), std::begin(brick_size),
+                 [](double box){ return static_cast<int>(box); });
 
   int ncells = 1;
   if (max_range > ROUND_ERROR_PREC * box_l[0])
@@ -141,13 +138,57 @@ int dd_p4est_cellsize_even() {
 
   int lvl = Utils::nat_log2_floor(ncells);
 
-  grid_size[0] = brick_size[0] << lvl;
-  grid_size[1] = brick_size[1] << lvl;
-  grid_size[2] = brick_size[2] << lvl;
+  std::transform(std::begin(brick_size), std::end(brick_size),
+                 std::begin(grid_size), [lvl](int bs){ return bs << lvl; });
 
   return lvl; // Return level > 0 if max_range <= 0.5
 }
 //--------------------------------------------------------------------------------------------------
+
+enum class Direction { x_l = 1, x_r = 2, y_l = 4, y_r = 8, z_l = 16, z_r = 32 };
+
+/** Returns the boundary flags for an inner cell given a ghost offset
+ * Given that (x, y, z) is no ghost and (x+xi, y+yi, z+zi) is ghost,
+ * determines the boundary flags for cell (x, y, z) from the offsets
+ * (xi, yi, zi).
+ */
+int dd_p4est_boundary_flags_for_neighbor(int xi, int yi, int zi) {
+  int res = 0;
+  if (xi == 0 && yi == 1 && zi == 1)
+    res |= static_cast<int>(Direction::x_l);
+  if (xi == 2 && yi == 1 && zi == 1)
+    res |= static_cast<int>(Direction::x_r);
+  if (xi == 1 && yi == 0 && zi == 1)
+    res |= static_cast<int>(Direction::y_l);
+  if (xi == 1 && yi == 2 && zi == 1)
+    res |= static_cast<int>(Direction::y_r);
+  if (xi == 1 && yi == 1 && zi == 0)
+    res |= static_cast<int>(Direction::z_l);
+  if (xi == 1 && yi == 1 && zi == 2)
+    res |= static_cast<int>(Direction::z_r);
+  return res;
+}
+
+/** Returns boundary flags for cells of index (x,z,y).
+ */
+int dd_p4est_boundary_flags(int x, int y, int z)
+{
+  int res = 0;
+  if (PERIODIC(0) && x == 0)
+    res |= static_cast<int>(Direction::x_l);
+  if (PERIODIC(0) && x == grid_size[0] + 1)
+    res |= static_cast<int>(Direction::x_r);
+  if (PERIODIC(1) && y == 0)
+    res |= static_cast<int>(Direction::y_l);
+  if (PERIODIC(1) && y == grid_size[1] + 1)
+    res |= static_cast<int>(Direction::y_r);
+  if (PERIODIC(2) && z == 0)
+    res |= static_cast<int>(Direction::z_l);
+  if (PERIODIC(2) && z == grid_size[2] + 1)
+    res |= static_cast<int>(Direction::z_r);
+  return res;
+}
+
 void dd_p4est_create_grid() {
   // printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
@@ -221,10 +262,13 @@ void dd_p4est_create_grid() {
 
 
   // gather cell neighbors
-  std::vector<uint64_t> quads;
+  std::vector<Index3D> quads;
   std::vector<local_shell_t> shell;
-  quads.clear();
-  shell.clear();
+  // Reserve some memory to reduce the number of reallocs.
+  // quads and shell also hold ghost cells, so this does not prevent
+  // reallocs
+  quads.reserve(dd.p4est->local_num_quadrants);
+  shell.reserve(dd.p4est->local_num_quadrants);
 
   // Loop all local cells to gather information for those
   for (int i = 0; i < dd.p4est->local_num_quadrants; ++i) {
@@ -241,11 +285,11 @@ void dd_p4est_create_grid() {
     uint64_t z = xyz[2] * ql;
     // This is a simple but easy unique index, that also works for cells outside
     // box_l (by one cell)
-    quads.push_back((x + 1) | ((y + 1) << 21) | ((z + 1) << 42));
+    quads.emplace_back(x + 1, y + 1, z + 1);
     local_shell_t ls;
     ls.idx = i;
     ls.rank = this_node;
-    ls.shell = 0;
+    ls.shell = CellType::inner;
     ls.boundary = 0;
     ls.coord[0] = x;
     ls.coord[1] = y;
@@ -272,12 +316,9 @@ void dd_p4est_create_grid() {
       sc_array_destroy(ne);
       sc_array_destroy(ni);
     }
-    shell.push_back(ls);
+    shell.push_back(std::move(ls));
   }
 
-  // char fname[100];
-  // sprintf(fname,"cells_%i.list",this_node);
-  // FILE* h = fopen(fname,"w");
 
   // compute ghost, mirror and boundary information
   // here the ghost layer around the local domain is computed
@@ -293,8 +334,6 @@ void dd_p4est_create_grid() {
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
-    // fprintf(h,"%i %li %ix%ix%i ",i,p4est_utils_cell_morton_idx(x,y,z),
-    // shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
 
     // Loop all 27 cells in the fullshell
     for (uint64_t zi = 0; zi <= 2; zi++)
@@ -304,47 +343,22 @@ void dd_p4est_create_grid() {
             continue;
           // Check if this node has already been processed using the unique
           // index
-          uint64_t qidx = (x + xi) | ((y + yi) << 21) | ((z + zi) << 42);
-          size_t pos = 0;
-          while (pos < quads.size() && quads[pos] != qidx)
-            ++pos;
+          Index3D qidx {(x + xi), (y + yi), (z + zi)};
+          auto it = std::find(std::begin(quads), std::end(quads), qidx);
 
-          if (pos == quads.size()) { // Cell has not been processed yet
+          if (it == std::end(quads)) { // Cell has not been processed yet
             quads.push_back(qidx);   // Add it to list
             local_shell_t ls;
             // Copy corresponding information from p4est internal struct
             ls.idx = data->ishell[neighbor_lut[zi][yi][xi]];
             ls.rank = data->rshell[neighbor_lut[zi][yi][xi]];
-            ls.shell = 2; // This is a ghost cell, since all locals have been
+            ls.shell = CellType::ghost; // This is a ghost cell, since all locals have been
                           // added before
-            ls.boundary = 0;
-            for (int n = 0; n < 26; ++n)
-              ls.neighbor[n] = -1; // Neighbors from ghosts do not matter
-            // Set/Update ghost and corresponding local cells boundary info
-            if (PERIODIC(0) && (x + xi) == 0)
-              ls.boundary |= 1;
-            if (PERIODIC(0) && (x + xi) == grid_size[0] + 1)
-              ls.boundary |= 2;
-            if (PERIODIC(1) && (y + yi) == 0)
-              ls.boundary |= 4;
-            if (PERIODIC(1) && (y + yi) == grid_size[1] + 1)
-              ls.boundary |= 8;
-            if (PERIODIC(2) && (z + zi) == 0)
-              ls.boundary |= 16;
-            if (PERIODIC(2) && (z + zi) == grid_size[2] + 1)
-              ls.boundary |= 32;
-            if (xi == 0 && yi == 1 && zi == 1)
-              shell[i].boundary |= 1;
-            if (xi == 2 && yi == 1 && zi == 1)
-              shell[i].boundary |= 2;
-            if (xi == 1 && yi == 0 && zi == 1)
-              shell[i].boundary |= 4;
-            if (xi == 1 && yi == 2 && zi == 1)
-              shell[i].boundary |= 8;
-            if (xi == 1 && yi == 1 && zi == 0)
-              shell[i].boundary |= 16;
-            if (xi == 1 && yi == 1 && zi == 2)
-              shell[i].boundary |= 32;
+            ls.boundary = dd_p4est_boundary_flags(x + xi, y + yi, z + zi);
+
+            std::fill(std::begin(ls.neighbor), std::end(ls.neighbor), -1);
+
+            shell[i].boundary |= dd_p4est_boundary_flags_for_neighbor(xi, yi, zi);
             // Link the new cell to a local cell
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = shell.size();
             ls.coord[0] = int(x + xi) - 1;
@@ -361,48 +375,22 @@ void dd_p4est_create_grid() {
                   shell[l].p_cnt += 1;
               }
             }
-            shell.push_back(ls); // add the new ghost cell to all cells
-            shell[i].shell = 1;  // The cell for which this one was added is at
+            shell.push_back(std::move(ls)); // add the new ghost cell to all cells
+            shell[i].shell = CellType::boundary;  // The cell for which this one was added is at
                                  // the domain bound
           } else {               // Cell already exists in list
-            if (shell[pos].shell ==
-                2) { // is it a ghost cell, then ubdate the boundary info
+            auto pos = std::distance(std::begin(quads), it);
+            if (shell[pos].shell == CellType::ghost) { // is it a ghost cell, then update the boundary info
               // of the current local cell, since they are neighbors
-              shell[i].shell = 1; // this local cell is at domain boundary
+              shell[i].shell = CellType::boundary; // this local cell is at domain boundary
               // Update boundary info
-              if (xi == 0 && yi == 1 && zi == 1)
-                shell[i].boundary |= 1;
-              if (xi == 2 && yi == 1 && zi == 1)
-                shell[i].boundary |= 2;
-              if (xi == 1 && yi == 0 && zi == 1)
-                shell[i].boundary |= 4;
-              if (xi == 1 && yi == 2 && zi == 1)
-                shell[i].boundary |= 8;
-              if (xi == 1 && yi == 1 && zi == 0)
-                shell[i].boundary |= 16;
-              if (xi == 1 && yi == 1 && zi == 2)
-                shell[i].boundary |= 32;
+              shell[i].boundary |= dd_p4est_boundary_flags_for_neighbor(xi, yi, zi);
             }
             // Link it as neighbor
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;
           }
         }
-    /*for (int n=0;n<26;++n) {
-      if (n < 6)
-        fprintf(h,"f%i[",n);
-      else if (n < 18)
-        fprintf(h,"e%i[",n-6);
-      else
-        fprintf(h,"c%i[",n-18);
-      if (data->ishell[n] >= 0)
-        fprintf(h,"%i:%i] ",data->rshell[n],data->ishell[n]);
-      else
-        fprintf(h,"] ");
-    }
-    fprintf(h,"\n");*/
   }
-
-  // fclose(h);
 
   // Copy the generated data to globals
   num_cells = (size_t)quads.size();
@@ -421,7 +409,7 @@ void dd_p4est_create_grid() {
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
 #endif
 
-  dd_p4est_write_vtk();
+  //dd_p4est_write_vtk();
 
   CELL_TRACE(printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n", this_node,
                     max_range, box_l[0], box_l[1], box_l[2], dd.cell_size[0],
@@ -471,7 +459,7 @@ void dd_p4est_comm() {
   // Loop all cells
   for (int i = 0; i < num_cells; ++i) {
     // is ghost cell that is linked to a process? -> add to recv list
-    if (dd.p4est_shell[i].rank >= 0 && dd.p4est_shell[i].shell == 2) {
+    if (dd.p4est_shell[i].rank >= 0 && dd.p4est_shell[i].shell == CellType::ghost) {
       int irank = dd.p4est_shell[i].rank;
       int pos = 0;
       // find position to add new element (keep order)
@@ -509,7 +497,7 @@ void dd_p4est_comm() {
       }
     }
     // is mirror cell (at domain boundary)? -> add to send list
-    if (dd.p4est_shell[i].shell == 1) {
+    if (dd.p4est_shell[i].shell == CellType::boundary) {
       // for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
       // loop fullshell
       for (int n = 0; n < 26; ++n) {
@@ -517,7 +505,7 @@ void dd_p4est_comm() {
         int nrank = dd.p4est_shell[nidx].rank;
         if (nidx < 0 || nrank < 0)
           continue; // invalid neighbor
-        if (dd.p4est_shell[nidx].shell != 2)
+        if (dd.p4est_shell[nidx].shell != CellType::ghost)
           continue; // no need to send to local cell
         // check if this is the first time to add this mirror cell
         if (!send_tag[nrank].empty() &&
@@ -956,29 +944,6 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf,
   }
 }
 //--------------------------------------------------------------------------------------------------
-static void dd_resort_particles() {
-  // Move all particles to the cell it belongs to. Only for particles that are
-  // in local domain
-  for (int c = 0; c < local_cells.n; c++) {
-    ParticleList *cell = local_cells.cell[c];
-    for (int p = 0; p < cell->n; p++) {
-      Particle *part = &cell->part[p];
-      ParticleList *sort_cell = dd_p4est_save_position_to_cell(part->r.p);
-      if (sort_cell == NULL) { // Not in local domain -> Error
-        fprintf(stderr, "[%i] dd_exchange_and_sort_particles: Particle %i "
-                        "(%lf, %lf, %lf) not inside subdomain\n",
-                this_node, part->p.identity, part->r.p[0], part->r.p[1],
-                part->r.p[2]);
-        errexit();
-      } else if (sort_cell != cell) { // Local cell that is not the current one
-        move_indexed_particle(sort_cell, cell, p);
-        if (p < cell->n)
-          p--;
-      }
-    }
-  }
-}
-//--------------------------------------------------------------------------------------------------
 
 void dd_p4est_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
@@ -1017,14 +982,13 @@ void dd_p4est_exchange_and_sort_particles() {
   // Receive all data
   MPI_Status status;
   std::vector<int> recvs(num_comm_proc, 0); // number of recv for each process
-  int recvidx, tag, source;
+  int recvidx, source;
   while (true) {
     MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
     if (recvidx == MPI_UNDEFINED)
       break;
 
     source = status.MPI_SOURCE;
-    tag = status.MPI_TAG;
 
     int cnt;
     MPI_Get_count(&status, MPI_BYTE, &cnt);

@@ -66,11 +66,12 @@
 #include <p8est_ghost.h>
 #include <p8est_mesh.h>
 
+enum class CellType { inner = 0, boundary, ghost };
 // Structure that stores basic grid information
 typedef struct {
   int64_t idx; // a unique index within all cells (as used by p4est for locals)
   int rank; // the rank of this cell (equals this_node for locals)
-  int shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
+  CellType shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
   int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
                 // Cells with shell-type 0 or those located within the domain are always 0
                 // Cells with shell-type 1 store information about which face is a boundary

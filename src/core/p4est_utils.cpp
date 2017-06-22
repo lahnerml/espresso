@@ -17,7 +17,12 @@
 #include <p8est_search.h>
 #include <vector>
 
-std::vector<p4est_utils_forest_info_t> forest_info;
+static std::vector<p4est_utils_forest_info_t> forest_info;
+
+const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo) {
+  // Use at() here because forest_info might not have been initialized yet.
+  return forest_info.at(static_cast<int>(fo));
+}
 
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   // fill element to insert
@@ -66,30 +71,21 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
                 p4est->mpicomm);
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
 
-  // calculate Morton-Index normed w.r.t finest level global
-  p8est_tree_t *tree = nullptr;
-  if (0 < p4est->local_num_quadrants) {
-    tree = p8est_tree_array_index(p4est->trees, p4est->first_local_tree);
-  }
-  std::vector<p4est_gloidx_t> local_first_quadrant(p4est->mpisize, 0);
-  local_first_quadrant[p4est->mpirank] =
-      (0 != p4est->local_num_quadrants)
-          ? (p4est->first_local_tree *
-                 (1 << P8EST_DIM * insert_elem.finest_level_global) +
-             p8est_quadrant_linear_id(
-                 p8est_quadrant_array_index(&tree->quadrants, 0),
-                 insert_elem.finest_level_global))
-          : std::numeric_limits<p4est_gloidx_t>::min();
-  MPI_Allreduce(local_first_quadrant.data(),
-                insert_elem.global_first_quadrant_norm_level.data(),
-                p4est->mpisize, P4EST_MPI_GLOIDX, MPI_MAX, p4est->mpicomm);
   // ensure monotony
   P4EST_ASSERT(
       std::is_sorted(std::begin(insert_elem.tree_quadrant_offset_synced),
                      std::end(insert_elem.tree_quadrant_offset_synced)));
-  P4EST_ASSERT(
-      std::is_sorted(std::begin(insert_elem.global_first_quadrant_norm_level),
-                     std::end(insert_elem.global_first_quadrant_norm_level)));
+
+  for (int i = 0; i < p4est->mpisize; ++i) {
+    p4est_quadrant_t *q = &p4est->global_first_position[i];
+    double xyz[3];
+    p4est_qcoord_to_vertex(p4est->connectivity,q->p.which_tree,q->x,q->y,q->z,xyz);
+    int64_t midx = p4est_utils_cell_morton_idx(xyz[0]*(1<<insert_elem.finest_level_global),
+                                               xyz[1]*(1<<insert_elem.finest_level_global),
+                                               xyz[2]*(1<<insert_elem.finest_level_global));
+    insert_elem.first_quad_morton_idx.push_back(midx);
+  }
+  insert_elem.first_quad_morton_idx.push_back(std::numeric_limits<int64_t>::max());
 
   return insert_elem;
 }
@@ -109,12 +105,10 @@ int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
 
   int p = (qid == 0)
               ? 0
-              : std::distance(
-                    current_forest.global_first_quadrant_norm_level.begin(),
-                    std::upper_bound(
-                        current_forest.global_first_quadrant_norm_level.begin(),
-                        current_forest.global_first_quadrant_norm_level.end(),
-                        qid)) - 1;
+              : std::distance(current_forest.first_quad_morton_idx.begin(),
+                              std::upper_bound(current_forest.first_quad_morton_idx.begin(),
+                                               current_forest.first_quad_morton_idx.end(),
+                                               qid)) - 1;
 
   P4EST_ASSERT(0 <= p && p < p4est->mpisize);
 

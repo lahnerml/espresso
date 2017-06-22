@@ -70,10 +70,10 @@ int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]);
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Calculate a global cell index for a given position. This index is no p4est
- * quadrant index.
- * CAUTION: This only works for a regular grid. Use
- *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
- *          adaptively refined grids.
+ * quadrant index as if the forest would be discretized regularly on its finest
+ * level.
+ * CAUTION: If LB_ADAPTIVE is not set, all p4ests will be scaled by the side
+ *          length of the p4est instance used for short-ranged MD.
  *
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.

@@ -19,10 +19,16 @@
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
-const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo) {
+const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
   return forest_info.at(static_cast<int>(fo));
 }
+
+// forward declaration
+int64_t
+p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
+                                  std::vector<int> tree_quadrant_offset_synced,
+                                  const double pos[3]);
 
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   // fill element to insert
@@ -62,30 +68,35 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     }
   }
   // synchronize offsets and level and insert into forest_info vector
+  // clang-format off
   MPI_Allreduce(local_tree_offsets.data(),
                 insert_elem.tree_quadrant_offset_synced.data(),
                 p4est->trees->elem_count, P4EST_MPI_LOCIDX, MPI_MAX,
                 p4est->mpicomm);
+  // clang-format on
   MPI_Allreduce(&insert_elem.finest_level_local,
                 &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
                 p4est->mpicomm);
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
 
   // ensure monotony
-  P4EST_ASSERT(
-      std::is_sorted(std::begin(insert_elem.tree_quadrant_offset_synced),
-                     std::end(insert_elem.tree_quadrant_offset_synced)));
+  P4EST_ASSERT(std::is_sorted(insert_elem.tree_quadrant_offset_synced.begin(),
+                              insert_elem.tree_quadrant_offset_synced.end()));
 
   for (int i = 0; i < p4est->mpisize; ++i) {
     p4est_quadrant_t *q = &p4est->global_first_position[i];
     double xyz[3];
-    p4est_qcoord_to_vertex(p4est->connectivity,q->p.which_tree,q->x,q->y,q->z,xyz);
-    int64_t midx = p4est_utils_cell_morton_idx(xyz[0]*(1<<insert_elem.finest_level_global),
-                                               xyz[1]*(1<<insert_elem.finest_level_global),
-                                               xyz[2]*(1<<insert_elem.finest_level_global));
-    insert_elem.first_quad_morton_idx.push_back(midx);
+    p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree, q->x, q->y,
+                           q->z, xyz);
+
+    insert_elem.first_quad_morton_idx[i] = p4est_utils_pos_morton_idx_global(
+        p4est, insert_elem.finest_level_global,
+        insert_elem.tree_quadrant_offset_synced, xyz);
   }
-  insert_elem.first_quad_morton_idx.push_back(std::numeric_limits<int64_t>::max());
+  insert_elem.first_quad_morton_idx[p4est->mpisize] =
+      p4est->global_num_quadrants;
+  P4EST_ASSERT(std::is_sorted(insert_elem.first_quad_morton_idx.begin(),
+                              insert_elem.first_quad_morton_idx.end()));
 
   return insert_elem;
 }
@@ -103,12 +114,11 @@ int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
   p8est_t *p4est = current_forest.p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
-  int p = (qid == 0)
-              ? 0
-              : std::distance(current_forest.first_quad_morton_idx.begin(),
-                              std::upper_bound(current_forest.first_quad_morton_idx.begin(),
-                                               current_forest.first_quad_morton_idx.end(),
-                                               qid)) - 1;
+  int p = std::distance(current_forest.first_quad_morton_idx.begin(),
+                        std::upper_bound(
+                            current_forest.first_quad_morton_idx.begin(),
+                            current_forest.first_quad_morton_idx.end(), qid)) -
+          1;
 
   P4EST_ASSERT(0 <= p && p < p4est->mpisize);
 
@@ -193,15 +203,13 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
   return tid;
 }
 
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
-                                          const double pos[3]) {
-  p4est_utils_forest_info_t &current_p4est =
-      forest_info.at(static_cast<int>(forest));
-  p8est_t *p4est = current_p4est.p4est;
+int64_t
+p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
+                                  std::vector<int> tree_quadrant_offset_synced,
+                                  const double pos[3]) {
 
   // find correct tree
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
-  int level = current_p4est.finest_level_global;
   int qpos[3];
 
 #ifndef LB_ADAPTIVE
@@ -222,17 +230,18 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
   }
 
   int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]) +
-            current_p4est.tree_quadrant_offset_synced[tid];
+            tree_quadrant_offset_synced[tid];
 
   return qid;
 }
 
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest,
-                                         const double pos[3]) {
-  p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
-  int idx = p4est_utils_pos_morton_idx_global(forest, pos);
-  idx -= p4est->global_first_quadrant[p4est->mpirank];
-  return idx;
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
+                                          const double pos[3]) {
+  p4est_utils_forest_info_t &current_p4est =
+      forest_info.at(static_cast<int>(forest));
+  return p4est_utils_pos_morton_idx_global(
+      current_p4est.p4est, current_p4est.finest_level_global,
+      current_p4est.tree_quadrant_offset_synced, pos);
 }
 
 static inline bool is_valid_local_quad(const p8est *p4est, int64_t quad) {
@@ -248,7 +257,7 @@ static inline bool is_valid_local_quad(const p8est *p4est, int64_t quad) {
 
 int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
   // Try pos itself
-  RETURN_IF_VALID_QUAD(p4est_utils_pos_morton_idx_local(forest, pos), forest);
+  RETURN_IF_VALID_QUAD(p4est_utils_pos_qid_local(forest, pos), forest);
 
   // If pos is outside of the local domain try the bounding box enlarged
   // ROUND_ERROR_PREC
@@ -259,8 +268,7 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC};
 
-        RETURN_IF_VALID_QUAD(p4est_utils_pos_morton_idx_local(forest, spos),
-                             forest);
+        RETURN_IF_VALID_QUAD(p4est_utils_pos_qid_local(forest, spos), forest);
       }
     }
   }
@@ -623,8 +631,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                     num_quad_per_proc_global[this_node]));
 
   // Repartition with the computed distribution
-  int shipped = p8est_partition_given(p4est_mod,
-                                      num_quad_per_proc_global.data());
+  int shipped =
+      p8est_partition_given(p4est_mod, num_quad_per_proc_global.data());
   P4EST_GLOBAL_PRODUCTIONF(
       "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
       (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);

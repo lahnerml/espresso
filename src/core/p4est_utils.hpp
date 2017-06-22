@@ -29,7 +29,7 @@ struct p4est_utils_forest_info_t {
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
-        first_quad_morton_idx(p4est->mpisize),
+        first_quad_morton_idx(p4est->mpisize + 1),
         coarsest_level_local(0), finest_level_local(-1),
         finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
   }

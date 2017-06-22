@@ -22,6 +22,9 @@
 #include <p8est_mesh.h>
 #include <p8est_vtk.h>
 #include <vector>
+#include <tuple>
+
+typedef std::tuple<uint64_t, uint64_t, uint64_t> Index3D;
 
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
@@ -232,7 +235,7 @@ void dd_p4est_create_grid() {
 
 
   // gather cell neighbors
-  std::vector<uint64_t> quads;
+  std::vector<Index3D> quads;
   std::vector<local_shell_t> shell;
   // Reserve some memory to reduce the number of reallocs.
   // quads and shell also hold ghost cells, so this does not prevent
@@ -255,7 +258,7 @@ void dd_p4est_create_grid() {
     uint64_t z = xyz[2] * ql;
     // This is a simple but easy unique index, that also works for cells outside
     // box_l (by one cell)
-    quads.push_back((x + 1) | ((y + 1) << 21) | ((z + 1) << 42));
+    quads.emplace_back(x + 1, y + 1, z + 1);
     local_shell_t ls;
     ls.idx = i;
     ls.rank = this_node;
@@ -313,7 +316,7 @@ void dd_p4est_create_grid() {
             continue;
           // Check if this node has already been processed using the unique
           // index
-          uint64_t qidx = (x + xi) | ((y + yi) << 21) | ((z + zi) << 42);
+          Index3D qidx {(x + xi), (y + yi), (z + zi)};
           auto it = std::find(std::begin(quads), std::end(quads), qidx);
 
           if (it == std::end(quads)) { // Cell has not been processed yet

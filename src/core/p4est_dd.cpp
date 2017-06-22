@@ -266,7 +266,7 @@ void dd_p4est_create_grid() {
     local_shell_t ls;
     ls.idx = i;
     ls.rank = this_node;
-    ls.shell = 0;
+    ls.shell = CellType::inner;
     ls.boundary = 0;
     ls.coord[0] = x;
     ls.coord[1] = y;
@@ -329,7 +329,7 @@ void dd_p4est_create_grid() {
             // Copy corresponding information from p4est internal struct
             ls.idx = data->ishell[neighbor_lut[zi][yi][xi]];
             ls.rank = data->rshell[neighbor_lut[zi][yi][xi]];
-            ls.shell = 2; // This is a ghost cell, since all locals have been
+            ls.shell = CellType::ghost; // This is a ghost cell, since all locals have been
                           // added before
             ls.boundary = 0;
             for (int n = 0; n < 26; ++n)
@@ -366,14 +366,13 @@ void dd_p4est_create_grid() {
               }
             }
             shell.push_back(std::move(ls)); // add the new ghost cell to all cells
-            shell[i].shell = 1;  // The cell for which this one was added is at
+            shell[i].shell = CellType::boundary;  // The cell for which this one was added is at
                                  // the domain bound
           } else {               // Cell already exists in list
             auto pos = std::distance(std::begin(quads), it);
-            if (shell[pos].shell ==
-                2) { // is it a ghost cell, then ubdate the boundary info
+            if (shell[pos].shell == CellType::ghost) { // is it a ghost cell, then update the boundary info
               // of the current local cell, since they are neighbors
-              shell[i].shell = 1; // this local cell is at domain boundary
+              shell[i].shell = CellType::boundary; // this local cell is at domain boundary
               // Update boundary info
               shell[i].boundary |= dd_p4est_boundary_flags(xi, yi, zi);
             }
@@ -450,7 +449,7 @@ void dd_p4est_comm() {
   // Loop all cells
   for (int i = 0; i < num_cells; ++i) {
     // is ghost cell that is linked to a process? -> add to recv list
-    if (dd.p4est_shell[i].rank >= 0 && dd.p4est_shell[i].shell == 2) {
+    if (dd.p4est_shell[i].rank >= 0 && dd.p4est_shell[i].shell == CellType::ghost) {
       int irank = dd.p4est_shell[i].rank;
       int pos = 0;
       // find position to add new element (keep order)
@@ -488,7 +487,7 @@ void dd_p4est_comm() {
       }
     }
     // is mirror cell (at domain boundary)? -> add to send list
-    if (dd.p4est_shell[i].shell == 1) {
+    if (dd.p4est_shell[i].shell == CellType::boundary) {
       // for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
       // loop fullshell
       for (int n = 0; n < 26; ++n) {
@@ -496,7 +495,7 @@ void dd_p4est_comm() {
         int nrank = dd.p4est_shell[nidx].rank;
         if (nidx < 0 || nrank < 0)
           continue; // invalid neighbor
-        if (dd.p4est_shell[nidx].shell != 2)
+        if (dd.p4est_shell[nidx].shell != CellType::ghost)
           continue; // no need to send to local cell
         // check if this is the first time to add this mirror cell
         if (!send_tag[nrank].empty() &&

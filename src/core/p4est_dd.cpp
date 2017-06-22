@@ -293,7 +293,7 @@ void dd_p4est_create_grid() {
       sc_array_destroy(ne);
       sc_array_destroy(ni);
     }
-    shell.push_back(ls);
+    shell.push_back(std::move(ls));
   }
 
 
@@ -365,7 +365,7 @@ void dd_p4est_create_grid() {
                   shell[l].p_cnt += 1;
               }
             }
-            shell.push_back(ls); // add the new ghost cell to all cells
+            shell.push_back(std::move(ls)); // add the new ghost cell to all cells
             shell[i].shell = 1;  // The cell for which this one was added is at
                                  // the domain bound
           } else {               // Cell already exists in list

@@ -199,8 +199,9 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
   return tid;
 }
 
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]) {
-  p4est_utils_forest_info_t& current_p4est =
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
+                                          const double pos[3]) {
+  p4est_utils_forest_info_t &current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
@@ -221,35 +222,35 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[
   {
     int nq = 1 << level;
     for (int i = 0; i < P8EST_DIM; ++i) {
-      qpos[i] = (pos[i] - (int) pos[i]) * nq;
+      qpos[i] = (pos[i] - (int)pos[i]) * nq;
       P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
     }
   }
 
-  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2])
-            + current_p4est.tree_quadrant_offset_synced[tid];
+  int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]) +
+            current_p4est.tree_quadrant_offset_synced[tid];
 
   return qid;
 }
 
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]) {
+int64_t p4est_utils_pos_morton_idx_local(forest_order forest,
+                                         const double pos[3]) {
   p8est_t *p4est = forest_info.at(static_cast<int>(forest)).p4est;
   int idx = p4est_utils_pos_morton_idx_global(forest, pos);
   idx -= p4est->global_first_quadrant[p4est->mpirank];
   return idx;
 }
 
-
 static inline bool is_valid_local_quad(const p8est *p4est, int64_t quad) {
   return quad >= 0 && quad < p4est->local_num_quadrants;
 }
 
-#define RETURN_IF_VALID_QUAD(q, fo) \
-  do { \
-    int64_t qid = q; \
-    if (is_valid_local_quad(forest_info[static_cast<int>(fo)].p4est, qid)) \
-      return qid; \
-  } while(0)
+#define RETURN_IF_VALID_QUAD(q, fo)                                            \
+  do {                                                                         \
+    int64_t qid = q;                                                           \
+    if (is_valid_local_quad(forest_info[static_cast<int>(fo)].p4est, qid))     \
+      return qid;                                                              \
+  } while (0)
 
 int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
   // Try pos itself
@@ -260,13 +261,12 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
   for (int i = -1; i <= 1; i += 2) {
     for (int j = -1; j <= 1; j += 2) {
       for (int k = -1; k <= 1; k += 2) {
-        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
-                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
-                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
+        double spos[3] = {pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
+                          pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
+                          pos[2] + k * box_l[2] * ROUND_ERROR_PREC};
 
         RETURN_IF_VALID_QUAD(p4est_utils_pos_morton_idx_local(forest, spos),
                              forest);
-
       }
     }
   }
@@ -277,77 +277,50 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
 static int p4est_utils_find_qid_prepare(forest_order forest,
                                         const double pos[3],
                                         p8est_tree_t **tree,
-                                        p8est_quadrant_t *q) {
-  p4est_utils_forest_info_t& current_p4est =
-      forest_info.at(static_cast<int>(forest));
-  p8est_t *p4est = current_p4est.p4est;
-
-  // FIXME: This does not yield a valid combination of qid and tid.
-  int64_t qid = p4est_utils_pos_morton_idx_global(forest, pos);
-  int tid = p4est_utils_map_pos_to_tree(p4est, pos);
-
-  int64_t tree_offset = current_p4est.tree_quadrant_offset_synced[tid];
-  int64_t local_qid = qid - tree_offset;
-
-  *tree = p4est_tree_array_index(p4est->trees, tid);
-  // create an artificial quadrant based on p4est_utils_pos_morton_idx_global
-  P4EST_QUADRANT_INIT(q);
-  q->level = current_p4est.finest_level_global;
-  p8est_quadrant_set_morton(q, q->level, local_qid);
-
-  return 0;
-}
-
-/*p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
-  p8est_tree_t *tree;
-  p8est_quadrant_t q;
-  p4est_utils_find_qid_prepare(forest, pos, &tree, &q);
-
-  p4est_locidx_t index = p8est_find_lower_bound_overlap(
-      &tree->quadrants, &q, 0.5 * tree->quadrants.elem_count);
-
-#ifdef P4EST_ENABLE_DEBUG
-  p8est_quadrant_t *quad = p4est_quadrant_array_index(&tree->quadrants, index);
-  P4EST_ASSERT(p8est_quadrant_overlaps(&q, quad));
-#endif // P4EST_ENABLE_DEBUG
-
-  index += tree->quadrants_offset;
-
-  P4EST_ASSERT(0 <= index && index < forest_info.at(static_cast<int>(forest)).p4est->local_num_quadrants);
-
-  return index;
-}*/
-
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]) {
-  p4est_utils_forest_info_t& current_p4est =
+                                        p8est_quadrant_t *pquad) {
+  p4est_utils_forest_info_t &current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
   // find correct tree
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
   int level = current_p4est.finest_level_global;
-  p4est_tree_t *tree = p4est_tree_array_index(p4est->trees, tid);
-  
+  *tree = p4est_tree_array_index(p4est->trees, tid);
+
   double first_pos[3];
   int shifted_pos[3];
   p4est_qcoord_to_vertex(p4est->connectivity, tid, 0, 0, 0, first_pos);
-  
-  p4est_quadrant_t pquad;
+
   int64_t pidx;
+  for (int i = 0; i < P8EST_DIM; ++i) {
 #ifdef LB_ADAPTIVE
-  // Trees have a base length of 1
-  shifted_pos[0] = (pos[0] - first_pos[0])*(1<<level);
-  shifted_pos[1] = (pos[1] - first_pos[1])*(1<<level);
-  shifted_pos[2] = (pos[2] - first_pos[2])*(1<<level);
+    // Trees have a base length of 1
+    shifted_pos[i] = (pos[i] - first_pos[i]) * (1 << level);
 #else
-  // Trees might not have a base lenngth of 1
-  shifted_pos[0] = (pos[0]*dd_p4est_num_trees_in_dir(0)/box_l[0] - first_pos[0])*(1<<level);
-  shifted_pos[1] = (pos[1]*dd_p4est_num_trees_in_dir(1)/box_l[1] - first_pos[1])*(1<<level);
-  shifted_pos[2] = (pos[2]*dd_p4est_num_trees_in_dir(2)/box_l[2] - first_pos[2])*(1<<level);
+    // Trees might not have a base length of 1
+    shifted_pos[i] =
+        (pos[i] * dd_p4est_num_trees_in_dir(i) / box_l[i] - first_pos[i]) *
+        (1 << level);
 #endif
-  pidx = p4est_utils_cell_morton_idx(shifted_pos[0], shifted_pos[1], shifted_pos[2]);
-  p4est_quadrant_set_morton(&pquad, level, pidx);
-  
+  }
+  pidx = p4est_utils_cell_morton_idx(shifted_pos[0], shifted_pos[1],
+                                     shifted_pos[2]);
+  p4est_quadrant_set_morton(pquad, level, pidx);
+  pquad->p.which_tree = tid;
+
+  return 0;
+}
+
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest,
+                                         const double pos[3]) {
+  p4est_utils_forest_info_t &current_p4est =
+      forest_info.at(static_cast<int>(forest));
+  p8est_t *p4est = current_p4est.p4est;
+
+  p4est_tree_t *tree;
+  p4est_quadrant_t pquad;
+  p4est_utils_find_qid_prepare(forest, pos, &tree, &pquad);
+
   p4est_locidx_t index = p8est_find_lower_bound_overlap(
       &tree->quadrants, &pquad, 0.5 * tree->quadrants.elem_count);
 
@@ -358,18 +331,22 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3
 
   index += tree->quadrants_offset;
 
-  P4EST_ASSERT(0 <= index && index < forest_info.at(static_cast<int>(forest)).p4est->local_num_quadrants);
+  P4EST_ASSERT(
+      0 <= index &&
+      index <
+          forest_info.at(static_cast<int>(forest)).p4est->local_num_quadrants);
 
   return index;
 }
 
 p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
-                                         p8est_ghost_t *ghost, const double pos[3]) {
+                                         p8est_ghost_t *ghost,
+                                         const double pos[3]) {
   p8est_tree_t *tree;
   p8est_quadrant_t q;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &q);
 
-  p4est_locidx_t index = p8est_find_lower_bound_overlap(
+  p4est_locidx_t index = p8est_find_lower_bound_overlap_piggy(
       &ghost->ghosts, &q, 0.5 * ghost->ghosts.elem_count);
 
 #ifdef P4EST_ENABLE_DEBUG
@@ -659,8 +636,9 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
       (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
 }
 
-int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx, p4est_quadrant_t *quad[]) {
-  p4est_t *cmp = (p4est_t*)p4est->user_pointer;
+int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
+                   p4est_quadrant_t *quad[]) {
+  p4est_t *cmp = (p4est_t *)p4est->user_pointer;
   p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
   for (int i = 0; i < tree->quadrants.elem_count; ++i) {
     p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
@@ -670,9 +648,9 @@ int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx, p4est_quadrant_t *qu
   return 1;
 }
 
-p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
+p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   p4est_t *fct = p4est_copy(t2, 0);
-  fct->user_pointer = (void*)t1;
+  fct->user_pointer = (void *)t1;
   p4est_coarsen(fct, 1, fct_coarsen_cb, NULL);
   return fct;
 }

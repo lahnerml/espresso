@@ -85,7 +85,8 @@ int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       spatial coordinate to map.
  *
- * @return int      Quadrant index of quadrant containing pos or one of its shifted counterparts
+ * @return int      Quadrant index of quadrant containing pos or one of its
+ *                  shifted counterparts
  */
 int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]);
 

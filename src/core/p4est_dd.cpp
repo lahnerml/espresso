@@ -935,29 +935,6 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf,
   }
 }
 //--------------------------------------------------------------------------------------------------
-static void dd_resort_particles() {
-  // Move all particles to the cell it belongs to. Only for particles that are
-  // in local domain
-  for (int c = 0; c < local_cells.n; c++) {
-    ParticleList *cell = local_cells.cell[c];
-    for (int p = 0; p < cell->n; p++) {
-      Particle *part = &cell->part[p];
-      ParticleList *sort_cell = dd_p4est_save_position_to_cell(part->r.p);
-      if (sort_cell == NULL) { // Not in local domain -> Error
-        fprintf(stderr, "[%i] dd_exchange_and_sort_particles: Particle %i "
-                        "(%lf, %lf, %lf) not inside subdomain\n",
-                this_node, part->p.identity, part->r.p[0], part->r.p[1],
-                part->r.p[2]);
-        errexit();
-      } else if (sort_cell != cell) { // Local cell that is not the current one
-        move_indexed_particle(sort_cell, cell, p);
-        if (p < cell->n)
-          p--;
-      }
-    }
-  }
-}
-//--------------------------------------------------------------------------------------------------
 
 void dd_p4est_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
@@ -996,14 +973,13 @@ void dd_p4est_exchange_and_sort_particles() {
   // Receive all data
   MPI_Status status;
   std::vector<int> recvs(num_comm_proc, 0); // number of recv for each process
-  int recvidx, tag, source;
+  int recvidx, source;
   while (true) {
     MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
     if (recvidx == MPI_UNDEFINED)
       break;
 
     source = status.MPI_SOURCE;
-    tag = status.MPI_TAG;
 
     int cnt;
     MPI_Get_count(&status, MPI_BYTE, &cnt);

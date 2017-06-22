@@ -85,12 +85,11 @@ int dd_p4est_full_shell_neigh(int cell, int neighidx) {
 //-----------------------------------------------------------------------------------------
 // Init Callback for internal structure
 static void init_fn(p4est_t *p4est, p4est_topidx_t tree, p4est_quadrant_t *q) {
-  ((quad_data_t *)(q->p.user_data))->rank = this_node;
-  ((quad_data_t *)(q->p.user_data))->lidx = -1;
-  for (int i = 0; i < 26; ++i) {
-    ((quad_data_t *)(q->p.user_data))->ishell[i] = -1;
-    ((quad_data_t *)(q->p.user_data))->rshell[i] = -1;
-  }
+  quad_data_t& qd = *static_cast<quad_data_t *>(q->p.user_data);
+  qd.rank = this_node;
+  qd.lidx = -1;
+  std::fill(std::begin(qd.ishell), std::end(qd.ishell), -1);
+  std::fill(std::begin(qd.rshell), std::end(qd.rshell), -1);
 }
 //--------------------------------------------------------------------------------------------------
 static inline int count_trailing_zeros(int x) {

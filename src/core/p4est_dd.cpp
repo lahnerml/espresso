@@ -223,8 +223,11 @@ void dd_p4est_create_grid() {
   // gather cell neighbors
   std::vector<uint64_t> quads;
   std::vector<local_shell_t> shell;
-  quads.clear();
-  shell.clear();
+  // Reserve some memory to reduce the number of reallocs.
+  // quads and shell also hold ghost cells, so this does not prevent
+  // reallocs
+  quads.reserve(dd.p4est->local_num_quadrants);
+  shell.reserve(dd.p4est->local_num_quadrants);
 
   // Loop all local cells to gather information for those
   for (int i = 0; i < dd.p4est->local_num_quadrants; ++i) {

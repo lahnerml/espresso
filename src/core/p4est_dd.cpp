@@ -296,9 +296,6 @@ void dd_p4est_create_grid() {
     shell.push_back(ls);
   }
 
-  // char fname[100];
-  // sprintf(fname,"cells_%i.list",this_node);
-  // FILE* h = fopen(fname,"w");
 
   // compute ghost, mirror and boundary information
   // here the ghost layer around the local domain is computed
@@ -314,8 +311,6 @@ void dd_p4est_create_grid() {
     uint64_t x = xyz[0] * ql;
     uint64_t y = xyz[1] * ql;
     uint64_t z = xyz[2] * ql;
-    // fprintf(h,"%i %li %ix%ix%i ",i,p4est_utils_cell_morton_idx(x,y,z),
-    // shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
 
     // Loop all 27 cells in the fullshell
     for (uint64_t zi = 0; zi <= 2; zi++)
@@ -386,22 +381,7 @@ void dd_p4est_create_grid() {
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;
           }
         }
-    /*for (int n=0;n<26;++n) {
-      if (n < 6)
-        fprintf(h,"f%i[",n);
-      else if (n < 18)
-        fprintf(h,"e%i[",n-6);
-      else
-        fprintf(h,"c%i[",n-18);
-      if (data->ishell[n] >= 0)
-        fprintf(h,"%i:%i] ",data->rshell[n],data->ishell[n]);
-      else
-        fprintf(h,"] ");
-    }
-    fprintf(h,"\n");*/
   }
-
-  // fclose(h);
 
   // Copy the generated data to globals
   num_cells = (size_t)quads.size();
@@ -420,7 +400,7 @@ void dd_p4est_create_grid() {
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
 #endif
 
-  dd_p4est_write_vtk();
+  //dd_p4est_write_vtk();
 
   CELL_TRACE(printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n", this_node,
                     max_range, box_l[0], box_l[1], box_l[2], dd.cell_size[0],

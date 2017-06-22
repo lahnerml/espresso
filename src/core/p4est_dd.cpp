@@ -144,21 +144,48 @@ int dd_p4est_cellsize_even() {
   return lvl; // Return level > 0 if max_range <= 0.5
 }
 //--------------------------------------------------------------------------------------------------
-int dd_p4est_boundary_flags(int xi, int yi, int zi)
-{
+
+enum class Direction { x_l = 1, x_r = 2, y_l = 4, y_r = 8, z_l = 16, z_r = 32 };
+
+/** Returns the boundary flags for an inner cell given a ghost offset
+ * Given that (x, y, z) is no ghost and (x+xi, y+yi, z+zi) is ghost,
+ * determines the boundary flags for cell (x, y, z) from the offsets
+ * (xi, yi, zi).
+ */
+int dd_p4est_boundary_flags_for_neighbor(int xi, int yi, int zi) {
   int res = 0;
   if (xi == 0 && yi == 1 && zi == 1)
-    res |= 1;
+    res |= static_cast<int>(Direction::x_l);
   if (xi == 2 && yi == 1 && zi == 1)
-    res |= 2;
+    res |= static_cast<int>(Direction::x_r);
   if (xi == 1 && yi == 0 && zi == 1)
-    res |= 4;
+    res |= static_cast<int>(Direction::y_l);
   if (xi == 1 && yi == 2 && zi == 1)
-    res |= 8;
+    res |= static_cast<int>(Direction::y_r);
   if (xi == 1 && yi == 1 && zi == 0)
-    res |= 16;
+    res |= static_cast<int>(Direction::z_l);
   if (xi == 1 && yi == 1 && zi == 2)
-    res |= 32;
+    res |= static_cast<int>(Direction::z_r);
+  return res;
+}
+
+/** Returns boundary flags for cells of index (x,z,y).
+ */
+int dd_p4est_boundary_flags(int x, int y, int z)
+{
+  int res = 0;
+  if (PERIODIC(0) && x == 0)
+    res |= static_cast<int>(Direction::x_l);
+  if (PERIODIC(0) && x == grid_size[0] + 1)
+    res |= static_cast<int>(Direction::x_r);
+  if (PERIODIC(1) && y == 0)
+    res |= static_cast<int>(Direction::y_l);
+  if (PERIODIC(1) && y == grid_size[1] + 1)
+    res |= static_cast<int>(Direction::y_r);
+  if (PERIODIC(2) && z == 0)
+    res |= static_cast<int>(Direction::z_l);
+  if (PERIODIC(2) && z == grid_size[2] + 1)
+    res |= static_cast<int>(Direction::z_r);
   return res;
 }
 
@@ -327,24 +354,11 @@ void dd_p4est_create_grid() {
             ls.rank = data->rshell[neighbor_lut[zi][yi][xi]];
             ls.shell = CellType::ghost; // This is a ghost cell, since all locals have been
                           // added before
-            ls.boundary = 0;
-            for (int n = 0; n < 26; ++n)
-              ls.neighbor[n] = -1; // Neighbors from ghosts do not matter
-            // Set/Update ghost and corresponding local cells boundary info
-            if (PERIODIC(0) && (x + xi) == 0)
-              ls.boundary |= 1;
-            if (PERIODIC(0) && (x + xi) == grid_size[0] + 1)
-              ls.boundary |= 2;
-            if (PERIODIC(1) && (y + yi) == 0)
-              ls.boundary |= 4;
-            if (PERIODIC(1) && (y + yi) == grid_size[1] + 1)
-              ls.boundary |= 8;
-            if (PERIODIC(2) && (z + zi) == 0)
-              ls.boundary |= 16;
-            if (PERIODIC(2) && (z + zi) == grid_size[2] + 1)
-              ls.boundary |= 32;
+            ls.boundary = dd_p4est_boundary_flags(x + xi, y + yi, z + zi);
 
-            shell[i].boundary |= dd_p4est_boundary_flags(xi, yi, zi);
+            std::fill(std::begin(ls.neighbor), std::end(ls.neighbor), -1);
+
+            shell[i].boundary |= dd_p4est_boundary_flags_for_neighbor(xi, yi, zi);
             // Link the new cell to a local cell
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = shell.size();
             ls.coord[0] = int(x + xi) - 1;
@@ -370,7 +384,7 @@ void dd_p4est_create_grid() {
               // of the current local cell, since they are neighbors
               shell[i].shell = CellType::boundary; // this local cell is at domain boundary
               // Update boundary info
-              shell[i].boundary |= dd_p4est_boundary_flags(xi, yi, zi);
+              shell[i].boundary |= dd_p4est_boundary_flags_for_neighbor(xi, yi, zi);
             }
             // Link it as neighbor
             shell[i].neighbor[neighbor_lut[zi][yi][xi]] = pos;

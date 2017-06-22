@@ -208,23 +208,23 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
 
   // find correct tree
   int tid = p4est_utils_map_pos_to_tree(p4est, pos);
+  // Qpos is the 3d cell index within tree "tid".
   int qpos[3];
 
+  double spos[3] = { pos[0], pos[1], pos[2] };
 #ifndef LB_ADAPTIVE
-  // This is basically the same as below but also works in the case of
-  // pure MD (without LB_ADAPTIVE) if box_l > 1.
-  // CAUTION: Only one p4est instance (i.e. p4est for short-range MD) is
-  //          supported here.
+  // In case of pure MD arbitrary numbers are allowed for box_l.
+  // Scale "spos" such that it corresponds to a box_l of 1.0
   for (int i = 0; i < 3; ++i) {
-    qpos[i] = pos[i] * dd.inv_cell_size[i];
-  }
-#else // !LB_ADAPTIVE
-  int nq = 1 << level;
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    qpos[i] = (pos[i] - (int)pos[i]) * nq;
-    P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+    spos[i] /= box_l[i] / dd_p4est_num_trees_in_dir(i);
   }
 #endif // !LB_ADAPTIVE
+
+  int nq = 1 << level;
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    qpos[i] = (spos[i] - (int)spos[i]) * nq;
+    P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+  }
 
   int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]) +
             tree_quadrant_offset_synced[tid];

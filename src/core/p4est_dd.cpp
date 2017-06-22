@@ -308,11 +308,9 @@ void dd_p4est_create_grid() {
           // Check if this node has already been processed using the unique
           // index
           uint64_t qidx = (x + xi) | ((y + yi) << 21) | ((z + zi) << 42);
-          size_t pos = 0;
-          while (pos < quads.size() && quads[pos] != qidx)
-            ++pos;
+          auto it = std::find(std::begin(quads), std::end(quads), qidx);
 
-          if (pos == quads.size()) { // Cell has not been processed yet
+          if (it == std::end(quads)) { // Cell has not been processed yet
             quads.push_back(qidx);   // Add it to list
             local_shell_t ls;
             // Copy corresponding information from p4est internal struct
@@ -368,6 +366,7 @@ void dd_p4est_create_grid() {
             shell[i].shell = 1;  // The cell for which this one was added is at
                                  // the domain bound
           } else {               // Cell already exists in list
+            auto pos = std::distance(std::begin(quads), it);
             if (shell[pos].shell ==
                 2) { // is it a ghost cell, then ubdate the boundary info
               // of the current local cell, since they are neighbors

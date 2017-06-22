@@ -213,21 +213,20 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
   int qpos[3];
 
 #ifndef LB_ADAPTIVE
-  if (forest == forest_order::short_range) {
-    // This is basically the same as below but also works in the case of
-    // pure MD (without LB_ADAPTIVE) if box_l > 1.
-    for (int i = 0; i < 3; ++i) {
-      qpos[i] = pos[i] * dd.inv_cell_size[i];
-    }
-  } else
-#endif // !LB_ADAPTIVE
-  {
-    int nq = 1 << level;
-    for (int i = 0; i < P8EST_DIM; ++i) {
-      qpos[i] = (pos[i] - (int)pos[i]) * nq;
-      P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
-    }
+  // This is basically the same as below but also works in the case of
+  // pure MD (without LB_ADAPTIVE) if box_l > 1.
+  // CAUTION: Only one p4est instance (i.e. p4est for short-range MD) is
+  //          supported here.
+  for (int i = 0; i < 3; ++i) {
+    qpos[i] = pos[i] * dd.inv_cell_size[i];
   }
+#else // !LB_ADAPTIVE
+  int nq = 1 << level;
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    qpos[i] = (pos[i] - (int)pos[i]) * nq;
+    P4EST_ASSERT(0 <= qpos[i] && qpos[i] < nq);
+  }
+#endif // !LB_ADAPTIVE
 
   int qid = p4est_utils_cell_morton_idx(qpos[0], qpos[1], qpos[2]) +
             tree_quadrant_offset_synced[tid];

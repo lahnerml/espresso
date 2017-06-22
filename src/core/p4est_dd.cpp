@@ -105,21 +105,17 @@ int dd_p4est_cellsize_optimal() {
 
   // compute number of cells
   if (max_range > ROUND_ERROR_PREC * box_l[0]) {
-    ncells[0] = std::max<int>(box_l[0] / max_range, 1);
-    ncells[1] = std::max<int>(box_l[1] / max_range, 1);
-    ncells[2] = std::max<int>(box_l[2] / max_range, 1);
+    std::transform(std::begin(box_l), std::end(box_l), std::begin(ncells),
+                   [](double box){ return std::max<int>(box / max_range, 1);});
   }
 
-  grid_size[0] = ncells[0];
-  grid_size[1] = ncells[1];
-  grid_size[2] = ncells[2];
+  std::copy(std::begin(ncells), std::end(ncells), std::begin(grid_size));
 
   // divide all dimensions by biggest common power of 2
   int lvl = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
 
-  brick_size[0] = ncells[0] >> lvl;
-  brick_size[1] = ncells[1] >> lvl;
-  brick_size[2] = ncells[2] >> lvl;
+  std::transform(std::begin(ncells), std::end(ncells), std::begin(brick_size),
+                 [lvl](int nc){ return nc >> lvl; });
 
   return lvl; // return the level of the grid
 }
@@ -130,9 +126,8 @@ int dd_p4est_cellsize_even() {
   P4EST_ASSERT(0 <= max_range && max_range <= 1.0);
 #endif // LB_ADAPTIVE
 
-  brick_size[0] = box_l[0];
-  brick_size[1] = box_l[1];
-  brick_size[2] = box_l[2];
+  std::transform(std::begin(box_l), std::end(box_l), std::begin(brick_size),
+                 [](double box){ return static_cast<int>(box); });
 
   int ncells = 1;
   if (max_range > ROUND_ERROR_PREC * box_l[0])
@@ -140,9 +135,8 @@ int dd_p4est_cellsize_even() {
 
   int lvl = Utils::nat_log2_floor(ncells);
 
-  grid_size[0] = brick_size[0] << lvl;
-  grid_size[1] = brick_size[1] << lvl;
-  grid_size[2] = brick_size[2] << lvl;
+  std::transform(std::begin(brick_size), std::end(brick_size),
+                 std::begin(grid_size), [lvl](int bs){ return bs << lvl; });
 
   return lvl; // Return level > 0 if max_range <= 0.5
 }

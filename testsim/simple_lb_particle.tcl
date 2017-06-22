@@ -23,14 +23,14 @@ setmd periodic 1 1 1
 #part 0 pos 1.9 1.9 0.5 q 0.0 type 0 v 0.1 0 0 ext_force 0.00 0 0 fix 1 1 1
 #part 0 pos 2.0 1.9 0.5 q 0.0 type 0 v 0 0 0 ;#ext_force 0.01 0 0
 
-part 0 pos 0.0625 0.0625 0.0625 q 0.0 type 0 v 0 0 0
+#part 0 pos 0.0625 0.0625 0.0625 q 0.0 type 0 v 0 0 0
 
 expr srand([pid])
 for {set i 1} {$i <= $n_part} {incr i} {
   set pos_x [expr rand()*($boxl-2*$wall) + $wall]
   set pos_y [expr rand()*($boxl-2*$wall) + $wall]
   set pos_z [expr rand()*1.0]
-  part $i pos $pos_x $pos_y $pos_z q 0.0 type 0 v 0 0 0 ;# ext_force 0.1 0 0
+  part [expr $i - 1] pos $pos_x $pos_y $pos_z q 0.0 type 0 v 0 0 0 ;# ext_force 0.1 0 0
 }
 
 set dt 0.01

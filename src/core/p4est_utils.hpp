@@ -29,6 +29,7 @@ struct p4est_utils_forest_info_t {
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
+        first_quad_morton_idx(p4est->mpisize),
         coarsest_level_local(0), finest_level_local(-1),
         finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
   }
@@ -81,19 +82,6 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  */
 int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]);
 
-/** Calculate a local cell index for a given position. This index is no p4est
- * quadrant index.
- * CAUTION: This only works for a regular grid. Use
- *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
- *          adaptively refined grids.
- *
- * @param forest    p4est whose domain decomposition is to be used.
- * @param pos       Spatial coordinate to map.
- *
- * @return int      Morton index for a cell corresponding to pos.
- */
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3]);
-
 /** Get the index of a position in the by ROUND_ERROR_PREC extended local domain.
  * If pos is in the local domain, returns the same as
  * \ref p4est_utils_pos_morton_idx_local. Otherwise tries if by ROUND_ERROR_PREC
@@ -103,7 +91,8 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, const double pos[3
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       spatial coordinate to map.
  *
- * @return int      Quadrant index of quadrant containing pos or one of its shifted counterparts
+ * @return int      Quadrant index of quadrant containing pos or one of its
+ *                  shifted counterparts
  */
 int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]);
 

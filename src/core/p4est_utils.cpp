@@ -205,8 +205,8 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
     }
 
     // find lower left and upper right corner of forest
-    std::array<double, 3> pos_min = {0., 0., 0.};
-    std::array<double, 3> pos_max = {box_l[0], box_l[1], box_l[2]};
+    std::array<double, 3> pos_min {{0., 0., 0.}};
+    std::array<double, 3> pos_max {{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
     double dist;
     double dist_min = DBL_MAX;

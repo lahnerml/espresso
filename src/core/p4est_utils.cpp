@@ -115,6 +115,10 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree, q->x, q->y,
                            q->z, xyz);
 
+    // Scale xyz because p4est_utils_pos_morton_idx_global will assume it is
+    // and undo this.
+    maybe_tree_to_boxlcoords(xyz);
+
     insert_elem.first_quad_morton_idx[i] = p4est_utils_pos_morton_idx_global(
         p4est, insert_elem.finest_level_global,
         insert_elem.tree_quadrant_offset_synced, xyz);

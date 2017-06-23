@@ -109,9 +109,8 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
-  p4est_utils_forest_info_t current_forest =
+  const p4est_utils_forest_info_t& current_forest =
       forest_info.at(static_cast<int>(forest));
-  p8est_t *p4est = current_forest.p4est;
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
   int p = std::distance(current_forest.first_quad_morton_idx.begin(),
@@ -120,7 +119,7 @@ int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
                             current_forest.first_quad_morton_idx.end(), qid)) -
           1;
 
-  P4EST_ASSERT(0 <= p && p < p4est->mpisize);
+  P4EST_ASSERT(0 <= p && p < current_forest.p4est->mpisize);
 
   return p;
 }
@@ -239,7 +238,7 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
 
 int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
                                           const double pos[3]) {
-  p4est_utils_forest_info_t &current_p4est =
+  const p4est_utils_forest_info_t &current_p4est =
       forest_info.at(static_cast<int>(forest));
   return p4est_utils_pos_morton_idx_global(
       current_p4est.p4est, current_p4est.finest_level_global,
@@ -282,7 +281,7 @@ static int p4est_utils_find_qid_prepare(forest_order forest,
                                         const double pos[3],
                                         p8est_tree_t **tree,
                                         p8est_quadrant_t *pquad) {
-  p4est_utils_forest_info_t &current_p4est =
+  const p4est_utils_forest_info_t &current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;
 
@@ -317,10 +316,6 @@ static int p4est_utils_find_qid_prepare(forest_order forest,
 
 p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest,
                                          const double pos[3]) {
-  p4est_utils_forest_info_t &current_p4est =
-      forest_info.at(static_cast<int>(forest));
-  p8est_t *p4est = current_p4est.p4est;
-
   p4est_tree_t *tree;
   p4est_quadrant_t pquad;
   p4est_utils_find_qid_prepare(forest, pos, &tree, &pquad);

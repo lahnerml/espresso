@@ -50,6 +50,13 @@ static inline void maybe_boxl_to_treecoords(double x[3]) {
 #endif
 }
 
+static inline std::array<double, 3>
+maybe_boxl_to_treecoords_copy(const double x[3]) {
+  std::array<double, 3> res{{x[0], x[1], x[2]}};
+  maybe_boxl_to_treecoords(res.data());
+  return res;
+}
+
 // forward declaration
 int64_t
 p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
@@ -242,10 +249,9 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
   // Qpos is the 3d cell index within tree "tid".
   int qpos[3];
 
-  double spos[3] = { pos[0], pos[1], pos[2] };
   // In case of pure MD arbitrary numbers are allowed for box_l.
   // Scale "spos" such that it corresponds to a box_l of 1.0
-  maybe_boxl_to_treecoords(spos);
+  auto spos = maybe_boxl_to_treecoords_copy(pos);
 
   int nq = 1 << level;
   for (int i = 0; i < P8EST_DIM; ++i) {
@@ -316,9 +322,8 @@ static int p4est_utils_find_qid_prepare(forest_order forest,
   double first_pos[3];
   p4est_qcoord_to_vertex(p4est->connectivity, tid, 0, 0, 0, first_pos);
 
-  int spos[3] = { pos[0], pos[1], pos[2] };
   // Trees might not have a base length of 1
-  maybe_boxl_to_treecoords(spos);
+  auto spos = maybe_boxl_to_treecoords_copy(pos);
 
   int qcoord[3];
   for (int i = 0; i < P8EST_DIM; ++i) {

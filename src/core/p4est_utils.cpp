@@ -24,6 +24,39 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   return forest_info.at(static_cast<int>(fo));
 }
 
+static inline void tree_to_boxlcoords(double x[3]) {
+  for (int i = 0; i < 3; ++i)
+    x[i] *= box_l[i] / dd_p4est_num_trees_in_dir(i);
+}
+
+static inline void maybe_tree_to_boxlcoords(double x[3]) {
+#ifndef LB_ADAPTIVE
+  tree_to_boxlcoords(x);
+#else
+  // Id mapping
+#endif
+}
+
+static inline void boxl_to_treecoords(double x[3]) {
+  for (int i = 0; i < 3; ++i)
+    x[i] /= (box_l[i] / dd_p4est_num_trees_in_dir(i));
+}
+
+static inline void maybe_boxl_to_treecoords(double x[3]) {
+#ifndef LB_ADAPTIVE
+  boxl_to_treecoords(x);
+#else
+   // Id mapping
+#endif
+}
+
+static inline std::array<double, 3>
+maybe_boxl_to_treecoords_copy(const double x[3]) {
+  std::array<double, 3> res{{x[0], x[1], x[2]}};
+  maybe_boxl_to_treecoords(res.data());
+  return res;
+}
+
 // forward declaration
 int64_t
 p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
@@ -88,6 +121,10 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     double xyz[3];
     p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree, q->x, q->y,
                            q->z, xyz);
+
+    // Scale xyz because p4est_utils_pos_morton_idx_global will assume it is
+    // and undo this.
+    maybe_tree_to_boxlcoords(xyz);
 
     insert_elem.first_quad_morton_idx[i] = p4est_utils_pos_morton_idx_global(
         p4est, insert_elem.finest_level_global,
@@ -161,18 +198,14 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
       c[ci][1] = p4est->connectivity->vertices[P4EST_DIM * v + 1];
       c[ci][2] = p4est->connectivity->vertices[P4EST_DIM * v + 2];
 
-#ifndef LB_ADAPTIVE
       // As pure MD allows for box_l != 1.0, "pos" will be in [0,box_l) and
       // not in [0,1). So manually scale the trees to fill [0,box_l).
-      c[ci][0] *= box_l[0] / dd_p4est_num_trees_in_dir(0);
-      c[ci][1] *= box_l[1] / dd_p4est_num_trees_in_dir(1);
-      c[ci][2] *= box_l[2] / dd_p4est_num_trees_in_dir(2);
-#endif
+      maybe_tree_to_boxlcoords(c[ci].data());
     }
 
     // find lower left and upper right corner of forest
-    std::array<double, 3> pos_min = {0., 0., 0.};
-    std::array<double, 3> pos_max = {box_l[0], box_l[1], box_l[2]};
+    std::array<double, 3> pos_min {{0., 0., 0.}};
+    std::array<double, 3> pos_max {{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
     double dist;
     double dist_min = DBL_MAX;
@@ -215,14 +248,9 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
   // Qpos is the 3d cell index within tree "tid".
   int qpos[3];
 
-  double spos[3] = { pos[0], pos[1], pos[2] };
-#ifndef LB_ADAPTIVE
   // In case of pure MD arbitrary numbers are allowed for box_l.
   // Scale "spos" such that it corresponds to a box_l of 1.0
-  for (int i = 0; i < 3; ++i) {
-    spos[i] /= box_l[i] / dd_p4est_num_trees_in_dir(i);
-  }
-#endif // !LB_ADAPTIVE
+  auto spos = maybe_boxl_to_treecoords_copy(pos);
 
   int nq = 1 << level;
   for (int i = 0; i < P8EST_DIM; ++i) {
@@ -291,23 +319,17 @@ static int p4est_utils_find_qid_prepare(forest_order forest,
   *tree = p4est_tree_array_index(p4est->trees, tid);
 
   double first_pos[3];
-  int shifted_pos[3];
   p4est_qcoord_to_vertex(p4est->connectivity, tid, 0, 0, 0, first_pos);
 
-  int64_t pidx;
+  // Trees might not have a base length of 1
+  auto spos = maybe_boxl_to_treecoords_copy(pos);
+
+  int qcoord[3];
   for (int i = 0; i < P8EST_DIM; ++i) {
-#ifdef LB_ADAPTIVE
-    // Trees have a base length of 1
-    shifted_pos[i] = (pos[i] - first_pos[i]) * (1 << level);
-#else
-    // Trees might not have a base length of 1
-    shifted_pos[i] =
-        (pos[i] * dd_p4est_num_trees_in_dir(i) / box_l[i] - first_pos[i]) *
-        (1 << level);
-#endif
+    qcoord[i] = (spos[i] - first_pos[i]) * (1 << level);
   }
-  pidx = p4est_utils_cell_morton_idx(shifted_pos[0], shifted_pos[1],
-                                     shifted_pos[2]);
+
+  int64_t pidx = p4est_utils_cell_morton_idx(qcoord[0], qcoord[1], qcoord[2]);
   p4est_quadrant_set_morton(pquad, level, pidx);
   pquad->p.which_tree = tid;
 

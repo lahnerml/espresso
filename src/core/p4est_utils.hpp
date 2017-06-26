@@ -361,7 +361,7 @@ template <typename T>
  */
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<T> **data_partitioned);
+    std::vector<std::vector<T>> data_partitioned);
 
 template <typename T>
 /** After all local data has been received insert in newly allocated level-wise
@@ -375,10 +375,9 @@ template <typename T>
  * @param data_levelwise  Level-wise numerical payload.
  * @return int
  */
-int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
-                                           p8est_mesh_t mesh_new,
-                                           std::vector<T> **data_partitioned,
-                                           T **data_levelwise);
+int p4est_utils_post_gridadapt_insert_data(
+    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    std::vector<std::vector<T>> data_partitioned, T **data_levelwise);
 /*@}*/
 
 /*****************************************************************************/

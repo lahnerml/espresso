@@ -476,7 +476,7 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
 template <typename T>
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<T> **data_partitioned) {
+    std::vector<std::vector<T>> data_partitioned) {
   int rank = p4est_old->mpirank;
   int size = p4est_old->mpisize;
   int lb_old_local = p4est_old->global_first_quadrant[rank];
@@ -491,9 +491,8 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
   int send_offset = 0;
 
   int mpiret;
-  sc_MPI_Request *r;
-  sc_array_t *requests;
-  requests = sc_array_new(sizeof(sc_MPI_Request));
+  MPI_Request *r;
+  std::vector<MPI_Request> requests;
 
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish
@@ -512,11 +511,11 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
                                std::max(lb_old_remote, ub_new_local));
 
     // allocate receive buffer and wait for messages
-    data_partitioned[p] = new std::vector<T>(data_length);
-    r = (sc_MPI_Request *)sc_array_push(requests);
-    mpiret = sc_MPI_Irecv((void *)data_partitioned[p]->begin(),
-                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
-                          p4est_new->mpicomm, r);
+    data_partitioned[p].reserve(data_length);
+    mpiret =
+        MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
+                  MPI_BYTE, p, 0, p4est_new->mpicomm, r);
+    requests.push_back(*r);
     SC_CHECK_MPI(mpiret);
   }
 
@@ -529,29 +528,25 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
                            std::min(ub_old_local, ub_new_remote) -
                                std::max(lb_old_local, ub_new_remote));
 
-    r = (sc_MPI_Request *)sc_array_push(requests);
-    mpiret = sc_MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
-                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
-                          p4est_new->mpicomm, r);
+    mpiret = MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
+                       data_length * sizeof(T), MPI_BYTE, p, 0,
+                       p4est_new->mpicomm, r);
+    requests.push_back(*r);
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;
   }
 
   /** Wait for communication to finish */
-  mpiret =
-      sc_MPI_Waitall(requests->elem_count, (sc_MPI_Request *)requests->array,
-                     sc_MPI_STATUSES_IGNORE);
+  mpiret = MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
   SC_CHECK_MPI(mpiret);
-  sc_array_destroy(requests);
 
   return 0;
 }
 
 template <typename T>
-int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
-                                           p8est_mesh_t *mesh_new,
-                                           std::vector<T> **data_partitioned,
-                                           T **data_levelwise) {
+int p4est_utils_post_gridadapt_insert_data(
+    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    std::vector<std::vector<T>> data_partitioned, T **data_levelwise) {
   int size = p4est_new->mpisize;
   // counters
   int tid = p4est_new->first_local_tree;
@@ -566,7 +561,7 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
   int level, sid;
 
   for (int p = 0; p < size; ++p) {
-    for (int q = 0; q < data_partitioned[p]->size(); ++q) {
+    for (int q = 0; q < data_partitioned[p].size(); ++q) {
       // wrap multiple trees
       if (tqid == curr_tree->quadrants.elem_count) {
         ++tid;
@@ -577,7 +572,7 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
       curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
       level = curr_quad->level;
       sid = mesh_new->quad_qreal_offset[qid];
-      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p]->at(q),
+      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p].at(q),
                   sizeof(T));
       ++tqid;
       ++qid;

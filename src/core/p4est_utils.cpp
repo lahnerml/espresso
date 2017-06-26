@@ -508,7 +508,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
     data_length = std::max(0,
                            std::min(ub_old_remote, ub_new_local) -
-                               std::max(lb_old_remote, ub_new_local));
+                               std::max(lb_old_remote, lb_new_local));
 
     // allocate receive buffer and wait for messages
     data_partitioned[p].reserve(data_length);
@@ -526,7 +526,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
     data_length = std::max(0,
                            std::min(ub_old_local, ub_new_remote) -
-                               std::max(lb_old_local, ub_new_remote));
+                               std::max(lb_old_local, lb_new_remote));
 
     mpiret = MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
                        data_length * sizeof(T), MPI_BYTE, p, 0,

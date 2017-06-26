@@ -48,6 +48,7 @@
 #include "nemd.hpp"
 #include "nsquare.hpp"
 #include "p3m.hpp"
+#include "p4est_utils.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
 #include "rattle.hpp"
@@ -389,6 +390,14 @@ void integrate_vv(int n_steps, int reuse_forces) {
   for (int step = 0; step < n_steps; step++) {
     INTEG_TRACE(fprintf(stderr, "%d: STEP %d\n", this_node, step));
 
+#ifdef LB_ADAPTIVE
+    int n_integration_steps = sim_time / time_step;
+    if (steps_until_grid_change - 1 ==
+        n_integration_steps % steps_until_grid_change) {
+          p4est_utils_adapt_grid();
+        }
+#endif // LB_ADAPTIVE
+
 #ifdef BOND_CONSTRAINT
     save_old_pos();
 #endif
@@ -649,7 +658,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
   if (thermo_switch & THERMO_GHMC)
     ghmc_close();
 #endif
-}
+} // integrate_vv
 
 /************************************************************/
 

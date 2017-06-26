@@ -2625,7 +2625,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   for (int i = 0; i < ncnt; ++i)
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
-    printf("%le\n", dsum);
+    printf("dsum is larger than round error precision: %le\n", dsum);
   if (ncnt > 20)
     printf("too many neighbours\n");
   return ncnt;

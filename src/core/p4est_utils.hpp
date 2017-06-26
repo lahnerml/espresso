@@ -20,6 +20,7 @@ enum class forest_order { short_range = 0, adaptive_LB };
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
+  std::vector<int64_t> first_quad_morton_idx;
   int coarsest_level_local;
   int finest_level_local;
   int finest_level_global;
@@ -28,12 +29,19 @@ struct p4est_utils_forest_info_t {
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
+        first_quad_morton_idx(p4est->mpisize + 1),
         coarsest_level_local(0), finest_level_local(-1),
         finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
   }
 };
 
-extern std::vector<p4est_utils_forest_info_t> forest_info;
+/** Returns a const reference to the forest_info of "fo".
+ * Throws a std::out_of_range if the forest_info of "fo" has not been created
+ * yet.
+ *
+ * @param fo specifier which forest_info to return
+ */
+const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo);
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.
@@ -52,7 +60,7 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
  * @param pos       Spatial coordinate to map.
  * @return int      Rank responsible for that position in space.
  */
-int p4est_utils_pos_to_proc(forest_order forest, double pos[3]);
+int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]);
 
 /** Compute a Morton index for a cell using its coordinates
  *
@@ -62,30 +70,31 @@ int p4est_utils_pos_to_proc(forest_order forest, double pos[3]);
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Calculate a global cell index for a given position. This index is no p4est
- * quadrant index.
- * CAUTION: This only works for a regular grid. Use
- *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
- *          adaptively refined grids.
+ * quadrant index as if the forest would be discretized regularly on its finest
+ * level.
+ * CAUTION: If LB_ADAPTIVE is not set, all p4ests will be scaled by the side
+ *          length of the p4est instance used for short-ranged MD.
  *
  * @param forest    p4est whose domain decomposition is to be used.
  * @param pos       Spatial coordinate to map.
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest, double pos[3]);
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]);
 
-/** Calculate a local cell index for a given position. This index is no p4est
- * quadrant index.
- * CAUTION: This only works for a regular grid. Use
- *          \ref p4est_utils_pos_qid_local or \ref p4est_utils_pos_qid_ghost for
- *          adaptively refined grids.
+/** Get the index of a position in the by ROUND_ERROR_PREC extended local domain.
+ * If pos is in the local domain, returns the same as
+ * \ref p4est_utils_pos_morton_idx_local. Otherwise tries if by ROUND_ERROR_PREC
+ * shifted copies of pos lie inside the local domain. If so, returns the
+ * quad id. If no shifted image lies inside the local box, returns -1.
  *
  * @param forest    p4est whose domain decomposition is to be used.
- * @param pos       Spatial coordinate to map.
+ * @param pos       spatial coordinate to map.
  *
- * @return int      Morton index for a cell corresponding to pos.
+ * @return int      Quadrant index of quadrant containing pos or one of its
+ *                  shifted counterparts
  */
-int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]);
+int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]);
 
 /** Find quadrant index for a given position among local quadrants
  *
@@ -94,7 +103,7 @@ int64_t p4est_utils_pos_morton_idx_local(forest_order forest, double pos[3]);
  *
  * @return int      Quadrant index of quadrant containing pos
  */
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]);
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]);
 
 /** Find quadrant index for a given position among ghost quadrants
  *
@@ -105,7 +114,7 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, double pos[3]);
  * @return int      Quadrant index of quadrant containing pos
  */
 p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
-                                         p8est_ghost_t *ghost, double pos[3]);
+                                         p8est_ghost_t *ghost, const double pos[3]);
 /*@}*/
 
 /*****************************************************************************/
@@ -385,6 +394,8 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
 void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
+
+p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

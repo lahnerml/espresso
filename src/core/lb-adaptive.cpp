@@ -1521,7 +1521,9 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
     if (mesh_iter->neighbor_qid != -1) {
+#ifdef P4EST_ENABLE_DEBUG
       ++neighbor_cnt;
+#endif
       int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
@@ -1546,7 +1548,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     }
   }
   P4EST_ASSERT((mesh_iter->current_level <
-                forest_info[static_cast<int>(forest_order::adaptive_LB)]
+                p4est_utils_get_forest_info(forest_order::adaptive_LB)
                     .finest_level_global) ||
                (-1 < mesh_iter->current_vid) ||
                ((lbmodel.n_veloc - 1) == neighbor_cnt));
@@ -1920,8 +1922,7 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
-  p4est_utils_forest_info_t forest =
-      forest_info[static_cast<int>(forest_order::adaptive_LB)];
+  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double bnd, *bnd_ptr;
@@ -1971,8 +1972,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
-  p4est_utils_forest_info_t forest =
-      forest_info[static_cast<int>(forest_order::adaptive_LB)];
+  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double dens, *dens_ptr;
@@ -2072,8 +2072,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
-  p4est_utils_forest_info_t forest =
-      forest_info[static_cast<int>(forest_order::adaptive_LB)];
+  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double *veloc_ptr;
@@ -2438,6 +2437,7 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
 
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
+  int idx_a, idx_b;
   int xid, yid, zid;
   for (int d = 0; d < 3; ++d) {
     if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
@@ -2457,73 +2457,12 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
     qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
     zlvlfill = 1 << (3 * (lbpar.max_refinement_level - q->level));
     if (qidx <= pidx && pidx < qidx + zlvlfill)
-      return i;
+      idx_a = i;
   }
-  return -1;
-}
-
-int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
-  int xid, yid, zid;
-  p8est_quadrant_t *q;
-  for (int d = 0; d < 3; ++d) {
-    if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
-      return -1;
-    if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
-      return -1;
-  }
-  xid = (pos[0]) * (1 << lbpar.max_refinement_level);
-  yid = (pos[1]) * (1 << lbpar.max_refinement_level);
-  zid = (pos[2]) * (1 << lbpar.max_refinement_level);
-  int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
-  int64_t ret[8], sidx[8], qidx;
-  int cnt = 0;
-  for (int z = -1; z <= 1; z += 2) {
-    for (int y = -1; y <= 1; y += 2) {
-      for (int x = -1; x <= 1; x += 2) {
-        xid = (pos[0] + x * box_l[0] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
-        yid = (pos[1] + y * box_l[1] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
-        zid = (pos[2] + z * box_l[2] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
-        ret[cnt] = -1;
-        sidx[cnt++] = p4est_utils_cell_morton_idx(xid, yid, zid);
-      }
-    }
-  }
-  for (int64_t i = 0; i < lb_p8est->local_num_quadrants; ++i) {
-    q = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, i);
-    qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]);
-    if (qidx > pidx)
-      return i - 1;
-    for (int j = 0; j < 8; ++j)
-      if (qidx > sidx[j])
-        ret[j] = i - 1;
-  }
-  if (this_node + 1 >= n_nodes) {
-    int64_t tmp = (1 << lbpar.max_refinement_level);
-    while (tmp < (box_l[0] * (1 << lbpar.max_refinement_level)))
-      tmp <<= 1;
-    while (tmp < (box_l[1] * (1 << lbpar.max_refinement_level)))
-      tmp <<= 1;
-    while (tmp < (box_l[2] * (1 << lbpar.max_refinement_level)))
-      tmp <<= 1;
-    qidx == tmp *tmp *tmp;
-  } else {
-    q = &lb_p8est->global_first_position[this_node + 1];
-    qidx = lbadapt_get_global_idx(q, q->p.which_tree);
-  }
-  if (pidx < qidx) {
-    return lb_p8est->local_num_quadrants - 1;
-  } else {
-    for (int j = 0; j < 8; ++j) {
-      if (sidx[j] < qidx)
-        ret[j] = lb_p8est->local_num_quadrants - 1;
-      if (ret[j] >= 0)
-        return ret[j];
-    }
-    return -1;
-  }
+  idx_b =
+    p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, lbadapt_ghost, pos);
+  P4EST_ASSERT(idx_a == idx_b);
+  return idx_b;
 }
 
 int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
@@ -2542,7 +2481,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  int64_t qidx = lbadapt_map_pos_to_quad_ext(pos);
+  int64_t qidx = p4est_utils_pos_quad_ext(forest_order::adaptive_LB, pos);
   if (qidx < 0) {
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
     if (ncnt > 0)
@@ -2686,7 +2625,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   for (int i = 0; i < ncnt; ++i)
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
-    printf("%le\n", dsum);
+    printf("dsum is larger than round error precision: %le\n", dsum);
   if (ncnt > 20)
     printf("too many neighbours\n");
   return ncnt;

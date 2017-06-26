@@ -17,6 +17,8 @@
 /*****************************************************************************/
 enum class forest_order { short_range = 0, adaptive_LB };
 
+extern int steps_until_grid_change;
+
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
@@ -270,6 +272,11 @@ int p4est_utils_deallocate_levelwise_storage(T ***data) {
 /** \name Grid Change                                                        */
 /*****************************************************************************/
 /*@{*/
+/** Function that handles grid alteration. After calling this function the grid
+ * has changed and everything is set to perform the next integration step.
+ */
+int p4est_utils_adapt_grid();
+
 template <typename T>
 /** Skeleton for copying data.
  *

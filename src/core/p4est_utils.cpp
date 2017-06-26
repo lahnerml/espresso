@@ -4,6 +4,7 @@
 
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
+#include "lb-adaptive.hpp"
 #include "p4est_dd.hpp"
 
 #include <algorithm>
@@ -18,6 +19,9 @@
 #include <vector>
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
+
+// number of (MD) intergration steps before grid changes
+int steps_until_grid_change = 50;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -146,7 +150,7 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
-  const p4est_utils_forest_info_t& current_forest =
+  const p4est_utils_forest_info_t &current_forest =
       forest_info.at(static_cast<int>(forest));
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
@@ -204,8 +208,8 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
     }
 
     // find lower left and upper right corner of forest
-    std::array<double, 3> pos_min {{0., 0., 0.}};
-    std::array<double, 3> pos_max {{box_l[0], box_l[1], box_l[2]}};
+    std::array<double, 3> pos_min{{0., 0., 0.}};
+    std::array<double, 3> pos_max{{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
     double dist;
     double dist_min = DBL_MAX;
@@ -378,6 +382,66 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
   P4EST_ASSERT(0 <= index && index < ghost->ghosts.elem_count);
 
   return index;
+}
+
+// CAUTION: Currently LB only
+int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
+                        p8est_quadrant_t **quads) {
+  return 0;
+}
+
+int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
+                        p8est_quadrant_t *q) {
+  return 0;
+}
+
+int p4est_utils_adapt_grid() {
+  // 0th step: de-allocate invalid storage and data-structures
+  p4est_utils_deallocate_levelwise_storage(&lbadapt_ghost_data);
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  // 1st step: alter copied grid and map data between grids.
+  const p4est_utils_forest_info_t &current_forest =
+      p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  p8est_t *p4est_adapted = p8est_copy(current_forest.p4est, 0);
+  p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
+                   refinement_criteria, 0, 0);
+  p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
+
+  lbadapt_payload_t *mapped_data_flat =
+      P4EST_ALLOC(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
+  p4est_utils_post_gridadapt_map_data(lb_p8est, lbadapt_mesh, p4est_adapted,
+                                      lbadapt_local_data, mapped_data_flat);
+
+  // clean-up anything that is not needed anymore
+  p4est_utils_deallocate_levelwise_storage(&lbadapt_local_data);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_destroy(lb_p8est);
+
+  // 2nd step: partition grid and transfer data
+  // FIXME: Interface to Steffens partitioning logic
+  p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
+  p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
+  std::vector<std::vector<lbadapt_payload_t>> data_partitioned;
+  p4est_utils_post_gridadapt_data_partition_transfer(
+      p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
+  p8est_destroy(p4est_adapted);
+  P4EST_FREE(mapped_data_flat);
+
+  lbadapt_ghost = p8est_ghost_new(p4est_partitioned, P8EST_CONNECT_FULL);
+  lbadapt_mesh = p8est_mesh_new_ext(p4est_partitioned, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_FULL);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(p4est_partitioned, lbadapt_ghost, lbadapt_mesh);
+  p4est_utils_allocate_levelwise_storage(&lbadapt_local_data, lbadapt_mesh,
+                                         false);
+  p4est_utils_allocate_levelwise_storage(&lbadapt_ghost_data, lbadapt_mesh,
+                                         true);
+  p4est_utils_post_gridadapt_insert_data(p4est_partitioned, lbadapt_mesh,
+                                         data_partitioned, lbadapt_local_data);
+
+  return 0;
 }
 
 template <typename T>

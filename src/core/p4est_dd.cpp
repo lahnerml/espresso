@@ -719,32 +719,7 @@ void dd_p4est_init_cell_interaction() {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_save_position_to_cell(double pos[3]) {
-  Cell *c;
-  // This function implicitly uses binary search by using
-  // dd_p4est_position_to_cell
-
-  if ((c = dd_p4est_position_to_cell(pos)))
-    return c;
-
-  // If pos is outside of the local domain try the bounding box enlarged
-  // by ROUND_ERROR_PREC
-  for (int i = -1; i <= 1; i += 2) {
-    for (int j = -1; j <= 1; j += 2) {
-      for (int k = -1; k <= 1; k += 2) {
-        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
-                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
-                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
-        if ((c = dd_p4est_position_to_cell(spos)))
-          return c;
-      }
-    }
-  }
-
-  return NULL;
-}
-//--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_position_to_cell(double pos[3]) {
+static Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
   CALL_TRACE();
   
   // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain
@@ -766,6 +741,44 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
     return &cells[i];
   else
     return NULL;
+}
+//--------------------------------------------------------------------------------------------------
+Cell* dd_p4est_save_position_to_cell(double pos[3]) {
+  Cell *c;
+  // This function implicitly uses binary search by using
+  // dd_p4est_position_to_cell
+
+  if ((c = dd_p4est_position_to_cell_strict(pos)))
+    return c;
+
+  // If pos is outside of the local domain try the bounding box enlarged
+  // by ROUND_ERROR_PREC
+  for (int i = -1; i <= 1; i += 2) {
+    for (int j = -1; j <= 1; j += 2) {
+      for (int k = -1; k <= 1; k += 2) {
+        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
+                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
+                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
+        if ((c = dd_p4est_position_to_cell_strict(spos)))
+          return c;
+      }
+    }
+  }
+
+  return NULL;
+}
+//--------------------------------------------------------------------------------------------------
+Cell* dd_p4est_position_to_cell(double pos[3]) {
+  // Accept OOB particles for the sake of IO.
+  // If this is used, you need to manually do a global(!) resort afterwards
+  // i.e. in Tcl: sort_particles.
+  Cell *c = dd_p4est_position_to_cell_strict(pos);
+
+  if (c) {
+    return c;
+  } else {
+    return &cells[0];
+  }
 }
 //--------------------------------------------------------------------------------------------------
 // Checks all particles and resorts them to local cells or sendbuffers

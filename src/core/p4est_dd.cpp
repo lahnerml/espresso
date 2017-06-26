@@ -720,69 +720,27 @@ void dd_p4est_init_cell_interaction() {
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_save_position_to_cell(double pos[3]) {
-  CALL_TRACE();
-    
-  // Mapping a position to the local domain is not as easy since the domain is not a cube
-  // Loop over all cells and check if position is inside cell
-  
-  // Note: Since the local cells are sorted along a space filling curve. The List can be used as
-  // search tree. But for simplicity reasons this is not implemendet yet. It would reduce
-  // the complexity from O(N) to O(log(N)).
-  
-  int i;
-  int scale_pos[3], scale_pos_l[3], scale_pos_h[3];
-  
-  // To check the extended domain create the shifted positions
-  for (int d=0;d<3;++d) {
-    scale_pos[d] = pos[d]*dd.inv_cell_size[d];
-    scale_pos_l[d] = (pos[d] + ROUND_ERROR_PREC*box_l[d])*dd.inv_cell_size[d];
-    scale_pos_h[d] = (pos[d] - ROUND_ERROR_PREC*box_l[d])*dd.inv_cell_size[d];
-    
-    if (!PERIODIC(d) && scale_pos[d] < 0) scale_pos[d] = 0;
-    if (!PERIODIC(d) && scale_pos_l[d] < 0) scale_pos_l[d] = 0;
-    if (!PERIODIC(d) && scale_pos_h[d] < 0) scale_pos_h[d] = 0;
-    if (!PERIODIC(d) && scale_pos[d] >= grid_size[d]) scale_pos[d] = grid_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_l[d] >= grid_size[d]) scale_pos_l[d] = grid_size[d] - 1;
-    if (!PERIODIC(d) && scale_pos_h[d] >= grid_size[d]) scale_pos_h[d] = grid_size[d] - 1;
+  Cell *c;
+  // This function implicitly uses binary search by using
+  // dd_p4est_position_to_cell
+
+  if ((c = dd_p4est_position_to_cell(pos)))
+    return c;
+
+  // If pos is outside of the local domain try the bounding box enlarged
+  // by ROUND_ERROR_PREC
+  for (int i = -1; i <= 1; i += 2) {
+    for (int j = -1; j <= 1; j += 2) {
+      for (int k = -1; k <= 1; k += 2) {
+        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
+                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
+                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
+        if ((c = dd_p4est_position_to_cell(spos)))
+          return c;
+      }
+    }
   }
-  
-  // Loop all cells and break if containing cell is found
-  for (i=0;i<num_local_cells;++i) {
-    if ((p4est_shell[i].boundary & 1)) {
-      if (scale_pos_l[0] < p4est_shell[i].coord[0]) continue;
-    } else {
-      if (scale_pos[0] < p4est_shell[i].coord[0]) continue;
-    }
-    if ((p4est_shell[i].boundary & 2)) {
-      if (scale_pos_h[0] > p4est_shell[i].coord[0]) continue;
-    } else {
-      if (scale_pos[0] > p4est_shell[i].coord[0]) continue;
-    }
-    if ((p4est_shell[i].boundary & 4)) {
-      if (scale_pos_l[1] < p4est_shell[i].coord[1]) continue;
-    } else {
-      if (scale_pos[1] < p4est_shell[i].coord[1]) continue;
-    }
-    if ((p4est_shell[i].boundary & 8)) {
-      if (scale_pos_h[1] > p4est_shell[i].coord[1]) continue;
-    } else {
-      if (scale_pos[1] > p4est_shell[i].coord[1]) continue;
-    }
-    if ((p4est_shell[i].boundary & 16)) {
-      if (scale_pos_l[2] < p4est_shell[i].coord[2]) continue;
-    } else {
-      if (scale_pos[2] < p4est_shell[i].coord[2]) continue;
-    }
-    if ((p4est_shell[i].boundary & 32)) {
-      if (scale_pos_h[2] > p4est_shell[i].coord[2]) continue;
-    } else {
-      if (scale_pos[2] > p4est_shell[i].coord[2]) continue;
-    }
-    break;
-  }
-  
-  // return the index
-  if (i < num_local_cells) return &cells[i];
+
   return NULL;
 }
 //--------------------------------------------------------------------------------------------------

@@ -30,7 +30,7 @@ for {set i 1} {$i <= $n_part} {incr i} {
   set pos_x [expr rand()*($boxl-2*$wall) + $wall]
   set pos_y [expr rand()*($boxl-2*$wall) + $wall]
   set pos_z [expr rand()*1.0]
-  part [expr $i - 1] pos $pos_x $pos_y $pos_z q 0.0 type 0 v 0 0 0 ;# ext_force 0.1 0 0
+  part [expr $i - 1] pos $pos_x $pos_y $pos_z q 0.0 type 0 v 0 0 0 ext_force 0 0 0
 }
 
 set dt 0.01

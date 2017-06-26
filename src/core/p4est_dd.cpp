@@ -1141,18 +1141,11 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
-  // compute morton index of cell to which this position belongs
-  int64_t idx = dd_p4est_pos_morton_idx(pos);
-  // Note: Since p4est_space_idx is a ordered list, it is possible to do a binary search here.
-  // Doing so would reduce the complexity from O(N) to O(log(N))
-  if (idx >= 0) {
-    for (int i = 1; i <= n_nodes; ++i) {
-      // compare the first cell of a process with this cell
-      if (p4est_space_idx[i] > idx) return i - 1;
-    }
-  }
-  fprintf(stderr, "Could not resolve the proc of particle %lf %lf %lf\n", pos[0], pos[1], pos[2]);
-  errexit();
+  auto it = std::upper_bound(p4est_space_idx, p4est_space_idx + n_nodes,
+                             dd_p4est_pos_morton_idx(pos),
+                             [](int i, int64_t idx){ return i < idx; });
+
+  return std::distance(p4est_space_idx, it) - 1;
 }
 //--------------------------------------------------------------------------------------------------
 // Repartitions the given p4est, such that process boundaries do not intersect the partition of the

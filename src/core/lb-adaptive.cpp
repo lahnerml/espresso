@@ -65,8 +65,8 @@ p8est_t *lb_p8est = 0;
 p8est_ghost_t *lbadapt_ghost;
 p8est_ghostvirt_t *lbadapt_ghost_virt;
 p8est_mesh_t *lbadapt_mesh;
-lbadapt_payload_t **lbadapt_local_data = NULL;
-lbadapt_payload_t **lbadapt_ghost_data = NULL;
+std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
+std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 int lb_conn_brick[3] = {0, 0, 0};
 double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
                                             DBL_MAX, DBL_MIN, DBL_MAX};
@@ -99,7 +99,7 @@ double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
 /*** SETUP ***/
 void lbadapt_allocate_data() {
 
-  p4est_utils_allocate_levelwise_storage(&lbadapt_local_data, lbadapt_mesh,
+  p4est_utils_allocate_levelwise_storage(lbadapt_local_data, lbadapt_mesh,
                                          true);
 
   int coarsest_level_ghost = -1;
@@ -112,10 +112,9 @@ void lbadapt_allocate_data() {
     }
   }
   if (coarsest_level_ghost == -1) {
-    lbadapt_ghost_data = NULL;
     return;
   } else {
-    p4est_utils_allocate_levelwise_storage(&lbadapt_ghost_data, lbadapt_mesh,
+    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, lbadapt_mesh,
                                            false);
   }
 
@@ -127,8 +126,8 @@ void lbadapt_allocate_data() {
 
 void lbadapt_release() {
   /** cleanup custom managed payload */
-  p4est_utils_deallocate_levelwise_storage(&lbadapt_local_data);
-  p4est_utils_deallocate_levelwise_storage(&lbadapt_ghost_data);
+  p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
+  p4est_utils_deallocate_levelwise_storage(lbadapt_ghost_data);
 #ifdef LB_ADAPTIVE_GPU
   lbadapt_gpu_deallocate_device_memory();
 #endif // LB_ADAPTIVE_GPU
@@ -214,7 +213,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  if (lbadapt_local_data == NULL) {
+  if (lbadapt_local_data.empty()) {
     lbadapt_allocate_data();
   }
   int status;
@@ -290,7 +289,7 @@ void lbadapt_reinit_parameters() {
 }
 
 void lbadapt_reinit_force_per_cell() {
-  if (lbadapt_local_data == NULL) {
+  if (lbadapt_local_data.empty()) {
     lbadapt_allocate_data();
   }
   int status;
@@ -334,7 +333,7 @@ void lbadapt_reinit_force_per_cell() {
 }
 
 void lbadapt_reinit_fluid_per_cell() {
-  if (lbadapt_local_data == NULL) {
+  if (lbadapt_local_data.empty()) {
     lbadapt_allocate_data();
   }
   int status;
@@ -423,7 +422,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
 #ifndef LB_ADAPTIVE_GPU
   // FIXME Port to GPU
   // verify that level is correct
-  P4EST_ASSERT(quad_new->level == quad_old->level + 1);
+  P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
 
   // check boundary status.
   double new_mp[3];
@@ -457,7 +456,7 @@ int data_interpolation<lbadapt_payload_t>(
     lbadapt_payload_t *data_new) {
 #ifndef LB_ADAPTIVE_GPU
   // verify that level is correct
-  P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
+  P4EST_ASSERT(quad_new->level == 1 + quad_old->level);
 
   // check boundary status.
   lb_float new_mp[3];
@@ -2230,9 +2229,14 @@ void lbadapt_get_boundary_status() {
     p8est_meshiter_destroy(mesh_iter);
 
     /** exchange boundary values */
+    std::vector<lbadapt_payload_t*> local_pointer (P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t*> ghost_pointer (P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+
     p8est_ghostvirt_exchange_data(
         lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-        (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
 }
 

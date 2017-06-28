@@ -2817,11 +2817,11 @@ void mpi_lbadapt_grid_init(int node, int level) {
   lbadapt_ghost_virt =
       p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
 
-  lbadapt_local_data = NULL;
-  lbadapt_ghost_data = NULL;
+  lbadapt_local_data.clear();
+  lbadapt_ghost_data.clear();
 
-// regular grid
 #ifdef LB_ADAPTIVE_GPU
+  // regular grid
   local_num_quadrants = lb_p8est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 

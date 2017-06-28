@@ -233,13 +233,14 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-int p4est_utils_allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh,
+int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
+                                           p8est_mesh_t *mesh,
                                            bool local_data) {
-  // make sure data is not yet in used
-  P4EST_ASSERT(*data == NULL);
+  P4EST_ASSERT(data.empty());
 
   // allocate data for each level
-  *data = P4EST_ALLOC(T *, P8EST_QMAXLEVEL);
+  data = std::vector<std::vector<T>>(P8EST_QMAXLEVEL, std::vector<T>());
+  P4EST_ASSERT(data.size() == P8EST_QMAXLEVEL);
 
   int quads_on_level;
 
@@ -250,7 +251,8 @@ int p4est_utils_allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh,
                   P8EST_CHILDREN * (mesh->virtual_qlevels + level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
                   P8EST_CHILDREN * (mesh->virtual_glevels + level)->elem_count;
-    (*data)[level] = P4EST_ALLOC(T, quads_on_level);
+    data[level] = std::vector<T>(quads_on_level);
+    P4EST_ASSERT(data[level].size() == quads_on_level);
   }
 
   return 0;
@@ -263,13 +265,26 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-int p4est_utils_deallocate_levelwise_storage(T ***data) {
-  if (*data != NULL) {
+int p4est_utils_deallocate_levelwise_storage(std::vector<std::vector<T>> &data) {
+  if (!data.empty()) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
-      P4EST_FREE((*data)[level]);
+      data[level].clear();
     }
-    P4EST_FREE(*data);
-    *data = NULL;
+  }
+  data.clear();
+
+  return 0;
+}
+
+template <typename T>
+int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
+                       std::vector<T*> &local_pointer,
+                       std::vector<std::vector<T>> &ghost_data,
+                       std::vector<T*> &ghost_pointer) {
+  P4EST_ASSERT (ghost_data.size() == 0 || ghost_data.size() == local_data.size());
+  for (int i = 0; i < local_data.size(); ++i) {
+    local_pointer[i] = local_data[i].data();
+    ghost_pointer[i] = ghost_data[i].data();
   }
   return 0;
 }
@@ -358,7 +373,7 @@ template <typename T>
 int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
                                         p8est_mesh_t *mesh_old,
                                         p8est_t *p4est_new,
-                                        T **local_data_levelwise,
+                                        std::vector<std::vector<T>> &local_data_levelwise,
                                         T *mapped_data_flat);
 
 template <typename T>
@@ -378,7 +393,7 @@ template <typename T>
  */
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> data_partitioned);
+    std::vector<std::vector<T>> &data_partitioned);
 
 template <typename T>
 /** After all local data has been received insert in newly allocated level-wise
@@ -394,7 +409,8 @@ template <typename T>
  */
 int p4est_utils_post_gridadapt_insert_data(
     p8est_t *p4est_new, p8est_mesh_t *mesh_new,
-    std::vector<std::vector<T>> data_partitioned, T **data_levelwise);
+    std::vector<std::vector<T>> &data_partitioned,
+    std::vector<std::vector<T>> &data_levelwise);
 /*@}*/
 
 /*****************************************************************************/

@@ -591,8 +591,8 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
   int send_offset = 0;
 
   int mpiret;
-  MPI_Request *r;
-  std::vector<MPI_Request> requests;
+  MPI_Request r;
+  std::vector<MPI_Request> requests (2 * size, MPI_REQUEST_NULL);
 
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish
@@ -612,11 +612,12 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
                                std::max(lb_old_remote, lb_new_local));
 
     // allocate receive buffer and wait for messages
-    data_partitioned[p].reserve(data_length);
+    data_partitioned[p].resize(data_length);
+    r = requests[p];
     mpiret =
         MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
-                  MPI_BYTE, p, 0, p4est_new->mpicomm, r);
-    requests.push_back(*r);
+                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
+    requests[p] = r;
     SC_CHECK_MPI(mpiret);
   }
 
@@ -629,10 +630,11 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
                            std::min(ub_old_local, ub_new_remote) -
                                std::max(lb_old_local, lb_new_remote));
 
+    r = requests[size + p];
     mpiret = MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
                        data_length * sizeof(T), MPI_BYTE, p, 0,
-                       p4est_new->mpicomm, r);
-    requests.push_back(*r);
+                       p4est_new->mpicomm, &r);
+    requests[size + p] = r;
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;
   }

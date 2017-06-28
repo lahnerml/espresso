@@ -116,14 +116,23 @@ void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
   comm->comm = (GhostCommunication*)Utils::malloc(num*sizeof(GhostCommunication));
   for(i=0; i<num; i++) {
     comm->comm[i].shift[0]=comm->comm[i].shift[1]=comm->comm[i].shift[2]=0.0;
+#ifdef RECV_GHOST_SHIFT
+    comm->comm[i].n_extra_shifts = 0;
+#endif
   }
 }
 
 void free_comm(GhostCommunicator *comm)
 {
-  int n;
+  int n, i;
   GHOST_TRACE(fprintf(stderr,"%d: free_comm: %p has %d ghost communications\n",this_node,comm,comm->num));
-  for (n = 0; n < comm->num; n++) free(comm->comm[n].part_lists);
+  for (n = 0; n < comm->num; n++) {
+    free(comm->comm[n].part_lists);
+#ifdef RECV_GHOST_SHIFT
+    for (i = 0; i < comm->comm[n].n_extra_shifts; ++i) free(comm->comm[n].extra_shifts[i].part_lists);
+    free(comm->comm[n].extra_shifts);
+#endif
+  }
   free(comm->comm);
 }
 
@@ -567,6 +576,39 @@ static int is_recv_op(int comm_type, int node)
           (comm_type == GHOST_RDCE && node == this_node));
 }
 
+#ifdef RECV_GHOST_SHIFT
+static void ghost_extra_shifts(GhostShifts *ghost_shift) {
+  ParticleList *origin = ghost_shift->origin;
+  for (int i = 0; i < ghost_shift->n_part_lists; ++i) {
+    ParticleList *cur_cell = ghost_shift->part_lists[i];
+    double *shift = &ghost_shift->shift[3*i];
+    prepare_ghost_cell(cur_cell, origin->n);
+    for (int p = 0; p < origin->n; ++p) {
+      memcpy(&cur_cell->part[p], &origin->part[p], sizeof(Particle));
+      cur_cell->part[p].r.p[0] += shift[0];
+      cur_cell->part[p].r.p[1] += shift[1];
+      cur_cell->part[p].r.p[2] += shift[2];
+#ifdef GHOSTS_HAVE_BONDS
+      if (origin->part[p].bl.n) {
+        realloc_intlist(&cur_cell->part[p].bl, cur_cell->part[p].bl.n = origin->part[p].bl.n);
+        memcpy(cur_cell->part[p].bl.e, origin->part[p].bl.e, sizeof(int)*origin->part[p].bl.n);
+      }
+#ifdef EXCLUSIONS
+      if (origin->part[p].el.n) {
+        realloc_intlist(&cur_cell->part[p].el, cur_cell->part[p].el.n = origin->part[p].el.n);
+        memcpy(cur_cell->part[p].el.e, origin->part[p].el.e, sizeof(int)*origin->part[p].el.n);
+      }
+#endif
+#endif
+      
+      if (local_particles[cur_cell->part[p].p.identity] == NULL) {
+        local_particles[cur_cell->part[p].p.identity] = &cur_cell->part[p];
+      }
+    }
+  }
+}
+#endif //RECV_GHOST_SHIFT
+
 /** Asynchronous communication.
  * Only supports sends and receives, not optimizations for local communications
  * and no broadcasts or reductions.
@@ -672,6 +714,18 @@ static void ghost_communicator_async(GhostCommunicator *gc)
 
   // Wait for the bond send requests (second half of reqs)
   MPI_Waitall(gc->num, reqs.data() + gc->num, MPI_STATUS_IGNORE);
+  
+#ifdef RECV_GHOST_SHIFT
+  for (int i = 0; i < gc->num; i++) {
+    GhostCommunication *gcn = &gc->comm[i];
+    const int comm_type = gcn->type & GHOST_JOBMASK;
+    if (comm_type == GHOST_RECV) {
+      for (int n = 0; n < gcn->n_extra_shifts; ++n) {
+        ghost_extra_shifts(&gcn->extra_shifts[n]);
+      }
+    }
+  }
+#endif
 }
 
 /** Synchronous communication.

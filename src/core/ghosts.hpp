@@ -145,6 +145,15 @@ The ghost communicators are created in the init routines of the cell systems, th
 /************************************************************/
 /*@{*/
 
+#ifdef RECV_GHOST_SHIFT
+typedef struct {
+  ParticleList *origin;
+  int n_part_lists;
+  ParticleList **part_lists;
+  double *shift; // 3*n_part_lists shifts relative to origin
+} GhostShifts;
+#endif // RECV_GHOST_SHIFT
+
 typedef struct {
 
   /** Communication type. */
@@ -168,6 +177,11 @@ typedef struct {
   /** if \ref GhostCommunicator::data_parts has \ref GHOSTTRANS_POSSHFTD, then this is the shift vector.
       Normally this a integer multiple of the box length. The shift is done on the sender side */
   double shift[3];
+
+#ifdef RECV_GHOST_SHIFT
+  int n_extra_shifts;
+  GhostShifts *extra_shifts;
+#endif //RECV_GHOST_SHIFT
 } GhostCommunication;
 
 /** Properties for a ghost communication. A ghost communication is defined */

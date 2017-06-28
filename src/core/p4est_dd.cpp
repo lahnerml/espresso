@@ -644,6 +644,9 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
       if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] =  box_l[2];
       if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
     }
+#ifdef RECV_GHOST_SHIFT
+    comm->comm[cnt].n_extra_shifts = 0;
+#endif
     ++cnt;
   }
   for (int i=0;i<num_comm_recv;++i) {
@@ -658,6 +661,9 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
     for (int n=0;n<comm_recv[i].cnt;++n)
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
+#ifdef RECV_GHOST_SHIFT
+    comm->comm[cnt].n_extra_shifts = 0;
+#endif
     ++cnt;
   }
 }

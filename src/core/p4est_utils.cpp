@@ -528,7 +528,7 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
       ++qid_new;
       ++tqid_old;
       ++tqid_new;
-    } else if (level_old + 1 == level_new) {
+    } else if (level_old == level_new + 1) {
       // old cell has been coarsened
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
         data_restriction(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
@@ -540,7 +540,7 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
       }
       ++tqid_new;
       ++qid_new;
-    } else if (level_old == level_new + 1) {
+    } else if (level_old + 1 == level_new) {
       // old cell has been refined
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
         data_interpolation(p4est_old, p4est_new, curr_quad_old, curr_quad_new,

@@ -341,32 +341,7 @@ void mpi_stop() {
     return;
   // stop worker nodes
   mpi_call(mpi_stop_slave, -1, 0);
-
-#ifdef LB_ADAPTIVE
-  lb_release();
-  // shutdown p4est if it was used
-  if (lbadapt_ghost_virt) {
-    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  }
-  if (lbadapt_mesh) {
-    p8est_mesh_destroy(lbadapt_mesh);
-  }
-  if (lbadapt_ghost) {
-    p8est_ghost_destroy(lbadapt_ghost);
-  }
-  if (lb_p8est) {
-    p8est_destroy(lb_p8est);
-  }
-  if (conn) {
-    p8est_connectivity_destroy(conn);
-  }
-
-  sc_finalize();
-#endif // LB_ADAPTIVE
-  MPI_Barrier(comm_cart);
-  MPI_Finalize();
-  regular_exit = 1;
-  terminated = 1;
+  mpi_stop_slave(0, 0);
 }
 
 void mpi_stop_slave(int node, int param) {

@@ -408,6 +408,7 @@ int p4est_utils_adapt_grid() {
   p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
                    refinement_criteria, 0, 0);
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
+  p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, 0, 0);
 
   lbadapt_payload_t *mapped_data_flat =
       P4EST_ALLOC(lbadapt_payload_t, p4est_adapted->local_num_quadrants);

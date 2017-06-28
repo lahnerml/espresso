@@ -392,6 +392,16 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
+  double pos[3];
+  p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
+  // refine front lower left quadrant(s)
+  std::array<double, 3> ref_min = { 0.25, 0., 0.25};
+  std::array<double, 3> ref_max = { 0.5, 0.25, 0.5};
+  if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
+      (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
+      (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {
+    return 1;
+  }
   return 0;
 }
 

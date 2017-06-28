@@ -15,7 +15,14 @@
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
-enum class forest_order { short_range = 0, adaptive_LB };
+enum class forest_order {
+#ifdef DD_P4EST
+  short_range = 0,
+#endif // DD_P4EST
+#ifdef LB_ADAPTIVE
+  adaptive_LB
+#endif // LB_ADAPTIVE
+};
 
 extern int steps_until_grid_change;
 

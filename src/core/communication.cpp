@@ -2798,11 +2798,13 @@ void mpi_lbadapt_grid_init(int node, int level) {
                            NULL       /* user pointer */);
 // clang-format on
 
-#ifdef DD_P4EST
   std::vector<p4est_t *> forests;
+#ifdef DD_P4EST
   forests.push_back(dd.p4est);
+#endif // DD_P4EST
   forests.push_back(lb_p8est);
   p4est_utils_prepare(forests);
+#ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST

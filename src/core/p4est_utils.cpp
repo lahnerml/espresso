@@ -421,15 +421,17 @@ int p4est_utils_adapt_grid() {
   p8est_destroy(lb_p8est);
 
   // 2nd step: partition grid and transfer data
-  // FIXME: Interface to Steffens partitioning logic
+  // FIXME: Interface to Steffen's partitioning logic
   p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
   p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
-  std::vector<std::vector<lbadapt_payload_t>> data_partitioned;
+  std::vector<std::vector<lbadapt_payload_t>> data_partitioned (
+      p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
   p4est_utils_post_gridadapt_data_partition_transfer(
       p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
   p8est_destroy(p4est_adapted);
   P4EST_FREE(mapped_data_flat);
 
+  // 3rd step: Insert data into new levelwise data-structure
   lbadapt_ghost = p8est_ghost_new(p4est_partitioned, P8EST_CONNECT_FULL);
   lbadapt_mesh = p8est_mesh_new_ext(p4est_partitioned, lbadapt_ghost, 1, 1, 1,
                                     P8EST_CONNECT_FULL);
@@ -472,11 +474,9 @@ int p4est_utils_adapt_grid() {
 }
 
 template <typename T>
-int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
-                                        p8est_mesh_t *mesh_old,
-                                        p8est_t *p4est_new,
-                                        T **local_data_levelwise,
-                                        T *mapped_data_flat) {
+int p4est_utils_post_gridadapt_map_data(
+    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p8est_new,
+    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat) {
   // counters
   int tid_old = p4est_old->first_local_tree;
   int tid_new = p4est_new->first_local_tree;
@@ -561,13 +561,22 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
     P4EST_ASSERT(tqid_new + curr_tree_new->quadrants_offset == qid_new);
     P4EST_ASSERT(tid_old == tid_new);
   }
+  P4EST_ASSERT(qid_old == p4est_old->local_num_quadrants);
+  P4EST_ASSERT(qid_new == p4est_new->local_num_quadrants);
+
   return 0;
 }
 
 template <typename T>
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> data_partitioned) {
+    std::vector<std::vector<T>> &data_partitioned) {
+  // simple consistency checks
+  P4EST_ASSERT(p4est_old->mpirank == p4est_new->mpirank);
+  P4EST_ASSERT(p4est_old->mpisize == p4est_new->mpisize);
+  P4EST_ASSERT(p4est_old->global_num_quadrants ==
+               p4est_new->global_num_quadrants);
+
   int rank = p4est_old->mpirank;
   int size = p4est_old->mpisize;
   int lb_old_local = p4est_old->global_first_quadrant[rank];
@@ -597,6 +606,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     lb_old_remote = ub_old_remote;
     ub_old_remote = p4est_old->global_first_quadrant[p + 1];
 
+    // number of quadrants from which payload will be received
     data_length = std::max(0,
                            std::min(ub_old_remote, ub_new_local) -
                                std::max(lb_old_remote, lb_new_local));
@@ -664,7 +674,7 @@ int p4est_utils_post_gridadapt_insert_data(
       curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
       level = curr_quad->level;
       sid = mesh_new->quad_qreal_offset[qid];
-      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p].at(q),
+      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p][q],
                   sizeof(T));
       ++tqid;
       ++qid;

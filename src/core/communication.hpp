@@ -570,11 +570,18 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len);
 #endif // LB_ADAPTIVE_GPU
 
 /** Set maximum refinement level
- * 
+ *
  * @param [in] node   The node on which this function is called (all)
  * @param [in] l_max  New maximum refinement level
  */
 void mpi_lbadapt_set_max_level (int node, int l_max);
+
+/** Set number of (MD) integration steps before grid is changed
+ *
+ * @param[in] node   Node on which function is called (all)
+ * @param[in] steps  Updated number of steps
+ */
+void mpi_lbadapt_set_steps_before_grid_change(int node, int steps);
 
 /** Call non-recursive uniform refinement function, i.e. all quadrants are
  * refined exactly once.

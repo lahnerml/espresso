@@ -93,6 +93,39 @@ int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
   return TCL_OK;
 }
 
+int tclcommand_set_steps_until_grid_change(ClientData data, Tcl_Interp *interp,
+                                           int argc, char **argv) {
+  int steps;
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Setting number of integration steps requires one "
+                             "parameter, specifying that number of steps.",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  if (!ARG_IS_I(1, steps)) {
+    Tcl_AppendResult(interp,
+                     "Setting number of integration steps before grid is "
+                     "changed needs 1 parameter of type and meaning:\n",
+                     (char *)NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *)NULL);
+    Tcl_AppendResult(interp, "<number_steps>\n", (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  /* check input for semantic correctness */
+  if (steps < 1) {
+    Tcl_AppendResult(interp, "number of steps needs to be at least 1.\n",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_lbadapt_set_steps_before_grid_change, -1, steps);
+  mpi_lbadapt_set_steps_before_grid_change(0, steps);
+
+  return TCL_OK;
+}
+
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv) {
   /* container for parameters */

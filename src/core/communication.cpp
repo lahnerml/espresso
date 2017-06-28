@@ -189,6 +189,7 @@ static int terminated = 0;
   CB(mpi_mpiio_slave)                                                          \
   CB(mpi_lbadapt_grid_init)                                                    \
   CB(mpi_lbadapt_set_max_level)                                                \
+  CB(mpi_lbadapt_set_steps_before_grid_change)                                 \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
   CB(mpi_lbadapt_vtk_print_density)                                            \
   CB(mpi_lbadapt_vtk_print_velocity)                                           \
@@ -2834,6 +2835,12 @@ void mpi_lbadapt_set_max_level(int node, int l_max) {
   lbpar.max_refinement_level = l_max;
 
   lbadapt_reinit_parameters();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_lbadapt_set_steps_before_grid_change(int node, int steps) {
+#ifdef LB_ADAPTIVE
+  steps_until_grid_change = steps;
 #endif // LB_ADAPTIVE
 }
 

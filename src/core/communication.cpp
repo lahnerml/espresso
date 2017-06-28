@@ -3651,10 +3651,14 @@ void mpi_mpiio(const char *filename, unsigned fields, int write) {
   MPI_Bcast((void *)filename, (int)flen, MPI_CHAR, 0, MPI_COMM_WORLD);
   MPI_Bcast(&fields, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
   MPI_Bcast(&write, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  if (write)
+  if (write) {
     mpi_mpiio_common_write(filename, fields);
-  else
+  } else {
     mpi_mpiio_common_read(filename, fields);
+    // Do a global exchange because oob particles are accepted by the nodes
+    std::puts("MPI-IO done. Forcing a global resort.");
+    cells_resort_particles(CELL_GLOBAL_EXCHANGE);
+  }
 }
 
 void mpi_mpiio_slave(int dummy, int flen) {
@@ -3664,10 +3668,12 @@ void mpi_mpiio_slave(int dummy, int flen) {
   MPI_Bcast((void *)filename, flen, MPI_CHAR, 0, MPI_COMM_WORLD);
   MPI_Bcast(&fields, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
   MPI_Bcast(&write, 1, MPI_INT, 0, MPI_COMM_WORLD);
-  if (write)
+  if (write) {
     mpi_mpiio_common_write(filename, fields);
-  else
+  } else {
     mpi_mpiio_common_read(filename, fields);
+    cells_resort_particles(CELL_GLOBAL_EXCHANGE);
+  }
   delete[] filename;
 }
 

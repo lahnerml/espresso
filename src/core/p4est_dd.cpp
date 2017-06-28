@@ -772,11 +772,13 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
   // Accept OOB particles for the sake of IO.
   // If this is used, you need to manually do a global(!) resort afterwards
   // i.e. in Tcl: sort_particles.
-  // TODO: This could be done automatically: Add another flag to cells.hpp:
+  // xTODO: This could be done automatically: Add another flag to cells.hpp:
   // "int force_global_resort" and MPI_Reduce it in cells_resort_particles.
   // Need to clarify first if this has negative implications on the normal
   // function of ESPResSo since this means, oob particles would silently(!)
   // be accepted.
+  // Is now implemented as follows: In communication.cpp in mpi_mpiio a
+  // global exchange is performed.
   Cell *c = dd_p4est_position_to_cell_strict(pos);
 
   if (c) {

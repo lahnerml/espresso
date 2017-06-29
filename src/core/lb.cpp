@@ -3384,8 +3384,6 @@ inline void lb_collide_stream() {
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
       lbadapt_swap_pointers(level);
-      // TODO: do not use convenience function here
-      // (exchange_data_begin)
 
       // synchronize ghost data for next collision step
       std::vector<lbadapt_payload_t*> local_pointer (P8EST_QMAXLEVEL);
@@ -3393,11 +3391,11 @@ inline void lb_collide_stream() {
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
 
-      for (int level = 0; level <= p4est_utils_get_forest_info(forest_order::adaptive_LB).finest_level_global; ++level) {
-        p8est_ghostvirt_exchange_data(
-            lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-            (void **)local_pointer.data(), (void **)ghost_pointer.data());
-      }
+      // TODO: do not use convenience function here
+      // if comm_hiding (exchange_data_begin)
+      p8est_ghostvirt_exchange_data(
+          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
     }
   }
 #endif // LB_ADAPTIVE_GPU

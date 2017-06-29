@@ -284,7 +284,9 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
   P4EST_ASSERT (ghost_data.size() == 0 || ghost_data.size() == local_data.size());
   for (int i = 0; i < local_data.size(); ++i) {
     local_pointer[i] = local_data[i].data();
-    ghost_pointer[i] = ghost_data[i].data();
+    if (ghost_data.size() != 0) {
+      ghost_pointer[i] = ghost_data[i].data();
+    }
   }
   return 0;
 }

@@ -38,6 +38,7 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]);
 // Map a position to a cell, returns NULL if not in local domain
 Cell* dd_p4est_position_to_cell(double pos[3]);
 //void dd_p4est_position_to_cell(double pos[3], int* idx);
+Cell* dd_p4est_position_to_cell_strict(double pos[3]);
 
 // Check all particles if they have left their cell and move the to the right neighboring cell
 void dd_p4est_exchange_and_sort_particles();

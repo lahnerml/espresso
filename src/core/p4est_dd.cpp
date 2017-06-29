@@ -719,7 +719,7 @@ void dd_p4est_init_cell_interaction() {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-static Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
+Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
   CALL_TRACE();
   
   // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain

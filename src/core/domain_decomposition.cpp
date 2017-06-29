@@ -1116,7 +1116,7 @@ void dd_exchange_and_sort_particles (int global_flag) {
       Cell *pl = local_cells.cell[c];
       for (int p = 0; p < pl->n; p++) {
         fold_position(pl->part[p].r.p, pl->part[p].l.i);
-        Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
+        Cell *nc = dd_p4est_position_to_cell_strict(pl->part[p].r.p);
         if (nc == NULL) { // Belongs to other node
           int pid = pl->part[p].p.identity;
           move_indexed_particle(&sendbuf, pl, p);

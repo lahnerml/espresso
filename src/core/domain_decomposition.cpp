@@ -1027,7 +1027,7 @@ void dd_topology_init(CellPList *old) {
     for (p = 0; p < np; p++) {
       fold_position(part[p].r.p, part[p].l.i);
       
-      Cell *nc = dd_save_position_to_cell(part[p].r.p);
+      Cell *nc = dd_p4est_position_to_cell_strict(part[p].r.p);
       if (nc == NULL) { // Particle is on other process, move it to cell[0]
         append_unindexed_particle(local_cells.cell[0], &part[p]);
       } else { // It is on this node, move it to right local_cell

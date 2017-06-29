@@ -596,7 +596,13 @@ void mpi_rand_refinement (int node, int maxLevel);
  */
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
 
+/** statically refine a square within the local domain
+ */
 void mpi_reg_refinement (int node, int param=0);
+
+/** statically coarsen a square within the local domain
+ */
+void mpi_reg_coarsening (int node, int param=0);
 
 /** Call recursive geometric refinement function, i.e. all quadrants that are
  * touching a boundary are recursively refined until l_max.

@@ -198,6 +198,7 @@ static int terminated = 0;
   CB(mpi_rand_refinement)                                                      \
   CB(mpi_bcast_parameters_for_regional_refinement)                             \
   CB(mpi_reg_refinement)                                                       \
+  CB(mpi_reg_coarsening)                                                       \
   CB(mpi_geometric_refinement)                                                 \
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
@@ -3144,6 +3145,57 @@ void mpi_reg_refinement(int node, int param) {
                    refine_regional,      // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
+
+  p8est_balance_ext(lb_p8est,               // forest
+                    P8EST_CONNECT_CORNER, // connection type
+                    NULL,                // init data
+                    NULL);               // replace data
+  // clang-format on
+
+  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+  p8est_mesh_destroy(lbadapt_mesh);
+  p8est_ghost_destroy(lbadapt_ghost);
+
+  std::vector<p4est_t *> forests;
+#ifdef DD_P4EST
+  forests.push_back(dd.p4est);
+#endif // DD_P4EST
+  forests.push_back(lb_p8est);
+  p4est_utils_prepare(forests);
+#ifdef DD_P4EST
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
+#endif // DD_P4EST
+
+  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = lb_p8est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
+
+  // FIXME: Implement mapping between two trees
+  lb_release_fluid();
+  lb_reinit_fluid();
+  lb_reinit_forces();
+
+  // reinitialize boundary
+  lbadapt_get_boundary_status();
+#endif // LB_ADAPTIVE
+}
+
+void mpi_reg_coarsening(int node, int param) {
+#ifdef LB_ADAPTIVE
+  // clang-format off
+  p8est_coarsen_ext(lb_p8est,                // forest
+                    0,                    // no recursive refinement
+                    0,
+                    coarsen_regional,      // return true to refine cell
+                    NULL,                 // init data
+                    NULL);                // replace data
 
   p8est_balance_ext(lb_p8est,               // forest
                     P8EST_CONNECT_CORNER, // connection type

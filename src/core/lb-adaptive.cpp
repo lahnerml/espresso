@@ -759,6 +759,26 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
   return 0;
 }
 
+int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
+                     p8est_quadrant_t **quads) {
+  lb_float midpoint[3];
+  int coarsen = 1;
+  for (int i = 0; i < P8EST_CHILDREN; ++i) {
+    p4est_utils_get_midpoint(p8est, which_tree, quads[i], midpoint);
+    if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
+        (midpoint[0] <= coords_for_regional_refinement[1]) &&
+        (coords_for_regional_refinement[2] <= midpoint[1]) &&
+        (midpoint[1] <= coords_for_regional_refinement[3]) &&
+        (coords_for_regional_refinement[4] <= midpoint[2]) &&
+        (midpoint[2] <= coords_for_regional_refinement[5])) {
+      coarsen &= 1;
+    } else {
+      coarsen = 0;
+    }
+  }
+  return coarsen;
+}
+
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q) {
   int base = P8EST_QUADRANT_LEN(q->level);
@@ -1921,7 +1941,7 @@ void lbadapt_swap_pointers(int level) {
 }
 
 void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
-  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double bnd, *bnd_ptr;
@@ -1971,7 +1991,7 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 }
 
 void lbadapt_get_density_values(sc_array_t *density_values) {
-  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double dens, *dens_ptr;
@@ -2071,7 +2091,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 }
 
 void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
-  const auto& forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int status;
   int level;
   double *veloc_ptr;
@@ -2229,8 +2249,8 @@ void lbadapt_get_boundary_status() {
     p8est_meshiter_destroy(mesh_iter);
 
     /** exchange boundary values */
-    std::vector<lbadapt_payload_t*> local_pointer (P8EST_QMAXLEVEL);
-    std::vector<lbadapt_payload_t*> ghost_pointer (P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
 
@@ -2464,7 +2484,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
       idx_a = i;
   }
   idx_b =
-    p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, lbadapt_ghost, pos);
+      p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, lbadapt_ghost, pos);
   P4EST_ASSERT(idx_a == idx_b);
   return idx_b;
 }

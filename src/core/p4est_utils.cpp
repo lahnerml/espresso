@@ -122,8 +122,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   for (int i = 0; i < p4est->mpisize; ++i) {
     p4est_quadrant_t *q = &p4est->global_first_position[i];
     double xyz[3];
-    p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree, q->x, q->y,
-                           q->z, xyz);
+    p4est_utils_get_front_lower_left(p4est, q->p.which_tree, q, xyz);
 
     // Scale xyz because p4est_utils_pos_morton_idx_global will assume it is
     // and undo this.

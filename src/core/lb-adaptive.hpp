@@ -161,8 +161,8 @@ int refine_uniform(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
                   p8est_quadrant_t *quadrant);
 
-/** Refinement function that refines all cells for whichs anchor point holds
- * 0.25 <= z < 0.75
+/** Refinement function that refines all cells that are contained within
+ * \ref coords_for_regional_refinement
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
@@ -170,6 +170,16 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q);
+
+/** Coarsening function that coarsens all groups cells contained within
+ * \ref coords_for_regional_refinement
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quads       The set of quadrant.
+ */
+int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
+                     p8est_quadrant_t **quads);
 
 /** Refinement function that refines all cells whose midpoint is closer to a
  * boundary than half the cells side length.

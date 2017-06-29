@@ -249,6 +249,61 @@ int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
   return TCL_OK;
 }
 
+int tclcommand_set_reg_coarse(ClientData data, Tcl_Interp *interp, int argc,
+                           char **argv) {
+  if (argc == 7) {
+    if (!ARG_IS_D(1, coords_for_regional_refinement[0])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(2, coords_for_regional_refinement[1])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(3, coords_for_regional_refinement[2])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(4, coords_for_regional_refinement[3])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(5, coords_for_regional_refinement[4])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(6, coords_for_regional_refinement[5])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+  }
+  mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
+  mpi_bcast_parameters_for_regional_refinement(0, 0);
+
+  mpi_call(mpi_reg_coarsening, -1, 0);
+  mpi_reg_coarsening(0, 0);
+
+  return TCL_OK;
+}
+
 int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv) {
   if (argc != 1) {

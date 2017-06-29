@@ -3659,6 +3659,11 @@ void mpi_mpiio(const char *filename, unsigned fields, int write) {
     std::puts("MPI-IO done. Forcing a global resort.");
     cells_resort_particles(CELL_GLOBAL_EXCHANGE);
   }
+
+  rebuild_verletlist = 1;
+  on_particle_change();
+
+  build_particle_node();
 }
 
 void mpi_mpiio_slave(int dummy, int flen) {
@@ -3675,6 +3680,9 @@ void mpi_mpiio_slave(int dummy, int flen) {
     cells_resort_particles(CELL_GLOBAL_EXCHANGE);
   }
   delete[] filename;
+
+  rebuild_verletlist = 1;
+  on_particle_change();
 }
 
 void mpi_dd_p4est_write_particle_vtk(int node, int len) {

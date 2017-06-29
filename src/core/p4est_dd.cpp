@@ -732,13 +732,18 @@ static Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
     return sidx < idx;
   };
 
-  int i = std::distance(p4est_shell,
-                        std::lower_bound(p4est_shell,
-                                         p4est_shell + num_local_cells,
-                                         dd_p4est_pos_morton_idx(pos),
-                                         shellidxcomp));
-  if (i < num_local_cells)
-    return &cells[i];
+  const auto needle = dd_p4est_pos_morton_idx(pos);
+
+  const auto p4est_shell_end = p4est_shell + num_local_cells;
+  auto it = std::lower_bound(p4est_shell,
+                             p4est_shell_end,
+                             needle,
+                             shellidxcomp);
+  if (it != p4est_shell_end
+        && dd_p4est_cell_morton_idx(it->coord[0],
+                                    it->coord[1],
+                                    it->coord[2]) == needle)
+    return &cells[std::distance(p4est_shell, it)];
   else
     return NULL;
 }

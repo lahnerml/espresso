@@ -641,9 +641,9 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
                                std::max(lb_old_local, lb_new_remote));
 
     r = requests[size + p];
-    mpiret = MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
-                       data_length * sizeof(T), MPI_BYTE, p, 0,
-                       p4est_new->mpicomm, &r);
+    mpiret =
+        MPI_Isend((void *)(data_mapped + send_offset), data_length * sizeof(T),
+                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
     requests[size + p] = r;
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;

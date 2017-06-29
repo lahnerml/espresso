@@ -257,7 +257,7 @@ void lbadapt_init() {
 } // lbadapt_init();
 
 void lbadapt_reinit_parameters() {
-  for (int i = lbpar.max_refinement_level; lbpar.base_level <= i; --i) {
+  for (int i = lbpar.max_refinement_level; 0 <= i; --i) {
     prefactors[i] = 1 << (lbpar.max_refinement_level - i);
 
 #ifdef LB_ADAPTIVE_GPU

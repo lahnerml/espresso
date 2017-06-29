@@ -387,7 +387,22 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 // CAUTION: Currently LB only
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
-  return 0;
+  double pos[3];
+  int inside = 1;
+  for (int i = 0; i < P8EST_CHILDREN; ++i) {
+    p4est_utils_get_front_lower_left(p8est, which_tree, quads[i], pos);
+    // refine front lower left quadrant(s)
+    std::array<double, 3> ref_min = {0.75, 0.00, 0.25};
+    std::array<double, 3> ref_max = {1.00, 0.25, 0.50};
+    if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
+        (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
+        (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {
+      inside &= 1;
+    } else {
+      inside = 0;
+    }
+  }
+  return inside;
 }
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,

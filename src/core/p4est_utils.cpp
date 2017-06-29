@@ -135,7 +135,8 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
         insert_elem.tree_quadrant_offset_synced, xyz);
   }
   insert_elem.first_quad_morton_idx[p4est->mpisize] =
-      p4est->global_num_quadrants;
+      p4est->trees->elem_count *
+      (1 << (P8EST_DIM * insert_elem.finest_level_global));
   P4EST_ASSERT(std::is_sorted(insert_elem.first_quad_morton_idx.begin(),
                               insert_elem.first_quad_morton_idx.end()));
 

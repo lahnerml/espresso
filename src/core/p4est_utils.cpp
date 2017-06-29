@@ -86,8 +86,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   }
   // only fill local send buffer if current process is not empty
   if (p4est->local_num_quadrants != 0) {
-    // set start index; if first tree is not completely owned by
-    // current
+    // set start index; if first tree is not completely owned by current
     // process it will set a wrong quadrant offset
     int start_idx = (p4est->first_local_tree == last_tree_prev_rank)
                         ? p4est->first_local_tree + 1
@@ -396,8 +395,8 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   double pos[3];
   p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
   // refine front lower left quadrant(s)
-  std::array<double, 3> ref_min = { 0.25, 0., 0.25};
-  std::array<double, 3> ref_max = { 0.5, 0.25, 0.5};
+  std::array<double, 3> ref_min = {0.25, 0., 0.25};
+  std::array<double, 3> ref_max = {0.5, 0.25, 0.5};
   if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
       (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
       (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {
@@ -435,7 +434,7 @@ int p4est_utils_adapt_grid() {
   // FIXME: Interface to Steffen's partitioning logic
   p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
   p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
-  std::vector<std::vector<lbadapt_payload_t>> data_partitioned (
+  std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
       p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
   p4est_utils_post_gridadapt_data_partition_transfer(
       p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
@@ -459,10 +458,10 @@ int p4est_utils_adapt_grid() {
   lb_p8est = p4est_partitioned;
 
   // synchronize ghost data for next collision step
-  std::vector<lbadapt_payload_t*> local_pointer (P8EST_QMAXLEVEL);
-  std::vector<lbadapt_payload_t*> ghost_pointer (P8EST_QMAXLEVEL);
-  prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                         lbadapt_ghost_data, ghost_pointer);
+  std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+  prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
+                         ghost_pointer);
 
   for (int level = 0; level <= current_forest.finest_level_global; ++level) {
     p8est_ghostvirt_exchange_data(
@@ -603,7 +602,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
   int mpiret;
   MPI_Request r;
-  std::vector<MPI_Request> requests (2 * size, MPI_REQUEST_NULL);
+  std::vector<MPI_Request> requests(2 * size, MPI_REQUEST_NULL);
 
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish

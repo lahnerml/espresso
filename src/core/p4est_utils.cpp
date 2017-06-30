@@ -488,7 +488,7 @@ int p4est_utils_adapt_grid() {
 
     // 1st step: locally map data between forests.
     lbadapt_payload_t *mapped_data_flat =
-        P4EST_ALLOC(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
+        P4EST_ALLOC_ZERO(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
     p4est_utils_post_gridadapt_map_data(lb_p8est, lbadapt_mesh, p4est_adapted,
                                         lbadapt_local_data, mapped_data_flat);
     // cleanup

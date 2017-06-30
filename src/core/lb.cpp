@@ -3353,7 +3353,8 @@ inline void lb_collide_stream() {
    */
   bool hide_communication = false;
 
-  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+  for (level = 0; level <= lbpar.max_refinement_level; ++level) {
+  //for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
     lvl_diff = lbpar.max_refinement_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       if (hide_communication) {
@@ -3375,7 +3376,8 @@ inline void lb_collide_stream() {
 
   // perform second half of subcycling here (process fine before coarse)
   // TODO: which max refinement level is needed?
-  for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
+  for (level = lbpar.max_refinement_level; 0 <= level; --level) {
+  //for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
     // level always relates to level of real cells
     lvl_diff = lbpar.max_refinement_level - level;
 

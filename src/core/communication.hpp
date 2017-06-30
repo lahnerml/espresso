@@ -609,6 +609,9 @@ void mpi_reg_coarsening (int node, int param=0);
  */
 void mpi_geometric_refinement (int node, int param);
 
+/** Call inverse of recursive geometric refinement function, i.e. all quadrants
+ * that are not touching a boundary are recursively refined until l_max.
+ */
 void mpi_inv_geometric_refinement (int node, int param);
 
 /** Ignore boundary with given index in geometric refinement function.

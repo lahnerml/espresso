@@ -3390,8 +3390,8 @@ inline void lb_collide_stream() {
       lbadapt_swap_pointers(level);
 
       // synchronize ghost data for next collision step
-      std::vector<lbadapt_payload_t*> local_pointer (P8EST_QMAXLEVEL);
-      std::vector<lbadapt_payload_t*> ghost_pointer (P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
 

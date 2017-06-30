@@ -268,7 +268,8 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-int p4est_utils_deallocate_levelwise_storage(std::vector<std::vector<T>> &data) {
+int p4est_utils_deallocate_levelwise_storage(
+    std::vector<std::vector<T>> &data) {
   if (!data.empty()) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
       data[level].clear();
@@ -281,10 +282,11 @@ int p4est_utils_deallocate_levelwise_storage(std::vector<std::vector<T>> &data) 
 
 template <typename T>
 int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
-                       std::vector<T*> &local_pointer,
-                       std::vector<std::vector<T>> &ghost_data,
-                       std::vector<T*> &ghost_pointer) {
-  P4EST_ASSERT (ghost_data.size() == 0 || ghost_data.size() == local_data.size());
+                           std::vector<T *> &local_pointer,
+                           std::vector<std::vector<T>> &ghost_data,
+                           std::vector<T *> &ghost_pointer) {
+  P4EST_ASSERT(ghost_data.size() == 0 ||
+               ghost_data.size() == local_data.size());
   for (int i = 0; i < local_data.size(); ++i) {
     local_pointer[i] = local_data[i].data();
     if (ghost_data.size() != 0) {
@@ -375,11 +377,9 @@ template <typename T>
  *                          CAUTION: Needs to be allocated and all numerical
  *                                   payload is supposed to be filled with 0.
  */
-int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
-                                        p8est_mesh_t *mesh_old,
-                                        p8est_t *p4est_new,
-                                        std::vector<std::vector<T>> &local_data_levelwise,
-                                        T *mapped_data_flat);
+int p4est_utils_post_gridadapt_map_data(
+    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p4est_new,
+    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
 
 template <typename T>
 /** Generic function to re-establish a proper load balacing after the grid has

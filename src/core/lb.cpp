@@ -3370,12 +3370,8 @@ inline void lb_collide_stream() {
       }
     }
   }
-
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
-  // prevent overflow
-  // TODO Mark grid alteration
-  n_lbsteps %= (1 << (lbpar.max_refinement_level - lbpar.base_level));
 
   // perform second half of subcycling here (process fine before coarse)
   // TODO: which max refinement level is needed?

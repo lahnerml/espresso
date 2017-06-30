@@ -97,9 +97,17 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
         local_tree_offsets[i] = tree->quadrants_offset +
                                 p4est->global_first_quadrant[p4est->mpirank];
       }
-      /* get local max level */
+      /* local max level */
       if (insert_elem.finest_level_local < tree->maxlevel) {
-        insert_elem.finest_level_local = tree->maxlevel;
+        insert_elem.finest_level_local = insert_elem.coarsest_level_local =
+            tree->maxlevel;
+      }
+      /* local min level */
+      for (int l = insert_elem.coarsest_level_local; l >= 0; --l) {
+        if (l < insert_elem.coarsest_level_local &&
+            tree->quadrants_per_level[l]) {
+          insert_elem.coarsest_level_local = l;
+        }
       }
     }
   }
@@ -113,6 +121,9 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   MPI_Allreduce(&insert_elem.finest_level_local,
                 &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
                 p4est->mpicomm);
+  MPI_Allreduce(&insert_elem.coarsest_level_local,
+                &insert_elem.coarsest_level_global, 1, P4EST_MPI_LOCIDX,
+                MPI_MAX, p4est->mpicomm);
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
 
   // ensure monotony

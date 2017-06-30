@@ -31,16 +31,19 @@ struct p4est_utils_forest_info_t {
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
   std::vector<int64_t> first_quad_morton_idx;
   int coarsest_level_local;
+  int coarsest_level_ghost;
+  int coarsest_level_global;
   int finest_level_local;
   int finest_level_global;
-  int coarsest_level_ghost;
   int finest_level_ghost;
 
   p4est_utils_forest_info_t(p4est_t *p4est)
       : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count, 0),
-        first_quad_morton_idx(p4est->mpisize + 1, 0), coarsest_level_local(0),
-        finest_level_local(-1), finest_level_global(-1),
-        coarsest_level_ghost(0), finest_level_ghost(0) {}
+        first_quad_morton_idx(p4est->mpisize + 1, 0),
+        coarsest_level_local(P8EST_QMAXLEVEL),
+        coarsest_level_ghost(P8EST_QMAXLEVEL),
+        coarsest_level_global(P8EST_QMAXLEVEL), finest_level_local(-1),
+        finest_level_global(-1), finest_level_ghost(-1) {}
 };
 
 /** Returns a const reference to the forest_info of "fo".

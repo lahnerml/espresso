@@ -48,40 +48,22 @@
  * buffer but to be able to remove the old global variables.
  */
 class CommBuf {
-  int nbytes;
-  int maxbytes;
-  char *buf;
+  std::vector<char> buf;
   std::vector<int> bondbuffer;
 
 public:
-  CommBuf(): nbytes(0), maxbytes(0), buf(nullptr) {}
-
-  ~CommBuf() { Utils::realloc(buf, 0); }
-  
-  CommBuf(const CommBuf& other): nbytes(other.nbytes), maxbytes(other.maxbytes), buf((char*)Utils::malloc(maxbytes))
-  {
-    memcpy(buf, other.buf, nbytes);
-  }
-
   /** Returns the size in bytes set by the last call to ensure_and_set_size.
    */
-  int size() { return nbytes; }
+  int size() { return buf.size(); }
 
   /** Ensures that this buffer can hold at least nb bytes of data.
    * Also sets the internal state so that subsequent calls to size() return nb.
    */
-  void ensure_and_set_size(int nb)
-  {
-    if (nb > maxbytes) {
-       maxbytes = nb;
-       buf = (char *) Utils::realloc(buf, nb);
-     }
-     nbytes = nb;
-   }
+  void ensure_and_set_size(int nb) { buf.resize(nb); }
 
   /** Returns a char pointer to the underlying data buffer.
    */
-   operator char *() { return buf; }
+   operator char *() { return buf.data(); }
 
    /** Access the associated bond buffer.
     */

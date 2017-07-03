@@ -111,6 +111,15 @@ struct CommunicationStatus {
   std::vector<ReceiveStatus> nextstatus;
   std::vector<ReceiveStatus> donestatus;
 };
+
+static inline void DIE_IF_TAG_MISMATCH(int act, int desired, const char *str) {
+  if (act != desired) {
+    std::cerr << "[" << this_node << "] TAG MISMATCH!"
+              << "Desired: " << desired << " Got: " << act << std::endl;
+    errexit();
+  }
+}
+
 static const int LOC_EX_CNT_TAG  = 11011;
 static const int LOC_EX_PART_TAG = 11022;
 static const int LOC_EX_DYN_TAG  = 11033;
@@ -1056,10 +1065,11 @@ void dd_p4est_exchange_and_sort_particles() {
     MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
     if (recvidx == MPI_UNDEFINED)
       break;
-    int dyndatasiz, source = status.MPI_SOURCE;
+    int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
 
     switch (commstat.expected(recvidx)) {
     case CommunicationStatus::ReceiveStatus::RECV_COUNT:
+      DIE_IF_TAG_MISMATCH(tag, LOC_EX_CNT_TAG, "Local exchange count");
       if (nrecvpart[recvidx] > 0) {
         realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
         MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
@@ -1068,6 +1078,7 @@ void dd_p4est_exchange_and_sort_particles() {
       }
       break;
     case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
+      DIE_IF_TAG_MISMATCH(tag, LOC_EX_PART_TAG, "Local exchange particles");
       recvbuf[recvidx].n = nrecvpart[recvidx];
       dyndatasiz =
           dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
@@ -1079,6 +1090,7 @@ void dd_p4est_exchange_and_sort_particles() {
       }
       break;
     case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
+      DIE_IF_TAG_MISMATCH(tag, LOC_EX_DYN_TAG, "Local exchange dyndata");
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
       commstat.next(recvidx);
       break;
@@ -1179,10 +1191,11 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
     if (recvidx == MPI_UNDEFINED)
       break;
 
-    int dyndatasiz, source = status.MPI_SOURCE;
+    int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
 
     switch (commstat.expected(recvidx)) {
     case CommunicationStatus::ReceiveStatus::RECV_COUNT:
+      DIE_IF_TAG_MISMATCH(tag, GLO_EX_CNT_TAG, "Global exchange count");
       if (nrecvpart[recvidx] > 0) {
         realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
         MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
@@ -1191,6 +1204,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
       }
       break;
     case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
+      DIE_IF_TAG_MISMATCH(tag, GLO_EX_PART_TAG, "Global exchange particles");
       recvbuf[recvidx].n = nrecvpart[recvidx];
       dyndatasiz =
           dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
@@ -1202,6 +1216,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
       }
       break;
     case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
+      DIE_IF_TAG_MISMATCH(tag, GLO_EX_DYN_TAG, "Global exchange dyndata");
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
       commstat.next(recvidx);
       break;

@@ -559,28 +559,12 @@ static void ghost_communicator_async(GhostCommunicator *gc)
 {
   const int data_parts = gc->data_parts;
   // Use static buffers for performance reasons
-  static std::vector<CommBuf> commbufs;
+  std::vector<CommBuf> commbufs(gc->num);
   // Reqs has size 2 * gc->num. In the first gc->num elements the requests of
   // particle data Isend and Irecv are stored. In the second half requests of
   // bond Isends are stored. After reception of the particle data, the finished
   // Irecv requests are replaced by new bond Irecv requests.
-  static std::vector<MPI_Request> reqs;
-
-  // Zero the size of *all* bondbufs since we rely of zero size receive
-  // bondbufs and we cannot guarantee that all comm_types are ordered the same
-  // way for each GhostCommunicator.
-  for (int i = 0; i < commbufs.size(); ++i)
-    commbufs[i].bondbuf().resize(0);
-
-
-  // Ensure minimum size of buffers
-  if (commbufs.size() < gc->num) {
-    commbufs.resize(gc->num);
-    reqs.resize(2 * gc->num);
-    // Since the second half of reqs stores only request for sends, we need to
-    // initialize the elements (Note: could also be done in the receive loop)
-    std::fill(reqs.begin() + gc->num, reqs.end(), MPI_REQUEST_NULL);
-  }
+  std::vector<MPI_Request> reqs(2 * gc->num, MPI_REQUEST_NULL);
 
   // Prepare receive buffers and post receives
   for (int i = 0; i < gc->num; i++) {
@@ -613,9 +597,7 @@ static void ghost_communicator_async(GhostCommunicator *gc)
 
   // Wait for requests and postprocess them if they are receives
   int outcount;
-  static std::vector<int> idxs;
-  if (idxs.size() < gc->num)
-    idxs.resize(gc->num);
+  std::vector<int> idxs(gc->num);
 
   while (true) {
     // Wait only for the first half. The second half does not hold receive

@@ -1041,10 +1041,9 @@ void dd_p4est_exchange_and_sort_particles() {
 
   // send number of particles, particles, and particle data
   for (int i = 0; i < num_comm_proc; ++i) {
-    int nsend = sendbuf[i].n;
-    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG, comm_cart,
-              &sreq[i]);
-    if (nsend <= 0)
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
+              comm_cart, &sreq[i]);
+    if (sendbuf[i].n <= 0)
       continue;
     MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE,
               comm_rank[i], LOC_EX_PART_TAG, comm_cart,
@@ -1169,9 +1168,8 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
 
   // send number of particles, particles, and particle data
   for (int i = 0; i < n_nodes; ++i) {
-    int nsend = sendbuf[i].n;
-    MPI_Isend(&nsend, 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart, &sreq[i]);
-    if (nsend <= 0)
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart, &sreq[i]);
+    if (sendbuf[i].n <= 0)
       continue;
     MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i,
               GLO_EX_PART_TAG, comm_cart, &sreq[i + n_nodes]);

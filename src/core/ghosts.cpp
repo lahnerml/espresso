@@ -572,6 +572,8 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     const int comm_type = gcn->type & GHOST_JOBMASK;
     if (comm_type == GHOST_RECV) {
       prepare_recv_buffer(commbufs[i], gcn, data_parts);
+      if (commbufs[i].size() <= 0)
+        continue;
       MPI_Irecv(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
     } else if (comm_type != GHOST_SEND) {
       // Check for invalid operations
@@ -586,12 +588,15 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     const int comm_type = gcn->type & GHOST_JOBMASK;
     if (comm_type == GHOST_SEND) {
       prepare_send_buffer(commbufs[i], gcn, data_parts);
+      if (commbufs[i].size() <= 0)
+        continue;
       MPI_Isend(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
 
       // MPI guarantees ordered communication for the same pair of (receiver, tag)
       std::vector<int>& bbuf = commbufs[i].bondbuf();
-      if (bbuf.size() > 0)
-        MPI_Isend(bbuf.data(), bbuf.size(), MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gc->num + i]);
+      if (bbuf.size() <= 0)
+        continue;
+      MPI_Isend(bbuf.data(), bbuf.size(), MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gc->num + i]);
     }
   }
 

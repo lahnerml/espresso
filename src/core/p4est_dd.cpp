@@ -65,6 +65,60 @@ typedef struct {
 // Empty as long as tclcommand_repart has not been called.
 static std::vector<p4est_locidx_t> part_nquads;
 //--------------------------------------------------------------------------------------------------
+struct CommunicationStatus {
+  enum class ReceiveStatus {
+    RECV_NOTSTARTED,
+    RECV_COUNT,
+    RECV_PARTICLES,
+    RECV_DYNDATA,
+    RECV_DONE
+  };
+
+  CommunicationStatus(int ncomm)
+      : nextstatus(ncomm, ReceiveStatus::RECV_COUNT),
+        donestatus(ncomm, ReceiveStatus::RECV_NOTSTARTED)
+  {
+  }
+
+  ReceiveStatus expected(int idx)
+  {
+    if (nextstatus[idx] <= donestatus[idx]) {
+      std::cerr << "[" << this_node << "] "
+                << "Error in communication sequence: "
+                << "Expecting status " << static_cast<int>(nextstatus[idx])
+                << " to happen but is already done ("
+                << static_cast<int>(donestatus[idx]) << ")" << std::endl;
+      errexit();
+    }
+
+    incr_recvstatus(donestatus[idx]);
+    return nextstatus[idx];
+  }
+
+  void next(int idx) { incr_recvstatus(nextstatus[idx]); }
+
+  static void incr_recvstatus(ReceiveStatus &r)
+  {
+    if (r == ReceiveStatus::RECV_DONE) {
+      std::cerr << "[" << this_node << "] "
+                << "Trying to increment bad communication status: "
+                << static_cast<int>(r) << std::endl;
+    }
+    r = static_cast<ReceiveStatus>(static_cast<int>(r) + 1);
+  }
+
+ private:
+  std::vector<ReceiveStatus> nextstatus;
+  std::vector<ReceiveStatus> donestatus;
+};
+static const int LOC_EX_CNT_TAG  = 11011;
+static const int LOC_EX_PART_TAG = 11022;
+static const int LOC_EX_DYN_TAG  = 11033;
+static const int GLO_EX_CNT_TAG  = 22011;
+static const int GLO_EX_PART_TAG = 22022;
+static const int GLO_EX_DYN_TAG  = 22033;
+static const int COMM_RANK_NONE  = 999999;
+//--------------------------------------------------------------------------------------------------
 int dd_p4est_full_shell_neigh(int cell, int neighidx)
 {
     if (neighidx >= 0 && neighidx < 26)
@@ -945,71 +999,85 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
 void dd_p4est_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
   std::vector<ParticleList> sendbuf(num_comm_proc), recvbuf(num_comm_proc);
-  std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc), recvbuf_dyn(num_comm_proc);
+  std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc),
+      recvbuf_dyn(num_comm_proc);
   std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(num_comm_proc, 0);
-  
-  for (int i=0;i<num_comm_proc;++i) {
+
+  for (int i = 0; i < num_comm_proc; ++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
-    // Invoke the recv thread for number of particles from all neighbouring nodes
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], 0, comm_cart, &rreq[i]);
+    // Invoke receive for the number of particles to be received from
+    // all neighbors
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
+              comm_cart, &rreq[i]);
   }
-      
+
   // Fill the send buffers with particles that leave the local domain
   dd_p4est_fill_sendbuf(sendbuf.data(), sendbuf_dyn.data());
-  
-  
+
   // send number of particles, particles, and particle data
-  for (int i=0;i<num_comm_proc;++i) {
+  for (int i = 0; i < num_comm_proc; ++i) {
     int nsend = sendbuf[i].n;
-    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, comm_rank[i], 1, comm_cart, &sreq[i + num_comm_proc]);
-    if (sendbuf_dyn[i].size() > 0) {
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, comm_rank[i], 2, comm_cart, &sreq[i + 2*num_comm_proc]);
-    }
+    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG, comm_cart,
+              &sreq[i]);
+    if (nsend <= 0)
+      continue;
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE,
+              comm_rank[i], LOC_EX_PART_TAG, comm_cart,
+              &sreq[i + num_comm_proc]);
+    if (sendbuf_dyn[i].size() <= 0)
+      continue;
+    MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT,
+              comm_rank[i], LOC_EX_DYN_TAG, comm_cart,
+              &sreq[i + 2 * num_comm_proc]);
   }
-      
+
   // Receive all data
   MPI_Status status;
-  std::vector<int> recvs(num_comm_proc, 0); // number of recv for each process
-  int recvidx, source;
+  CommunicationStatus commstat(num_comm_proc);
+
   while (true) {
+    int recvidx;
     MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
     if (recvidx == MPI_UNDEFINED)
       break;
+    int dyndatasiz, source = status.MPI_SOURCE;
 
-    source = status.MPI_SOURCE;
-    
-    int cnt;
-    MPI_Get_count(&status,MPI_BYTE,&cnt);
-    
-    // this is the first recv for the process. this means, that the Irecv fornumber of particles 
-    // has finished
-    if (recvs[recvidx] == 0) { 
-      // alloc recv buffer with number of particles
-      realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      // fill it
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, 1, comm_cart, &rreq[recvidx]);
-    } else if (recvs[recvidx] == 1) { // filling the recv buffer has finished
-      // Particles received
-      recvbuf[recvidx].n = nrecvpart[recvidx];
-      // Add new particles to local storage
-      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
-      if (dyndatasiz > 0) { // If there is dynamic data, invoke recv thread for that as well
-        recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, /*tag*/2, comm_cart, &rreq[recvidx]);
+    switch (commstat.expected(recvidx)) {
+    case CommunicationStatus::ReceiveStatus::RECV_COUNT:
+      if (nrecvpart[recvidx] > 0) {
+        realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
+        MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
+                  MPI_BYTE, source, LOC_EX_PART_TAG, comm_cart, &rreq[recvidx]);
+        commstat.next(recvidx);
       }
-    } else { // recv for dynamic data has finished
+      break;
+    case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
+      recvbuf[recvidx].n = nrecvpart[recvidx];
+      dyndatasiz =
+          dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
+      if (dyndatasiz > 0) {
+        recvbuf_dyn[recvidx].resize(dyndatasiz);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source,
+                  LOC_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
+        commstat.next(recvidx);
+      }
+      break;
+    case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
+      commstat.next(recvidx);
+      break;
+    default:
+      std::cerr << "[" << this_node << "]"
+                << "Unknown comm status for receive index " << recvidx
+                << std::endl;
+      break;
     }
-    recvs[recvidx]++;
   }
-
-  
   MPI_Waitall(3 * num_comm_proc, sreq.data(), MPI_STATUS_IGNORE);
-  
+
   // clear all buffers and free memory
   for (int i = 0; i < num_comm_proc; ++i) {
     // Remove particles from this nodes local list and free data
@@ -1022,90 +1090,117 @@ void dd_p4est_exchange_and_sort_particles() {
     sendbuf_dyn[i].clear();
     recvbuf_dyn[i].clear();
   }
-  
+
 #ifdef ADDITIONAL_CHECKS
   check_particle_consistency();
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_global_exchange_part (ParticleList* pl) {
+void dd_p4est_global_exchange_part(ParticleList *pl)
+{
   // Prepare send/recv buffers to ALL processes
   std::vector<ParticleList> sendbuf(n_nodes), recvbuf(n_nodes);
   std::vector<std::vector<int>> sendbuf_dyn(n_nodes), recvbuf_dyn(n_nodes);
   std::vector<MPI_Request> sreq(3 * n_nodes, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(n_nodes, MPI_REQUEST_NULL);
   std::vector<int> nrecvpart(n_nodes, 0);
-    
-  for (int i=0;i<n_nodes;++i) {
+
+  for (int i = 0; i < n_nodes; ++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
-    
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, 0, comm_cart, &rreq[i]);
+
+    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart,
+              &rreq[i]);
   }
-  
-  // If pl == NULL do nothing, since there are no particles and cells on this node
+
+  // If pl == NULL do nothing, since there are no particles and cells on this
+  // node
   if (pl) {
     // Find the correct node for each particle in pl
     for (int p = 0; p < pl->n; p++) {
       Particle *part = &pl->part[p];
-      //fold_position(part->r.p, part->l.i);
+      // fold_position(part->r.p, part->l.i);
       int rank = dd_p4est_pos_to_proc(part->r.p);
-      if (rank != this_node) { // It is actually a remote particle -> copy all data to sendbuffer
+      if (rank != this_node) {  // It is actually a remote particle -> copy all
+                                // data to sendbuffer
         if (rank > n_nodes || rank < 0) {
-          fprintf(stderr,"process %i invalid\n", rank);
+          fprintf(stderr, "process %i invalid\n", rank);
           errexit();
         }
-        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->bl.e, part->bl.e + part->bl.n);
+        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->bl.e,
+                                 part->bl.e + part->bl.n);
 #ifdef EXCLUSIONS
-        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->el.e, part->el.e + part->el.n);
+        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->el.e,
+                                 part->el.e + part->el.n);
 #endif
         int pid = part->p.identity;
         move_indexed_particle(&sendbuf[rank], pl, p);
         local_particles[pid] = NULL;
-        if(p < pl->n) p -= 1;
+        if (p < pl->n)
+          p -= 1;
       }
     }
   }
-  
+
   // send number of particles, particles, and particle data
-  for (int i=0;i<n_nodes;++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, 0, comm_cart, &sreq[i]);
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i, 0, comm_cart, &sreq[i + n_nodes]);
-    if (sendbuf_dyn[i].size() > 0)
-      MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i, 0, comm_cart, &sreq[i + 2*n_nodes]);
+  for (int i = 0; i < n_nodes; ++i) {
+    int nsend = sendbuf[i].n;
+    MPI_Isend(&nsend, 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart, &sreq[i]);
+    if (nsend <= 0)
+      continue;
+    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i,
+              GLO_EX_PART_TAG, comm_cart, &sreq[i + n_nodes]);
+    if (sendbuf_dyn[i].size() <= 0)
+      continue;
+    MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i,
+              GLO_EX_DYN_TAG, comm_cart, &sreq[i + 2 * n_nodes]);
   }
-  
-  // Receive all data. The async communication scheme is the same as in exchange_and_sort_particles
+
+  // Receive all data. The async communication scheme is the same as in
+  // exchange_and_sort_particles
   MPI_Status status;
-  std::vector<int> recvs(n_nodes, 0);
-  int recvidx, tag, source;
+  CommunicationStatus commstat(n_nodes);
   while (true) {
+    int recvidx;
     MPI_Waitany(n_nodes, rreq.data(), &recvidx, &status);
     if (recvidx == MPI_UNDEFINED)
       break;
 
-    source = status.MPI_SOURCE;
-    tag = status.MPI_TAG;
+    int dyndatasiz, source = status.MPI_SOURCE;
 
-    if (recvs[recvidx] == 0) {
-      // Size received
-      realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-      MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle), MPI_BYTE, source, tag, comm_cart, &rreq[recvidx]);
-    } else if (recvs[recvidx] == 1) {
-      // Particles received
+    switch (commstat.expected(recvidx)) {
+    case CommunicationStatus::ReceiveStatus::RECV_COUNT:
+      if (nrecvpart[recvidx] > 0) {
+        realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
+        MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
+                  MPI_BYTE, source, GLO_EX_PART_TAG, comm_cart, &rreq[recvidx]);
+        commstat.next(recvidx);
+      }
+      break;
+    case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
       recvbuf[recvidx].n = nrecvpart[recvidx];
-      int dyndatasiz = dd_async_exchange_insert_particles(&recvbuf[recvidx], 1, source);
+      dyndatasiz =
+          dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
       if (dyndatasiz > 0) {
         recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source, tag, comm_cart, &rreq[recvidx]);
+        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source,
+                  GLO_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
+        commstat.next(recvidx);
       }
-    } else {
+      break;
+    case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
       dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
+      commstat.next(recvidx);
+      break;
+    default:
+      std::cerr << "[" << this_node << "]"
+                << "Unknown comm status for receive index " << recvidx
+                << std::endl;
+      break;
     }
-    recvs[recvidx]++;
   }
-  
   MPI_Waitall(3 * n_nodes, sreq.data(), MPI_STATUS_IGNORE);
+
   for (int i = 0; i < n_nodes; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {

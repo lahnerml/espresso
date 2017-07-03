@@ -973,8 +973,7 @@ void dd_p4est_exchange_and_sort_particles() {
 
   // send number of particles, particles, and particle data
   for (int i = 0; i < num_comm_proc; ++i) {
-    int nsend = sendbuf[i].n;
-    MPI_Isend(&nsend, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
+    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], 0, comm_cart, &sreq[i]);
     MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE,
               comm_rank[i], 1, comm_cart, &sreq[i + num_comm_proc]);
     if (sendbuf_dyn[i].size() > 0) {

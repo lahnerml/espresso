@@ -628,7 +628,9 @@ void dd_p4est_comm () {
   comm_recv = new comm_t[num_recv];
   comm_send = new comm_t[num_send];
   comm_rank = new int[num_comm_proc];
-  
+
+  std::fill(comm_rank, comm_rank + num_comm_proc, COMM_RANK_NONE);
+
   // Parse all bitmasks and fill the actual lists
   for (int n=0,s_cnt=0,r_cnt=0;n<n_nodes;++n) {
     if (comm_proc[n] >= 0) comm_rank[comm_proc[n]] = n;
@@ -655,7 +657,18 @@ void dd_p4est_comm () {
       }
     }
   }
-  
+
+  // Debug or rather sanity check
+  {
+    for (int i = 0; i < num_comm_proc; i++) {
+      if (comm_rank[i] == COMM_RANK_NONE) {
+        std::cerr << "[" << this_node << "]"
+                  << "Error: Comm_rank[" << i << "] is NONE." << std::endl;
+        errexit();
+      }
+    }
+  }
+
   /*sprintf(fname,"send_%i.list",this_node);
   h = fopen(fname,"w");
   for (int n=0;n<num_comm_send;++n)

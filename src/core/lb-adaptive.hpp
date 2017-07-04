@@ -314,6 +314,14 @@ void lbadapt_get_density_values(sc_array_t *density_values);
  */
 void lbadapt_get_velocity_values(sc_array_t *velocity_values);
 
+/** Calculate vorticity value of each local quadrant for refinement/coarsening
+ *
+ * @param [in]  p4est    Current forest
+ * @param [out] vort     Container for storing vorticity values
+ */
+void lbadapt_calc_vorticity(p8est_t *p4est,
+                            std::vector<std::array<double, 3>> &vort);
+
 /** Init boudary flag of each quadrant.
  */
 void lbadapt_get_boundary_status();

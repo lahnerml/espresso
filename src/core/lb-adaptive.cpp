@@ -1058,10 +1058,9 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   return 0;
 }
 
-int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float mode[19],
-                              lb_float force[3], int boundary, int has_force,
-                              lb_float h, lb_float *rho, lb_float *j,
-                              lb_float *pi) {
+int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
+                              int boundary, int has_force, lb_float h,
+                              lb_float *rho, lb_float *j, lb_float *pi) {
   int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
 #ifdef LB_ADAPTIVE_GPU
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
@@ -2096,7 +2095,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   int level;
   double *veloc_ptr;
   lbadapt_payload_t *data;
-  double modes[19];
 
 #ifdef LB_ADAPTIVE_GPU
   int cells_per_patch =
@@ -2134,9 +2132,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_modes(data->lbfluid, modes);
-
-        lbadapt_calc_local_fields(data->lbfluid, modes, data->lbfields.force,
+        lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                                   data->lbfields.boundary,
                                   data->lbfields.has_force, h, &rho, j, NULL);
 
@@ -2157,7 +2153,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
               lb_float tmp_rho, tmp_j[3];
               lbadapt_calc_local_fields(
                   data->patch[patch_x][patch_y][patch_z].lbfluid,
-                  data->patch[patch_x][patch_y][patch_z].modes,
                   data->patch[patch_x][patch_y][patch_z].force,
                   data->patch[patch_x][patch_y][patch_z].boundary, 1, h,
                   &tmp_rho, tmp_j, NULL);

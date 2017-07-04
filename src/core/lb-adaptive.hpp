@@ -318,9 +318,9 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values);
  */
 void lbadapt_get_boundary_status();
 
-int lbadapt_calc_local_fields(double populations[2][19], double mode[19],
-                              double force[3], int boundary, int has_force,
-                              double h, double *rho, double *j, double *pi);
+int lbadapt_calc_local_fields(double populations[2][19], double force[3],
+                              int boundary, int has_force, double h,
+                              double *rho, double *j, double *pi);
 
 /** Calculate local density from pre-collision moments
  *

@@ -436,42 +436,10 @@ int p4est_utils_adapt_grid() {
   const p4est_utils_forest_info_t &current_forest =
       p4est_utils_get_forest_info(forest_order::adaptive_LB);
 
-  // FIXME remove DEBUG
-  char filename_pre[42];
-  snprintf(filename_pre, 42, "pre_gridchange_%i", (int)(sim_time / time_step));
-  sc_array_t *vel;
-  p4est_locidx_t num_cells = current_forest.p4est->local_num_quadrants;
-  vel = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-
-  lbadapt_get_velocity_values(vel);
-
-  /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename_pre);
-  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
-
-  /* begin writing the output files */
-  context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
-                 P8EST_STRING "_vtk: Error writing vtk header");
-  // clang-format off
-  context = p8est_vtk_write_cell_dataf(context,
-                                       1, /* write tree indices */
-                                       1, /* write the refinement level */
-                                       1, /* write the mpi process id */
-                                       0, /* do not wrap the mpi rank */
-                                       0, /* no custom cell scalar data */
-                                       1, /* write velocity as vector cell
-                                             data */
-                                       "velocity", vel, context);
-  // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
-
-  const int retval = p8est_vtk_write_footer(context);
-  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-
-  /* free memory */
-  sc_array_destroy(vel);
-  // FIXME remove DEBUG
+  // calculate vorticity
+  std::vector<std::array<double, 3>> vorticity_values(
+      current_forest.p4est->local_num_quadrants, std::array<double, 3>());
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values);
 
   p8est_t *p4est_adapted = p8est_copy(current_forest.p4est, 0);
   p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
@@ -549,44 +517,11 @@ int p4est_utils_adapt_grid() {
   } else {
     p8est_destroy(p4est_adapted);
   }
-  // FIXME remove DEBUG
-  char filename_post[42];
-  snprintf(filename_post, 42, "post_gridchange_%i",
-           (int)(sim_time / time_step));
-  num_cells = lb_p8est->local_num_quadrants;
-  vel = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
-  lbadapt_get_velocity_values(vel);
-
-  /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context_post =
-      p8est_vtk_context_new(lb_p8est, filename_post);
-  p8est_vtk_context_set_scale(context_post, 1);
-
-  /* begin writing the output files */
-  context_post = p8est_vtk_write_header(context_post);
-  SC_CHECK_ABORT(context_post != NULL,
-                 P8EST_STRING "_vtk: Error writing vtk header");
-  // clang-format off
-  context_post = p8est_vtk_write_cell_dataf(context_post,
-                                            1, /* write tree indices */
-                                            1, /* write the refinement level */
-                                            1, /* write the mpi process id */
-                                            0, /* do not wrap the mpi rank */
-                                            0, /* no custom cell scalar data */
-                                            1, /* write velocity as vector cell
-                                                  data */
-                                            "velocity", vel, context_post);
-  // clang-format on
-  SC_CHECK_ABORT(context_post != NULL,
-                 P8EST_STRING "_vtk: Error writing cell data");
-
-  const int retval_post = p8est_vtk_write_footer(context_post);
-  SC_CHECK_ABORT(!retval_post, P8EST_STRING "_vtk: Error writing footer");
-
-  /* free memory */
-  sc_array_destroy(vel);
-  // FIXME remove DEBUG
+  // calculate vorticity
+  vorticity_values.clear();
+  vorticity_values.resize(current_forest.p4est->local_num_quadrants);
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values);
 
   return 0;
 }

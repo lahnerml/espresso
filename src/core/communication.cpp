@@ -3152,6 +3152,16 @@ void mpi_reg_refinement(int node, int param) {
   p8est_mesh_destroy(lbadapt_mesh);
   p8est_ghost_destroy(lbadapt_ghost);
 
+  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
+  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
+                                    P8EST_CONNECT_CORNER);
+  lbadapt_ghost_virt =
+      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = lb_p8est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
+
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
@@ -3163,23 +3173,21 @@ void mpi_reg_refinement(int node, int param) {
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
 
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
+  const p4est_utils_forest_info_t &forest =
+      p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  fprintf(stderr, "[p4est %i] level: coarsest local %i, coarsest global %i, "
+                  "finest local %i, finest global %i\n",
+          lb_p8est->mpirank, forest.coarsest_level_local,
+          forest.coarsest_level_global, forest.finest_level_local,
+          forest.finest_level_global);
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 
-  // reinitialize boundary
-  lbadapt_get_boundary_status();
+// reinitialize boundary
+// lbadapt_get_boundary_status();
 #endif // LB_ADAPTIVE
 }
 

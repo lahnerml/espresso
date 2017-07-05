@@ -586,11 +586,11 @@ void mpi_lbadapt_set_steps_before_grid_change(int node, int steps);
 /** Call non-recursive uniform refinement function, i.e. all quadrants are
  * refined exactly once.
  */
-void mpi_unif_refinement (int node, int level);
+void mpi_unif_refinement (int node, int ref_iterations);
 
 /** Call non-recursive random refinement function. Probability is 50%.
  */
-void mpi_rand_refinement (int node, int maxLevel);
+void mpi_rand_refinement (int node, int ref_iterations);
 
 /** Call broadcast routine to populate 6 coordinates
  */

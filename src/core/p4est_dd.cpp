@@ -195,7 +195,7 @@ int dd_p4est_cellsize_even () {
   return lvl; // Return level > 0 if max_range <= 0.5
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_create_grid () {
+void dd_p4est_create_grid (bool isRepart) {
   //printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
   // Clear data to prevent accidental use of old stuff
@@ -206,7 +206,6 @@ void dd_p4est_create_grid () {
   p4est_space_idx.clear();
   dd.p4est_shell.clear();
 
-  
 #ifdef LB_ADAPTIVE
   // the adaptive LB has a strange grid, thus we have to do something similar here
   if (max_range < 1.0)
@@ -233,7 +232,7 @@ void dd_p4est_create_grid () {
 #endif
   
   // create p4est structs
-  {
+  if (!isRepart) {
     auto oldconn = std::move(dd.p4est_conn);
     dd.p4est_conn =
         std::unique_ptr<p4est_connectivity_t>(p8est_connectivity_new_brick(
@@ -1455,7 +1454,7 @@ p4est_dd_repartition(const std::string& desc, bool debug)
   p4est_dd_repart_calc_nquads(weights, debug);
 
   repart::print_cell_info("!>>> Before Repart", desc);
-  cells_re_init(CELL_STRUCTURE_CURRENT);
+  cells_re_init(CELL_STRUCTURE_CURRENT, true);
   repart::print_cell_info("!>>> After Repart", desc);
 }
 

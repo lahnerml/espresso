@@ -145,15 +145,15 @@ static void topology_release(int cs) {
 
 /** Switch for choosing the topology init function of a certain
     cell system. */
-static void topology_init(int cs, CellPList *local) {
+static void topology_init(int cs, CellPList *local, bool isRepart) {
   switch (cs) {
   case CELL_STRUCTURE_NONEYET:
     break;
   case CELL_STRUCTURE_CURRENT:
-    topology_init(cell_structure.type, local);
+    topology_init(cell_structure.type, local, isRepart);
     break;
   case CELL_STRUCTURE_DOMDEC:
-    dd_topology_init(local);
+    dd_topology_init(local, isRepart);
     break;
   case CELL_STRUCTURE_NSQUARE:
     nsq_topology_init(local);
@@ -175,7 +175,7 @@ static void topology_init(int cs, CellPList *local) {
 
 /************************************************************/
 
-void cells_re_init (int new_cs)
+void cells_re_init (int new_cs, bool isRepart)
 {
   CALL_TRACE();
   
@@ -208,7 +208,7 @@ void cells_re_init (int new_cs)
   cells   = NULL;
   n_cells = 0;
 
-  topology_init(new_cs, &tmp_local);
+  topology_init(new_cs, &tmp_local, isRepart);
 
   particle_invalidate_part_node();
 

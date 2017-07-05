@@ -17,7 +17,7 @@
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Creates the irregular DD using p4est
-void dd_p4est_create_grid ();
+void dd_p4est_create_grid (bool isRepart = false);
 // Compute communication partners for this node and fill internal lists
 void dd_p4est_comm ();
 // Mark all cells either local or ghost. Local cells are arranged before ghost cells

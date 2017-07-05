@@ -132,13 +132,13 @@ double max_skin   = 0.0;
  *  DomainDecomposition::cell_size, \ref
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
-void dd_create_cell_grid () {
+void dd_create_cell_grid (bool isRepart) {
   CALL_TRACE();
   
 #ifndef P4EST_NOCHANGE
 
   // Construct p4est-DD and allocate memory
-  dd_p4est_create_grid ();
+  dd_p4est_create_grid (isRepart);
   // Fill internal communator lists
   dd_p4est_comm();
   
@@ -937,7 +937,7 @@ void dd_on_geometry_change(int flags) {
 }
 
 /************************************************************/
-void dd_topology_init(CellPList *old) {
+void dd_topology_init(CellPList *old, bool isRepart) {
   CALL_TRACE();
 
   int c,p,np;
@@ -962,7 +962,7 @@ void dd_topology_init(CellPList *old) {
 #endif
 
   /* set up new domain decomposition cell structure */
-  dd_create_cell_grid();
+  dd_create_cell_grid(isRepart);
   /* mark cells */
   dd_mark_cells();
 

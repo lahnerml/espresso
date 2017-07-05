@@ -6,6 +6,7 @@
 #include "domain_decomposition.hpp"
 #include "lb-adaptive.hpp"
 #include "p4est_dd.hpp"
+#include "p4est_gridchange_criteria.hpp"
 
 #include <algorithm>
 #include <array>
@@ -398,37 +399,18 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 // CAUTION: Currently LB only
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
-  double pos[3];
-  int inside = 1;
+  int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    p4est_utils_get_front_lower_left(p8est, which_tree, quads[i], pos);
-    // refine front lower left quadrant(s)
-    std::array<double, 3> ref_min = {0.75, 0.00, 0.25};
-    std::array<double, 3> ref_max = {1.00, 0.25, 0.50};
-    if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
-        (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
-        (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {
-      inside &= 1;
-    } else {
-      inside = 0;
-    }
+    // coarsen &= random_geometric(p8est, which_tree, quads[i]);
+    coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
   }
-  return inside;
+  return coarsen;
 }
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
-  double pos[3];
-  p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
-  // refine front lower left quadrant(s)
-  std::array<double, 3> ref_min = {0.25, 0., 0.25};
-  std::array<double, 3> ref_max = {0.5, 0.25, 0.5};
-  if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
-      (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
-      (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {
-    return 1;
-  }
-  return 0;
+  // return random_geometric(p8est, which_tree, q);
+  return !mirror_refinement_pattern(p8est, which_tree, q);
 }
 
 int p4est_utils_adapt_grid() {

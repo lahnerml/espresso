@@ -2308,7 +2308,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   if (filename == "") {
     filename = "vorticity_" + std::to_string((int)(sim_time / time_step));
   }
-  sc_array_t *vorticity, *velocity, *dbg_vel, *qid;
+  sc_array_t *vorticity, *velocity, *qid;
   p4est_locidx_t num_cells = p4est->local_num_quadrants;
   vorticity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
   velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
@@ -2351,7 +2351,6 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   /* free memory */
   sc_array_destroy(velocity);
   sc_array_destroy(vorticity);
-  sc_array_destroy(dbg_vel);
   sc_array_destroy(qid);
   // FIXME remove DEBUG
 

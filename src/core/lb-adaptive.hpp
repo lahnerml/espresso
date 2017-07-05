@@ -41,6 +41,7 @@
 #include <p8est_meshiter.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
+#include <string.h>
 #include <vector>
 
 #include "lb-adaptive-gpu.hpp"
@@ -320,7 +321,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values);
  * @param [out] vort     Container for storing vorticity values
  */
 void lbadapt_calc_vorticity(p8est_t *p4est,
-                            std::vector<std::array<double, 3>> &vort);
+                            std::vector<std::array<double, 3>> &vort,
+                            std::string filename = "");
 
 /** Init boudary flag of each quadrant.
  */

@@ -2205,7 +2205,8 @@ void check_vel(int qid, double h, lbadapt_payload_t *data,
 }
 
 void lbadapt_calc_vorticity(p8est_t *p4est,
-                            std::vector<std::array<double, 3>> &vort) {
+                            std::vector<std::array<double, 3>> &vort,
+                            std::string filename) {
   P4EST_ASSERT(vort.size() == p4est->local_num_quadrants);
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
@@ -2304,8 +2305,9 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
 
   // vtk output
   // FIXME remove DEBUG
-  char filename[42];
-  snprintf(filename, 42, "vorticity_%i", (int)(sim_time / time_step));
+  if (filename == "") {
+    filename = "vorticity_" + std::to_string((int)(sim_time / time_step));
+  }
   sc_array_t *vorticity, *velocity, *dbg_vel, *qid;
   p4est_locidx_t num_cells = p4est->local_num_quadrants;
   vorticity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
@@ -2324,7 +2326,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   lbadapt_get_velocity_values(velocity);
 
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename.c_str());
   p8est_vtk_context_set_scale(context, 1); /* quadrants at full scale */
 
   /* begin writing the output files */

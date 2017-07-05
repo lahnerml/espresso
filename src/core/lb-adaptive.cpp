@@ -2312,13 +2312,10 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   p4est_locidx_t num_cells = p4est->local_num_quadrants;
   vorticity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
   velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-  dbg_vel = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
   qid = sc_array_new_size(sizeof(double), num_cells);
   for (int i = 0; i < num_cells; ++i) {
     double *ins = (double *)sc_array_index(vorticity, 3 * i);
     std::memcpy(ins, vort[i].data(), 3 * sizeof(double));
-    ins = (double *)sc_array_index(dbg_vel, 3 * i);
-    std::memcpy(ins, fluid_vel[i].data(), 3 * sizeof(double));
     ins = (double *) sc_array_index(qid, i);
     *ins = i + p4est->global_first_quadrant[p4est->mpirank];
   }
@@ -2340,11 +2337,10 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
                                        1, /* no custom cell scalar data */
-                                       3, /* write velocity and vorticity as
+                                       2, /* write velocity and vorticity as
                                              vector cell data */
                                        "qid", qid,
                                        "velocity", velocity,
-                                       "vel_debug", dbg_vel,
                                        "vorticity", vorticity, context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");

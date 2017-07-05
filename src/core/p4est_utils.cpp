@@ -421,7 +421,9 @@ int p4est_utils_adapt_grid() {
   // calculate vorticity
   std::vector<std::array<double, 3>> vorticity_values(
       current_forest.p4est->local_num_quadrants, std::array<double, 3>());
-  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values);
+  std::string filename_pre =
+      "pre_gridchange_" + std::to_string((int)(sim_time / time_step));
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_pre);
 
   p8est_t *p4est_adapted = p8est_copy(current_forest.p4est, 0);
   p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
@@ -503,7 +505,9 @@ int p4est_utils_adapt_grid() {
   // calculate vorticity
   vorticity_values.clear();
   vorticity_values.resize(current_forest.p4est->local_num_quadrants);
-  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values);
+  std::string filename_post =
+      "post_gridchange_" + std::to_string((int)(sim_time / time_step));
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_post);
 
   return 0;
 }
@@ -528,6 +532,9 @@ int p4est_utils_post_gridadapt_map_data(
 
   int level_old, sid_old;
   int level_new;
+
+  double impulse_old = 0.0;
+  double impulse_new = 0.0;
   while (qid_old < p4est_old->local_num_quadrants &&
          qid_new < p4est_new->local_num_quadrants) {
     // wrap multiple trees
@@ -570,9 +577,16 @@ int p4est_utils_post_gridadapt_map_data(
         data_restriction(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
                          tid_old, &local_data_levelwise[level_old][sid_old],
                          &mapped_data_flat[qid_new]);
+        for (int i = 0; i < lbmodel.n_veloc; ++i) {
+          impulse_old +=
+              0.125 * local_data_levelwise[level_old][sid_old].lbfluid[0][i];
+        }
         ++sid_old;
         ++tqid_old;
         ++qid_old;
+      }
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        impulse_new += mapped_data_flat[qid_new].lbfluid[0][i];
       }
       ++tqid_new;
       ++qid_new;
@@ -599,6 +613,19 @@ int p4est_utils_post_gridadapt_map_data(
           ++qid_new;
         }
       }
+      // DEBUG
+      int backup_qid_new = qid_new;
+      qid_new -= P8EST_CHILDREN;
+      for (int j = 0; j < P8EST_CHILDREN; ++j) {
+        for (int i = 0; i < lbmodel.n_veloc; ++i) {
+          impulse_new += 0.125 * mapped_data_flat[qid_new].lbfluid[0][i];
+        }
+        ++qid_new;
+      }
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        impulse_old += local_data_levelwise[level_old][sid_old].lbfluid[0][i];
+      }
+      P4EST_ASSERT(backup_qid_new == qid_new);
       ++tqid_old;
       ++qid_old;
     } else {
@@ -612,6 +639,9 @@ int p4est_utils_post_gridadapt_map_data(
   }
   P4EST_ASSERT(qid_old == p4est_old->local_num_quadrants);
   P4EST_ASSERT(qid_new == p4est_new->local_num_quadrants);
+
+  fprintf(stderr, "[p4est %i] old impulse: %lf, new impulse %lf\n",
+          p4est_new->mpirank, impulse_old, impulse_new);
 
   return 0;
 }

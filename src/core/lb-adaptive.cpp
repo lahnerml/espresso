@@ -2377,8 +2377,8 @@ void lbadapt_get_boundary_status() {
   prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                          lbadapt_ghost_data, ghost_pointer);
 
-  for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
-       ++level) {
+  for (level = forest.coarsest_level_global;
+       level <= forest.finest_level_global; ++level) {
 #ifdef LB_ADAPTIVE_GPU
     int base = P8EST_QUADRANT_LEN(level);
     int root = P8EST_ROOT_LEN;

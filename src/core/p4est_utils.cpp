@@ -401,6 +401,8 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
+    // avoid coarser cells than base_level
+    if (quads[i]->level == lbpar.base_level) return 0;
     // coarsen &= random_geometric(p8est, which_tree, quads[i]);
     coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
   }

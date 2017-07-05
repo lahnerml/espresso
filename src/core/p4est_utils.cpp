@@ -601,26 +601,12 @@ int p4est_utils_post_gridadapt_map_data(
       ++qid_new;
     } else if (level_old + 1 == level_new) {
       // old cell has been refined.
-      if (mesh_old->virtual_qflags[qid_old]) {
-        // if it had virtual cells before refinement: use their values.
-        int tmp_sid = mesh_old->quad_qvirtual_offset[qid_old];
-        for (int child = 0; child < P8EST_CHILDREN; ++child) {
-          data_transfer(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
-                        tid_old, &local_data_levelwise[level_old + 1][tmp_sid],
-                        &mapped_data_flat[qid_new]);
-          ++tmp_sid;
-          ++tqid_new;
-          ++qid_new;
-        }
-      } else {
-        // else evenly distribute value from former coarse cell
-        for (int child = 0; child < P8EST_CHILDREN; ++child) {
-          data_interpolation(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
-                             tid_old, &local_data_levelwise[level_old][sid_old],
-                             &mapped_data_flat[qid_new]);
-          ++tqid_new;
-          ++qid_new;
-        }
+      for (int child = 0; child < P8EST_CHILDREN; ++child) {
+        data_interpolation(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
+                           tid_old, &local_data_levelwise[level_old][sid_old],
+                           &mapped_data_flat[qid_new]);
+        ++tqid_new;
+        ++qid_new;
       }
       // DEBUG
       int backup_qid_new = qid_new;

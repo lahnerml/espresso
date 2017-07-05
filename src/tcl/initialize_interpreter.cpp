@@ -214,10 +214,10 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbadapt_set_max_level", tclcommand_set_max_level);
   REGISTER_COMMAND("lbadapt-set-steps-before-grid-change",
                    tclcommand_set_steps_until_grid_change);
-  REGISTER_COMMAND("lbadapt-unif", tclcommand_set_unif_ref);
-  REGISTER_COMMAND("lbadapt-rref", tclcommand_set_rand_ref);
-  REGISTER_COMMAND("lbadapt-regref", tclcommand_set_reg_ref);
-  REGISTER_COMMAND("lbadapt-regcoarse", tclcommand_set_reg_coarse);
+  REGISTER_COMMAND("lbadapt-uniform-ref", tclcommand_set_unif_ref);
+  REGISTER_COMMAND("lbadapt-random-ref", tclcommand_set_rand_ref);
+  REGISTER_COMMAND("lbadapt-region-ref", tclcommand_set_reg_ref);
+  REGISTER_COMMAND("lbadapt-region-coarse", tclcommand_set_reg_coarse);
   REGISTER_COMMAND("lbadapt-geom-ref", tclcommand_set_geom_ref);
   REGISTER_COMMAND("lbadapt-inv-geom-ref", tclcommand_set_inv_geom_ref);
   REGISTER_COMMAND("lbadapt-exclude-bnd-from-geom-ref",

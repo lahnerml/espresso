@@ -150,7 +150,8 @@ typedef struct {
   ParticleList *origin;
   int n_part_lists;
   ParticleList **part_lists;
-  double *shift; // 3*n_part_lists shifts relative to origin
+  double *shift; // 3*n_part_lists shifts
+  double origin_shift[3];
 } GhostShifts;
 #endif // RECV_GHOST_SHIFT
 
@@ -178,10 +179,6 @@ typedef struct {
       Normally this a integer multiple of the box length. The shift is done on the sender side */
   double shift[3];
 
-#ifdef RECV_GHOST_SHIFT
-  int n_extra_shifts;
-  GhostShifts *extra_shifts;
-#endif //RECV_GHOST_SHIFT
 } GhostCommunication;
 
 /** Properties for a ghost communication. A ghost communication is defined */
@@ -202,6 +199,10 @@ typedef struct {
   /** List of ghost communications. */
   GhostCommunication *comm;
 
+#ifdef RECV_GHOST_SHIFT
+  int n_extra_shifts;
+  GhostShifts *extra_shifts;
+#endif //RECV_GHOST_SHIFT
 } GhostCommunicator;
 
 /*@}*/

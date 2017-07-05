@@ -117,22 +117,25 @@ void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
   for(i=0; i<num; i++) {
     comm->comm[i].shift[0]=comm->comm[i].shift[1]=comm->comm[i].shift[2]=0.0;
 #ifdef RECV_GHOST_SHIFT
-    comm->comm[i].n_extra_shifts = 0;
+    comm->n_extra_shifts = 0;
 #endif
   }
 }
 
 void free_comm(GhostCommunicator *comm)
 {
-  int n, i;
+  int n;
   GHOST_TRACE(fprintf(stderr,"%d: free_comm: %p has %d ghost communications\n",this_node,comm,comm->num));
   for (n = 0; n < comm->num; n++) {
     free(comm->comm[n].part_lists);
-#ifdef RECV_GHOST_SHIFT
-    for (i = 0; i < comm->comm[n].n_extra_shifts; ++i) free(comm->comm[n].extra_shifts[i].part_lists);
-    free(comm->comm[n].extra_shifts);
-#endif
   }
+#ifdef RECV_GHOST_SHIFT
+  for (n = 0; n < comm->n_extra_shifts; ++n) {
+    free(comm->extra_shifts[n].part_lists);
+    free(comm->extra_shifts[n].shift);
+  }
+  free(comm->extra_shifts);
+#endif
   free(comm->comm);
 }
 
@@ -229,8 +232,10 @@ void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_par
 	  ParticlePosition *pp = (ParticlePosition *)insert;
 	  int i;
 	  memmove(pp, &pt->r, sizeof(ParticlePosition));
+#ifndef RECV_GHOST_SHIFT
 	  for (i = 0; i < 3; i++)
 	    pp->p[i] += gc->shift[i];
+#endif
       /* No special wrapping for Lees-Edwards here:
        * LE wrap-on-receive instead, for convenience in
        * mapping to local cell geometry. */
@@ -577,14 +582,48 @@ static int is_recv_op(int comm_type, int node)
 }
 
 #ifdef RECV_GHOST_SHIFT
-static void ghost_extra_shifts(GhostShifts *ghost_shift) {
+static void ghost_extra_shifts(GhostShifts *ghost_shift, int data_parts) {
   ParticleList *origin = ghost_shift->origin;
   for (int i = 0; i < ghost_shift->n_part_lists; ++i) {
     ParticleList *cur_cell = ghost_shift->part_lists[i];
     double *shift = &ghost_shift->shift[3*i];
     prepare_ghost_cell(cur_cell, origin->n);
     for (int p = 0; p < origin->n; ++p) {
-      memcpy(&cur_cell->part[p], &origin->part[p], sizeof(Particle));
+      Particle *pt1 = &origin->part[p];
+      Particle *pt2 = &cur_cell->part[p];
+      if (data_parts & GHOSTTRANS_PROPRTS) {
+        memmove(&pt2->p, &pt1->p, sizeof(ParticleProperties));
+#ifdef GHOSTS_HAVE_BONDS
+        realloc_intlist(&(pt2->bl), pt2->bl.n = pt1->bl.n);
+        memmove(pt2->bl.e, pt1->bl.e, pt1->bl.n*sizeof(int));
+#ifdef EXCLUSIONS
+        realloc_intlist(&(pt2->el), pt2->el.n = pt1->el.n);
+        memmove(pt2->el.e, pt1->el.e, pt1->el.n*sizeof(int));
+#endif
+#endif
+      }
+      if (data_parts & GHOSTTRANS_POSSHFTD) {
+        /* ok, this is not nice, but perhaps fast */
+        memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
+        for (int n = 0; n < 3; n++) {
+          pt2->r.p[n] += shift[n];
+        }
+      } else if (data_parts & GHOSTTRANS_POSITION)
+        memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
+      if (data_parts & GHOSTTRANS_MOMENTUM) {
+        memmove(&pt2->m, &pt1->m, sizeof(ParticleMomentum));
+      }
+      if (data_parts & GHOSTTRANS_FORCE)
+        add_force(&pt2->f, &pt1->f);
+#ifdef LB
+      if (data_parts & GHOSTTRANS_COUPLING)
+        memmove(&pt2->lc, &pt1->lc, sizeof(ParticleLatticeCoupling));
+#endif
+#ifdef ENGINE
+      if (data_parts & GHOSTTRANS_SWIMMING)
+        memmove(&pt2->swim, &pt1->swim, sizeof(ParticleParametersSwimming));
+#endif
+      /*memcpy(&cur_cell->part[p], &origin->part[p], sizeof(Particle));
       cur_cell->part[p].r.p[0] += shift[0];
       cur_cell->part[p].r.p[1] += shift[1];
       cur_cell->part[p].r.p[2] += shift[2];
@@ -599,13 +638,20 @@ static void ghost_extra_shifts(GhostShifts *ghost_shift) {
         memcpy(cur_cell->part[p].el.e, origin->part[p].el.e, sizeof(int)*origin->part[p].el.n);
       }
 #endif
-#endif
+#endif*/
       
-      if (local_particles[cur_cell->part[p].p.identity] == NULL) {
-        local_particles[cur_cell->part[p].p.identity] = &cur_cell->part[p];
-      }
+      ///This seems not to be needed as it segfaults :/
+      //if (local_particles[cur_cell->part[p].p.identity] == NULL) {
+      //  local_particles[cur_cell->part[p].p.identity] = &cur_cell->part[p];
+      //}
     }
   }
+  if (data_parts & GHOSTTRANS_POSSHFTD)
+    for (int p = 0; p < origin->n; ++p) {
+      origin->part[p].r.p[0] += ghost_shift->origin_shift[0];
+      origin->part[p].r.p[1] += ghost_shift->origin_shift[1];
+      origin->part[p].r.p[2] += ghost_shift->origin_shift[2];
+    }
 }
 #endif //RECV_GHOST_SHIFT
 
@@ -716,14 +762,8 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   MPI_Waitall(gc->num, reqs.data() + gc->num, MPI_STATUS_IGNORE);
   
 #ifdef RECV_GHOST_SHIFT
-  for (int i = 0; i < gc->num; i++) {
-    GhostCommunication *gcn = &gc->comm[i];
-    const int comm_type = gcn->type & GHOST_JOBMASK;
-    if (comm_type == GHOST_RECV) {
-      for (int n = 0; n < gcn->n_extra_shifts; ++n) {
-        ghost_extra_shifts(&gcn->extra_shifts[n]);
-      }
-    }
+  for (int n = 0; n < gc->n_extra_shifts; ++n) {
+    ghost_extra_shifts(&gc->extra_shifts[n], gc->data_parts);
   }
 #endif
 }

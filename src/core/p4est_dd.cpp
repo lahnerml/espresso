@@ -38,6 +38,15 @@ static int num_comm_recv = 0;     // Number of recc lists (should be euqal to se
 static int *comm_proc = NULL;     // Number of communicators per Process
 static int *comm_rank = NULL;     // Communication partner index for a certain communication
 static int num_comm_proc = 0;     // Total Number of bidirectional communications
+#ifdef RECV_GHOST_SHIFT
+typedef struct {
+  int origin;
+  int origin_dir;
+  std::vector<int> idx;
+  std::vector<int> dir;
+} CommShift_t;
+static std::vector<CommShift_t> comm_shift;
+#endif
 //--------------------------------------------------------------------------------------------------
 static size_t num_cells = 0;
 static size_t num_local_cells = 0;
@@ -430,9 +439,153 @@ void dd_p4est_create_grid () {
 //--------------------------------------------------------------------------------------------------
 
 // Compute communication partners and the cells that need to be comunicated
+#ifdef RECV_GHOST_SHIFT
+void dd_p4est_comm () {
+  // List of cell idx marked for send/recv for each process
+  std::vector<int>      send_idx[n_nodes];
+  std::vector<int>      recv_idx[n_nodes];
+  std::vector<int>::iterator pos;
+  
+  // Prepare all lists
+  num_comm_proc = 0;
+  if (comm_proc) delete[] comm_proc;
+  comm_proc = new int[n_nodes];
+  
+  for (int i=0;i<n_nodes;++i) {
+    comm_proc[i] = -1;
+    send_idx[i].clear();
+    recv_idx[i].clear();
+  }
+  for (int i=0;i<comm_shift.size();++i) {
+    comm_shift[i].idx.clear();
+    comm_shift[i].dir.clear();
+  }
+  comm_shift.clear();
+  
+  // create send and receive list
+  char fname[100];
+  sprintf(fname,"cells_conn_%i.list",this_node);
+  FILE* h = fopen(fname,"w");
+  // Loop all cells
+  for (int i=0; i<num_cells; ++i) {
+    // is ghost cell that is linked to a process? -> add to recv list
+    if (p4est_shell[i].rank >= 0 && p4est_shell[i].shell == 2) {
+      int nrank = p4est_shell[i].rank;
+      int oidx;
+      for (oidx = 0; oidx < comm_shift.size(); ++oidx) {
+        int orig = comm_shift[oidx].origin;
+        if (p4est_shell[orig].idx == p4est_shell[i].idx && p4est_shell[orig].rank == nrank) {
+          break;
+        }
+      }
+      if (oidx >= comm_shift.size()) {
+        CommShift_t tmp_shift;
+        tmp_shift.origin = i;
+        tmp_shift.origin_dir = p4est_shell[i].boundary;
+        comm_shift.push_back(tmp_shift); 
+      }
+      if (p4est_shell[i].p_cnt != (nrank==this_node?1:0)) {
+        comm_shift[oidx].idx.push_back(i);
+        comm_shift[oidx].dir.push_back(p4est_shell[i].boundary);
+      } else {
+        if (recv_idx[nrank].empty()) {
+          recv_idx[nrank].push_back(i);
+          comm_shift[oidx].origin = i;
+          comm_shift[oidx].origin_dir = p4est_shell[i].boundary;
+        } else {
+          int pos = 0;
+          // find position to add new element (keep order)
+          while (pos < recv_idx[nrank].size() && 
+            p4est_shell[recv_idx[nrank][pos]].idx <= p4est_shell[i].idx) pos++;
+            
+          if (pos == 0 || recv_idx[nrank][pos-1] != i) {
+            recv_idx[nrank].insert(recv_idx[nrank].begin() + pos, i);
+            comm_shift[oidx].origin = i;
+            comm_shift[oidx].origin_dir = p4est_shell[i].boundary;
+          } else {
+            comm_shift[oidx].idx.push_back(i);
+            comm_shift[oidx].dir.push_back(p4est_shell[i].boundary);
+          }
+        }
+      }
+    }
+    // is mirror cell (at domain boundary)? -> add to send list
+    if (p4est_shell[i].shell == 1) {
+      // loop fullshell
+      for (int n=0;n<26;++n) {
+        int nidx = p4est_shell[i].neighbor[n];
+        int nrank = p4est_shell[nidx].rank;
+        if (nidx < 0 || nrank < 0) continue; // invalid neighbor
+        if (p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
+        if (send_idx[nrank].empty() || send_idx[nrank].back() != i)
+          send_idx[nrank].push_back(i);
+      }
+    }
+    fprintf(h,"%i %i:%li (%i) %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,p4est_shell[i].p_cnt,
+      p4est_shell[i].shell,p4est_shell[i].boundary);
+    for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
+    fprintf(h,"]\n");
+  }
+  fclose(h);
+  
+  /*for (int i=0;i<comm_shift.size();++i) {
+    if (comm_shift[i].idx.empty()) {
+      comm_shift.erase(comm_shift.begin() + i);
+      i -= 1;
+    }
+  }*/
+  
+  num_comm_proc = 0;
+  for (int i=0; i<n_nodes; ++i) {
+    if (send_idx[i].size() != 0 && recv_idx[i].size() != 0) {
+      comm_proc[i] = num_comm_proc;
+      num_comm_proc += 1;
+    } else if (!(send_idx[i].size() == 0 && recv_idx[i].size() == 0)) {
+      printf("[%i] : Unexpected mismatch in send and receive lists.\n", this_node);
+      errexit();
+    }
+  }
+  
+  if (comm_send) {
+    for (int i=0;i<num_comm_send;++i)
+      delete[] comm_send[i].idx;
+    delete[] comm_send;
+    comm_send = NULL;
+  }
+  if (comm_recv) {
+    for (int i=0;i<num_comm_recv;++i)
+      delete[] comm_recv[i].idx;
+    delete[] comm_recv;
+    comm_recv = NULL;
+  }
+  if (comm_rank) delete[] comm_rank;
+  num_comm_recv = num_comm_proc;
+  num_comm_send = num_comm_proc;
+  comm_recv = new comm_t[num_comm_proc];
+  comm_send = new comm_t[num_comm_proc];
+  comm_rank = new int[num_comm_proc];
+  
+  for (int n=0; n<n_nodes; ++n) {
+    if (comm_proc[n] >= 0) {
+      comm_rank[comm_proc[n]] = n;
+      
+      comm_recv[comm_proc[n]].cnt = recv_idx[n].size();
+      comm_recv[comm_proc[n]].dir = 0;
+      comm_recv[comm_proc[n]].rank = n;
+      comm_recv[comm_proc[n]].idx = new int[recv_idx[n].size()];
+      memcpy(comm_recv[comm_proc[n]].idx, &recv_idx[n][0], recv_idx[n].size()*sizeof(int));
+      
+      comm_send[comm_proc[n]].cnt = send_idx[n].size();
+      comm_send[comm_proc[n]].dir = 0;
+      comm_send[comm_proc[n]].rank = n;
+      comm_send[comm_proc[n]].idx = new int[send_idx[n].size()];
+      memcpy(comm_send[comm_proc[n]].idx, &send_idx[n][0], send_idx[n].size()*sizeof(int));
+    }
+  }
+}
+#else
 void dd_p4est_comm () {
   CALL_TRACE();
-  
   // List of cell idx marked for send/recv for each process
   std::vector<int>      send_idx[n_nodes];
   std::vector<int>      recv_idx[n_nodes];
@@ -541,10 +694,10 @@ void dd_p4est_comm () {
         }
       }
     }
-    //fprintf(h,"%i %i:%li (%i) %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,p4est_shell[i].p_cnt,
-    //  p4est_shell[i].shell,p4est_shell[i].boundary);
-    //for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
-    //fprintf(h,"]\n");
+    /*fprintf(h,"%i %i:%li (%i) %i %i [ ",i,p4est_shell[i].rank,p4est_shell[i].idx,p4est_shell[i].p_cnt,
+      p4est_shell[i].shell,p4est_shell[i].boundary);
+    for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
+    fprintf(h,"]\n");*/
   }
   //fclose(h);
   /*sprintf(fname,"send_%i.list",this_node);
@@ -621,11 +774,34 @@ void dd_p4est_comm () {
       fprintf(h,"%i:%i %i\n",comm_recv[n].rank,comm_recv[n].idx[i],comm_recv[n].dir);
   fclose(h);*/
 }
+#endif
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
   CALL_TRACE();
+  /*printf("[%i] send %i :", this_node, num_comm_send);
+  for (int i=0;i<num_comm_send;++i) {
+    printf("%2i(%i:%2i) ", comm_send[i].cnt, comm_send[i].rank, comm_send[i].dir);
+  }
+  printf("\n[%i] recv %i :", this_node, num_comm_recv);
+  for (int i=0;i<num_comm_recv;++i) {
+    printf("%2i(%i:%2i) ", comm_recv[i].cnt, comm_recv[i].rank, comm_recv[i].dir);
+  }
+  printf("\n");*/
+  /*int recv_shifts = 0;
+  int recv_per_comm[num_comm_recv];
+  for (int i=0;i<num_comm_recv;++i) {
+    recv_per_comm[i] = 0;
+    for (int n=0;n<comm_recv[i].cnt;++n)
+      if (p4est_shell[comm_recv[i].idx[n]].p_cnt == (p4est_shell[comm_recv[i].idx[n]].rank==this_node?1:0))
+        ++recv_per_comm[i];
+    recv_shifts += recv_per_comm[i];
+    if (recv_per_comm[i] != 0) printf("%2i(%i:%2i) ", recv_per_comm[i], comm_recv[i].rank, comm_recv[i].dir);
+  }
+  printf("%2i\n", recv_shifts);*/
+//#ifndef RECV_GHOST_SHIFT
   prepare_comm(comm, data_part, num_comm_send + num_comm_recv, true);
   int cnt = 0;
+  
   for (int i=0;i<num_comm_send;++i) {
     comm->comm[cnt].type = GHOST_SEND;
     comm->comm[cnt].node = comm_send[i].rank;
@@ -633,8 +809,12 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     comm->comm[cnt].tag = comm_send[i].dir;
     comm->comm[cnt].part_lists = (ParticleList**)Utils::malloc(comm_send[i].cnt*sizeof(ParticleList*));
     comm->comm[cnt].n_part_lists = comm_send[i].cnt;
-    for (int n=0;n<comm_send[i].cnt;++n)
+    for (int n=0;n<comm_send[i].cnt;++n) {
       comm->comm[cnt].part_lists[n] = &cells[comm_send[i].idx[n]];
+      printf("%i ", comm_send[i].idx[n]); 
+    }
+    printf("\n");
+#ifndef RECV_GHOST_SHIFT
     if ((data_part & GHOSTTRANS_POSSHFTD)) {
       // Set shift according to communication direction
       if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] =  box_l[0];
@@ -644,8 +824,6 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
       if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] =  box_l[2];
       if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
     }
-#ifdef RECV_GHOST_SHIFT
-    comm->comm[cnt].n_extra_shifts = 0;
 #endif
     ++cnt;
   }
@@ -659,13 +837,55 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     if ((comm_recv[i].dir & 48)) comm->comm[cnt].tag ^= 48;
     comm->comm[cnt].part_lists = (ParticleList**)Utils::malloc(comm_recv[i].cnt*sizeof(ParticleList*));
     comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
-    for (int n=0;n<comm_recv[i].cnt;++n)
+    for (int n=0;n<comm_recv[i].cnt;++n) {
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
-#ifdef RECV_GHOST_SHIFT
-    comm->comm[cnt].n_extra_shifts = 0;
-#endif
+      printf("%i(%li) ", comm_recv[i].idx[n], p4est_shell[comm_recv[i].idx[n]].idx); 
+    }
     ++cnt;
+    printf("\n");
   }
+#ifdef RECV_GHOST_SHIFT
+  comm->n_extra_shifts = comm_shift.size();
+  comm->extra_shifts = (GhostShifts*)Utils::malloc(comm_shift.size()*sizeof(GhostShifts));
+  for (int i=0;i<comm_shift.size();++i) {
+    printf("%i : ", comm_shift[i].origin);
+    comm->extra_shifts[i].origin = &cells[comm_shift[i].origin];
+    comm->extra_shifts[i].origin_shift[0] = 0.0;
+    comm->extra_shifts[i].origin_shift[1] = 0.0;
+    comm->extra_shifts[i].origin_shift[2] = 0.0;
+    if ((data_part & GHOSTTRANS_POSSHFTD)) {
+      // Set shift according to communication direction
+      if ((comm_shift[i].origin_dir &  1)) comm->extra_shifts[i].origin_shift[0] =  box_l[0];
+      if ((comm_shift[i].origin_dir &  2)) comm->extra_shifts[i].origin_shift[0] = -box_l[0];
+      if ((comm_shift[i].origin_dir &  4)) comm->extra_shifts[i].origin_shift[1] =  box_l[1];
+      if ((comm_shift[i].origin_dir &  8)) comm->extra_shifts[i].origin_shift[1] = -box_l[1];
+      if ((comm_shift[i].origin_dir & 16)) comm->extra_shifts[i].origin_shift[2] =  box_l[2];
+      if ((comm_shift[i].origin_dir & 32)) comm->extra_shifts[i].origin_shift[2] = -box_l[2];
+    }
+    comm->extra_shifts[i].n_part_lists = comm_shift[i].idx.size();
+    if (comm_shift[i].idx.size() > 0) {
+      comm->extra_shifts[i].part_lists = (ParticleList**)Utils::malloc(comm_shift[i].idx.size()*sizeof(ParticleList*));
+      comm->extra_shifts[i].shift = (double*)Utils::malloc(comm_shift[i].idx.size()*sizeof(double)*3);
+      for (int n=0;n<comm_shift[i].idx.size();++n) {
+        printf("%i ", comm_shift[i].idx[n]);
+        comm->extra_shifts[i].part_lists[n] = &cells[comm_shift[i].idx[n]];
+        comm->extra_shifts[i].shift[3*n + 0] = 0.0;
+        comm->extra_shifts[i].shift[3*n + 1] = 0.0;
+        comm->extra_shifts[i].shift[3*n + 2] = 0.0;
+        if ((data_part & GHOSTTRANS_POSSHFTD)) {
+          // Set shift according to communication direction
+          if ((comm_shift[i].dir[n] &  1)) comm->extra_shifts[i].shift[3*n + 0] =  box_l[0];
+          if ((comm_shift[i].dir[n] &  2)) comm->extra_shifts[i].shift[3*n + 0] = -box_l[0];
+          if ((comm_shift[i].dir[n] &  4)) comm->extra_shifts[i].shift[3*n + 1] =  box_l[1];
+          if ((comm_shift[i].dir[n] &  8)) comm->extra_shifts[i].shift[3*n + 1] = -box_l[1];
+          if ((comm_shift[i].dir[n] & 16)) comm->extra_shifts[i].shift[3*n + 2] =  box_l[2];
+          if ((comm_shift[i].dir[n] & 32)) comm->extra_shifts[i].shift[3*n + 2] = -box_l[2];
+        }
+      }
+    }
+    printf("\n");
+  } 
+#endif
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_mark_cells () {

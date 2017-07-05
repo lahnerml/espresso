@@ -20,23 +20,17 @@
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
-p4est_t *&p4est = dd.p4est;
-p4est_ghost_t *&p4est_ghost = dd.p4est_ghost;
-p4est_mesh_t *&p4est_mesh = dd.p4est_mesh;
-p4est_connectivity_t *&p4est_conn = dd.p4est_conn;
-local_shell_t *&p4est_shell = dd.p4est_shell;
-//--------------------------------------------------------------------------------------------------
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
-static int *p4est_space_idx = NULL; // n_nodes + 1 elements, storing the first Morton index of local cell
+static std::vector<int> p4est_space_idx; // n_nodes + 1 elements, storing the first Morton index of local cell
 static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
-static comm_t *comm_send = NULL;  // Internal send lists, idx maps to local cells
-static comm_t *comm_recv = NULL;  // Internal recv lists, idx maps to ghost cells
+static std::vector<comm_t> comm_send;  // Internal send lists, idx maps to local cells
+static std::vector<comm_t> comm_recv;  // Internal recv lists, idx maps to ghost cells
 static int num_comm_send = 0;     // Number of send lists
 static int num_comm_recv = 0;     // Number of recc lists (should be euqal to send lists)
-static int *comm_proc = NULL;     // Number of communicators per Process
-static int *comm_rank = NULL;     // Communication partner index for a certain communication
+static std::vector<int> comm_proc;     // Number of communicators per Process
+static std::vector<int> comm_rank;     // Communication partner index for a certain communication
 static int num_comm_proc = 0;     // Total Number of bidirectional communications
 //--------------------------------------------------------------------------------------------------
 static size_t num_cells = 0;
@@ -131,7 +125,7 @@ static const int COMM_RANK_NONE  = 999999;
 int dd_p4est_full_shell_neigh(int cell, int neighidx)
 {
     if (neighidx >= 0 && neighidx < 26)
-        return p4est_shell[cell].neighbor[neighidx];
+        return dd.p4est_shell[cell].neighbor[neighidx];
     else if (neighidx == 26)
         return cell;
     else {
@@ -148,41 +142,6 @@ static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
     ((quad_data_t*)(q->p.user_data))->ishell[i] = -1;
     ((quad_data_t*)(q->p.user_data))->rshell[i] = -1;
   }
-}
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_free () {
-  CALL_TRACE();
-  
-  if (dd.p4est_mesh)
-    p4est_mesh_destroy(dd.p4est_mesh);
-  if (dd.p4est_ghost)
-    p4est_ghost_destroy(dd.p4est_ghost);
-  if (dd.p4est)
-    p4est_destroy (dd.p4est);
-  if (dd.p4est_conn)
-    p4est_connectivity_destroy(dd.p4est_conn);
-  if (dd.p4est_shell)
-    delete[] dd.p4est_shell;
-  if (p4est_space_idx)
-    delete[] p4est_space_idx;
-  if (comm_send)
-    delete[] comm_send;
-  if (comm_recv)
-    delete[] comm_recv;
-  if (comm_proc)
-    delete[] comm_proc;
-  if (comm_rank)
-    delete[] comm_rank;
-  comm_rank = NULL;
-  comm_proc = NULL;
-  comm_recv = NULL;
-  comm_send = NULL;
-  p4est_space_idx = NULL;
-  dd.p4est = NULL;
-  dd.p4est_ghost = NULL;
-  dd.p4est_mesh = NULL;
-  dd.p4est_conn = NULL;
-  dd.p4est_shell = NULL;
 }
 //--------------------------------------------------------------------------------------------------
 static inline int count_trailing_zeros(int x)
@@ -239,9 +198,14 @@ int dd_p4est_cellsize_even () {
 void dd_p4est_create_grid () {
   //printf("%i : new MD grid\n", this_node);
   CALL_TRACE();
-  
-  // delete all existing stuff  
-  dd_p4est_free();
+  // Clear data to prevent accidental use of old stuff
+  comm_rank.clear();
+  comm_proc.clear();
+  comm_recv.clear();
+  comm_send.clear();
+  p4est_space_idx.clear();
+  dd.p4est_shell.clear();
+
   
 #ifdef LB_ADAPTIVE
   // the adaptive LB has a strange grid, thus we have to do something similar here
@@ -269,31 +233,39 @@ void dd_p4est_create_grid () {
 #endif
   
   // create p4est structs
-  p4est_conn = p8est_connectivity_new_brick (brick_size[0], brick_size[1], brick_size[2], 
-                                             PERIODIC(0), PERIODIC(1), PERIODIC(2));
-  p4est = p4est_new_ext (comm_cart, p4est_conn, 0, grid_level, true, 
-                         sizeof(quad_data_t), init_fn, NULL);
+  {
+    auto oldconn = std::move(dd.p4est_conn);
+    dd.p4est_conn =
+        std::unique_ptr<p4est_connectivity_t>(p8est_connectivity_new_brick(
+            brick_size[0], brick_size[1], brick_size[2], PERIODIC(0),
+            PERIODIC(1), PERIODIC(2)));
+    dd.p4est = std::unique_ptr<p4est_t>(
+        p4est_new_ext(comm_cart, dd.p4est_conn, 0, grid_level, true,
+                      sizeof(quad_data_t), init_fn, NULL));
+  }
   // Repartition uniformly if part_nquads is empty (because not repart has been
   // done yet). Else use part_nquads as given partitioning.
   if (part_nquads.size() == 0)
-    p4est_partition(p4est, 0, NULL);
+    p4est_partition(dd.p4est, 0, NULL);
   else
-    p4est_partition_given(p4est, part_nquads.data());
+    p4est_partition_given(dd.p4est, part_nquads.data());
 
-  p4est_ghost = p4est_ghost_new(p4est, P8EST_CONNECT_CORNER);
-  p4est_mesh = p4est_mesh_new_ext(p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER);
-  
+  auto p4est_ghost = castable_unique_ptr<p4est_ghost_t>(
+      p4est_ghost_new(dd.p4est, P8EST_CONNECT_CORNER));
+  auto p4est_mesh = castable_unique_ptr<p4est_mesh_t>(
+      p4est_mesh_new_ext(dd.p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER));
+
   CELL_TRACE(printf("%i : %i %i-%i %i\n",
     this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants));
   
   // create space filling inforamtion about first quads per node from p4est
-  p4est_space_idx = new int[n_nodes + 1];
+  p4est_space_idx.resize(n_nodes + 1);
   for (int i=0;i<=n_nodes;++i) {
-    p4est_quadrant_t *q = &p4est->global_first_position[i];
+    p4est_quadrant_t *q = &dd.p4est->global_first_position[i];
     //p4est_quadrant_t c;
     if (i < n_nodes) {
       double xyz[3];
-      p4est_qcoord_to_vertex(p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
+      p4est_qcoord_to_vertex(dd.p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
       //c.x = xyz[0]*(1<<grid_level);
       //c.y = xyz[1]*(1<<grid_level);
       //c.z = xyz[2]*(1<<grid_level);
@@ -320,16 +292,14 @@ void dd_p4est_create_grid () {
   // geather cell neighbors
   std::vector<uint64_t> quads;
   std::vector<local_shell_t> shell;
-  quads.clear();
-  shell.clear();
   
   // Loop all local cells to geather information for those
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
+  for (int i=0;i<dd.p4est->local_num_quadrants;++i) {
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(dd.p4est,p4est_mesh,i);
     quad_data_t *data = (quad_data_t*)(q->p.user_data);
     double xyz[3];
-    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
+    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1<<p4est_tree_array_index(dd.p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
     uint64_t x = xyz[0]*ql;
     uint64_t y = xyz[1]*ql;
     uint64_t z = xyz[2]*ql;
@@ -350,7 +320,7 @@ void dd_p4est_create_grid () {
       sc_array_t *ne, *ni;
       ne = sc_array_new(sizeof(int));
       ni = sc_array_new(sizeof(int));
-      p4est_mesh_get_neighbors(p4est, p4est_ghost, p4est_mesh, i, -1, n, 0, NULL, ne, ni);
+      p4est_mesh_get_neighbors(dd.p4est, p4est_ghost, p4est_mesh, i, -1, n, 0, NULL, ne, ni);
       if (ni->elem_count > 1)
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
       if (ni->elem_count > 0) {
@@ -373,12 +343,12 @@ void dd_p4est_create_grid () {
   
   // compute ghost, mirror and boundary information
   // here the ghost layer around the local domain is computed
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_quadrant_t* q = p4est_mesh_get_quadrant(p4est,p4est_mesh,i);
+  for (int i=0;i<dd.p4est->local_num_quadrants;++i) {
+    p4est_quadrant_t* q = p4est_mesh_get_quadrant(dd.p4est,p4est_mesh,i);
     quad_data_t *data = (quad_data_t*)(q->p.user_data);
     double xyz[3];
-    p4est_qcoord_to_vertex(p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
+    p4est_qcoord_to_vertex(dd.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1<<p4est_tree_array_index(dd.p4est->trees,p4est_mesh->quad_to_tree[i])->maxlevel;
     uint64_t x = xyz[0]*ql;
     uint64_t y = xyz[1]*ql;
     uint64_t z = xyz[2]*ql;
@@ -467,14 +437,12 @@ void dd_p4est_create_grid () {
   //fclose(h);
   
   // Copy the generated data to globals
-  num_cells = (size_t)quads.size();
-  num_local_cells = (size_t)p4est->local_num_quadrants;
-  num_ghost_cells = num_cells - (size_t)p4est->local_num_quadrants;
-  
-  p4est_shell = new local_shell_t[num_cells];
-  for (int i=0;i<num_cells;++i)
-    p4est_shell[i] = shell[i];
-  
+  num_cells = quads.size();
+  num_local_cells = (size_t) dd.p4est->local_num_quadrants;
+  num_ghost_cells = num_cells - num_local_cells;
+
+  dd.p4est_shell = std::move(shell);
+
   CELL_TRACE(printf("%d : %ld, %ld, %ld\n",this_node,num_cells,num_local_cells,num_ghost_cells));
 
 #ifndef P4EST_NOCHANGE  
@@ -506,6 +474,7 @@ void dd_p4est_comm () {
   std::vector<uint64_t> send_cnt_tag(n_nodes, 0UL);
   std::vector<uint64_t> recv_cnt_tag(n_nodes, 0UL);
   // Number of cells for each communication (rank and direction)
+  // Default value initialized to all 0
   std::vector<std::array<int, 64>> send_cnt(n_nodes);
   std::vector<std::array<int, 64>> recv_cnt(n_nodes);
   
@@ -518,17 +487,10 @@ void dd_p4est_comm () {
   
   // Prepare all lists
   num_comm_proc = 0;
-  if (comm_proc) delete[] comm_proc;
-  comm_proc = new int[n_nodes];
-  
-  for (int i=0;i<n_nodes;++i) {
-    comm_proc[i] = -1;
-    for (int j=0;j<64;++j) {
-      send_cnt[i][j] = 0;
-      recv_cnt[i][j] = 0;
-    }
-  }
-  
+
+  comm_proc.resize(n_nodes);
+  std::fill(std::begin(comm_proc), std::end(comm_proc), -1);
+
   // create send and receive list
   //char fname[100];
   //sprintf(fname,"cells_conn_%i.list",this_node);
@@ -536,29 +498,29 @@ void dd_p4est_comm () {
   // Loop all cells
   for (int i=0;i<num_cells;++i) {
     // is ghost cell that is linked to a process? -> add to recv list
-    if (p4est_shell[i].rank >= 0 && p4est_shell[i].shell == 2) {
-      int irank = p4est_shell[i].rank;
+    if (dd.p4est_shell[i].rank >= 0 && dd.p4est_shell[i].shell == 2) {
+      int irank = dd.p4est_shell[i].rank;
       int pos = 0;
       // find position to add new element (keep order)
       while (pos < recv_idx[irank].size() && 
-        p4est_shell[recv_idx[irank][pos]].idx <= p4est_shell[i].idx) pos++;
+        dd.p4est_shell[recv_idx[irank][pos]].idx <= dd.p4est_shell[i].idx) pos++;
       
       if (pos >= recv_idx[irank].size()) { // Add to end of vector
         recv_idx[irank].push_back(i);
-        recv_tag[irank].push_back(1L<<p4est_shell[i].boundary);
+        recv_tag[irank].push_back(1L<<dd.p4est_shell[i].boundary);
       // insert if this cell has not been added yet
-      } else if (p4est_shell[recv_idx[irank][pos]].idx != p4est_shell[i].idx) {
+      } else if (dd.p4est_shell[recv_idx[irank][pos]].idx != dd.p4est_shell[i].idx) {
         recv_idx[irank].insert(recv_idx[irank].begin() + pos, i);
-        recv_tag[irank].insert(recv_tag[irank].begin() + pos, 1L<<p4est_shell[i].boundary);
+        recv_tag[irank].insert(recv_tag[irank].begin() + pos, 1L<<dd.p4est_shell[i].boundary);
       // update diraction info for communication if already added but for other direction
       } else {
-        recv_tag[irank][pos] |= 1L<<p4est_shell[i].boundary;        
+        recv_tag[irank][pos] |= 1L<<dd.p4est_shell[i].boundary;        
       }
       // count what happend above
-      recv_cnt[irank][p4est_shell[i].boundary] += 1;
-      if ((recv_cnt_tag[irank] & (1L<<p4est_shell[i].boundary)) == 0) {
+      recv_cnt[irank][dd.p4est_shell[i].boundary] += 1;
+      if ((recv_cnt_tag[irank] & (1L<<dd.p4est_shell[i].boundary)) == 0) {
         ++num_recv;
-        recv_cnt_tag[irank] |= 1L<<p4est_shell[i].boundary;
+        recv_cnt_tag[irank] |= 1L<<dd.p4est_shell[i].boundary;
       }
       //recv_cnt[p4est_shell[i].rank].insert(recv_cnt[p4est_shell[i].rank].begin() + pos, i); //p4est_shell[i].idx);
       if (num_recv_flag[irank] == 0) {
@@ -569,28 +531,28 @@ void dd_p4est_comm () {
       }
     }
     // is mirror cell (at domain boundary)? -> add to send list
-    if (p4est_shell[i].shell == 1) {
+    if (dd.p4est_shell[i].shell == 1) {
       //for (int n=0;n<n_nodes;++n) comm_cnt[n] = 0;
       // loop fullshell
       for (int n=0;n<26;++n) {
-        int nidx = p4est_shell[i].neighbor[n];
-        int nrank = p4est_shell[nidx].rank;
+        int nidx = dd.p4est_shell[i].neighbor[n];
+        int nrank = dd.p4est_shell[nidx].rank;
         if (nidx < 0 || nrank < 0) continue; // invalid neighbor
-        if (p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
+        if (dd.p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
         // check if this is the first time to add this mirror cell
         if (!send_tag[nrank].empty() && send_idx[nrank].back() == i) { // already added
-          if ((send_tag[nrank].back() & (1L<<p4est_shell[nidx].boundary))) continue;
+          if ((send_tag[nrank].back() & (1L<<dd.p4est_shell[nidx].boundary))) continue;
           // update direction info for this communication
-          send_tag[nrank].back() |= (1L<<p4est_shell[nidx].boundary);
+          send_tag[nrank].back() |= (1L<<dd.p4est_shell[nidx].boundary);
         } else { // not added yet -> do so
           send_idx[nrank].push_back(i);
-          send_tag[nrank].push_back(1L<<p4est_shell[nidx].boundary);
+          send_tag[nrank].push_back(1L<<dd.p4est_shell[nidx].boundary);
         }
         // count what happend
-        send_cnt[nrank][p4est_shell[nidx].boundary] += 1;
-        if ((send_cnt_tag[nrank] & (1L<<p4est_shell[nidx].boundary)) == 0) {
+        send_cnt[nrank][dd.p4est_shell[nidx].boundary] += 1;
+        if ((send_cnt_tag[nrank] & (1L<<dd.p4est_shell[nidx].boundary)) == 0) {
           ++num_send;
-          send_cnt_tag[nrank] |= 1L<<p4est_shell[nidx].boundary;
+          send_cnt_tag[nrank] |= 1L<<dd.p4est_shell[nidx].boundary;
         }
         if (num_send_flag[nrank] == 0) {
           //++num_send;
@@ -619,36 +581,22 @@ void dd_p4est_comm () {
   
   // prepare communicator
   CELL_TRACE(fprintf(stdout,"%i : proc %i send %i, recv %i\n",this_node,num_comm_proc,num_send,num_recv));
-  if (comm_send) {
-    for (int i=0;i<num_comm_send;++i)
-      delete[] comm_send[i].idx;
-    delete[] comm_send;
-    comm_send = NULL;
-  }
-  if (comm_recv) {
-    for (int i=0;i<num_comm_recv;++i)
-      delete[] comm_recv[i].idx;
-    delete[] comm_recv;
-    comm_recv = NULL;
-  }
-  if (comm_rank) delete[] comm_rank;
   num_comm_recv = num_recv;
   num_comm_send = num_send;
-  comm_recv = new comm_t[num_recv];
-  comm_send = new comm_t[num_send];
-  comm_rank = new int[num_comm_proc];
-
-  std::fill(comm_rank, comm_rank + num_comm_proc, COMM_RANK_NONE);
+  comm_recv.resize(num_recv);
+  comm_send.resize(num_send);
+  comm_rank.resize(num_comm_proc, COMM_RANK_NONE);
 
   // Parse all bitmasks and fill the actual lists
-  for (int n=0,s_cnt=0,r_cnt=0;n<n_nodes;++n) {
+  int s_cnt = 0, r_cnt = 0;
+  for (int n = 0; n < n_nodes; ++n) {
     if (comm_proc[n] >= 0) comm_rank[comm_proc[n]] = n;
     for (int i=0;i<64;++i) {
       if (num_recv_flag[n] && (recv_cnt_tag[n] & 1L<<i)) {
         comm_recv[r_cnt].cnt = recv_cnt[n][i];
         comm_recv[r_cnt].rank = n;
         comm_recv[r_cnt].dir = i;
-        comm_recv[r_cnt].idx = new int[recv_cnt[n][i]];
+        comm_recv[r_cnt].idx.resize(recv_cnt[n][i]);
         for (int j=0,c=0;j<recv_idx[n].size();++j)
           if ((recv_tag[n][j] & (1L<<i)))
             comm_recv[r_cnt].idx[c++] = recv_idx[n][j];
@@ -658,7 +606,7 @@ void dd_p4est_comm () {
         comm_send[s_cnt].cnt = send_cnt[n][i];
         comm_send[s_cnt].rank = n;
         comm_send[s_cnt].dir = i;
-        comm_send[s_cnt].idx = new int[send_cnt[n][i]];
+        comm_send[s_cnt].idx.resize(send_cnt[n][i]);
         for (int j=0,c=0;j<send_idx[n].size();++j)
           if ((send_tag[n][j] & 1L<<i))
             comm_send[s_cnt].idx[c++] = send_idx[n][j];
@@ -668,28 +616,14 @@ void dd_p4est_comm () {
   }
 
   // Debug or rather sanity check
-  {
-    for (int i = 0; i < num_comm_proc; i++) {
-      if (comm_rank[i] == COMM_RANK_NONE) {
-        std::cerr << "[" << this_node << "]"
-                  << "Error: Comm_rank[" << i << "] is NONE." << std::endl;
-        errexit();
-      }
-    }
+  if (std::find(std::begin(comm_proc), std::end(comm_proc), COMM_RANK_NONE) !=
+          std::end(comm_proc) ||
+      r_cnt != num_recv || s_cnt != num_send) {
+    std::cerr << "[" << this_node << "]"
+              << "Error: Comm_recv or comm_send or comm_rank has invalid entry."
+              << std::endl;
+    errexit();
   }
-
-  /*sprintf(fname,"send_%i.list",this_node);
-  h = fopen(fname,"w");
-  for (int n=0;n<num_comm_send;++n)
-    for (int i=0;i<comm_send[n].cnt;++i)
-      fprintf(h,"%i:%i %i\n",comm_send[n].rank,comm_send[n].idx[i],comm_send[n].dir);
-  fclose(h);
-  sprintf(fname,"recv_%i.list",this_node);
-  h = fopen(fname,"w");
-  for (int n=0;n<num_comm_recv;++n)
-    for (int i=0;i<comm_recv[n].cnt;++i)
-      fprintf(h,"%i:%i %i\n",comm_recv[n].rank,comm_recv[n].idx[i],comm_recv[n].dir);
-  fclose(h);*/
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
@@ -779,8 +713,8 @@ void dd_p4est_init_cell_interaction() {
     
     // Copy all other cells in half-shell
     for (int n=1;n<CELLS_MAX_NEIGHBORS;++n) {
-      dd.cell_inter[i].nList[n].cell_ind = p4est_shell[i].neighbor[half_neighbor_idx[n]];
-      dd.cell_inter[i].nList[n].pList = &cells[p4est_shell[i].neighbor[half_neighbor_idx[n]]];
+      dd.cell_inter[i].nList[n].cell_ind = dd.p4est_shell[i].neighbor[half_neighbor_idx[n]];
+      dd.cell_inter[i].nList[n].pList = &cells[dd.p4est_shell[i].neighbor[half_neighbor_idx[n]]];
       init_pairList(&dd.cell_inter[i].nList[n].vList);
     }
     
@@ -804,16 +738,16 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
 
   const auto needle = dd_p4est_pos_morton_idx(pos);
 
-  const auto p4est_shell_end = p4est_shell + num_local_cells;
-  auto it = std::lower_bound(p4est_shell,
-                             p4est_shell_end,
+  auto local_end = std::begin(dd.p4est_shell) + num_local_cells;
+  auto it = std::lower_bound(std::begin(dd.p4est_shell),
+                             local_end,
                              needle,
                              shellidxcomp);
-  if (it != p4est_shell_end
+  if (it != local_end
         && dd_p4est_cell_morton_idx(it->coord[0],
                                     it->coord[1],
                                     it->coord[2]) == needle)
-    return &cells[std::distance(p4est_shell, it)];
+    return &cells[std::distance(std::begin(dd.p4est_shell), it)];
   else
     return NULL;
 }
@@ -872,7 +806,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
   // Loop over all cells and particles
   for (int i=0;i<num_local_cells;++i) {
     Cell* cell = local_cells.cell[i];
-    local_shell_t* shell = &p4est_shell[i];
+    local_shell_t* shell = &dd.p4est_shell[i];
     
     for (int d=0;d<3;++d) {
       cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
@@ -918,12 +852,12 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
         // get neighbor cell
         nidx = shell->neighbor[nidx];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
-          if (p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
+          if (dd.p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
             CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part %d\n",this_node,part->p.identity));
               
-            if (p4est_shell[nidx].rank != this_node) { // It is a remote process
+            if (dd.p4est_shell[nidx].rank != this_node) { // It is a remote process
               // copy data to sendbuf according to rank
-              int li = comm_proc[p4est_shell[nidx].rank];
+              int li = comm_proc[dd.p4est_shell[nidx].rank];
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
 #ifdef EXCLUSIONS
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
@@ -935,7 +869,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
               if(p < cell->n) p -= 1;
             } else { // particle stays local, but since it went to a ghost it has to be folded
               fold_position(part->r.p, part->l.i);
-              move_indexed_particle(&cells[p4est_shell[nidx].idx], cell, p);
+              move_indexed_particle(&cells[dd.p4est_shell[nidx].idx], cell, p);
               if(p < cell->n) p -= 1;
             }
           } else { // Particle left global domain and is not tracked by any process anymore
@@ -1271,11 +1205,11 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
-  auto it = std::upper_bound(p4est_space_idx, p4est_space_idx + n_nodes,
-                             dd_p4est_pos_morton_idx(pos),
-                             [](int i, int64_t idx){ return i < idx; });
+  auto it = std::upper_bound(
+      std::begin(p4est_space_idx), std::end(p4est_space_idx) - 1,
+      dd_p4est_pos_morton_idx(pos), [](int i, int64_t idx) { return i < idx; });
 
-  return std::distance(p4est_space_idx, it) - 1;
+  return std::distance(std::begin(p4est_space_idx), it) - 1;
 }
 //--------------------------------------------------------------------------------------------------
 // Repartitions the given p4est, such that process boundaries do not intersect the partition of the
@@ -1496,10 +1430,10 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
       p4est_gloidx_t totnquads = std::accumulate(part_nquads.begin(),
                                                  part_nquads.end(),
                                                  static_cast<p4est_gloidx_t>(0));
-      if (p4est->global_num_quadrants != totnquads) {
+      if (dd.p4est->global_num_quadrants != totnquads) {
         fprintf(stderr,
                 "[%i] ERROR: totnquads = %li but global_num_quadrants = %li\n",
-                this_node, totnquads, p4est->global_num_quadrants);
+                this_node, totnquads, dd.p4est->global_num_quadrants);
         errexit();
       }
     }

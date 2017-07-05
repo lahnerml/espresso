@@ -400,19 +400,24 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
   int coarsen = 1;
+  std::array<double, 3> ref_min = {0.75, 0., 0.25};
+  std::array<double, 3> ref_max = {1.0, 0.25, 0.5};
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     // avoid coarser cells than base_level
     if (quads[i]->level == lbpar.base_level) return 0;
-    // coarsen &= random_geometric(p8est, which_tree, quads[i]);
-    coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
+    coarsen &= random_geometric(p8est, which_tree, quads[i], ref_min, ref_max);
+    // coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
   }
   return coarsen;
 }
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
-  // return random_geometric(p8est, which_tree, q);
-  return !mirror_refinement_pattern(p8est, which_tree, q);
+  // refine some arbitrary quadrant(s)
+  std::array<double, 3> ref_min = {0.25, 0., 0.25};
+  std::array<double, 3> ref_max = {0.5, 0.25, 0.5};
+  return random_geometric(p8est, which_tree, q, ref_min, ref_max);
+  // return !mirror_refinement_pattern(p8est, which_tree, q);
 }
 
 int p4est_utils_adapt_grid() {

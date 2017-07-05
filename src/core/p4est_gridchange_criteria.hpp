@@ -9,18 +9,11 @@
 /** change grid based on a quadrant's position
  */
 inline static int random_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
-                                   p8est_quadrant_t *q) {
+                                   p8est_quadrant_t *q,
+                                   std::array<double, 3> ref_min,
+                                   std::array<double, 3> ref_max) {
   double pos[3];
   p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
-  // refine some arbitrary quadrant(s)
-  std::array<double, 3> ref_min = {0.25, 0., 0.25};
-  std::array<double, 3> ref_max = {0.5, 0.25, 0.5};
-  // refine first tree uniformly
-  // std::array<double, 3> ref_min = {0., 0., 0.};
-  // std::array<double, 3> ref_max = {1., 1., 1.};
-  // do not refine anything in case of one tree
-  // std::array<double, 3> ref_min = {2, 2, 2};
-  // std::array<double, 3> ref_max = {2, 2, 2};
   if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
       (ref_min[1] <= pos[1] && pos[1] < ref_max[1]) &&
       (ref_min[2] <= pos[2] && pos[2] < ref_max[2])) {

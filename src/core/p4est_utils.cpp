@@ -478,18 +478,6 @@ int p4est_utils_adapt_grid() {
         p4est_partitioned, lbadapt_mesh, data_partitioned, lbadapt_local_data);
     lb_p8est = p4est_partitioned;
 
-    // synchronize ghost data for next collision step
-    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
-    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
-    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                           lbadapt_ghost_data, ghost_pointer);
-
-    for (int level = 0; level <= current_forest.finest_level_global; ++level) {
-      p8est_ghostvirt_exchange_data(
-          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)local_pointer.data(), (void **)ghost_pointer.data());
-    }
-
     std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
     forests.push_back(dd.p4est);
@@ -500,6 +488,20 @@ int p4est_utils_adapt_grid() {
     p4est_utils_partition_multiple_forests(forest_order::short_range,
                                            forest_order::adaptive_LB);
 #endif // DD_P4EST
+    const p4est_utils_forest_info_t new_forest =
+        p4est_utils_get_forest_info(forest_order::adaptive_LB);
+    // synchronize ghost data for next collision step
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+
+    for (int level = new_forest.coarsest_level_global;
+         level <= new_forest.finest_level_global; ++level) {
+      p8est_ghostvirt_exchange_data(
+          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
+    }
   } else {
     p8est_destroy(p4est_adapted);
   }

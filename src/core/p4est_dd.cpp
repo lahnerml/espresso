@@ -1234,13 +1234,13 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
     recv_quads[p] = std::max(0,
                            std::min(ub_old_remote, ub_new_local) -
-                               std::max(lb_old_remote, ub_new_local));
+                               std::max(lb_old_remote, lb_new_local));
     recv_num_part[p].resize(recv_quads[p]);
     init_particlelist(&recvbuf[p]);
     recv_prefix[p+1] = recv_prefix[p] + recv_quads[p];
     if (p != this_node && recv_quads[p] > 0)
       MPI_Irecv(recv_num_part[p].data(),
-                recv_quads[p] * sizeof(int), MPI_BYTE, p, REP_EX_CNT_TAG,
+                recv_quads[p], MPI_INT, p, REP_EX_CNT_TAG,
                 comm_cart, &rreq[p]);
   }
 
@@ -1253,7 +1253,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
     send_quads[p] = std::max(0,
                            std::min(ub_old_local, ub_new_remote) -
-                               std::max(lb_old_local, ub_new_remote));
+                               std::max(lb_old_local, lb_new_remote));
     send_prefix[p+1] = send_prefix[p] + send_quads[p];
     
     // Fill send list for number of particles per cell
@@ -1266,7 +1266,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         cells[recv_prefix[p] + c].n = old->cell[c_cnt]->n;
       } else {
         realloc_particlelist(&sendbuf[p], old->cell[c_cnt]->n);
-        sendbuf[p].n = old->cell[c_cnt]->n;
+        //sendbuf[p].n = old->cell[c_cnt]->n;
       }
       send_num_part[p][c] = old->cell[c_cnt]->n;
       for (int i = 0; i < old->cell[c_cnt]->n; i++) {
@@ -1280,19 +1280,20 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
                                 part->el.e + part->el.n);
 #endif
           int pid = part->p.identity;
-          memcpy(&sendbuf[p].part[i], part, sizeof(Particle));
+          //memcpy(&sendbuf[p].part[i], part, sizeof(Particle));
+          move_indexed_particle(&sendbuf[p], old->cell[c_cnt], i);
           local_particles[pid] = NULL;
         } else { // Particles that stay local
           int pid = part->p.identity;
           memcpy(&cells[recv_prefix[p] + c].part[i], part, sizeof(Particle));
-          local_particles[pid] = NULL;
+          local_particles[pid] = &cells[recv_prefix[p] + c].part[i];
         }
       }
       ++c_cnt;
     }
     if (p != this_node && send_quads[p] > 0) {
       MPI_Isend(send_num_part[p].data(),
-                send_quads[p] * sizeof(int), MPI_BYTE, p, REP_EX_CNT_TAG,
+                send_quads[p], MPI_INT, p, REP_EX_CNT_TAG,
                 comm_cart, &sreq[p]);
       if (sendbuf[p].n > 0) {
         MPI_Isend(sendbuf[p].part, 
@@ -1334,11 +1335,12 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
       DIE_IF_TAG_MISMATCH(tag, REP_EX_PART_TAG, "Repart exchange particles");
       dyndatasiz = 0;
-      for (int c = 0; c < recv_num_part[source].size(); ++c) {
+      for (int c = 0; c < recv_quads[source]; ++c) {
         realloc_particlelist(&cells[recv_prefix[source] + c], recv_num_part[source][c]);
-        cells[recv_prefix[source] + c].n = recv_num_part[source][c];
+        //cells[recv_prefix[source] + c].n = recv_num_part[source][c];
         for (int p = 0; p < recv_num_part[source][c]; ++p) {
-          memcpy(&cells[recv_prefix[source] + c].part[p], &recvbuf[source].part[p], sizeof(Particle));
+          //memcpy(&cells[recv_prefix[source] + c].part[p], &recvbuf[source].part[p], sizeof(Particle));
+          append_indexed_particle(&cells[recv_prefix[source] + c], &recvbuf[source].part[p]);
           dyndatasiz += recvbuf[source].part[p].bl.n;
 #ifdef EXCLUSIONS
           dyndatasiz += recvbuf[source].part[p].el.n;
@@ -1355,7 +1357,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
       DIE_IF_TAG_MISMATCH(tag, REP_EX_DYN_TAG, "Repart exchange dyndata");
       read = 0;
-      for (int c = 0; c < recv_num_part[source].size(); ++c) {
+      for (int c = 0; c < recv_quads[source]; ++c) {
         for (int i = 0; i < recv_num_part[source][c]; ++i) {
           Particle *p = &cells[recv_prefix[source] + c].part[i];
           if (p->bl.n > 0) {

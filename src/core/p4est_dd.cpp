@@ -33,6 +33,8 @@ static std::vector<int> comm_proc;     // Number of communicators per Process
 static std::vector<int> comm_rank;     // Communication partner index for a certain communication
 static int num_comm_proc = 0;     // Total Number of bidirectional communications
 //--------------------------------------------------------------------------------------------------
+static std::vector<p4est_gloidx_t> old_global_first_quadrant; // Old global_first_quadrants of the p4est before repartitioning.
+//--------------------------------------------------------------------------------------------------
 static size_t num_cells = 0;
 static size_t num_local_cells = 0;
 static size_t num_ghost_cells = 0;
@@ -241,6 +243,11 @@ void dd_p4est_create_grid (bool isRepart) {
     dd.p4est = std::unique_ptr<p4est_t>(
         p4est_new_ext(comm_cart, dd.p4est_conn, 0, grid_level, true,
                       sizeof(quad_data_t), init_fn, NULL));
+  } else {
+    // Save global_first_quadrants for migration
+    old_global_first_quadrant.clear();
+    std::copy_n(dd.p4est->global_first_quadrant, n_nodes + 1,
+              std::back_inserter(old_global_first_quadrant));
   }
   // Repartition uniformly if part_nquads is empty (because not repart has been
   // done yet). Else use part_nquads as given partitioning.

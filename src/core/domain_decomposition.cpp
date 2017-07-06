@@ -1020,30 +1020,37 @@ void dd_topology_init(CellPList *old, bool isRepart) {
 #endif
 
 #ifndef P4EST_NOCHANGE
-  // Go through all old particles and find owner & cell
-  for (c = 0; c < old->n; c++) {
-    part = old->cell[c]->part;
-    np   = old->cell[c]->n;
-    for (p = 0; p < np; p++) {
-      fold_position(part[p].r.p, part[p].l.i);
-      
-      Cell *nc = dd_p4est_position_to_cell_strict(part[p].r.p);
-      if (nc == NULL) { // Particle is on other process, move it to cell[0]
-        append_unindexed_particle(local_cells.cell[0], &part[p]);
-      } else { // It is on this node, move it to right local_cell
-        append_unindexed_particle(nc, &part[p]);
+  if (isRepart) {
+    dd_p4est_repart_exchange_part(old);
+    for(c=0; c<local_cells.n; c++) {
+      update_local_particles(local_cells.cell[c]);
+    }
+  } else {
+    // Go through all old particles and find owner & cell
+    for (c = 0; c < old->n; c++) {
+      part = old->cell[c]->part;
+      np   = old->cell[c]->n;
+      for (p = 0; p < np; p++) {
+        fold_position(part[p].r.p, part[p].l.i);
+        
+        Cell *nc = dd_p4est_position_to_cell_strict(part[p].r.p);
+        if (nc == NULL) { // Particle is on other process, move it to cell[0]
+          append_unindexed_particle(local_cells.cell[0], &part[p]);
+        } else { // It is on this node, move it to right local_cell
+          append_unindexed_particle(nc, &part[p]);
+        }
       }
     }
+    // Create particle index
+    for(c=0; c<local_cells.n; c++) {
+      update_local_particles(local_cells.cell[c]);
+    }
+    // Invoke global communication for cell[0] containing particles of other processes
+    if (local_cells.n > 0)
+      dd_p4est_global_exchange_part(local_cells.cell[0]);
+    else // Call it anyway in case there are no cells on this node (happens during startup)
+      dd_p4est_global_exchange_part(NULL);
   }
-  // Create particle index
-  for(c=0; c<local_cells.n; c++) {
-    update_local_particles(local_cells.cell[c]);
-  }
-  // Invoke global communication for cell[0] containing particles of other processes
-  if (local_cells.n > 0)
-    dd_p4est_global_exchange_part(local_cells.cell[0]);
-  else // Call it anyway in case there are no cells on this node (happens during startup)
-    dd_p4est_global_exchange_part(NULL);
 #else
   /* copy particles */
   for (c = 0; c < old->n; c++) {

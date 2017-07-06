@@ -43,6 +43,9 @@ void dd_p4est_exchange_and_sort_particles();
 // Send all particles in cp to the right process
 void dd_p4est_global_exchange_part(ParticleList* cp);
 
+// Send particles after a repartition
+void dd_p4est_repart_exchange_part(CellPList *old);
+
 // Map a position to a global processor index
 int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)

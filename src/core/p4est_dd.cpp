@@ -442,8 +442,8 @@ void dd_p4est_create_grid () {
 #ifdef RECV_GHOST_SHIFT
 void dd_p4est_comm () {
   // List of cell idx marked for send/recv for each process
-  std::vector<int>      send_idx[n_nodes];
-  std::vector<int>      recv_idx[n_nodes];
+  std::vector<std::vector<int>> send_idx(n_nodes);
+  std::vector<std::vector<int>> recv_idx(n_nodes);
   std::vector<int>::iterator pos;
   
   // Prepare all lists
@@ -453,8 +453,8 @@ void dd_p4est_comm () {
   
   for (int i=0;i<n_nodes;++i) {
     comm_proc[i] = -1;
-    send_idx[i].clear();
-    recv_idx[i].clear();
+    //send_idx[i].clear();
+    //recv_idx[i].clear();
   }
   for (int i=0;i<comm_shift.size();++i) {
     comm_shift[i].idx.clear();

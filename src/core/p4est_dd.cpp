@@ -1335,17 +1335,19 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
       DIE_IF_TAG_MISMATCH(tag, REP_EX_PART_TAG, "Repart exchange particles");
       dyndatasiz = 0;
+      read = 0;
       for (int c = 0; c < recv_quads[source]; ++c) {
         realloc_particlelist(&cells[recv_prefix[source] + c], recv_num_part[source][c]);
         //cells[recv_prefix[source] + c].n = recv_num_part[source][c];
         for (int p = 0; p < recv_num_part[source][c]; ++p) {
           //memcpy(&cells[recv_prefix[source] + c].part[p], &recvbuf[source].part[p], sizeof(Particle));
-          append_indexed_particle(&cells[recv_prefix[source] + c], &recvbuf[source].part[p]);
+          append_indexed_particle(&cells[recv_prefix[source] + c], &recvbuf[source].part[read + p]);
           dyndatasiz += recvbuf[source].part[p].bl.n;
 #ifdef EXCLUSIONS
           dyndatasiz += recvbuf[source].part[p].el.n;
 #endif
         }
+        read += recv_num_part[source][c];
       }
       if (dyndatasiz > 0) {
         recvbuf_dyn[source].resize(dyndatasiz);

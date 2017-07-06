@@ -587,70 +587,73 @@ static void ghost_extra_shifts(GhostShifts *ghost_shift, int data_parts) {
   for (int i = 0; i < ghost_shift->n_part_lists; ++i) {
     ParticleList *cur_cell = ghost_shift->part_lists[i];
     double *shift = &ghost_shift->shift[3*i];
-    prepare_ghost_cell(cur_cell, origin->n);
-    for (int p = 0; p < origin->n; ++p) {
-      Particle *pt1 = &origin->part[p];
-      Particle *pt2 = &cur_cell->part[p];
-      if (data_parts & GHOSTTRANS_PROPRTS) {
-        memmove(&pt2->p, &pt1->p, sizeof(ParticleProperties));
+    if (data_parts & GHOSTTRANS_PARTNUM) {
+      prepare_ghost_cell(cur_cell, origin->n);
+    } else {
+      for (int p = 0; p < origin->n; ++p) {
+        Particle *pt1 = &origin->part[p];
+        Particle *pt2 = &cur_cell->part[p];
+        if (data_parts & GHOSTTRANS_PROPRTS) {
+          memmove(&pt2->p, &pt1->p, sizeof(ParticleProperties));
 #ifdef GHOSTS_HAVE_BONDS
-        realloc_intlist(&(pt2->bl), pt2->bl.n = pt1->bl.n);
-        memmove(pt2->bl.e, pt1->bl.e, pt1->bl.n*sizeof(int));
-#ifdef EXCLUSIONS
-        realloc_intlist(&(pt2->el), pt2->el.n = pt1->el.n);
-        memmove(pt2->el.e, pt1->el.e, pt1->el.n*sizeof(int));
+          realloc_intlist(&(pt2->bl), pt2->bl.n = pt1->bl.n);
+          memmove(pt2->bl.e, pt1->bl.e, pt1->bl.n*sizeof(int));
+ #ifdef EXCLUSIONS
+          realloc_intlist(&(pt2->el), pt2->el.n = pt1->el.n);
+          memmove(pt2->el.e, pt1->el.e, pt1->el.n*sizeof(int));
 #endif
 #endif
-      }
-      if (data_parts & GHOSTTRANS_POSSHFTD) {
-        /* ok, this is not nice, but perhaps fast */
-        memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
-        for (int n = 0; n < 3; n++) {
-          pt2->r.p[n] += shift[n];
         }
-      } else if (data_parts & GHOSTTRANS_POSITION)
-        memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
-      if (data_parts & GHOSTTRANS_MOMENTUM) {
-        memmove(&pt2->m, &pt1->m, sizeof(ParticleMomentum));
-      }
-      if (data_parts & GHOSTTRANS_FORCE)
-        add_force(&pt2->f, &pt1->f);
+        if (data_parts & GHOSTTRANS_POSSHFTD) {
+          /* ok, this is not nice, but perhaps fast */
+          memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
+          for (int n = 0; n < 3; n++) {
+            pt2->r.p[n] -= shift[n];
+          }
+        } else if (data_parts & GHOSTTRANS_POSITION)
+          memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
+        if (data_parts & GHOSTTRANS_MOMENTUM) {
+          memmove(&pt2->m, &pt1->m, sizeof(ParticleMomentum));
+        }
+        //if (data_parts & GHOSTTRANS_FORCE)
+        //  add_force(&pt2->f, &pt1->f);
 #ifdef LB
-      if (data_parts & GHOSTTRANS_COUPLING)
-        memmove(&pt2->lc, &pt1->lc, sizeof(ParticleLatticeCoupling));
+        if (data_parts & GHOSTTRANS_COUPLING)
+          memmove(&pt2->lc, &pt1->lc, sizeof(ParticleLatticeCoupling));
 #endif
 #ifdef ENGINE
-      if (data_parts & GHOSTTRANS_SWIMMING)
-        memmove(&pt2->swim, &pt1->swim, sizeof(ParticleParametersSwimming));
+        if (data_parts & GHOSTTRANS_SWIMMING)
+          memmove(&pt2->swim, &pt1->swim, sizeof(ParticleParametersSwimming));
 #endif
-      /*memcpy(&cur_cell->part[p], &origin->part[p], sizeof(Particle));
-      cur_cell->part[p].r.p[0] += shift[0];
-      cur_cell->part[p].r.p[1] += shift[1];
-      cur_cell->part[p].r.p[2] += shift[2];
-#ifdef GHOSTS_HAVE_BONDS
-      if (origin->part[p].bl.n) {
-        realloc_intlist(&cur_cell->part[p].bl, cur_cell->part[p].bl.n = origin->part[p].bl.n);
-        memcpy(cur_cell->part[p].bl.e, origin->part[p].bl.e, sizeof(int)*origin->part[p].bl.n);
+        /*memcpy(&cur_cell->part[p], &origin->part[p], sizeof(Particle));
+        cur_cell->part[p].r.p[0] += shift[0];
+        cur_cell->part[p].r.p[1] += shift[1];
+        cur_cell->part[p].r.p[2] += shift[2];
+  #ifdef GHOSTS_HAVE_BONDS
+        if (origin->part[p].bl.n) {
+          realloc_intlist(&cur_cell->part[p].bl, cur_cell->part[p].bl.n = origin->part[p].bl.n);
+          memcpy(cur_cell->part[p].bl.e, origin->part[p].bl.e, sizeof(int)*origin->part[p].bl.n);
+        }
+  #ifdef EXCLUSIONS
+        if (origin->part[p].el.n) {
+          realloc_intlist(&cur_cell->part[p].el, cur_cell->part[p].el.n = origin->part[p].el.n);
+          memcpy(cur_cell->part[p].el.e, origin->part[p].el.e, sizeof(int)*origin->part[p].el.n);
+        }
+  #endif
+  #endif*/
+        
+        ///This seems not to be needed as it segfaults :/
+        //if (local_particles[cur_cell->part[p].p.identity] == NULL) {
+        //  local_particles[cur_cell->part[p].p.identity] = &cur_cell->part[p];
+        //}
       }
-#ifdef EXCLUSIONS
-      if (origin->part[p].el.n) {
-        realloc_intlist(&cur_cell->part[p].el, cur_cell->part[p].el.n = origin->part[p].el.n);
-        memcpy(cur_cell->part[p].el.e, origin->part[p].el.e, sizeof(int)*origin->part[p].el.n);
-      }
-#endif
-#endif*/
-      
-      ///This seems not to be needed as it segfaults :/
-      //if (local_particles[cur_cell->part[p].p.identity] == NULL) {
-      //  local_particles[cur_cell->part[p].p.identity] = &cur_cell->part[p];
-      //}
     }
   }
   if (data_parts & GHOSTTRANS_POSSHFTD)
     for (int p = 0; p < origin->n; ++p) {
-      origin->part[p].r.p[0] += ghost_shift->origin_shift[0];
-      origin->part[p].r.p[1] += ghost_shift->origin_shift[1];
-      origin->part[p].r.p[2] += ghost_shift->origin_shift[2];
+      origin->part[p].r.p[0] -= ghost_shift->origin_shift[0];
+      origin->part[p].r.p[1] -= ghost_shift->origin_shift[1];
+      origin->part[p].r.p[2] -= ghost_shift->origin_shift[2];
     }
 }
 #endif //RECV_GHOST_SHIFT
@@ -663,6 +666,20 @@ static void ghost_extra_shifts(GhostShifts *ghost_shift, int data_parts) {
  */
 static void ghost_communicator_async(GhostCommunicator *gc)
 {
+#ifdef RECV_GHOST_SHIFT
+  if ((gc->data_parts & GHOSTTRANS_FORCE)) {
+    for (int n = 0; n < gc->n_extra_shifts; ++n) {
+      ParticleList *origin = gc->extra_shifts[n].origin;
+      for (int i = 0; i < gc->extra_shifts[n].n_part_lists; ++i) {
+        ParticleList *cur_cell = gc->extra_shifts[n].part_lists[i];
+        for (int p = 0; p < origin->n; ++p) {
+          add_force(&origin->part[p].f, &cur_cell->part[p].f);
+        }
+      }
+    }
+  }
+#endif
+  
   const int data_parts = gc->data_parts;
   // Use static buffers for performance reasons
   static std::vector<CommBuf> commbufs;
@@ -762,8 +779,10 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   MPI_Waitall(gc->num, reqs.data() + gc->num, MPI_STATUS_IGNORE);
   
 #ifdef RECV_GHOST_SHIFT
-  for (int n = 0; n < gc->n_extra_shifts; ++n) {
-    ghost_extra_shifts(&gc->extra_shifts[n], gc->data_parts);
+  if (!(gc->data_parts & GHOSTTRANS_FORCE)) {
+    for (int n = 0; n < gc->n_extra_shifts; ++n) {
+      ghost_extra_shifts(&gc->extra_shifts[n], gc->data_parts);
+    }
   }
 #endif
 }

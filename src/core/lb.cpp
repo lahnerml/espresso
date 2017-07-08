@@ -3353,11 +3353,9 @@ inline void lb_collide_stream() {
    */
   bool hide_communication = false;
 
-  for (level = p4est_utils_get_forest_info(forest_order::adaptive_LB)
-                   .coarsest_level_global;
-       level <= p4est_utils_get_forest_info(forest_order::adaptive_LB)
-                    .finest_level_global;
-       ++level) {
+  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  for (level = forest_lb.coarsest_level_global;
+       level <= forest_lb.finest_level_global; ++level) {
     lvl_diff = lbpar.max_refinement_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       if (hide_communication) {
@@ -3375,11 +3373,8 @@ inline void lb_collide_stream() {
 
   // perform second half of subcycling here (process fine before coarse)
   // TODO: which max refinement level is needed?
-  for (level = p4est_utils_get_forest_info(forest_order::adaptive_LB)
-                   .finest_level_global;
-       p4est_utils_get_forest_info(forest_order::adaptive_LB)
-           .coarsest_level_global <= level;
-       --level) {
+  for (level = forest_lb.finest_level_global;
+       forest_lb.coarsest_level_global <= level; --level) {
     // level always relates to level of real cells
     lvl_diff = lbpar.max_refinement_level - level;
 

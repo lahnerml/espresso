@@ -41,6 +41,7 @@
 #include <assert.h>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <stdlib.h>
 
 #ifdef LB_ADAPTIVE
@@ -68,8 +69,10 @@ p8est_mesh_t *lbadapt_mesh;
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 int lb_conn_brick[3] = {0, 0, 0};
-double coords_for_regional_refinement[6] = {DBL_MIN, DBL_MAX, DBL_MIN,
-                                            DBL_MAX, DBL_MIN, DBL_MAX};
+double coords_for_regional_refinement[6] = {
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max()};
 
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**

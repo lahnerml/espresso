@@ -1649,8 +1649,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
         lbadapt_calc_pop_from_modes(data->lbfluid[0], modes);
       }
       if (has_virtuals) {
-        lbadapt_populate_virtuals(mesh_iter, data->lbfluid,
-                                  data->lbfields.boundary);
+        lbadapt_populate_virtuals(mesh_iter);
       }
     }
   }
@@ -1658,13 +1657,12 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
 #endif // LB_ADAPTIVE_GPU
 }
 
-void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
-                               lb_float source_populations[2][19],
-                               int source_boundary) {
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
 #ifndef LB_ADAPTIVE_GPU
   int parent_qid = mesh_iter->current_qid;
   int virtual_sid;
   int lvl = 1 + mesh_iter->current_level;
+  lbadapt_payload_t *source_data;
   lbadapt_payload_t *virtual_data;
 
   // virtual quads are local if their parent is local, ghost analogous
@@ -1672,18 +1670,26 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
 
   if (is_ghost) {
     virtual_sid = mesh_iter->mesh->quad_gvirtual_offset[parent_qid];
+    source_data =
+        &lbadapt_ghost_data[mesh_iter->current_level]
+                           [p8est_meshiter_get_current_storage_id(mesh_iter)];
     virtual_data = &lbadapt_ghost_data[lvl][virtual_sid];
   } else {
     virtual_sid = mesh_iter->mesh->quad_qvirtual_offset[parent_qid];
+    source_data =
+        &lbadapt_local_data[mesh_iter->current_level]
+                           [p8est_meshiter_get_current_storage_id(mesh_iter)];
     virtual_data = &lbadapt_local_data[lvl][virtual_sid];
   }
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    std::memcpy(virtual_data->lbfluid[0], source_populations[0],
+    std::memcpy(virtual_data->lbfluid[0], source_data->lbfluid[0],
                 lbmodel.n_veloc * sizeof(lb_float));
-    // std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
-    //            lbmodel.n_veloc * sizeof(lb_float));
+    std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
+                lbmodel.n_veloc * sizeof(lb_float));
     // make sure that boundary is not occupied by some memory clutter
-    virtual_data->lbfields.boundary = source_boundary;
+    std::memcpy(virtual_data->lbfields.force, source_data->lbfields.force,
+                P8EST_DIM * sizeof(double));
+    virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
   }
 #endif // LB_ADAPTIVE_GPU

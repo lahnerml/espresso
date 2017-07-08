@@ -271,9 +271,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
  * \param [in] source_boundary     The boundary value set in host cell that is
  *                                 copied to each virtual subquadrant.
  */
-void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
-                               lb_float source_populations[2][19],
-                               int source_boundary);
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter);
 
 /** streaming
  * CAUTION: sync ghost data before streaming

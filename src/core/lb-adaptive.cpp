@@ -2325,14 +2325,15 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   for (int i = 0; i < num_cells; ++i) {
     double *ins = (double *)sc_array_index(vorticity, 3 * i);
     std::memcpy(ins, vort[i].data(), 3 * sizeof(double));
-    ins = (double *) sc_array_index(qid, i);
+    ins = (double *)sc_array_index(qid, i);
     *ins = i + p4est->global_first_quadrant[p4est->mpirank];
   }
 
   lbadapt_get_velocity_values(velocity);
 
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename.c_str());
+  p8est_vtk_context_t *context =
+      p8est_vtk_context_new(lb_p8est, filename.c_str());
   p8est_vtk_context_set_scale(context, 1); /* quadrants at full scale */
 
   /* begin writing the output files */
@@ -2378,8 +2379,8 @@ void lbadapt_get_boundary_status() {
   /** prepare exchanging boundary values */
   std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
-  prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                         lbadapt_ghost_data, ghost_pointer);
+  prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
+                         ghost_pointer);
 
   for (level = forest.coarsest_level_global;
        level <= forest.finest_level_global; ++level) {

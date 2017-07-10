@@ -11,7 +11,7 @@ proc rescale_velocities { target_temperature particle_number } {
 cellsystem domain_decomposition -no_verlet_list
 setmd skin 0.1
 
-set n_part 1000
+set n_part 10000
 set density 0.8442
 set min_dist 0.87
 set boxl [expr pow($n_part/$density,1.0/3.0)+2*0.1]
@@ -29,6 +29,14 @@ if { [file exists particle.dat]==0 } {
     part $i pos $pos_x $pos_y $pos_z q 0.0 type 0
   }
 
+  setmd time_step 0.001
+
+  puts "Mindist: [analyze mindist]"
+  minimize_energy 10.0 100 0.1 0.01
+  kill_particle_motion
+  kill_particle_forces
+  puts "Mindist: [analyze mindist]"
+
   thermostat off
   setmd time_step 0.001
   puts "Mindist: [analyze mindist]"
@@ -39,12 +47,16 @@ if { [file exists particle.dat]==0 } {
   while { $i < 2000 && $act_min_dist < $min_dist } {    
       integrate 100
 
+      puts -nonewline "$i "
+      flush stdout
+
       set act_min_dist [analyze mindist]
 
       set cap [expr $cap+1.0]
       inter forcecap $cap
       incr i
   }
+  puts "."
   inter forcecap 0
   puts "Mindist: [analyze mindist]"
 
@@ -52,9 +64,12 @@ if { [file exists particle.dat]==0 } {
   setmd time_step 0.0001
   for { set n 0 } { $n < 200 } { incr n } {
     integrate 1000
+    puts -nonewline "$n"
+    flush stdout
     rescale_velocities  $target_temperature [setmd n_part]
   }
-  
+  puts "."
+
   set out [open "particle.dat" "w"]
   blockfile $out write particles "id pos v f type" "all"
   close $out
@@ -66,9 +81,9 @@ if { [file exists particle.dat]==0 } {
 
 setmd time_step 0.001
 
-for { set i 1 } { $i <= 1000 } { incr i } {
+for { set i 1 } { $i <= 5000 } { incr i } {
   integrate 100
-  if {$i % 20 == 0} {
+  if {$i % 10 == 0} {
     #puts "."
     repart rand
   } else {

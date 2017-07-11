@@ -81,8 +81,8 @@ int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
   }
 
   /* check input for semantic correctness */
-  if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+  if ((level > 18) || (level < 0)) {
+    Tcl_AppendResult(interp, "allowed refinement levels are [0, 18]\n",
                      (char *)NULL);
     return TCL_ERROR;
   }

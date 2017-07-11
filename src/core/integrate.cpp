@@ -391,7 +391,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
     INTEG_TRACE(fprintf(stderr, "%d: STEP %d\n", this_node, step));
 
 #ifdef LB_ADAPTIVE
-    int n_integration_steps = sim_time / time_step;
+    int n_integration_steps = (sim_time / time_step) + 0.5;
     if ((n_integration_steps != 0) &&
         (0 == n_integration_steps % steps_until_grid_change)) {
           p4est_utils_adapt_grid();

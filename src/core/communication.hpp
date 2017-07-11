@@ -570,32 +570,48 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len);
 #endif // LB_ADAPTIVE_GPU
 
 /** Set maximum refinement level
- * 
+ *
  * @param [in] node   The node on which this function is called (all)
  * @param [in] l_max  New maximum refinement level
  */
 void mpi_lbadapt_set_max_level (int node, int l_max);
 
+/** Set number of (MD) integration steps before grid is changed
+ *
+ * @param[in] node   Node on which function is called (all)
+ * @param[in] steps  Updated number of steps
+ */
+void mpi_lbadapt_set_steps_before_grid_change(int node, int steps);
+
 /** Call non-recursive uniform refinement function, i.e. all quadrants are
  * refined exactly once.
  */
-void mpi_unif_refinement (int node, int level);
+void mpi_unif_refinement (int node, int ref_iterations);
 
 /** Call non-recursive random refinement function. Probability is 50%.
  */
-void mpi_rand_refinement (int node, int maxLevel);
+void mpi_rand_refinement (int node, int ref_iterations);
 
 /** Call broadcast routine to populate 6 coordinates
  */
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param);
 
+/** statically refine a square within the local domain
+ */
 void mpi_reg_refinement (int node, int param=0);
+
+/** statically coarsen a square within the local domain
+ */
+void mpi_reg_coarsening (int node, int param=0);
 
 /** Call recursive geometric refinement function, i.e. all quadrants that are
  * touching a boundary are recursively refined until l_max.
  */
 void mpi_geometric_refinement (int node, int param);
 
+/** Call inverse of recursive geometric refinement function, i.e. all quadrants
+ * that are not touching a boundary are recursively refined until l_max.
+ */
 void mpi_inv_geometric_refinement (int node, int param);
 
 /** Ignore boundary with given index in geometric refinement function.

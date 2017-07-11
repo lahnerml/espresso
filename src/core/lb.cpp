@@ -3353,7 +3353,9 @@ inline void lb_collide_stream() {
    */
   bool hide_communication = false;
 
-  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  for (level = forest_lb.coarsest_level_global;
+       level <= forest_lb.finest_level_global; ++level) {
     lvl_diff = lbpar.max_refinement_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       if (hide_communication) {
@@ -3366,16 +3368,13 @@ inline void lb_collide_stream() {
       }
     }
   }
-
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
-  // prevent overflow
-  // TODO Mark grid alteration
-  n_lbsteps %= (1 << (lbpar.max_refinement_level - lbpar.base_level));
 
   // perform second half of subcycling here (process fine before coarse)
   // TODO: which max refinement level is needed?
-  for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
+  for (level = forest_lb.finest_level_global;
+       forest_lb.coarsest_level_global <= level; --level) {
     // level always relates to level of real cells
     lvl_diff = lbpar.max_refinement_level - level;
 
@@ -3384,11 +3383,18 @@ inline void lb_collide_stream() {
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
       lbadapt_swap_pointers(level);
+
+      // synchronize ghost data for next collision step
+      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+      prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                             lbadapt_ghost_data, ghost_pointer);
+
       // TODO: do not use convenience function here
-      // (exchange_data_begin)
+      // if comm_hiding (exchange_data_begin)
       p8est_ghostvirt_exchange_data(
           lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
     }
   }
 #endif // LB_ADAPTIVE_GPU

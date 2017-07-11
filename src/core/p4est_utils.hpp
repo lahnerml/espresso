@@ -15,24 +15,35 @@
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
-enum class forest_order { short_range = 0, adaptive_LB };
+enum class forest_order {
+#ifdef DD_P4EST
+  short_range = 0,
+#endif // DD_P4EST
+#ifdef LB_ADAPTIVE
+  adaptive_LB
+#endif // LB_ADAPTIVE
+};
+
+extern int steps_until_grid_change;
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
   std::vector<p4est_locidx_t> tree_quadrant_offset_synced;
   std::vector<int64_t> first_quad_morton_idx;
   int coarsest_level_local;
+  int coarsest_level_ghost;
+  int coarsest_level_global;
   int finest_level_local;
   int finest_level_global;
-  int coarsest_level_ghost;
   int finest_level_ghost;
 
   p4est_utils_forest_info_t(p4est_t *p4est)
-      : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count),
-        first_quad_morton_idx(p4est->mpisize + 1),
-        coarsest_level_local(0), finest_level_local(-1),
-        finest_level_global(-1), coarsest_level_ghost(), finest_level_ghost(0) {
-  }
+      : p4est(p4est), tree_quadrant_offset_synced(p4est->trees->elem_count, 0),
+        first_quad_morton_idx(p4est->mpisize + 1, 0),
+        coarsest_level_local(P8EST_QMAXLEVEL),
+        coarsest_level_ghost(P8EST_QMAXLEVEL),
+        coarsest_level_global(P8EST_QMAXLEVEL), finest_level_local(-1),
+        finest_level_global(-1), finest_level_ghost(-1) {}
 };
 
 /** Returns a const reference to the forest_info of "fo".
@@ -41,7 +52,7 @@ struct p4est_utils_forest_info_t {
  *
  * @param fo specifier which forest_info to return
  */
-const p4est_utils_forest_info_t& p4est_utils_get_forest_info(forest_order fo);
+const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo);
 
 /** For algorithms like mapping a position to a quadrant to work we need a
  * synchronized version of the quadrant offsets of each tree.
@@ -80,9 +91,11 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  *
  * @return int      Morton index for a cell corresponding to pos.
  */
-int64_t p4est_utils_pos_morton_idx_global(forest_order forest, const double pos[3]);
+int64_t p4est_utils_pos_morton_idx_global(forest_order forest,
+                                          const double pos[3]);
 
-/** Get the index of a position in the by ROUND_ERROR_PREC extended local domain.
+/** Get the index of a position in the by ROUND_ERROR_PREC extended local
+ * domain.
  * If pos is in the local domain, returns the same as
  * \ref p4est_utils_pos_morton_idx_local. Otherwise tries if by ROUND_ERROR_PREC
  * shifted copies of pos lie inside the local domain. If so, returns the
@@ -103,7 +116,8 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]);
  *
  * @return int      Quadrant index of quadrant containing pos
  */
-p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3]);
+p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest,
+                                         const double pos[3]);
 
 /** Find quadrant index for a given position among ghost quadrants
  *
@@ -114,7 +128,8 @@ p4est_locidx_t p4est_utils_pos_qid_local(forest_order forest, const double pos[3
  * @return int      Quadrant index of quadrant containing pos
  */
 p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
-                                         p8est_ghost_t *ghost, const double pos[3]);
+                                         p8est_ghost_t *ghost,
+                                         const double pos[3]);
 /*@}*/
 
 /*****************************************************************************/
@@ -221,13 +236,14 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-int p4est_utils_allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh,
+int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
+                                           p8est_mesh_t *mesh,
                                            bool local_data) {
-  // make sure data is not yet in used
-  P4EST_ASSERT(*data == NULL);
+  P4EST_ASSERT(data.empty());
 
   // allocate data for each level
-  *data = P4EST_ALLOC(T *, P8EST_QMAXLEVEL);
+  data = std::vector<std::vector<T>>(P8EST_QMAXLEVEL, std::vector<T>());
+  P4EST_ASSERT(data.size() == P8EST_QMAXLEVEL);
 
   int quads_on_level;
 
@@ -238,7 +254,8 @@ int p4est_utils_allocate_levelwise_storage(T ***data, p8est_mesh_t *mesh,
                   P8EST_CHILDREN * (mesh->virtual_qlevels + level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
                   P8EST_CHILDREN * (mesh->virtual_glevels + level)->elem_count;
-    (*data)[level] = P4EST_ALLOC(T, quads_on_level);
+    data[level] = std::vector<T>(quads_on_level);
+    P4EST_ASSERT(data[level].size() == quads_on_level);
   }
 
   return 0;
@@ -251,13 +268,30 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-int p4est_utils_deallocate_levelwise_storage(T ***data) {
-  if (*data != NULL) {
+int p4est_utils_deallocate_levelwise_storage(
+    std::vector<std::vector<T>> &data) {
+  if (!data.empty()) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
-      P4EST_FREE((*data)[level]);
+      data[level].clear();
     }
-    P4EST_FREE(*data);
-    *data = NULL;
+  }
+  data.clear();
+
+  return 0;
+}
+
+template <typename T>
+int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
+                           std::vector<T *> &local_pointer,
+                           std::vector<std::vector<T>> &ghost_data,
+                           std::vector<T *> &ghost_pointer) {
+  P4EST_ASSERT(ghost_data.size() == 0 ||
+               ghost_data.size() == local_data.size());
+  for (int i = 0; i < local_data.size(); ++i) {
+    local_pointer[i] = local_data[i].data();
+    if (ghost_data.size() != 0) {
+      ghost_pointer[i] = ghost_data[i].data();
+    }
   }
   return 0;
 }
@@ -267,6 +301,11 @@ int p4est_utils_deallocate_levelwise_storage(T ***data) {
 /** \name Grid Change                                                        */
 /*****************************************************************************/
 /*@{*/
+/** Function that handles grid alteration. After calling this function the grid
+ * has changed and everything is set to perform the next integration step.
+ */
+int p4est_utils_adapt_grid();
+
 template <typename T>
 /** Skeleton for copying data.
  *
@@ -338,11 +377,9 @@ template <typename T>
  *                          CAUTION: Needs to be allocated and all numerical
  *                                   payload is supposed to be filled with 0.
  */
-int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
-                                        p8est_mesh_t *mesh_old,
-                                        p8est_t *p4est_new,
-                                        T **local_data_levelwise,
-                                        T *mapped_data_flat);
+int p4est_utils_post_gridadapt_map_data(
+    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p4est_new,
+    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
 
 template <typename T>
 /** Generic function to re-establish a proper load balacing after the grid has
@@ -361,7 +398,7 @@ template <typename T>
  */
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<T> **data_partitioned);
+    std::vector<std::vector<T>> &data_partitioned);
 
 template <typename T>
 /** After all local data has been received insert in newly allocated level-wise
@@ -375,10 +412,10 @@ template <typename T>
  * @param data_levelwise  Level-wise numerical payload.
  * @return int
  */
-int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
-                                           p8est_mesh_t mesh_new,
-                                           std::vector<T> **data_partitioned,
-                                           T **data_levelwise);
+int p4est_utils_post_gridadapt_insert_data(
+    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    std::vector<std::vector<T>> &data_partitioned,
+    std::vector<std::vector<T>> &data_levelwise);
 /*@}*/
 
 /*****************************************************************************/
@@ -395,7 +432,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
-p4est_t* p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
+p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

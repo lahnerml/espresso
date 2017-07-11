@@ -81,14 +81,47 @@ int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
   }
 
   /* check input for semantic correctness */
-  if ((level > 18) || (level < 1)) {
-    Tcl_AppendResult(interp, "allowed refinement levels are [1, 18]\n",
+  if ((level > 18) || (level < 0)) {
+    Tcl_AppendResult(interp, "allowed refinement levels are [0, 18]\n",
                      (char *)NULL);
     return TCL_ERROR;
   }
 
   mpi_call(mpi_lbadapt_set_max_level, -1, level);
   mpi_lbadapt_set_max_level(0, level);
+
+  return TCL_OK;
+}
+
+int tclcommand_set_steps_until_grid_change(ClientData data, Tcl_Interp *interp,
+                                           int argc, char **argv) {
+  int steps;
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Setting number of integration steps requires one "
+                             "parameter, specifying that number of steps.",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  if (!ARG_IS_I(1, steps)) {
+    Tcl_AppendResult(interp,
+                     "Setting number of integration steps before grid is "
+                     "changed needs 1 parameter of type and meaning:\n",
+                     (char *)NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *)NULL);
+    Tcl_AppendResult(interp, "<number_steps>\n", (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  /* check input for semantic correctness */
+  if (steps < 1) {
+    Tcl_AppendResult(interp, "number of steps needs to be at least 1.\n",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_lbadapt_set_steps_before_grid_change, -1, steps);
+  mpi_lbadapt_set_steps_before_grid_change(0, steps);
 
   return TCL_OK;
 }
@@ -212,6 +245,61 @@ int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
 
   mpi_call(mpi_reg_refinement, -1, 0);
   mpi_reg_refinement(0, 0);
+
+  return TCL_OK;
+}
+
+int tclcommand_set_reg_coarse(ClientData data, Tcl_Interp *interp, int argc,
+                           char **argv) {
+  if (argc == 7) {
+    if (!ARG_IS_D(1, coords_for_regional_refinement[0])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(2, coords_for_regional_refinement[1])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(3, coords_for_regional_refinement[2])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(4, coords_for_regional_refinement[3])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(5, coords_for_regional_refinement[4])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+    if (!ARG_IS_D(6, coords_for_regional_refinement[5])) {
+      Tcl_AppendResult(interp, "regional refinement needs 6 parameters of"
+                               "type and meaning:\n", (char*)NULL);
+      Tcl_AppendResult(interp, "DBL, DBL, DBL, DBL, DBL, DBL\n", (char*)NULL);
+      Tcl_AppendResult(interp, "x_min, x_max, y_min, y_max, z_min, z_max\n", (char*)NULL);
+      return TCL_ERROR;
+    }
+  }
+  mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
+  mpi_bcast_parameters_for_regional_refinement(0, 0);
+
+  mpi_call(mpi_reg_coarsening, -1, 0);
+  mpi_reg_coarsening(0, 0);
 
   return TCL_OK;
 }

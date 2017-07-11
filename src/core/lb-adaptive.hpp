@@ -41,6 +41,8 @@
 #include <p8est_meshiter.h>
 #include <p8est_nodes.h>
 #include <p8est_vtk.h>
+#include <string.h>
+#include <vector>
 
 #include "lb-adaptive-gpu.hpp"
 #include "lb.hpp"
@@ -52,8 +54,8 @@ extern p8est_connectivity_t *conn;
 extern p8est_ghost_t *lbadapt_ghost;
 extern p8est_ghostvirt_t *lbadapt_ghost_virt;
 extern p8est_mesh_t *lbadapt_mesh;
-extern lbadapt_payload_t **lbadapt_local_data;
-extern lbadapt_payload_t **lbadapt_ghost_data;
+extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
+extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
@@ -160,8 +162,8 @@ int refine_uniform(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
                   p8est_quadrant_t *quadrant);
 
-/** Refinement function that refines all cells for whichs anchor point holds
- * 0.25 <= z < 0.75
+/** Refinement function that refines all cells that are contained within
+ * \ref coords_for_regional_refinement
  *
  * \param [in] p8est       The forest.
  * \param [in] which_tree  The tree in the forest containing \a q.
@@ -169,6 +171,16 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q);
+
+/** Coarsening function that coarsens all groups cells contained within
+ * \ref coords_for_regional_refinement
+ *
+ * \param [in] p8est       The forest.
+ * \param [in] which_tree  The tree in the forest containing \a q.
+ * \param [in] quads       The set of quadrant.
+ */
+int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
+                     p8est_quadrant_t **quads);
 
 /** Refinement function that refines all cells whose midpoint is closer to a
  * boundary than half the cells side length.
@@ -259,9 +271,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
  * \param [in] source_boundary     The boundary value set in host cell that is
  *                                 copied to each virtual subquadrant.
  */
-void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter,
-                               lb_float source_populations[2][19],
-                               int source_boundary);
+void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter);
 
 /** streaming
  * CAUTION: sync ghost data before streaming
@@ -303,13 +313,22 @@ void lbadapt_get_density_values(sc_array_t *density_values);
  */
 void lbadapt_get_velocity_values(sc_array_t *velocity_values);
 
+/** Calculate vorticity value of each local quadrant for refinement/coarsening
+ *
+ * @param [in]  p4est    Current forest
+ * @param [out] vort     Container for storing vorticity values
+ */
+void lbadapt_calc_vorticity(p8est_t *p4est,
+                            std::vector<std::array<double, 3>> &vort,
+                            std::string filename = "");
+
 /** Init boudary flag of each quadrant.
  */
 void lbadapt_get_boundary_status();
 
-int lbadapt_calc_local_fields(double populations[2][19], double mode[19],
-                              double force[3], int boundary, int has_force,
-                              double h, double *rho, double *j, double *pi);
+int lbadapt_calc_local_fields(double populations[2][19], double force[3],
+                              int boundary, int has_force, double h,
+                              double *rho, double *j, double *pi);
 
 /** Calculate local density from pre-collision moments
  *

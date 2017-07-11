@@ -4,7 +4,9 @@
 
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
+#include "lb-adaptive.hpp"
 #include "p4est_dd.hpp"
+#include "p4est_gridchange_criteria.hpp"
 
 #include <algorithm>
 #include <array>
@@ -18,6 +20,9 @@
 #include <vector>
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
+
+// number of (MD) intergration steps before grid changes
+int steps_until_grid_change = 50;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -82,8 +87,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   }
   // only fill local send buffer if current process is not empty
   if (p4est->local_num_quadrants != 0) {
-    // set start index; if first tree is not completely owned by
-    // current
+    // set start index; if first tree is not completely owned by current
     // process it will set a wrong quadrant offset
     int start_idx = (p4est->first_local_tree == last_tree_prev_rank)
                         ? p4est->first_local_tree + 1
@@ -94,9 +98,17 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
         local_tree_offsets[i] = tree->quadrants_offset +
                                 p4est->global_first_quadrant[p4est->mpirank];
       }
-      /* get local max level */
+      /* local max level */
       if (insert_elem.finest_level_local < tree->maxlevel) {
-        insert_elem.finest_level_local = tree->maxlevel;
+        insert_elem.finest_level_local = insert_elem.coarsest_level_local =
+            tree->maxlevel;
+      }
+      /* local min level */
+      for (int l = insert_elem.coarsest_level_local; l >= 0; --l) {
+        if (l < insert_elem.coarsest_level_local &&
+            tree->quadrants_per_level[l]) {
+          insert_elem.coarsest_level_local = l;
+        }
       }
     }
   }
@@ -110,7 +122,11 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   MPI_Allreduce(&insert_elem.finest_level_local,
                 &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
                 p4est->mpicomm);
+  MPI_Allreduce(&insert_elem.coarsest_level_local,
+                &insert_elem.coarsest_level_global, 1, P4EST_MPI_LOCIDX,
+                MPI_MIN, p4est->mpicomm);
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
+  insert_elem.coarsest_level_ghost = insert_elem.coarsest_level_global;
 
   // ensure monotony
   P4EST_ASSERT(std::is_sorted(insert_elem.tree_quadrant_offset_synced.begin(),
@@ -119,8 +135,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   for (int i = 0; i < p4est->mpisize; ++i) {
     p4est_quadrant_t *q = &p4est->global_first_position[i];
     double xyz[3];
-    p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree, q->x, q->y,
-                           q->z, xyz);
+    p4est_utils_get_front_lower_left(p4est, q->p.which_tree, q, xyz);
 
     // Scale xyz because p4est_utils_pos_morton_idx_global will assume it is
     // and undo this.
@@ -131,7 +146,8 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
         insert_elem.tree_quadrant_offset_synced, xyz);
   }
   insert_elem.first_quad_morton_idx[p4est->mpisize] =
-      p4est->global_num_quadrants;
+      p4est->trees->elem_count *
+      (1 << (P8EST_DIM * insert_elem.finest_level_global));
   P4EST_ASSERT(std::is_sorted(insert_elem.first_quad_morton_idx.begin(),
                               insert_elem.first_quad_morton_idx.end()));
 
@@ -146,7 +162,7 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
-  const p4est_utils_forest_info_t& current_forest =
+  const p4est_utils_forest_info_t &current_forest =
       forest_info.at(static_cast<int>(forest));
   int qid = p4est_utils_pos_morton_idx_global(forest, pos);
 
@@ -204,8 +220,8 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
     }
 
     // find lower left and upper right corner of forest
-    std::array<double, 3> pos_min {{0., 0., 0.}};
-    std::array<double, 3> pos_max {{box_l[0], box_l[1], box_l[2]}};
+    std::array<double, 3> pos_min{{0., 0., 0.}};
+    std::array<double, 3> pos_max{{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
     double dist;
     double dist_min = DBL_MAX;
@@ -380,12 +396,135 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
   return index;
 }
 
+// CAUTION: Currently LB only
+int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
+                        p8est_quadrant_t **quads) {
+  int coarsen = 1;
+  std::array<double, 3> ref_min = {0.75, 0., 0.25};
+  std::array<double, 3> ref_max = {1.0, 0.25, 0.5};
+  for (int i = 0; i < P8EST_CHILDREN; ++i) {
+    // avoid coarser cells than base_level
+    if (quads[i]->level == lbpar.base_level) return 0;
+    coarsen &= random_geometric(p8est, which_tree, quads[i], ref_min, ref_max);
+    // coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
+  }
+  return coarsen;
+}
+
+int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
+                        p8est_quadrant_t *q) {
+  // refine some arbitrary quadrant(s)
+  std::array<double, 3> ref_min = {0.25, 0., 0.25};
+  std::array<double, 3> ref_max = {0.5, 0.25, 0.5};
+  return random_geometric(p8est, which_tree, q, ref_min, ref_max);
+  // return !mirror_refinement_pattern(p8est, which_tree, q);
+}
+
+int p4est_utils_adapt_grid() {
+  // 1st step: alter copied grid and map data between grids.
+  const p4est_utils_forest_info_t &current_forest =
+      p4est_utils_get_forest_info(forest_order::adaptive_LB);
+
+  // calculate vorticity
+  std::vector<std::array<double, 3>> vorticity_values(
+      current_forest.p4est->local_num_quadrants, std::array<double, 3>());
+  std::string filename_pre =
+      "pre_gridchange_" + std::to_string((int)(sim_time / time_step));
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_pre);
+
+  p8est_t *p4est_adapted = p8est_copy(current_forest.p4est, 0);
+  p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
+                   refinement_criteria, 0, 0);
+  p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
+  p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, 0, 0);
+
+  // only perform data mapping, communication, etc. if the forests have actually
+  // changed
+  if (!p8est_is_equal(lb_p8est, p4est_adapted, 0)) {
+    // 0th step: de-allocate invalid storage and data-structures
+    p4est_utils_deallocate_levelwise_storage(lbadapt_ghost_data);
+    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
+    p8est_ghost_destroy(lbadapt_ghost);
+
+    // 1st step: locally map data between forests.
+    lbadapt_payload_t *mapped_data_flat =
+        P4EST_ALLOC_ZERO(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
+    p4est_utils_post_gridadapt_map_data(lb_p8est, lbadapt_mesh, p4est_adapted,
+                                        lbadapt_local_data, mapped_data_flat);
+    // cleanup
+    p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
+    p8est_mesh_destroy(lbadapt_mesh);
+    p8est_destroy(lb_p8est);
+
+    // 2nd step: partition grid and transfer data to respective processors
+    // FIXME: Interface to Steffen's partitioning logic
+    p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
+    p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
+    std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
+        p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
+    p4est_utils_post_gridadapt_data_partition_transfer(
+        p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
+    // cleanup
+    p8est_destroy(p4est_adapted);
+    P4EST_FREE(mapped_data_flat);
+
+    // 3rd step: Insert data into new levelwise data-structure and prepare next
+    //           integration step
+    lbadapt_ghost = p8est_ghost_new(p4est_partitioned, P8EST_CONNECT_FULL);
+    lbadapt_mesh = p8est_mesh_new_ext(p4est_partitioned, lbadapt_ghost, 1, 1, 1,
+                                      P8EST_CONNECT_FULL);
+    lbadapt_ghost_virt =
+        p8est_ghostvirt_new(p4est_partitioned, lbadapt_ghost, lbadapt_mesh);
+    p4est_utils_allocate_levelwise_storage(lbadapt_local_data, lbadapt_mesh,
+                                           true);
+    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, lbadapt_mesh,
+                                           false);
+    p4est_utils_post_gridadapt_insert_data(
+        p4est_partitioned, lbadapt_mesh, data_partitioned, lbadapt_local_data);
+    lb_p8est = p4est_partitioned;
+
+    std::vector<p4est_t *> forests;
+#ifdef DD_P4EST
+    forests.push_back(dd.p4est);
+#endif // DD_P4EST
+    forests.push_back(lb_p8est);
+    p4est_utils_prepare(forests);
+#ifdef DD_P4EST
+    p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                           forest_order::adaptive_LB);
+#endif // DD_P4EST
+    const p4est_utils_forest_info_t new_forest =
+        p4est_utils_get_forest_info(forest_order::adaptive_LB);
+    // synchronize ghost data for next collision step
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+
+    for (int level = new_forest.coarsest_level_global;
+         level <= new_forest.finest_level_global; ++level) {
+      p8est_ghostvirt_exchange_data(
+          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
+    }
+  } else {
+    p8est_destroy(p4est_adapted);
+  }
+
+  // calculate vorticity
+  vorticity_values.clear();
+  vorticity_values.resize(current_forest.p4est->local_num_quadrants);
+  std::string filename_post =
+      "post_gridchange_" + std::to_string((int)(sim_time / time_step));
+  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_post);
+
+  return 0;
+}
+
 template <typename T>
-int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
-                                        p8est_mesh_t *mesh_old,
-                                        p8est_t *p4est_new,
-                                        T **local_data_levelwise,
-                                        T *mapped_data_flat) {
+int p4est_utils_post_gridadapt_map_data(
+    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p8est_new,
+    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat) {
   // counters
   int tid_old = p4est_old->first_local_tree;
   int tid_new = p4est_new->first_local_tree;
@@ -402,6 +541,9 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
 
   int level_old, sid_old;
   int level_new;
+
+  double impulse_old = 0.0;
+  double impulse_new = 0.0;
   while (qid_old < p4est_old->local_num_quadrants &&
          qid_new < p4est_new->local_num_quadrants) {
     // wrap multiple trees
@@ -438,20 +580,27 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
       ++qid_new;
       ++tqid_old;
       ++tqid_new;
-    } else if (level_old + 1 == level_new) {
+    } else if (level_old == level_new + 1) {
       // old cell has been coarsened
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
         data_restriction(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
                          tid_old, &local_data_levelwise[level_old][sid_old],
                          &mapped_data_flat[qid_new]);
+        for (int i = 0; i < lbmodel.n_veloc; ++i) {
+          impulse_old +=
+              0.125 * local_data_levelwise[level_old][sid_old].lbfluid[0][i];
+        }
         ++sid_old;
         ++tqid_old;
         ++qid_old;
       }
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        impulse_new += mapped_data_flat[qid_new].lbfluid[0][i];
+      }
       ++tqid_new;
       ++qid_new;
-    } else if (level_old == level_new + 1) {
-      // old cell has been refined
+    } else if (level_old + 1 == level_new) {
+      // old cell has been refined.
       for (int child = 0; child < P8EST_CHILDREN; ++child) {
         data_interpolation(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
                            tid_old, &local_data_levelwise[level_old][sid_old],
@@ -459,6 +608,19 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
         ++tqid_new;
         ++qid_new;
       }
+      // DEBUG
+      int backup_qid_new = qid_new;
+      qid_new -= P8EST_CHILDREN;
+      for (int j = 0; j < P8EST_CHILDREN; ++j) {
+        for (int i = 0; i < lbmodel.n_veloc; ++i) {
+          impulse_new += 0.125 * mapped_data_flat[qid_new].lbfluid[0][i];
+        }
+        ++qid_new;
+      }
+      for (int i = 0; i < lbmodel.n_veloc; ++i) {
+        impulse_old += local_data_levelwise[level_old][sid_old].lbfluid[0][i];
+      }
+      P4EST_ASSERT(backup_qid_new == qid_new);
       ++tqid_old;
       ++qid_old;
     } else {
@@ -470,13 +632,25 @@ int p4est_utils_post_gridadapt_map_data(p8est_t *p4est_old,
     P4EST_ASSERT(tqid_new + curr_tree_new->quadrants_offset == qid_new);
     P4EST_ASSERT(tid_old == tid_new);
   }
+  P4EST_ASSERT(qid_old == p4est_old->local_num_quadrants);
+  P4EST_ASSERT(qid_new == p4est_new->local_num_quadrants);
+
+  fprintf(stderr, "[p4est %i] old impulse: %lf, new impulse %lf\n",
+          p4est_new->mpirank, impulse_old, impulse_new);
+
   return 0;
 }
 
 template <typename T>
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<T> **data_partitioned) {
+    std::vector<std::vector<T>> &data_partitioned) {
+  // simple consistency checks
+  P4EST_ASSERT(p4est_old->mpirank == p4est_new->mpirank);
+  P4EST_ASSERT(p4est_old->mpisize == p4est_new->mpisize);
+  P4EST_ASSERT(p4est_old->global_num_quadrants ==
+               p4est_new->global_num_quadrants);
+
   int rank = p4est_old->mpirank;
   int size = p4est_old->mpisize;
   int lb_old_local = p4est_old->global_first_quadrant[rank];
@@ -491,9 +665,8 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
   int send_offset = 0;
 
   int mpiret;
-  sc_MPI_Request *r;
-  sc_array_t *requests;
-  requests = sc_array_new(sizeof(sc_MPI_Request));
+  MPI_Request r;
+  std::vector<MPI_Request> requests(2 * size, MPI_REQUEST_NULL);
 
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish
@@ -507,16 +680,18 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     lb_old_remote = ub_old_remote;
     ub_old_remote = p4est_old->global_first_quadrant[p + 1];
 
+    // number of quadrants from which payload will be received
     data_length = std::max(0,
                            std::min(ub_old_remote, ub_new_local) -
-                               std::max(lb_old_remote, ub_new_local));
+                               std::max(lb_old_remote, lb_new_local));
 
     // allocate receive buffer and wait for messages
-    data_partitioned[p] = new std::vector<T>(data_length);
-    r = (sc_MPI_Request *)sc_array_push(requests);
-    mpiret = sc_MPI_Irecv((void *)data_partitioned[p]->begin(),
-                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
-                          p4est_new->mpicomm, r);
+    data_partitioned[p].resize(data_length);
+    r = requests[p];
+    mpiret =
+        MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
+                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
+    requests[p] = r;
     SC_CHECK_MPI(mpiret);
   }
 
@@ -527,31 +702,29 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
     data_length = std::max(0,
                            std::min(ub_old_local, ub_new_remote) -
-                               std::max(lb_old_local, ub_new_remote));
+                               std::max(lb_old_local, lb_new_remote));
 
-    r = (sc_MPI_Request *)sc_array_push(requests);
-    mpiret = sc_MPI_Isend((void *)(data_mapped + send_offset * sizeof(T)),
-                          data_length * sizeof(T), sc_MPI_BYTE, p, 0,
-                          p4est_new->mpicomm, r);
+    r = requests[size + p];
+    mpiret =
+        MPI_Isend((void *)(data_mapped + send_offset), data_length * sizeof(T),
+                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
+    requests[size + p] = r;
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;
   }
 
   /** Wait for communication to finish */
-  mpiret =
-      sc_MPI_Waitall(requests->elem_count, (sc_MPI_Request *)requests->array,
-                     sc_MPI_STATUSES_IGNORE);
+  mpiret = MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
   SC_CHECK_MPI(mpiret);
-  sc_array_destroy(requests);
 
   return 0;
 }
 
 template <typename T>
-int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
-                                           p8est_mesh_t *mesh_new,
-                                           std::vector<T> **data_partitioned,
-                                           T **data_levelwise) {
+int p4est_utils_post_gridadapt_insert_data(
+    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    std::vector<std::vector<T>> &data_partitioned,
+    std::vector<std::vector<T>> &data_levelwise) {
   int size = p4est_new->mpisize;
   // counters
   int tid = p4est_new->first_local_tree;
@@ -566,7 +739,7 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
   int level, sid;
 
   for (int p = 0; p < size; ++p) {
-    for (int q = 0; q < data_partitioned[p]->size(); ++q) {
+    for (int q = 0; q < data_partitioned[p].size(); ++q) {
       // wrap multiple trees
       if (tqid == curr_tree->quadrants.elem_count) {
         ++tid;
@@ -577,7 +750,7 @@ int p4est_utils_post_gridadapt_insert_data(p8est_t *p4est_new,
       curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
       level = curr_quad->level;
       sid = mesh_new->quad_qreal_offset[qid];
-      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p]->at(q),
+      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p][q],
                   sizeof(T));
       ++tqid;
       ++qid;

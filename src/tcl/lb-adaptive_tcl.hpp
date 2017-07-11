@@ -32,6 +32,9 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
 int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
                              char **argv);
 
+int tclcommand_set_steps_until_grid_change(ClientData data, Tcl_Interp *interp,
+                                           int argc, char **argv);
+
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv);
 
@@ -40,6 +43,9 @@ int tclcommand_set_rand_ref(ClientData data, Tcl_Interp *interp, int argc,
 
 int tclcommand_set_reg_ref(ClientData data, Tcl_Interp *interp, int argc,
                            char **argv);
+
+int tclcommand_set_reg_coarse(ClientData data, Tcl_Interp *interp, int argc,
+                              char **argv);
 
 int tclcommand_set_geom_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv);

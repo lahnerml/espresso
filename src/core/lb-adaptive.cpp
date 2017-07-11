@@ -274,7 +274,7 @@ void lbadapt_reinit_parameters() {
           1. -
           2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
                 1.);
-      if (abs(gamma_shear[i] >= 1.0)) {
+      if ((abs(gamma_shear[i] > 1.0)) && (lbpar.base_level <= i)) {
         fprintf(stderr, "Error when setting relaxation parameter gamma_shear "
                         "for level %i (%lf)\n",
                 i, gamma_shear[i]);
@@ -286,7 +286,7 @@ void lbadapt_reinit_parameters() {
                       2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
                                 (prefactors[i] * SQR(h)) +
                             1.);
-      if (abs(gamma_shear[i] >= 1.0)) {
+      if ((abs(gamma_shear[i] > 1.0)) && (lbpar.base_level <= i)) {
         fprintf(stderr, "Error when setting relaxation parameter gamma_bulk "
                         "for level %i (%lf)\n",
                 i, gamma_bulk[i]);
@@ -1296,7 +1296,7 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
   mode[7] = pi_eq[3] + gamma_shear[level] * (mode[7] - pi_eq[3]);
   mode[8] = pi_eq[4] + gamma_shear[level] * (mode[8] - pi_eq[4]);
   mode[9] = pi_eq[5] + gamma_shear[level] * (mode[9] - pi_eq[5]);
-// clang-format on
+  // clang-format on
 
 #ifndef OLD_FLUCT
   /* relax the ghost modes (project them out) */

@@ -1699,8 +1699,6 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
     std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
                 lbmodel.n_veloc * sizeof(lb_float));
     // make sure that boundary is not occupied by some memory clutter
-    std::memcpy(virtual_data->lbfields.force, source_data->lbfields.force,
-                P8EST_DIM * sizeof(double));
     virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
   }

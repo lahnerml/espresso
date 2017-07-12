@@ -274,24 +274,12 @@ void lbadapt_reinit_parameters() {
           1. -
           2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
                 1.);
-      if ((abs(gamma_shear[i] > 1.0)) && (lbpar.base_level <= i)) {
-        fprintf(stderr, "Error when setting relaxation parameter gamma_shear "
-                        "for level %i (%lf)\n",
-                i, gamma_shear[i]);
-        errexit();
-      }
     }
     if (lbpar.bulk_viscosity[0] > 0.0) {
       gamma_bulk[i] = 1. -
                       2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
                                 (prefactors[i] * SQR(h)) +
                             1.);
-      if ((abs(gamma_shear[i] > 1.0)) && (lbpar.base_level <= i)) {
-        fprintf(stderr, "Error when setting relaxation parameter gamma_bulk "
-                        "for level %i (%lf)\n",
-                i, gamma_bulk[i]);
-        errexit();
-      }
     }
   }
 #ifdef LB_ADAPTIVE_GPU

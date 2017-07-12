@@ -29,6 +29,7 @@
 #include "lb_tcl.hpp"
 #include "lb.hpp"
 #include "lbgpu.hpp"
+#include "lb-adaptive.hpp"
 #include "lb-adaptive-gpu.hpp"
 #include "parser.hpp"
 #include "electrokinetics.hpp"
@@ -901,6 +902,10 @@ int tclcommand_lbfluid(ClientData data, Tcl_Interp *interp, int argc, char **arg
   /* thermo_switch is retained for backwards compatibility */
   thermo_switch = (thermo_switch | THERMO_LB);
   mpi_bcast_parameter(FIELD_THERMO_SWITCH);
+
+#ifdef LB_ADAPTIVE
+  lbadapt_sanity_check_parameters();
+#endif // LB_ADAPTIVE
 
   return TCL_OK;
 #else /* !defined LB */

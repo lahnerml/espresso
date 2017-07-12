@@ -327,12 +327,12 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
  */
 static int lbadapt_sanity_check_parameters() {
   for (int level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
-    if (abs(gamma_shear[level] > 1.0)) {
+    if (abs(gamma_shear[level]) > 1.0) {
       fprintf(stderr, "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
               level, gamma_shear[level]);
       errexit();
     }
-    if (abs(gamma_shear[level] > 1.0)) {
+    if (abs(gamma_shear[level]) > 1.0) {
       fprintf(stderr, "Bad relaxation parameter gamma_bulk on level %i (%lf)\n",
               level, gamma_bulk[level]);
       errexit();

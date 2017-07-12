@@ -345,6 +345,18 @@ static int lbadapt_sanity_check_parameters() {
  */
 void lbadapt_get_boundary_status();
 
+/** calculate local fluid moments (density, velocity, stress)of a cell based on
+ * lb populations
+ *
+ * @param [in]   populations    Local LB populations
+ * @param [in]   force          Cell-local force
+ * @param [in]   boundary       Flag indicating if cell is part of fluid domain
+ * @param [in]   has_force      Flag indicating if force is present
+ * @param [in]   h              Local meshwidth
+ * @param [out]  rho            Local fluid density
+ * @param [out]  j              Local fluid velocity
+ * @param [out]  pi             Local stress tensor
+ */
 int lbadapt_calc_local_fields(double populations[2][19], double force[3],
                               int boundary, int has_force, double h,
                               double *rho, double *j, double *pi);

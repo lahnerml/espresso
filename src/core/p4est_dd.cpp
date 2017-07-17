@@ -1242,7 +1242,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       MPI_Irecv(recv_num_part[p].data(),
                 recv_quads[p], MPI_INT, p, REP_EX_CNT_TAG,
                 comm_cart, &rreq[p]);
-      //printf("[%i] : recv %i (%i)\n", this_node, p, REP_EX_CNT_TAG);
+      fprintf(stderr, "[%i] : recv %i (%i)\n", this_node, p, REP_EX_CNT_TAG);
     }
   }
 
@@ -1265,7 +1265,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       if (p == this_node) {
         recv_num_part[p][c] = old->cell[c_cnt]->n;
         realloc_particlelist(&cells[recv_prefix[p] + c], old->cell[c_cnt]->n);
-        cells[recv_prefix[p] + c].n = old->cell[c_cnt]->n;
+        //cells[recv_prefix[p] + c].n = old->cell[c_cnt]->n;
       } else {
         realloc_particlelist(&sendbuf[p], sendbuf[p].n + old->cell[c_cnt]->n);
         //sendbuf[p].n = old->cell[c_cnt]->n;
@@ -1289,6 +1289,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           int pid = part->p.identity;
           memcpy(&cells[recv_prefix[p] + c].part[i], part, sizeof(Particle));
           local_particles[pid] = &cells[recv_prefix[p] + c].part[i];
+          cells[recv_prefix[p] + c].n += 1;
         }
       }
       ++c_cnt;
@@ -1297,17 +1298,17 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       MPI_Isend(send_num_part[p].data(),
                 send_quads[p], MPI_INT, p, REP_EX_CNT_TAG,
                 comm_cart, &sreq[p]);
-      //printf("[%i] : send %i (%i)\n", this_node, p, REP_EX_CNT_TAG);
+      fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_CNT_TAG);
       if (sendbuf[p].n > 0) {
         MPI_Isend(sendbuf[p].part, 
                   sendbuf[p].n * sizeof(Particle), MPI_BYTE, p, REP_EX_PART_TAG,
                   comm_cart, &sreq[p + n_nodes]);
-        //printf("[%i] : send %i (%i)\n", this_node, p, REP_EX_PART_TAG);
+        fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_PART_TAG);
         if (sendbuf_dyn[p].size() > 0) {
           MPI_Isend(sendbuf_dyn[p].data(), 
                     sendbuf_dyn[p].size(), MPI_INT, p, REP_EX_DYN_TAG,
                     comm_cart, &sreq[p + 2 * n_nodes]);
-        //printf("[%i] : send %i (%i)\n", this_node, p, REP_EX_DYN_TAG);
+        fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_DYN_TAG);
         }
       }
     }
@@ -1326,7 +1327,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
     int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
       
-    //printf("[%i] %i(%i)\n", this_node, source, tag);
+    fprintf(stderr, "[%i] %i(%i)\n", this_node, source, tag);
       
     switch (commstat.expected(recvidx)) {
     case CommunicationStatus::ReceiveStatus::RECV_COUNT:
@@ -1337,7 +1338,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         realloc_particlelist(&recvbuf[source], sum);
         MPI_Irecv(recvbuf[source].part, sum * sizeof(Particle),
                   MPI_BYTE, source, REP_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-        //printf("[%i] : recv %i (%i)\n", this_node, source, REP_EX_PART_TAG);
+        fprintf(stderr, "[%i] : recv %i (%i)\n", this_node, source, REP_EX_PART_TAG);
         commstat.next(recvidx);
       }
       break;
@@ -1362,7 +1363,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         recvbuf_dyn[source].resize(dyndatasiz);
         MPI_Irecv(recvbuf_dyn[source].data(), dyndatasiz, MPI_INT, source,
                   REP_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
-        //printf("[%i] : send %i (%i)\n", this_node, source, REP_EX_DYN_TAG);
+        fprintf(stderr, "[%i] : send %i (%i)\n", this_node, source, REP_EX_DYN_TAG);
         commstat.next(recvidx);
       }
       break;

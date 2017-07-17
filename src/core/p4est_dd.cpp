@@ -1261,6 +1261,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     // Fill send list for number of particles per cell
     send_num_part[p].resize(send_quads[p]);
     init_particlelist(&sendbuf[p]);
+    int send_sum = 0;
     for (int c = 0; c < send_quads[p]; ++c) {
       if (p == this_node) {
         recv_num_part[p][c] = old->cell[c_cnt]->n;
@@ -1271,6 +1272,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         //sendbuf[p].n = old->cell[c_cnt]->n;
       }
       send_num_part[p][c] = old->cell[c_cnt]->n;
+      send_sum += old->cell[c_cnt]->n;
       for (int i = 0; i < old->cell[c_cnt]->n; i++) {
         Particle *part = &old->cell[c_cnt]->part[i];
         if (p != this_node) {
@@ -1293,6 +1295,10 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         }
       }
       ++c_cnt;
+    }
+    if (send_sum != sendbuf[p].n) {
+      fprintf(stderr, "[%i] send buffer mismatch for process %i\n", this_node, p);
+      errexit();
     }
     if (p != this_node && send_quads[p] > 0) {
       MPI_Isend(send_num_part[p].data(),
@@ -1336,10 +1342,12 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         int sum = std::accumulate(recv_num_part[source].begin(), recv_num_part[source].end(), 0);
         recvbuf[source].n = sum;
         realloc_particlelist(&recvbuf[source], sum);
-        MPI_Irecv(recvbuf[source].part, sum * sizeof(Particle),
-                  MPI_BYTE, source, REP_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-        fprintf(stderr, "[%i] : recv %i (%i)\n", this_node, source, REP_EX_PART_TAG);
-        commstat.next(recvidx);
+        if (sum > 0) {
+          MPI_Irecv(recvbuf[source].part, sum * sizeof(Particle),
+                    MPI_BYTE, source, REP_EX_PART_TAG, comm_cart, &rreq[recvidx]);
+          fprintf(stderr, "[%i] : recv %i (%i)\n", this_node, source, REP_EX_PART_TAG);
+          commstat.next(recvidx);
+        }
       }
       break;
     case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:

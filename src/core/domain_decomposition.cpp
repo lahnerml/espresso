@@ -1404,7 +1404,7 @@ void calc_link_cell() {
   rebuild_verletlist = 0;
 }
 
-static void __calc_link_cell_runtime(std::vector<double> ts) {
+static void __calc_link_cell_runtime(std::vector<double>& ts) {
   int c, np1, n, np2, i ,j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;

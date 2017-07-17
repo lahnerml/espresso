@@ -1297,7 +1297,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       ++c_cnt;
     }
     if (send_sum != sendbuf[p].n) {
-      fprintf(stderr, "[%i] send buffer mismatch for process %i\n", this_node, p);
+      fprintf(stderr, "[%i] send buffer (%i) mismatch for process %i (sum %i)\n", this_node, p, sendbuf[p].n, send_sum);
       errexit();
     }
     if (p != this_node && send_quads[p] > 0) {

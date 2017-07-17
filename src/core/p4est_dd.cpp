@@ -1276,6 +1276,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       for (int i = 0; i < old->cell[c_cnt]->n; i++) {
         Particle *part = &old->cell[c_cnt]->part[i];
         if (p != this_node) {
+          send_inc+=1;
           // It is actually a remote particle -> copy all data to sendbuffer
           sendbuf_dyn[p].insert(sendbuf_dyn[p].end(), part->bl.e,
                                 part->bl.e + part->bl.n);
@@ -1286,7 +1287,6 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           int pid = part->p.identity;
           //memcpy(&sendbuf[p].part[i], part, sizeof(Particle));
           append_unindexed_particle(&sendbuf[p], part);
-          send_inc+=1;
           local_particles[pid] = NULL;
         } else { // Particles that stay local
           int pid = part->p.identity;
@@ -1297,7 +1297,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       }
       ++c_cnt;
     }
-    if (send_sum != sendbuf[p].n) {
+    if (p != this_node && send_sum != sendbuf[p].n) {
       fprintf(stderr, "[%i] send buffer (%i) mismatch for process %i (sum %i, inc %i)\n", this_node, p, sendbuf[p].n, send_sum, send_inc);
       errexit();
     }

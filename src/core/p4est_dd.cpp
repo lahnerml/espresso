@@ -1261,7 +1261,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     // Fill send list for number of particles per cell
     send_num_part[p].resize(send_quads[p]);
     init_particlelist(&sendbuf[p]);
-    int send_sum = 0;
+    int send_sum = 0, send_inc = 0;
     for (int c = 0; c < send_quads[p]; ++c) {
       if (p == this_node) {
         recv_num_part[p][c] = old->cell[c_cnt]->n;
@@ -1272,7 +1272,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         //sendbuf[p].n = old->cell[c_cnt]->n;
       }
       send_num_part[p][c] = old->cell[c_cnt]->n;
-      send_sum += old->cell[c_cnt]->n;
+      send_sum += send_num_part[p][c];
       for (int i = 0; i < old->cell[c_cnt]->n; i++) {
         Particle *part = &old->cell[c_cnt]->part[i];
         if (p != this_node) {
@@ -1286,6 +1286,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           int pid = part->p.identity;
           //memcpy(&sendbuf[p].part[i], part, sizeof(Particle));
           append_unindexed_particle(&sendbuf[p], part);
+          send_inc+=1;
           local_particles[pid] = NULL;
         } else { // Particles that stay local
           int pid = part->p.identity;
@@ -1297,7 +1298,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       ++c_cnt;
     }
     if (send_sum != sendbuf[p].n) {
-      fprintf(stderr, "[%i] send buffer (%i) mismatch for process %i (sum %i)\n", this_node, p, sendbuf[p].n, send_sum);
+      fprintf(stderr, "[%i] send buffer (%i) mismatch for process %i (sum %i, inc %i)\n", this_node, p, sendbuf[p].n, send_sum, send_inc);
       errexit();
     }
     if (p != this_node && send_quads[p] > 0) {
@@ -1333,7 +1334,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
     int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
       
-    fprintf(stderr, "[%i] %i(%i)\n", this_node, source, tag);
+    //fprintf(stderr, "[%i] %i(%i)\n", this_node, source, tag);
       
     switch (commstat.expected(recvidx)) {
     case CommunicationStatus::ReceiveStatus::RECV_COUNT:

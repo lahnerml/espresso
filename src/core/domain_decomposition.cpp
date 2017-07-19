@@ -1044,6 +1044,9 @@ void dd_topology_init(CellPList *old, bool isRepart) {
     dd_p4est_global_exchange_part(local_cells.cell[0]);
   else // Call it anyway in case there are no cells on this node (happens during startup)
     dd_p4est_global_exchange_part(NULL);
+
+  // We just resorted properly
+  resort_particles = 0;
 #else
   /* copy particles */
   for (c = 0; c < old->n; c++) {

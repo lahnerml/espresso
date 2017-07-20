@@ -177,7 +177,7 @@ metric_nbondedia(std::vector<double>& weights)
                  local_cells.cell + local_cells.n,
                  IotaIter(),
                  weights.begin(),
-                 cell_nforcepairs);
+                 cell_nbondedia);
 }
 
 static void

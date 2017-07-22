@@ -30,6 +30,10 @@
 #include "ghosts.hpp"
 #include "verlet.hpp"
 
+#include <sstream>
+#include <iostream>
+#include <string>
+
 /************************************************************
  *            Exported Functions                            *
  ************************************************************/
@@ -110,3 +114,16 @@ int tclcommand_repart(ClientData data, Tcl_Interp *interp,
   return TCL_OK;
 }
 
+int tclcommand_imbalance(ClientData data, Tcl_Interp *interp,
+              int argc, char **argv)
+{
+  if (argc < 2) {
+    Tcl_AppendResult(interp, "usage: imbalance <metric>", (char *)NULL);
+    return TCL_ERROR;
+  }
+  double imb = mpi_p4est_imbalance(argv[1]);
+  std::stringstream s;
+  s << imb;
+  Tcl_AppendResult(interp, s.str().c_str(), (char *)NULL);
+  return TCL_OK;
+}

@@ -198,7 +198,8 @@ static int terminated = 0;
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_dd_p4est_write_particle_vtk)                                          \
   CB(mpi_lbadapt_grid_reset)                                                   \
-  CB(mpi_p4est_repart_slave)
+  CB(mpi_p4est_repart_slave)                                                   \
+  CB(mpi_p4est_imbalance_slave)
 
 // create the forward declarations
 #define CB(name) void name(int node, int param);
@@ -3709,3 +3710,20 @@ void mpi_p4est_repart_slave(int dummy, int strl) {
     p4est_dd_repartition(desc.get(), debug);
 }
 
+double mpi_p4est_imbalance(std::string desc) {
+    std::size_t len = desc.size();
+    if (len > std::numeric_limits<int>::max()) {
+        std::cerr << "Repart command too long." << std::endl;
+        errexit();
+    }
+    int strl = len + 1;
+    mpi_call(mpi_p4est_imbalance_slave, -1, strl);
+    MPI_Bcast((void *) desc.c_str(), strl, MPI_CHAR, 0, MPI_COMM_WORLD);
+    return p4est_dd_imbalance(desc);
+}
+
+void mpi_p4est_imbalance_slave(int dummy, int strl) {
+    std::vector<char> desc(strl);
+    MPI_Bcast((void *) desc.data(), strl, MPI_CHAR, 0, MPI_COMM_WORLD);
+    (void) p4est_dd_imbalance(desc.data());
+}

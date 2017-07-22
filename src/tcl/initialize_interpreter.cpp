@@ -279,6 +279,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("scafacos_methods", tclcommand_scafacos_methods);
 #endif
   REGISTER_COMMAND("repart", tclcommand_repart);
+  REGISTER_COMMAND("imbalance", tclcommand_imbalance);
 }
 
 static void tcl_register_global_variables(Tcl_Interp *interp)

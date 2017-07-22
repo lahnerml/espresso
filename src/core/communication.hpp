@@ -741,6 +741,7 @@ void mpi_thermalize_cpu(int temp);
 void mpi_mpiio(const char *filename, unsigned fields, int write);
 
 void mpi_p4est_repart(std::string desc, int debug);
+double mpi_p4est_imbalance(std::string desc);
 
 /*@}*/
 

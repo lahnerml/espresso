@@ -1468,4 +1468,22 @@ p4est_dd_repartition(const std::string& desc, bool debug)
   repart::print_cell_info("!>>> After Repart", desc);
 }
 
+double
+p4est_dd_imbalance(const std::string& desc)
+{
+  std::vector<double> weights = repart::metric{desc}();
+  double lsum = std::accumulate(std::begin(weights), std::end(weights), 0.0);
+  double gsum, max;
+
+  MPI_Reduce(&lsum, &gsum, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
+  MPI_Reduce(&lsum, &max, 1, MPI_DOUBLE, MPI_MAX, 0, comm_cart);
+
+  if (this_node == 0) {
+    double avg = gsum / n_nodes;
+    return max / avg;
+  } else {
+    return 0.0;
+  }
+}
+
 #endif

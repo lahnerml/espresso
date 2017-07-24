@@ -5,8 +5,18 @@
 #include <string>
 #include <functional>
 #include <vector>
+#include <mpi.h>
 
 namespace repart {
+
+extern double force_calc_runtime;
+
+struct RuntimeRecorder {
+  RuntimeRecorder(double& t): t(t) { t = MPI_Wtime(); }
+  ~RuntimeRecorder() { t = MPI_Wtime() - t; }
+private:
+  double& t;
+};
 
 
 // Print general information about cell process mapping

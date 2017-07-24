@@ -10,6 +10,8 @@
 #include "mol_cut.hpp"
 #include "interaction_data.hpp"
 
+double repart::force_calc_runtime = 1.0;
+
 // Iterator for iterating over integers (enumerating things while using
 // std::transform)
 struct IotaIter
@@ -207,7 +209,7 @@ metric_nghostpart(std::vector<double>& weights)
 }
 
 static void
-metric_runtime(std::vector<double>& weights)
+metric_lc_runtime(std::vector<double>& weights)
 {
     std::vector<double> ts(local_cells.n, 0.0);
     calc_link_cell_runtime(10, ts);
@@ -216,6 +218,13 @@ metric_runtime(std::vector<double>& weights)
     std::transform(ts.begin(), ts.end(),
                    weights.begin(),
                    [f](double d){ return f * d;});
+}
+
+static void
+metric_fc_runtime(std::vector<double>& weights)
+{
+    // Fill all cells with the same(!) prerecorded runtime for force_calc
+    std::fill(std::begin(weights), std::end(weights), repart::force_calc_runtime);
 }
 
 // Generator for random integers
@@ -253,7 +262,8 @@ get_single_metric_func(const std::string& desc)
     { "nbondedia"  , metric_nbondedia },
     { "nghostcells", metric_nghostcells },
     { "nghostpart" , metric_nghostpart },
-    { "runtime"    , metric_runtime },
+    { "lc_runtime" , metric_lc_runtime },
+    { "fc_runtime" , metric_fc_runtime },
     { "rand"       , metric_rand }
   };
 

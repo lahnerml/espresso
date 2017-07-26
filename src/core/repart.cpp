@@ -285,7 +285,7 @@ void repart::metric::parse_metric_desc(const std::string& desc) {
   bool parseadd = desc[0] == '+' || desc[0] == '-';
 
   // Single metric case
-  if (std::all_of(desc.begin(), desc.end(), ::isalpha)) {
+  if (std::all_of(desc.begin(), desc.end(), [](char c){ return ::isalpha(c) || c == '_';})) {
     mdesc.emplace_back(1.0, get_single_metric_func(desc));
     return;
   }

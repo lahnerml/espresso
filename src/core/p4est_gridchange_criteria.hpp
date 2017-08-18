@@ -12,6 +12,7 @@ inline static int random_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                                    p8est_quadrant_t *q,
                                    std::array<double, 3> ref_min,
                                    std::array<double, 3> ref_max) {
+  P4EST_ASSERT((int)((sim_time / time_step) + 0.5) % steps_until_grid_change == 0);
   double pos[3];
   p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
   if ((ref_min[0] <= pos[0] && pos[0] < ref_max[0]) &&
@@ -27,7 +28,7 @@ inline static int random_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 inline static int mirror_refinement_pattern(p8est_t *p8est,
                                             p4est_topidx_t which_tree,
                                             p8est_quadrant_t *q) {
-  P4EST_ASSERT((int)(sim_time / time_step) % steps_until_grid_change == 0);
+  P4EST_ASSERT((int)((sim_time / time_step) + 0.5) % steps_until_grid_change == 0);
   double pos[3];
   p4est_utils_get_front_lower_left(p8est, which_tree, q, pos);
 

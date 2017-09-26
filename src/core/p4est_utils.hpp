@@ -432,6 +432,11 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
+/*** Computes the finest common tree out of two given p4est trees on the same connectivity.
+ * @param[in] t1  reference tree for FCT
+ * @param[in] t2  base tree for FCT. this tree is copied and coarsened.
+ * 
+ */
 p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

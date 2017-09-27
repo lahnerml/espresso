@@ -811,9 +811,9 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     comm->comm[cnt].n_part_lists = comm_send[i].cnt;
     for (int n=0;n<comm_send[i].cnt;++n) {
       comm->comm[cnt].part_lists[n] = &cells[comm_send[i].idx[n]];
-      printf("%i ", comm_send[i].idx[n]); 
+      //printf("%i ", comm_send[i].idx[n]); 
     }
-    printf("\n");
+    //printf("\n");
 #ifndef RECV_GHOST_SHIFT
     if ((data_part & GHOSTTRANS_POSSHFTD)) {
       // Set shift according to communication direction
@@ -839,16 +839,16 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
     comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
     for (int n=0;n<comm_recv[i].cnt;++n) {
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
-      printf("%i(%li) ", comm_recv[i].idx[n], p4est_shell[comm_recv[i].idx[n]].idx); 
+      //printf("%i(%li) ", comm_recv[i].idx[n], p4est_shell[comm_recv[i].idx[n]].idx); 
     }
     ++cnt;
-    printf("\n");
+    //printf("\n");
   }
 #ifdef RECV_GHOST_SHIFT
   comm->n_extra_shifts = comm_shift.size();
   comm->extra_shifts = (GhostShifts*)Utils::malloc(comm_shift.size()*sizeof(GhostShifts));
   for (int i=0;i<comm_shift.size();++i) {
-    printf("%i : ", comm_shift[i].origin);
+    //printf("%i : ", comm_shift[i].origin);
     comm->extra_shifts[i].origin = &cells[comm_shift[i].origin];
     comm->extra_shifts[i].origin_shift[0] = 0.0;
     comm->extra_shifts[i].origin_shift[1] = 0.0;
@@ -867,7 +867,7 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
       comm->extra_shifts[i].part_lists = (ParticleList**)Utils::malloc(comm_shift[i].idx.size()*sizeof(ParticleList*));
       comm->extra_shifts[i].shift = (double*)Utils::malloc(comm_shift[i].idx.size()*sizeof(double)*3);
       for (int n=0;n<comm_shift[i].idx.size();++n) {
-        printf("%i ", comm_shift[i].idx[n]);
+        //printf("%i ", comm_shift[i].idx[n]);
         comm->extra_shifts[i].part_lists[n] = &cells[comm_shift[i].idx[n]];
         comm->extra_shifts[i].shift[3*n + 0] = 0.0;
         comm->extra_shifts[i].shift[3*n + 1] = 0.0;
@@ -883,7 +883,7 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
         }
       }
     }
-    printf("\n");
+    //printf("\n");
   } 
 #endif
 }

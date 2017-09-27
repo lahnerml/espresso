@@ -1386,25 +1386,29 @@ void calc_link_cell() {
       np2 = neighbor->pList->n;
       /* Loop cell particles */
       for(i=0; i < np1; i++) {
-	j_start = 0;
-	/* Tasks within cell: bonded forces */
-	if(n == 0) {
-          add_single_particle_force(&p1[i]);
-	  if (rebuild_verletlist)
-	    memcpy(p1[i].l.p_old, p1[i].r.p, 3*sizeof(double));
+        j_start = 0;
+        /* Tasks within cell: bonded forces */
+        if(n == 0) {
+                add_single_particle_force(&p1[i]);
+          if (rebuild_verletlist)
+            memcpy(p1[i].l.p_old, p1[i].r.p, 3*sizeof(double));
 
-	  j_start = i+1;
-	}
-	/* Loop neighbor cell particles */
-	for(j = j_start; j < np2; j++) {
+          j_start = i+1;
+        }
+        /* Loop neighbor cell particles */
+        for(j = j_start; j < np2; j++) {
 #ifdef EXCLUSIONS
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
-	    {
-	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-	      add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
-	    }
-	}
+          {
+#ifdef MINIMAL_GHOST
+            dist2 = neighbor->dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+#else
+            dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#endif
+            add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
+          }
+        }
       }
     }
   }

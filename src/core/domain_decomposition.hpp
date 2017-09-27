@@ -105,6 +105,10 @@ typedef struct {
   double my_pos[3];  /* position of the cell corner, only here for debug */
 #endif
 
+#ifdef MINIMAL_GHOST
+  double (*dist2vec)(double*, double*, double*);
+#endif
+
 } IA_Neighbor;
 
 

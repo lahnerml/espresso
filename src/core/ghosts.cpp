@@ -131,10 +131,15 @@ void free_comm(GhostCommunicator *comm)
   }
 #ifdef RECV_GHOST_SHIFT
   for (n = 0; n < comm->n_extra_shifts; ++n) {
-    free(comm->extra_shifts[n].part_lists);
-    free(comm->extra_shifts[n].shift);
+    if (comm->extra_shifts[n].n_part_lists) {
+      free(comm->extra_shifts[n].part_lists);
+      free(comm->extra_shifts[n].shift);
+    }
   }
-  free(comm->extra_shifts);
+  if (comm->n_extra_shifts) {
+    free(comm->extra_shifts);
+    comm->n_extra_shifts = 0;
+  }
 #endif
   free(comm->comm);
 }

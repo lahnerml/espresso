@@ -1402,7 +1402,10 @@ void calc_link_cell() {
 #endif
           {
 #ifdef MINIMAL_GHOST
-            dist2 = neighbor->dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+            if (neighbor->use_mi_vec)
+              dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+            else 
+              dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
 #else
             dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
 #endif
@@ -1452,7 +1455,14 @@ static void __calc_link_cell_runtime(std::vector<double> ts) {
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+        else 
+          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#else
+        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#endif
 	      add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}
@@ -1511,7 +1521,14 @@ void calculate_link_cell_energies()
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+        else 
+          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#else
+        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#endif
 	      add_non_bonded_pair_energy(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}
@@ -1570,7 +1587,14 @@ void calculate_link_cell_virials(int v_comp)
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+        else 
+          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#else
+        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#endif
 	      add_non_bonded_pair_virials(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}

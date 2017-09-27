@@ -106,7 +106,7 @@ typedef struct {
 #endif
 
 #ifdef MINIMAL_GHOST
-  double (*dist2vec)(double*, double*, double*);
+  bool use_mi_vec;
 #endif
 
 } IA_Neighbor;

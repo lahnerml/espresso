@@ -2166,7 +2166,7 @@ int lb_sanity_checks() {
     runtimeErrorMsg() << "Lattice Boltzmann fluid viscosity not set";
     ret = 1;
   }
-  if (cell_structure.type != CELL_STRUCTURE_DOMDEC) {
+  if (cell_structure.type != CELL_STRUCTURE_DOMDEC && cell_structure.type != CELL_STRUCTURE_P4EST) {
     runtimeErrorMsg() << "LB requires domain-decomposition cellsystem";
     ret = -1;
   }

@@ -99,6 +99,35 @@ static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
   }
 }
 //--------------------------------------------------------------------------------------------------
+void dd_p4est_topology_release() {
+  dd_p4est_free();
+  
+  int i,j;
+  CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
+  /* release cell interactions */
+  for(i=0; i<local_cells.n; i++) {
+    for(j=0; j<dd.cell_inter[i].n_neighbors; j++) 
+      free_pairList(&dd.cell_inter[i].nList[j].vList);
+    dd.cell_inter[i].nList = (IA_Neighbor *) Utils::realloc(dd.cell_inter[i].nList,0);
+  }
+  dd.cell_inter = (IA_Neighbor_List *) Utils::realloc(dd.cell_inter,0);
+  /* free ghost cell pointer list */
+  realloc_cellplist(&ghost_cells, ghost_cells.n = 0);
+  /* free ghost communicators */
+  free_comm(&cell_structure.ghost_cells_comm);
+  free_comm(&cell_structure.exchange_ghosts_comm);
+  free_comm(&cell_structure.update_ghost_pos_comm);
+  free_comm(&cell_structure.collect_ghost_force_comm);
+#ifdef LB
+  free_comm(&cell_structure.ghost_lbcoupling_comm);
+#endif
+#ifdef ENGINE
+  free_comm(&cell_structure.ghost_swimming_comm);
+#endif
+#ifdef IMMERSED_BOUNDARY
+  free_comm(&cell_structure.ibm_ghost_force_comm);
+#endif
+}
 void dd_p4est_free () {
   CALL_TRACE();
   
@@ -310,47 +339,9 @@ void dd_p4est_create_grid_minimal () {
   realloc_cells(num_cells);
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
-  
-  CELL_TRACE(printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n",
-    this_node, max_range, box_l[0],box_l[1],box_l[2], dd.cell_size[0],dd.cell_size[1],dd.cell_size[2]));
 }
-void dd_p4est_create_grid () {
-  //printf("%i : new MD grid\n", this_node);
-  CALL_TRACE();
-  
-  // delete all existing stuff  
-  dd_p4est_free();
-  
-#ifdef LB_ADAPTIVE
-  // the adaptive LB has a strange grid, thus we have to do something similar here
-  if (max_range < 1.0)
-    grid_level = dd_p4est_cellsize_even();
-  else
-    grid_level = dd_p4est_cellsize_optimal();
-#else
-  grid_level = dd_p4est_cellsize_optimal();
-#endif
-  
-#ifndef P4EST_NOCHANGE
-  // set global variables
-  dd.cell_size[0] = box_l[0]/(double)grid_size[0];
-  dd.cell_size[1] = box_l[1]/(double)grid_size[1];
-  dd.cell_size[2] = box_l[2]/(double)grid_size[2];
-  dd.inv_cell_size[0] = 1.0/dd.cell_size[0];
-  dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
-  dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
-  max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
-  
-  CELL_TRACE(printf("%i : gridsize %ix%ix%i\n", this_node, grid_size[0], grid_size[1], grid_size[2]));
-  CELL_TRACE(printf("%i : bricksize %ix%ix%i level %i\n", this_node, brick_size[0], brick_size[1], brick_size[2], grid_level));
-  CELL_TRACE(printf("%i : cellsize %lfx%lfx%lf\n", this_node, dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]));
-#endif
-  
-#ifdef MINIMAL_GHOST
-  dd_p4est_create_grid_minimal();
-  return;
-#endif
 
+void dd_p4est_create_grid_fullghost() {
   // create p4est structs
   p4est_conn = p8est_connectivity_new_brick (brick_size[0], brick_size[1], brick_size[2], 
                                              PERIODIC(0), PERIODIC(1), PERIODIC(2));
@@ -373,28 +364,18 @@ void dd_p4est_create_grid () {
   p4est_space_idx = new int[n_nodes + 1];
   for (int i=0;i<=n_nodes;++i) {
     p4est_quadrant_t *q = &p4est->global_first_position[i];
-    //p4est_quadrant_t c;
     if (i < n_nodes) {
       double xyz[3];
       p4est_qcoord_to_vertex(p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-      //c.x = xyz[0]*(1<<grid_level);
-      //c.y = xyz[1]*(1<<grid_level);
-      //c.z = xyz[2]*(1<<grid_level);
       p4est_space_idx[i] = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
                                                     xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
     } else {
-      /*c.x = 1<<grid_level;
-      while (c.x < grid_size[0]) c.x <<= 1;
-      c.y = 0;
-      c.z = 0;*/
       int64_t tmp = 1<<grid_level;
       while(tmp < grid_size[0]) tmp <<= 1;
       while(tmp < grid_size[1]) tmp <<= 1;
       while(tmp < grid_size[2]) tmp <<= 1;
       p4est_space_idx[i] = tmp*tmp*tmp;
     }
-    //c.level = P4EST_QMAXLEVEL;
-    //p4est_space_idx[i] = p4est_quadrant_linear_id(&c,P4EST_QMAXLEVEL+1);
     if (i == this_node + 1) {
       CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i-1], p4est_space_idx[i] - 1));
     }
@@ -560,18 +541,55 @@ void dd_p4est_create_grid () {
   
   CELL_TRACE(printf("%d : %ld, %ld, %ld\n",this_node,num_cells,num_local_cells,num_ghost_cells));
 
-#ifndef P4EST_NOCHANGE  
   // allocate memory
   realloc_cells(num_cells);
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
+}
+
+void dd_p4est_create_grid () {
+  //printf("%i : new MD grid\n", this_node);
+  CALL_TRACE();
+  
+  // delete all existing stuff  
+  dd_p4est_free();
+  
+#ifdef LB_ADAPTIVE
+  // the adaptive LB has a strange grid, thus we have to do something similar here
+  if (max_range < 1.0)
+    grid_level = dd_p4est_cellsize_even();
+  else
+    grid_level = dd_p4est_cellsize_optimal();
+#else
+  grid_level = dd_p4est_cellsize_optimal();
 #endif
   
-  dd_p4est_write_vtk();
+  // set global variables
+  dd.cell_size[0] = box_l[0]/(double)grid_size[0];
+  dd.cell_size[1] = box_l[1]/(double)grid_size[1];
+  dd.cell_size[2] = box_l[2]/(double)grid_size[2];
+  dd.inv_cell_size[0] = 1.0/dd.cell_size[0];
+  dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
+  dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
+  max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
+  
+  CELL_TRACE(printf("%i : gridsize %ix%ix%i\n", this_node, grid_size[0], grid_size[1], grid_size[2]));
+  CELL_TRACE(printf("%i : bricksize %ix%ix%i level %i\n", this_node, brick_size[0], brick_size[1], brick_size[2], grid_level));
+  CELL_TRACE(printf("%i : cellsize %lfx%lfx%lf\n", this_node, dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]));
+  
+#ifdef MINIMAL_GHOST
+  dd_p4est_create_grid_minimal();
+#else
+  dd_p4est_create_grid_fullghost();
+#endif
+
+  //dd_p4est_write_vtk();
   
   CELL_TRACE(printf("%d: %.3f %.3fx%.3fx%.3f %.3fx%.3fx%.3f\n",
     this_node, max_range, box_l[0],box_l[1],box_l[2], dd.cell_size[0],dd.cell_size[1],dd.cell_size[2]));
 
+  // Fill internal communator lists
+  dd_p4est_comm();
 }
 //--------------------------------------------------------------------------------------------------
 
@@ -1112,6 +1130,20 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
+void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
+  int i;
+
+  CELL_TRACE(fprintf(stderr,"%d: dd_revert_comm_order: anz comm: %d\n",this_node,comm->num));
+
+  /* exchange SEND/RECV */
+  for(i = 0; i < comm->num; i++) {
+    if (comm->comm[i].type == GHOST_SEND)
+      comm->comm[i].type = GHOST_RECV;
+    else if (comm->comm[i].type == GHOST_RECV)
+      comm->comm[i].type = GHOST_SEND;
+  }
+}
+//--------------------------------------------------------------------------------------------------
 void dd_p4est_mark_cells () {
   CALL_TRACE();
   // Take the memory map as they are. First local cells (along Morton curve).
@@ -1123,6 +1155,11 @@ void dd_p4est_mark_cells () {
   for (int c=0;c<num_ghost_cells;++c)
     ghost_cells.cell[c] = &cells[num_local_cells + c];
 #endif
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_update_communicators_w_boxl() {
+  dd_p4est_update_comm_w_boxl(&cell_structure.exchange_ghosts_comm);
+  dd_p4est_update_comm_w_boxl(&cell_structure.update_ghost_pos_comm);
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
@@ -1141,7 +1178,7 @@ void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_init_cell_interaction() {
+void dd_p4est_init_cell_interactions() {
 #ifndef P4EST_NOCHANGE
   dd.cell_inter = (IA_Neighbor_List*)Utils::realloc(dd.cell_inter,local_cells.n*sizeof(IA_Neighbor_List));
   for (int i=0;i<local_cells.n; i++) { 
@@ -1224,6 +1261,15 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
     return &cells[i];
   else
     return NULL;
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_position_to_cell_indices(double pos[3],int* idx) {
+  std::cerr << __FUNCTION__ << ": This function is not supported by p4est-md."
+            << " Use a p4est-md branch which is capable of handling"
+            << " collision detection.\n"
+            << " Do not use this function for anything else."
+            << std::endl;
+  errexit();
 }
 //--------------------------------------------------------------------------------------------------
 // Checks all particles and resorts them to local cells or sendbuffers
@@ -1385,7 +1431,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
   }
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_exchange_and_sort_particles() {
+void dd_p4est_local_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
   ParticleList *sendbuf, *recvbuf;
   std::vector<int> *sendbuf_dyn, *recvbuf_dyn;
@@ -1584,6 +1630,46 @@ void dd_p4est_global_exchange_part (ParticleList* pl) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
+void dd_p4est_exchange_and_sort_particles (int global_flag) {
+  if (global_flag == CELL_GLOBAL_EXCHANGE) { // perform a global resorting
+    ParticleList sendbuf;
+    init_particlelist(&sendbuf);
+    // Go through all local particles and move those not on node to the sendbuf
+    for (int c = 0; c < local_cells.n; c++) {
+      Cell *pl = local_cells.cell[c];
+      for (int p = 0; p < pl->n; p++) {
+        fold_position(pl->part[p].r.p, pl->part[p].l.i);
+        Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
+        if (nc == NULL) { // Belongs to other node
+          int pid = pl->part[p].p.identity;
+          move_indexed_particle(&sendbuf, pl, p);
+          local_particles[pid] = NULL;
+          if(p < pl->n) p -= 1;
+        } else if(nc != pl) { // Still on node but particle belongs to other cell
+          move_indexed_particle(nc, pl, p);
+          if(p < pl->n) p -= 1;
+        }
+        // Else not required since particle in cell it belongs to
+      }
+    }
+    // Invoke communication, the particle index is cleared there
+    if (local_cells.n > 0)
+      dd_p4est_global_exchange_part(&sendbuf);
+    else // Still call it if there are no cells on this node
+      dd_p4est_global_exchange_part(NULL);
+    // Free remaining particles in sendbuf, but it should be empty already
+    for (int p = 0; p < sendbuf.n; p++) {
+      local_particles[sendbuf.part[p].p.identity] = NULL;
+      free_particle(&sendbuf.part[p]);
+    }
+    realloc_particlelist(&sendbuf, 0);
+  } else { // do the local resorting (particles move at most on cell)
+    dd_p4est_local_exchange_and_sort_particles();
+  }
+
+  CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
+}
+//--------------------------------------------------------------------------------------------------
 // Maps a position to the cartesian grid and returns the morton index of this coordinates
 // Note: the global morton index returned here is NOT equal to the local cell index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
@@ -1655,6 +1741,106 @@ void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t
   
   // Repartition with the computed distribution
   p4est_partition_given(p4est, num_quad_per_proc_global);
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_assign_prefetches (GhostCommunicator *comm) {
+  CALL_TRACE();
+  int cnt;
+
+  for(cnt=0; cnt<comm->num; cnt += 2) {
+    if (comm->comm[cnt].type == GHOST_RECV && comm->comm[cnt + 1].type == GHOST_SEND) {
+      comm->comm[cnt].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
+      comm->comm[cnt + 1].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_topology_init(CellPList *old) {
+
+  int c,p,np;
+  int exchange_data, update_data;
+  Particle *part;
+
+  CELL_TRACE(fprintf(stderr, "%d: dd_p4est_topology_init: Number of recieved cells=%d\n", this_node, old->n));
+
+  /** broadcast the flag for using verlet list */
+  MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
+
+  // use p4est_dd callbacks, but Espresso sees a DOMDEC
+  cell_structure.type             = CELL_STRUCTURE_P4EST;
+  cell_structure.position_to_node = dd_p4est_pos_to_proc;
+  cell_structure.position_to_cell = dd_p4est_position_to_cell;
+  //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
+
+  /* set up new domain decomposition cell structure */
+  dd_p4est_create_grid();
+  /* mark cells */
+  dd_p4est_mark_cells();
+
+  /* create communicators */
+  dd_p4est_prepare_comm(&cell_structure.ghost_cells_comm, GHOSTTRANS_PARTNUM);
+
+  exchange_data = (GHOSTTRANS_PROPRTS | GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+  update_data   = (GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+
+  dd_p4est_prepare_comm(&cell_structure.exchange_ghosts_comm,  exchange_data);
+  dd_p4est_prepare_comm(&cell_structure.update_ghost_pos_comm, update_data);
+  dd_p4est_prepare_comm(&cell_structure.collect_ghost_force_comm, GHOSTTRANS_FORCE);
+
+  /* collect forces has to be done in reverted order! */
+  dd_p4est_revert_comm_order(&cell_structure.collect_ghost_force_comm);
+  dd_p4est_assign_prefetches(&cell_structure.ghost_cells_comm);
+  dd_p4est_assign_prefetches(&cell_structure.exchange_ghosts_comm);
+  dd_p4est_assign_prefetches(&cell_structure.update_ghost_pos_comm);
+  dd_p4est_assign_prefetches(&cell_structure.collect_ghost_force_comm);
+
+#ifdef LB
+  dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING) ;
+  dd_p4est_assign_prefetches(&cell_structure.ghost_lbcoupling_comm) ;
+#endif
+  
+#ifdef IMMERSED_BOUNDARY
+  // Immersed boundary needs to communicate the forces from but also to the ghosts
+  // This is different than usual collect_ghost_force_comm (not in reverse order)
+  // Therefore we need our own communicator
+  dd_p4est_prepare_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
+  dd_p4est_assign_prefetches(&cell_structure.ibm_ghost_force_comm);
+#endif
+
+#ifdef ENGINE
+  dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING) ;
+  dd_p4est_assign_prefetches(&cell_structure.ghost_swimming_comm) ;
+#endif
+
+  /* initialize cell neighbor structures */
+  dd_p4est_init_cell_interactions();
+
+  // Go through all old particles and find owner & cell
+  for (c = 0; c < old->n; c++) {
+    part = old->cell[c]->part;
+    np   = old->cell[c]->n;
+    for (p = 0; p < np; p++) {
+      fold_position(part[p].r.p, part[p].l.i);
+      
+      Cell *nc = dd_save_position_to_cell(part[p].r.p);
+      if (nc == NULL) { // Particle is on other process, move it to cell[0]
+        append_unindexed_particle(local_cells.cell[0], &part[p]);
+      } else { // It is on this node, move it to right local_cell
+        append_unindexed_particle(nc, &part[p]);
+      }
+    }
+  }
+  // Create particle index
+  for(c=0; c<local_cells.n; c++) {
+    update_local_particles(local_cells.cell[c]);
+  }
+  // Invoke global communication for cell[0] containing particles of other processes
+  if (local_cells.n > 0)
+    dd_p4est_global_exchange_part(local_cells.cell[0]);
+  else // Call it anyway in case there are no cells on this node (happens during startup)
+    dd_p4est_global_exchange_part(NULL);
+    
+  CELL_TRACE(fprintf(stderr,"%d: dd_topology_init: done\n",this_node));
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

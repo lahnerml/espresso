@@ -31,7 +31,7 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part);
 // Update the box length for a given communicator
 void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm);
 // Fill the IA_NeighborList and compute the half-shell for p4est based DD
-void dd_p4est_init_cell_interaction();
+void dd_p4est_init_cell_interactions();
 
 // Map a position to a cell, returns NULL if not in local (+ ROUND_ERR_PREC*boxl) domain
 Cell* dd_p4est_save_position_to_cell(double pos[3]);
@@ -40,10 +40,7 @@ Cell* dd_p4est_position_to_cell(double pos[3]);
 //void dd_p4est_position_to_cell(double pos[3], int* idx);
 
 // Check all particles if they have left their cell and move the to the right neighboring cell
-void dd_p4est_exchange_and_sort_particles();
-
-// Send all particles in cp to the right process
-void dd_p4est_global_exchange_part(ParticleList* cp);
+void dd_p4est_exchange_and_sort_particles(int global_flag);
 
 // Map a position to a global processor index
 int dd_p4est_pos_to_proc(double pos[3]);
@@ -55,6 +52,35 @@ void dd_p4est_on_geometry_change(int flags);
 
 // Writes all local particles in a parallel VTK-particle file
 void dd_p4est_write_particle_vtk(char *filename);
+
+void dd_p4est_position_to_cell_indices(double pos[3],int* idx);
+
+/** Revert the order of a communicator: After calling this the
+    communicator is working in reverted order with exchanged
+    communication types GHOST_SEND <-> GHOST_RECV. */
+void dd_p4est_revert_comm_order (GhostCommunicator *comm);
+
+/** Initialize the topology. The argument is a list of cell pointers,
+    containing particles that have to be sorted into new cells. The
+    particles might not belong to this node.  This procedure is used
+    when particle data or cell structure has changed and the cell
+    structure has to be reinitialized. This also includes setting up
+    the cell_structure array.
+    @param cl List of cell pointers with particles to be stored in the
+    new cell system.
+*/
+void dd_p4est_topology_init(CellPList *cl);
+
+/** Called when the current cell structure is invalidated because for
+    example the box length has changed. This procedure may NOT destroy
+    the old inner and ghost cells, but it should free all other
+    organizational data. Note that parameters like the box length or
+    the node_grid may already have changed. Therefore organizational
+    data has to be stored independently from variables that may be
+    changed from outside. */
+void dd_p4est_topology_release();
+
+void dd_p4est_update_communicators_w_boxl();
 
 // Writes the MD grid as VTK file
 void dd_p4est_write_vtk();

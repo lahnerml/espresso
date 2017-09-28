@@ -102,6 +102,7 @@ void pressure_calc(double *result, double *result_t, double *result_nb, double *
   case CELL_STRUCTURE_LAYERED:
     layered_calculate_virials(v_comp);
     break;
+  case CELL_STRUCTURE_P4EST:
   case CELL_STRUCTURE_DOMDEC:
     if(dd.use_vList) {
       if (rebuild_verletlist)  

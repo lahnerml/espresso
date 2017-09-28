@@ -44,6 +44,10 @@
 
 #include "call_trace.hpp"
 
+#ifdef DD_P4EST
+#include "p4est_dd.hpp"
+#endif
+
 /* Variables */
 
 /** list of all cells. */
@@ -137,6 +141,9 @@ static void topology_release(int cs) {
   case CELL_STRUCTURE_LAYERED:
     layered_topology_release();
     break;
+  case CELL_STRUCTURE_P4EST:
+    dd_p4est_topology_release();
+    break;
   default:
     fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an unknown way (%d)\n", cs);
     errexit();
@@ -160,6 +167,9 @@ static void topology_init(int cs, CellPList *local) {
     break;
   case CELL_STRUCTURE_LAYERED:
     layered_topology_init(local);
+    break;
+  case CELL_STRUCTURE_P4EST:
+    dd_p4est_topology_init(local);
     break;
   default:
     fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an unknown way (%d)\n", cs);
@@ -351,6 +361,9 @@ void cells_resort_particles(int global_flag)
   case CELL_STRUCTURE_DOMDEC:
     dd_exchange_and_sort_particles(global_flag);
     break;
+  case CELL_STRUCTURE_P4EST:
+    dd_p4est_exchange_and_sort_particles(global_flag);
+    break;
   }
 
 #ifdef ADDITIONAL_CHECKS
@@ -436,6 +449,9 @@ void cells_on_geometry_change (int flags)
     /* this cell system doesn't need to react, just tell
        the others */
     on_boxl_change();
+    break;
+  case CELL_STRUCTURE_P4EST:
+    dd_p4est_on_geometry_change(flags);
     break;
   }
 }

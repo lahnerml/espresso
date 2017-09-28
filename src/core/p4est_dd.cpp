@@ -1276,19 +1276,13 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
         if (part->r.p[2] < cell_lc[2]) z = 0;
         else if (part->r.p[2] >= cell_hc[2]) z = 2;
         else z = 1;
-        
-        nidx = neighbor_lut[z][y][x];
-#ifdef MINIMAL_GHOST
-        if ((shell->boundary & neighbor_mask[nidx])) { // moved over periodic boundary
-          fold_position(part->r.p, part->l.i);
-        }
-#endif
+
         // get neighbor cell
-        nidx = shell->neighbor[nidx];
+        nidx = shell->neighbor[neighbor_lut[z][y][x]];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
           if (p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
             CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part %d\n",this_node,part->p.identity));
-              
+            // With minimal ghost this condition is always true
             if (p4est_shell[nidx].rank != this_node) { // It is a remote process
               // copy data to sendbuf according to rank
               int li = comm_proc[p4est_shell[nidx].rank];
@@ -1311,6 +1305,11 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
             fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
           }
         } else { // Local Cell, just move the partilce
+#ifdef MINIMAL_GHOST
+          if ((shell->boundary & neighbor_mask[neighbor_lut[z][y][x]])) { // moved over local periodic boundary
+            fold_position(part->r.p, part->l.i);
+          }
+#endif
           move_indexed_particle(&cells[nidx], cell, p);
           if(p < cell->n) p -= 1;
         }

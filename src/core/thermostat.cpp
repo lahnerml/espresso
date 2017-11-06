@@ -66,7 +66,7 @@ int ghmc_nmd = 1;
 // phi parameter for partial momentum update step in GHMC
 double ghmc_phi = 0;
 
-double langevin_pref1, langevin_pref2;
+double langevin_pref1, langevin_pref2, langevin_pref3; // FIXME: Set langevin_pref3
 #ifndef ROTATIONAL_INERTIA
 double langevin_pref2_rotation;
 #else
@@ -94,10 +94,46 @@ double nptiso_pref4;
 #endif
 
 
+#ifdef USE_FLOWFIELD
+std::vector<double> velu, velv, velw;
+
+struct CFile {
+  CFile(const char *filename, const char *mode) {
+    if (!(fp = fopen(filename, mode))) {
+      fprintf(stderr, "[%i] Cannot open file: %s.\n", this_node, filename);
+      errexit();
+    }
+  }
+  ~CFile() { fclose(fp); }
+  operator FILE *() { return fp; }
+private:
+  FILE *fp;
+};
+
+static void fluid_init()
+{
+  CFile fp("u.dat", "rb"), fq("v.dat", "rb"), fr("w.dat", "rb");
+  size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);
+  size_t nelem = ffs * ffs * ffs;
+
+  velu.resize(nelem);
+  velv.resize(nelem);
+  velw.resize(nelem);
+
+  if (fread(velu.data(), sizeof(double), nelem, fp) != nelem
+      || fread(velv.data(), sizeof(double), nelem, fq) != nelem
+      || fread(velw.data(), sizeof(double), nelem, fr) != nelem) {
+    fprintf(stderr, "[%i] Error read flowfield has too few elements.\n", this_node);
+    errexit();
+  }
+}
+#endif // USE_FLOWFIELD
+
 void thermo_init_langevin() 
 {
   int j;
   langevin_pref1 = -langevin_gamma/time_step;
+  langevin_pref3 = time_step;
 #if defined (FLATNOISE)
   langevin_pref2 = sqrt(24.0*temperature*langevin_gamma/time_step);
 #elif defined (GAUSSRANDOMCUT) || defined (GAUSSRANDOM)
@@ -152,6 +188,10 @@ void thermo_init_langevin()
   THERMO_TRACE(fprintf(stderr,"%d: thermo_init_langevin: langevin_gamma_rotation=%f, langevin_pref2_rotation=%f",this_node, langevin_gamma_rotation,langevin_pref2_rotation));
 #endif
   THERMO_TRACE(fprintf(stderr,"%d: thermo_init_langevin: langevin_pref1=%f, langevin_pref2=%f",this_node,langevin_pref1,langevin_pref2));  
+
+#ifdef USE_FLOWFIELD
+  fluid_init();
+#endif // USE_FLOWFIELD
 }
 
 #ifdef NPT

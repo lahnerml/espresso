@@ -110,6 +110,28 @@ extern int ghmc_nmd;
 /** Phi parameter for GHMC partial momenum update step */
 extern double ghmc_phi;
 
+#ifdef USE_FLOWFIELD
+/** Flow field langevin parameter */
+extern double langevin_pref3;
+
+/** Flow field itself */
+extern std::vector<double> velu, velv, velw;
+
+#define FLOWFIELD_SIZE 65
+// Overflow is unlikely (who has that much memory). But prevent silent
+// execution or segmentation faults because of accidentally wrongly set
+// flowfield sizes.
+#define CBRT_SIZE_MAX 2642245UL
+#if (FLOWFIELD_SIZE > CBRT_SIZE_MAX)
+#  error Flowfield size too great for size_t
+#endif
+
+#define veluu(i, j, k) (velu[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
+#define velvv(i, j, k) (velv[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
+#define velww(i, j, k) (velw[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
+#endif // USE_FLOWFIELD
+
+
 /************************************************
  * functions
  ************************************************/
@@ -176,6 +198,113 @@ inline double friction_thermV_nptiso(double p_diff) {
 }
 #endif
 
+
+#ifdef USE_FLOWFIELD
+inline void fluid_velocity(double pos[3], double vfxyz[3])
+{
+  // Velocities at the corners of the grid cell particle p is in.
+  double u000, u100, u010, u001, u101, u011, u110, u111;
+  double v000, v100, v010, v001, v101, v011, v110, v111;
+  double w000, w100, w010, w001, w101, w011, w110, w111;
+
+  // Flowfield is defined on vertices, i.e. has FLOWFIELD_SIZE - 1 cells.
+  std::array<double, 3> ff_cellsize = {{ box_l[0] / (FLOWFIELD_SIZE - 1),
+                                         box_l[1] / (FLOWFIELD_SIZE - 1),
+                                         box_l[2] / (FLOWFIELD_SIZE - 1)}};
+  // Cell index and upper cell index
+  // In combination 000, 001, 010, ... all 8 neighboring grid points of p
+  int x0 = pos[0] / ff_cellsize[0];
+  int x1 = x0 + 1;
+
+  int y0 = pos[1] / ff_cellsize[1];
+  int y1 = y0 + 1;
+
+  int z0 = pos[2] / ff_cellsize[2];
+  int z1 = z0 + 1;
+
+  // Interpolation weights
+  double wx = (pos[0] - (x0 * ff_cellsize[0])) / ff_cellsize[0];
+  double wy = (pos[1] - (y0 * ff_cellsize[1])) / ff_cellsize[1];
+  double wz = (pos[2] - (z0 * ff_cellsize[2])) / ff_cellsize[2];
+
+  // Correct for oob particles (only correct for slightly oob particles).
+  // In parallel they cannot be far oob because otherwise they would be
+  // transferred to the corresponding process.
+  if (pos[0] >= box_l[0]) {
+    x0 = 0;
+    x1 = 1;
+  } else if (pos[0] < 0) {
+    x0 = FLOWFIELD_SIZE - 2;
+    x1 = FLOWFIELD_SIZE - 1;
+  }
+
+  if (pos[1] >= box_l[1]) {
+    y0 = 0;
+    y1 = 1;
+  } else if (pos[1] < 0) {
+    y0 = FLOWFIELD_SIZE - 2;
+    y1 = FLOWFIELD_SIZE - 1;
+  }
+
+  if (pos[2] >= box_l[2]) {
+    z0 = 0;
+    z1 = 1;
+  } else if (pos[2] < 0) {
+    z0 = FLOWFIELD_SIZE - 2;
+    z1 = FLOWFIELD_SIZE - 1;
+  }
+
+  // Look up the values of the 8 points of the grid
+
+  // HERE I,J,K VALUES ARE IN REVERSE ORDER TO MAINTAIN THE CORRECT
+  // CONFIGURATION !!!
+  // DOUBLE CHECK WHEN THE DNS DATASET CHANGED
+  u000 = veluu(z0, x0, y0);
+  u100 = veluu(z1, x0, y0);
+  u010 = veluu(z0, x1, y0);
+  u001 = veluu(z0, x0, y1);
+  u101 = veluu(z1, x0, y1);
+  u011 = veluu(z0, x1, y1);
+  u110 = veluu(z1, x1, y0);
+  u111 = veluu(z1, x1, y1);
+
+  v000 = velvv(z0, x0, y0);
+  v100 = velvv(z1, x0, y0);
+  v010 = velvv(z0, x1, y0);
+  v001 = velvv(z0, x0, y1);
+  v101 = velvv(z1, x0, y1);
+  v011 = velvv(z0, x1, y1);
+  v110 = velvv(z1, x1, y0);
+  v111 = velvv(z1, x1, y1);
+
+  w000 = velww(z0, x0, y0);
+  w100 = velww(z1, x0, y0);
+  w010 = velww(z0, x1, y0);
+  w001 = velww(z0, x0, y1);
+  w101 = velww(z1, x0, y1);
+  w011 = velww(z0, x1, y1);
+  w110 = velww(z1, x1, y0);
+  w111 = velww(z1, x1, y1);
+
+  // Compute the velocity components u, v, w at point
+  vfxyz[0] = u000 * (1 - wx) * (1 - wy) * (1 - wz) +
+             u100 * wx * (1 - wy) * (1 - wz) + u010 * (1 - wx) * wy * (1 - wz) +
+             u001 * (1 - wx) * (1 - wy) * wz + u101 * wx * (1 - wy) * wz +
+             u011 * (1 - wx) * wy * wz + u110 * wx * wy * (1 - wz) +
+             u111 * wx * wy * wz;
+  vfxyz[1] = v000 * (1 - wx) * (1 - wy) * (1 - wz) +
+             v100 * wx * (1 - wy) * (1 - wz) + v010 * (1 - wx) * wy * (1 - wz) +
+             v001 * (1 - wx) * (1 - wy) * wz + v101 * wx * (1 - wy) * wz +
+             v011 * (1 - wx) * wy * wz + v110 * wx * wy * (1 - wz) +
+             v111 * wx * wy * wz;
+  vfxyz[2] = w000 * (1 - wx) * (1 - wy) * (1 - wz) +
+             w100 * wx * (1 - wy) * (1 - wz) + w010 * (1 - wx) * wy * (1 - wz) +
+             w001 * (1 - wx) * (1 - wy) * wz + w101 * wx * (1 - wy) * wz +
+             w011 * (1 - wx) * wy * wz + w110 * wx * wy * (1 - wz) +
+             w111 * wx * wy * wz;
+}
+#endif // USE_FLOWFIELD
+
 /** overwrite the forces of a particle with
     the friction term, i.e. \f$ F_i= -\gamma v_i + \xi_i\f$.
 */
@@ -228,6 +357,13 @@ inline void friction_thermo_langevin(Particle *p)
   for (int i = 0; i < 3; i++) {
     // Particle velocity
     velocity[i] = p->m.v[i];
+#ifdef USE_FLOWFIELD
+    double vfxyz[3];
+    // Fluid velocity
+    fluid_velocity(p->r.p, vfxyz);
+    velocity[i] -= langevin_pref3 * vfxyz[i];
+#endif // USE_FLOWFIELD
+
     #ifdef ENGINE
       // In case of the engine feature, the velocity is relaxed
       // towards a swimming velocity oriented parallel to the

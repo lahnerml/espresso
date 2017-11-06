@@ -870,15 +870,17 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, 
     p4est_quadrant_t *q2 = p4est_quadrant_array_index(t_t1, q_id2);
     for (size_t q_idx = 0; q_idx < t_fct->quadrants.elem_count; ++q_idx) {
       p4est_quadrant_t *q_fct = p4est_quadrant_array_index(&t_fct->quadrants, q_idx);
-      while (p4est_quadrant_overlaps(q_fct, q1) && q_id1 < t_t1->quadrants.elem_count) {
+      while (p4est_quadrant_overlaps(q_fct, q1)) {
         w_fct[w_idx] += a1*w1[w_id1++];
         ++t1_quads_per_fct_quad[w_idx];
-        q1 = p4est_quadrant_array_index(t_t1, ++q_id1);
+        if (++q_id1 >= t_t1->quadrants.elem_count) break;
+        q1 = p4est_quadrant_array_index(t_t1, q_id1);
       }
-      while (p4est_quadrant_overlaps(q_fct, q2) && q_id2 < t_t2->quadrants.elem_count) {
+      while (p4est_quadrant_overlaps(q_fct, q2)) {
         w_fct[w_idx] += a2*w2[w_id2++];
         ++t2_quads_per_fct_quad[w_idx];
-        q2 = p4est_quadrant_array_index(t_t2, ++q_id2);
+        if (++q_id2 >= t_t2->quadrants.elem_count) break;
+        q2 = p4est_quadrant_array_index(t_t2, q_id2);
       }
       ++w_idx;
     }

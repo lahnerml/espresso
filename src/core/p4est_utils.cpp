@@ -888,7 +888,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, 
   double sum, prefix = 0; // Initialization is necessary on rank 0!
   MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
-  double target = sum / n_nodes;
+  double target = sum / fct->mpisize;
 
   for (size_t idx = 0; idx < fct->local_num_quadrants; ++idx) {
     int proc = std::min<int>(w_fct[idx] / target, fct->mpisize - 1);

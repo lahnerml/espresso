@@ -849,4 +849,60 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   return fct;
 }
 
+void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, double a1
+                                    p4est_t *t2, const std::vector<double> &w2, double a2) {
+  std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
+  std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
+  std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
+  std::vector<size_t> t2_quads_per_fct_quad(fct->local_num_quadrants, 0);
+  std::vector<size_t> t1_quads_per_proc(w_fct->mpisize, 0);
+  std::vector<size_t> t2_quads_per_proc(w_fct->mpisize, 0);
+  
+  size_t w_id1, w_id2, w_idx;
+  w_id1 = w_id2 = w_idx = 0;
+  for (p4est_topidx t_idx = fct->first_local_tree; t_idx <= fct->last_local_tree; ++t_idx) {
+    p4est_tree_t *t_fct = p4est_tree_array_index(fct->trees, t_idx);
+    p4est_tree_t *t_t1  = p4est_tree_array_index(t1->trees, t_idx);
+    p4est_tree_t *t_t2  = p4est_tree_array_index(t2->trees, t_idx);
+    size_t q_id1, q_id2;
+    q_id1 = q_id2 = 0;
+    p4est_quadrant_t *q1 = p4est_quadrant_array_index(t_t1, q_id1);
+    p4est_quadrant_t *q2 = p4est_quadrant_array_index(t_t1, q_id2);
+    for (size_t q_idx = 0; q_idx < t_fct->quadrants.elem_count; ++q_idx) {
+      p4est_quadrant_t *q_fct = p4est_quadrant_array_index(&t_fct->quadrants, q_idx);
+      while (p4est_quadrant_overlaps(q_fct, q1) && q_id1 < t_t1->quadrants.elem_count) {
+        w_fct[w_idx] += a1*w1[w_id1++];
+        ++t1_quads_per_fct_quad[w_idx];
+        q1 = p4est_quadrant_array_index(t_t1, ++q_id1);
+      }
+      while (p4est_quadrant_overlaps(q_fct, q2) && q_id2 < t_t2->quadrants.elem_count) {
+        w_fct[w_idx] += a2*w2[w_id2++];
+        ++t2_quads_per_fct_quad[w_idx];
+        q2 = p4est_quadrant_array_index(t_t2, ++q_id2);
+      }
+      ++w_idx;
+    }
+  }
+  
+  double localsum = std::accumulate(w_fct.begin(), w_fct.end(), 0.0);
+  double sum, prefix = 0; // Initialization is necessary on rank 0!
+  MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
+  MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
+  double target = sum / n_nodes;
+
+  for (size_t idx = 0; idx < fct->local_num_quadrants; ++idx) {
+    int proc = std::min<int>(w_fct[idx] / target, fct->mpisize - 1);
+    t1_quads_per_proc[proc] += t1_quads_per_fct_quad[idx];
+    t2_quads_per_proc[proc] += t2_quads_per_fct_quad[idx];
+  }
+  
+  MPI_Allreduce(MPI_IN_PLACE, t1_quads_per_proc.data(), fct->mpisize,
+                P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
+  MPI_Allreduce(MPI_IN_PLACE, t2_quads_per_proc.data(), fct->mpisize,
+                P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
+                
+  p4est_partition_given(t1, t1_quads_per_proc.data());
+  p4est_partition_given(t2, t2_quads_per_proc.data());
+}
+
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

@@ -423,6 +423,8 @@ int p4est_utils_post_gridadapt_insert_data(
 /*****************************************************************************/
 /*@{*/
 /** Partition two different p4ests such that their partition boundaries match.
+ *  In case the reference is coarser or equal, the process boundaries are identical.
+ *  Otherwise, only finer cells match the process for the reference.
  *
  * @param[in]  p4est_ref   p4est with reference partition boundaries.
  * @param[out] p4est_mod   p4est to be modified such that its boundaries match
@@ -432,12 +434,29 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
-/*** Computes the finest common tree out of two given p4est trees on the same connectivity.
+/** Computes the finest common tree out of two given p4est trees on the same connectivity.
+ *  Requiers all finer cells in t2 to match the process of t1. (see p4est_utils_partition_multiple_forests)
+ * 
  * @param[in] t1  reference tree for FCT
  * @param[in] t2  base tree for FCT. this tree is copied and coarsened.
  * 
  */
 p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
+
+/** Repartitions t1 and t2 wrt. the FCT. The respective weights are combined with the factors
+ *  a1 and a2.
+ *  It is required for t1 and t2 to have identical process boundaries.
+ * 
+ * @param[inout] t1   First tree
+ * @param[in]    w1   Weights for t1
+ * @param[in]    a1   Weight factor for w1
+ * @param[inout] t2   Second tree
+ * @param[in]    w2   Weights for t2
+ * @param[in]    a2   Weight factor for w2
+ * 
+ */
+void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, double a1
+                                    p4est_t *t2, const std::vector<double> &w2, double a2);
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

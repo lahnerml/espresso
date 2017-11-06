@@ -132,6 +132,7 @@ void energy_calc(double *result)
   case CELL_STRUCTURE_LAYERED:
     layered_calculate_energies();
     break;
+  case CELL_STRUCTURE_P4EST:
   case CELL_STRUCTURE_DOMDEC: 
     if(dd.use_vList) {
       if (rebuild_verletlist)  

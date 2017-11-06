@@ -227,7 +227,6 @@ void dd_p4est_create_grid (bool isRepart) {
   grid_level = dd_p4est_cellsize_optimal();
 #endif
   
-#ifndef P4EST_NOCHANGE
   // set global variables
   dd.cell_size[0] = box_l[0]/(double)grid_size[0];
   dd.cell_size[1] = box_l[1]/(double)grid_size[1];
@@ -236,11 +235,6 @@ void dd_p4est_create_grid (bool isRepart) {
   dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
   dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
-  
-  CELL_TRACE(printf("%i : gridsize %ix%ix%i\n", this_node, grid_size[0], grid_size[1], grid_size[2]));
-  CELL_TRACE(printf("%i : bricksize %ix%ix%i level %i\n", this_node, brick_size[0], brick_size[1], brick_size[2], grid_level));
-  CELL_TRACE(printf("%i : cellsize %lfx%lfx%lf\n", this_node, dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]));
-#endif
 
   // create p4est structs
   if (!isRepart) {
@@ -305,6 +299,9 @@ void dd_p4est_create_grid (bool isRepart) {
   realloc_cells(num_cells);
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
+
+  // Fill internal communator lists
+  dd_p4est_comm();
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {
@@ -748,7 +745,6 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
   CALL_TRACE();
   prepare_comm(comm, data_part, num_comm_send + num_comm_recv, true);
   int cnt = 0;
-
   for (int i=0;i<num_comm_send;++i) {
     comm->comm[cnt].type = GHOST_SEND;
     comm->comm[cnt].node = comm_send[i].rank;
@@ -786,6 +782,22 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
     }
     ++cnt;
+    //printf("\n");
+  }
+
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
+  int i;
+
+  CELL_TRACE(fprintf(stderr,"%d: dd_revert_comm_order: anz comm: %d\n",this_node,comm->num));
+
+  /* exchange SEND/RECV */
+  for(i = 0; i < comm->num; i++) {
+    if (comm->comm[i].type == GHOST_SEND)
+      comm->comm[i].type = GHOST_RECV;
+    else if (comm->comm[i].type == GHOST_RECV)
+      comm->comm[i].type = GHOST_SEND;
   }
 }
 //--------------------------------------------------------------------------------------------------
@@ -800,6 +812,11 @@ void dd_p4est_mark_cells () {
   for (int c=0;c<num_ghost_cells;++c)
     ghost_cells.cell[c] = &cells[num_local_cells + c];
 #endif
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_update_communicators_w_boxl() {
+  dd_p4est_update_comm_w_boxl(&cell_structure.exchange_ghosts_comm);
+  dd_p4est_update_comm_w_boxl(&cell_structure.update_ghost_pos_comm);
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
@@ -818,7 +835,7 @@ void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_init_cell_interaction() {
+void dd_p4est_init_cell_interactions() {
 #ifndef P4EST_NOCHANGE
   dd.cell_inter = (IA_Neighbor_List*)Utils::realloc(dd.cell_inter,local_cells.n*sizeof(IA_Neighbor_List));
   for (int i=0;i<local_cells.n; i++) {
@@ -1089,7 +1106,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
   }
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_exchange_and_sort_particles() {
+void dd_p4est_local_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
   std::vector<ParticleList> sendbuf(num_comm_proc), recvbuf(num_comm_proc);
   std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc),
@@ -1296,6 +1313,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
       break;
     }
   }
+
   MPI_Waitall(3 * n_nodes, sreq.data(), MPI_STATUS_IGNORE);
 
   for (int i = 0; i < n_nodes; ++i) {
@@ -1307,20 +1325,46 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
     realloc_particlelist(&sendbuf[i], 0);
     realloc_particlelist(&recvbuf[i], 0);
   }
-
-#if 0
-  // check if received particles acually belong here
-  for (int i=0;i<num_local_cells;++i) {
-    for (int p = 0; p < cells[i].n; p++) {
-      Particle *part = &cells[i].part[p];
-      if (dd_p4est_pos_to_proc(part->r.p) != this_node) {
-        fprintf(stderr,"W %i:%i : %lfx%lfx%lf %i %s\n", this_node, i,
-          part->r.p[0], part->r.p[1], part->r.p[2],
-          dd_p4est_pos_to_proc(part->r.p), (dd_p4est_save_position_to_cell(part->r.p)?"l":"r"));
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_exchange_and_sort_particles (int global_flag) {
+  if (global_flag == CELL_GLOBAL_EXCHANGE) { // perform a global resorting
+    ParticleList sendbuf;
+    init_particlelist(&sendbuf);
+    // Go through all local particles and move those not on node to the sendbuf
+    for (int c = 0; c < local_cells.n; c++) {
+      Cell *pl = local_cells.cell[c];
+      for (int p = 0; p < pl->n; p++) {
+        fold_position(pl->part[p].r.p, pl->part[p].l.i);
+        Cell *nc = dd_save_position_to_cell(pl->part[p].r.p);
+        if (nc == NULL) { // Belongs to other node
+          int pid = pl->part[p].p.identity;
+          move_indexed_particle(&sendbuf, pl, p);
+          local_particles[pid] = NULL;
+          if(p < pl->n) p -= 1;
+        } else if(nc != pl) { // Still on node but particle belongs to other cell
+          move_indexed_particle(nc, pl, p);
+          if(p < pl->n) p -= 1;
+        }
+        // Else not required since particle in cell it belongs to
       }
     }
+    // Invoke communication, the particle index is cleared there
+    if (local_cells.n > 0)
+      dd_p4est_global_exchange_part(&sendbuf);
+    else // Still call it if there are no cells on this node
+      dd_p4est_global_exchange_part(NULL);
+    // Free remaining particles in sendbuf, but it should be empty already
+    for (int p = 0; p < sendbuf.n; p++) {
+      local_particles[sendbuf.part[p].p.identity] = NULL;
+      free_particle(&sendbuf.part[p]);
+    }
+    realloc_particlelist(&sendbuf, 0);
+  } else { // do the local resorting (particles move at most on cell)
+    dd_p4est_local_exchange_and_sort_particles();
   }
-#endif
+
+  CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_repart_exchange_part (CellPList *old) {
@@ -1574,6 +1618,111 @@ int dd_p4est_pos_to_proc(double pos[3]) {
       dd_p4est_pos_morton_idx(pos), [](int i, int64_t idx) { return i < idx; });
 
   return std::distance(std::begin(p4est_space_idx), it) - 1;
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_assign_prefetches (GhostCommunicator *comm) {
+  CALL_TRACE();
+  int cnt;
+
+  for(cnt=0; cnt<comm->num; cnt += 2) {
+    if (comm->comm[cnt].type == GHOST_RECV && comm->comm[cnt + 1].type == GHOST_SEND) {
+      comm->comm[cnt].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
+      comm->comm[cnt + 1].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
+    }
+  }
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_topology_init(CellPList *old, bool isRepart) {
+
+  int c,p,np;
+  int exchange_data, update_data;
+  Particle *part;
+
+  CELL_TRACE(fprintf(stderr, "%d: dd_p4est_topology_init: Number of recieved cells=%d\n", this_node, old->n));
+
+  /** broadcast the flag for using verlet list */
+  MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
+
+  // use p4est_dd callbacks, but Espresso sees a DOMDEC
+  cell_structure.type             = CELL_STRUCTURE_P4EST;
+  cell_structure.position_to_node = dd_p4est_pos_to_proc;
+  cell_structure.position_to_cell = dd_p4est_position_to_cell;
+  //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
+
+  /* set up new domain decomposition cell structure */
+  dd_p4est_create_grid();
+  /* mark cells */
+  dd_p4est_mark_cells();
+
+  /* create communicators */
+  dd_p4est_prepare_comm(&cell_structure.ghost_cells_comm, GHOSTTRANS_PARTNUM);
+
+  exchange_data = (GHOSTTRANS_PROPRTS | GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+  update_data   = (GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+
+  dd_p4est_prepare_comm(&cell_structure.exchange_ghosts_comm,  exchange_data);
+  dd_p4est_prepare_comm(&cell_structure.update_ghost_pos_comm, update_data);
+  dd_p4est_prepare_comm(&cell_structure.collect_ghost_force_comm, GHOSTTRANS_FORCE);
+
+  /* collect forces has to be done in reverted order! */
+  dd_p4est_revert_comm_order(&cell_structure.collect_ghost_force_comm);
+  dd_p4est_assign_prefetches(&cell_structure.ghost_cells_comm);
+  dd_p4est_assign_prefetches(&cell_structure.exchange_ghosts_comm);
+  dd_p4est_assign_prefetches(&cell_structure.update_ghost_pos_comm);
+  dd_p4est_assign_prefetches(&cell_structure.collect_ghost_force_comm);
+
+#ifdef LB
+  dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING) ;
+  dd_p4est_assign_prefetches(&cell_structure.ghost_lbcoupling_comm) ;
+#endif
+  
+#ifdef IMMERSED_BOUNDARY
+  // Immersed boundary needs to communicate the forces from but also to the ghosts
+  // This is different than usual collect_ghost_force_comm (not in reverse order)
+  // Therefore we need our own communicator
+  dd_p4est_prepare_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
+  dd_p4est_assign_prefetches(&cell_structure.ibm_ghost_force_comm);
+#endif
+
+#ifdef ENGINE
+  dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING) ;
+  dd_p4est_assign_prefetches(&cell_structure.ghost_swimming_comm) ;
+#endif
+
+  /* initialize cell neighbor structures */
+  dd_p4est_init_cell_interactions();
+
+
+  if (isRepart) {
+    dd_p4est_repart_exchange_part(old);
+    for(c=0; c<local_cells.n; c++)
+      update_local_particles(local_cells.cell[c]);
+  } else {
+    // Go through all old particles and find owner & cell
+    for (c = 0; c < old->n; c++) {
+      part = old->cell[c]->part;
+      np   = old->cell[c]->n;
+      for (p = 0; p < np; p++) {
+	fold_position(part[p].r.p, part[p].l.i);
+
+	Cell *nc = dd_save_position_to_cell(part[p].r.p);
+	if (nc == NULL) { // Particle is on other process, move it to cell[0]
+	  append_unindexed_particle(local_cells.cell[0], &part[p]);
+	} else { // It is on this node, move it to right local_cell
+	  append_unindexed_particle(nc, &part[p]);
+	}
+      }
+    }
+    // Create particle index
+    for(c=0; c<local_cells.n; c++) {
+      update_local_particles(local_cells.cell[c]);
+    }
+    // Invoke global communication for cell[0] containing particles of other processes
+    if (local_cells.n > 0)
+      dd_p4est_global_exchange_part(local_cells.cell[0]);
+    else // Call it anyway in case there are no cells on this node (happens during startup)
+      dd_p4est_global_exchange_part(NULL);
+  }
 }
 //--------------------------------------------------------------------------------------------------
 // Repartitions the given p4est, such that process boundaries do not intersect the partition of the

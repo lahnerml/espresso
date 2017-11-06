@@ -971,8 +971,8 @@ static int tclcommand_analyze_parse_aggregation(Tcl_Interp *interp, int argc, ch
         return TCL_ERROR;
     }
 
-    if (cell_structure.type != CELL_STRUCTURE_DOMDEC) {
-        Tcl_AppendResult(interp, "aggregation can only be calculated with the domain decomposition cell system", (char *) NULL);
+    if (cell_structure.type != CELL_STRUCTURE_DOMDEC && cell_structure.type != CELL_STRUCTURE_P4EST) {
+        Tcl_AppendResult(interp, "aggregation can only be calculated with the (p4est) domain decomposition cell system", (char *) NULL);
         return TCL_ERROR;
     }
 

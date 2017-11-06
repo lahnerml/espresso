@@ -137,7 +137,7 @@ void force_calc()
   // When using virtual sites relative and LB at the same time, it is necessary
   // to reassemble the cell lists after all position updates, also of virtual
   // particles.
-  if ((lattice_switch & LATTICE_LB) && cell_structure.type == CELL_STRUCTURE_DOMDEC && (!dd.use_vList) )
+  if ((lattice_switch & LATTICE_LB) && (cell_structure.type == CELL_STRUCTURE_DOMDEC || cell_structure.type == CELL_STRUCTURE_P4EST) && (!dd.use_vList) )
     cells_update_ghosts();
 #endif
 
@@ -178,6 +178,7 @@ espressoSystemInterface.update();
   case CELL_STRUCTURE_LAYERED:
     layered_calculate_ia();
     break;
+  case CELL_STRUCTURE_P4EST:
   case CELL_STRUCTURE_DOMDEC:
     if(dd.use_vList) {
       if (rebuild_verletlist)
@@ -190,7 +191,7 @@ espressoSystemInterface.update();
     break;
   case CELL_STRUCTURE_NSQUARE:
     nsq_calculate_ia();
-
+    break;
   }
 
 #ifdef OIF_GLOBAL_FORCES

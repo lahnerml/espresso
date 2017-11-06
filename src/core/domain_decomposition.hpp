@@ -251,7 +251,7 @@ void dd_on_geometry_change(int flags);
     @param cl List of cell pointers with particles to be stored in the
     new cell system.
 */
-void dd_topology_init(CellPList *cl, bool isRepart = false);
+void dd_topology_init(CellPList *cl);
 
 /** Called when the current cell structure is invalidated because for
     example the box length has changed. This procedure may NOT destroy

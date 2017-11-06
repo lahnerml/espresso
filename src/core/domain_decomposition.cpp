@@ -1022,12 +1022,8 @@ void dd_topology_init(CellPList *old, bool isRepart) {
 #ifndef P4EST_NOCHANGE
   if (isRepart) {
     dd_p4est_repart_exchange_part(old);
-    //printf ("[%i] ", this_node);
-    for(c=0; c<local_cells.n; c++) {
-      //printf("%i ", local_cells.cell[c]->n);
+    for(c=0; c<local_cells.n; c++)
       update_local_particles(local_cells.cell[c]);
-    }
-    //printf("\n");
   } else {
     // Go through all old particles and find owner & cell
     for (c = 0; c < old->n; c++) {
@@ -1417,7 +1413,7 @@ void calc_link_cell() {
   rebuild_verletlist = 0;
 }
 
-static void __calc_link_cell_runtime(std::vector<double> ts) {
+static void __calc_link_cell_runtime(std::vector<double>& ts) {
   int c, np1, n, np2, i ,j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;

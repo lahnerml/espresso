@@ -399,6 +399,7 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 // CAUTION: Currently LB only
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
+#ifdef LB_ADAPTIVE
   int coarsen = 1;
   std::array<double, 3> ref_min = {0.75, 0., 0.25};
   std::array<double, 3> ref_max = {1.0, 0.25, 0.5};
@@ -409,6 +410,9 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
     // coarsen &= mirror_refinement_pattern(p8est, which_tree, quads[i]);
   }
   return coarsen;
+#else // LB_ADAPTIVE
+  return 0;
+#endif // LB_ADAPTIVE
 }
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
@@ -421,6 +425,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 int p4est_utils_adapt_grid() {
+#ifdef LB_ADAPTIVE
   // 1st step: alter copied grid and map data between grids.
   const p4est_utils_forest_info_t &current_forest =
       p4est_utils_get_forest_info(forest_order::adaptive_LB);
@@ -517,7 +522,7 @@ int p4est_utils_adapt_grid() {
   std::string filename_post =
       "post_gridchange_" + std::to_string((int)(sim_time / time_step));
   lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_post);
-
+#endif // LB_ADAPTIVE
   return 0;
 }
 
@@ -586,17 +591,21 @@ int p4est_utils_post_gridadapt_map_data(
         data_restriction(p4est_old, p4est_new, curr_quad_old, curr_quad_new,
                          tid_old, &local_data_levelwise[level_old][sid_old],
                          &mapped_data_flat[qid_new]);
+#ifdef LB_ADAPTIVE
         for (int i = 0; i < lbmodel.n_veloc; ++i) {
           impulse_old +=
               0.125 * local_data_levelwise[level_old][sid_old].lbfluid[0][i];
         }
+#endif // LB_ADAPTIVE
         ++sid_old;
         ++tqid_old;
         ++qid_old;
       }
+#ifdef LB_ADAPTIVE
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
         impulse_new += mapped_data_flat[qid_new].lbfluid[0][i];
       }
+#endif // LB_ADAPTIVE
       ++tqid_new;
       ++qid_new;
     } else if (level_old + 1 == level_new) {
@@ -609,6 +618,7 @@ int p4est_utils_post_gridadapt_map_data(
         ++qid_new;
       }
       // DEBUG
+#ifdef LB_ADAPTIVE
       int backup_qid_new = qid_new;
       qid_new -= P8EST_CHILDREN;
       for (int j = 0; j < P8EST_CHILDREN; ++j) {
@@ -621,6 +631,7 @@ int p4est_utils_post_gridadapt_map_data(
         impulse_old += local_data_levelwise[level_old][sid_old].lbfluid[0][i];
       }
       P4EST_ASSERT(backup_qid_new == qid_new);
+#endif // LB_ADAPTIVE
       ++tqid_old;
       ++qid_old;
     } else {
@@ -849,43 +860,45 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   return fct;
 }
 
-void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, double a1
-                                    p4est_t *t2, const std::vector<double> &w2, double a2) {
+void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
+                                    double a1, p4est_t *t2,
+                                    const std::vector<double> &w2, double a2) {
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
   std::vector<size_t> t2_quads_per_fct_quad(fct->local_num_quadrants, 0);
-  std::vector<size_t> t1_quads_per_proc(w_fct->mpisize, 0);
-  std::vector<size_t> t2_quads_per_proc(w_fct->mpisize, 0);
-  
+  std::vector<p4est_locidx_t> t1_quads_per_proc(fct->mpisize, 0);
+  std::vector<p4est_locidx_t> t2_quads_per_proc(fct->mpisize, 0);
+
   size_t w_id1, w_id2, w_idx;
   w_id1 = w_id2 = w_idx = 0;
-  for (p4est_topidx t_idx = fct->first_local_tree; t_idx <= fct->last_local_tree; ++t_idx) {
+  for (p4est_topidx_t t_idx = fct->first_local_tree;
+       t_idx <= fct->last_local_tree; ++t_idx) {
     p4est_tree_t *t_fct = p4est_tree_array_index(fct->trees, t_idx);
     p4est_tree_t *t_t1  = p4est_tree_array_index(t1->trees, t_idx);
     p4est_tree_t *t_t2  = p4est_tree_array_index(t2->trees, t_idx);
     size_t q_id1, q_id2;
     q_id1 = q_id2 = 0;
-    p4est_quadrant_t *q1 = p4est_quadrant_array_index(t_t1, q_id1);
-    p4est_quadrant_t *q2 = p4est_quadrant_array_index(t_t1, q_id2);
+    p4est_quadrant_t *q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
+    p4est_quadrant_t *q2 = p4est_quadrant_array_index(&t_t1->quadrants, q_id2);
     for (size_t q_idx = 0; q_idx < t_fct->quadrants.elem_count; ++q_idx) {
       p4est_quadrant_t *q_fct = p4est_quadrant_array_index(&t_fct->quadrants, q_idx);
       while (p4est_quadrant_overlaps(q_fct, q1)) {
         w_fct[w_idx] += a1*w1[w_id1++];
         ++t1_quads_per_fct_quad[w_idx];
         if (++q_id1 >= t_t1->quadrants.elem_count) break;
-        q1 = p4est_quadrant_array_index(t_t1, q_id1);
+        q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
       }
       while (p4est_quadrant_overlaps(q_fct, q2)) {
         w_fct[w_idx] += a2*w2[w_id2++];
         ++t2_quads_per_fct_quad[w_idx];
         if (++q_id2 >= t_t2->quadrants.elem_count) break;
-        q2 = p4est_quadrant_array_index(t_t2, q_id2);
+        q2 = p4est_quadrant_array_index(&t_t2->quadrants, q_id2);
       }
       ++w_idx;
     }
   }
-  
+
   double localsum = std::accumulate(w_fct.begin(), w_fct.end(), 0.0);
   double sum, prefix = 0; // Initialization is necessary on rank 0!
   MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
@@ -897,12 +910,12 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1, 
     t1_quads_per_proc[proc] += t1_quads_per_fct_quad[idx];
     t2_quads_per_proc[proc] += t2_quads_per_fct_quad[idx];
   }
-  
+
   MPI_Allreduce(MPI_IN_PLACE, t1_quads_per_proc.data(), fct->mpisize,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
   MPI_Allreduce(MPI_IN_PLACE, t2_quads_per_proc.data(), fct->mpisize,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
-                
+
   p4est_partition_given(t1, t1_quads_per_proc.data());
   p4est_partition_given(t2, t2_quads_per_proc.data());
 }

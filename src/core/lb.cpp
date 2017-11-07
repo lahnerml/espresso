@@ -3324,9 +3324,14 @@ inline void lb_collide_stream() {
     lbadapt_gpu_retrieve_data(level);
 
     // ghost exchange
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+
     p8est_ghostvirt_exchange_data(
         lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-        (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
 #else  // LB_ADAPTIVE_GPU
   int lvl_diff;
@@ -4103,9 +4108,15 @@ void calc_particle_lattice_ia() {
     // update ghost layer on all levels
     for (int level = lbpar.base_level; level <= lbpar.max_refinement_level;
          ++level) {
+      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+      prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                             lbadapt_ghost_data, ghost_pointer);
+
+      // if comm_hiding (exchange_data_begin)
       p8est_ghostvirt_exchange_data(
           lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
     }
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE

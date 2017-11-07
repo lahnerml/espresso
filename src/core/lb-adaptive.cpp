@@ -1256,17 +1256,12 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
   j[1] = mode[2];
   j[2] = mode[3];
 
-/* if forces are present, the momentum density is redefined to
- * include one half-step of the force action.  See the
- * Chapman-Enskog expansion in [Ladd & Verberg]. */
-#ifndef EXTERNAL_FORCES
-  if (lbfields[index].has_force)
-#endif // !EXTERNAL_FORCES
-  {
-    j[0] += 0.5 * force[0];
-    j[1] += 0.5 * force[1];
-    j[2] += 0.5 * force[2];
-  }
+  /* if forces are present, the momentum density is redefined to
+   * include one half-step of the force action.  See the
+   * Chapman-Enskog expansion in [Ladd & Verberg]. */
+  j[0] += 0.5 * force[0];
+  j[1] += 0.5 * force[1];
+  j[2] += 0.5 * force[2];
 
   /* equilibrium part of the stress modes */
   pi_eq[0] = scalar(j, j) / rho;
@@ -1642,7 +1637,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
         if (data->lbfields.has_force) {
-          lbadapt_apply_forces(modes, &data->lbfields.force, h);
+          lbadapt_apply_forces(modes, data->lbfields.force, h);
         }
 #endif // EXTERNAL_FORCES
 

@@ -434,6 +434,13 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
+/** Returns true if the process boundaries of two p4ests are aligned.
+ *  
+ * @param[in] t1    First tree
+ * @param[in] t2    Second tree
+ */
+bool p4est_utils_check_alignment(const p4est *t1, const p4est *t2);
+
 /** Computes the finest common tree out of two given p4est trees on the same
  * connectivity.
  * Requires all finer cells in t2 to match the process of t1. (see

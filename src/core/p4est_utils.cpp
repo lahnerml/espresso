@@ -860,9 +860,24 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   return fct;
 }
 
+bool p4est_utils_check_alignment(const p4est *t1, const p4est *t2) {
+  if (!p4est_connectivity_is_equivalent(t1->connectivity, t2->connectivity)) return false;
+  if (t1->first_local_tree != t2->first_local_tree) return false;
+  if (t1->last_local_tree != t2->last_local_tree) return false;
+  p4est_quadrant_t *q1 = t1->global_first_position[t1->mpirank];
+  p4est_quadrant_t *q2 = t2->global_first_position[t2->mpirank];
+  if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
+  q1 = t1->global_first_position[t1->mpirank+1];
+  q2 = t2->global_first_position[t2->mpirank+1];
+  if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
+  return true;
+}
+
 void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
                                     double a1, p4est_t *t2,
                                     const std::vector<double> &w2, double a2) {
+  P4EST_ASSERT(p4est_utils_check_alignment(t1, t2));
+                                      
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
@@ -886,18 +901,31 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
       while (p4est_quadrant_overlaps(q_fct, q1)) {
         w_fct[w_idx] += a1*w1[w_id1++];
         ++t1_quads_per_fct_quad[w_idx];
-        if (++q_id1 >= t_t1->quadrants.elem_count) break;
+        if (++q_id1 >= t_t1->quadrants.elem_count) {
+          // complain if last quad in t1 does not overlap with last quad of FCT
+          P4EST_ASSERT(q_idx == t_fct->quadrants.elem_count - 1);
+          break;
+        }
         q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
       }
       while (p4est_quadrant_overlaps(q_fct, q2)) {
         w_fct[w_idx] += a2*w2[w_id2++];
         ++t2_quads_per_fct_quad[w_idx];
-        if (++q_id2 >= t_t2->quadrants.elem_count) break;
+        if (++q_id2 >= t_t2->quadrants.elem_count) {
+          // complain if last quad in t2 does not overlap with last quad of FCT
+          P4EST_ASSERT(q_idx == t_fct->quadrants.elem_count - 1);
+          break;
+        }
         q2 = p4est_quadrant_array_index(&t_t2->quadrants, q_id2);
       }
       ++w_idx;
     }
   }
+  
+  // complain if counters haven't reached the end
+  P4EST_ASSERT(w_idx == fct->local_num_quadrants);
+  P4EST_ASSERT(w_id1 == t1->local_num_quadrants);
+  P4EST_ASSERT(w_id2 == t2->local_num_quadrants);
 
   double localsum = std::accumulate(w_fct.begin(), w_fct.end(), 0.0);
   double sum, prefix = 0; // Initialization is necessary on rank 0!

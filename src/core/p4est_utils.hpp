@@ -439,7 +439,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
  * @param[in] t1    First tree
  * @param[in] t2    Second tree
  */
-bool p4est_utils_check_alignment(const p4est *t1, const p4est *t2);
+bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2);
 
 /** Computes the finest common tree out of two given p4est trees on the same
  * connectivity.

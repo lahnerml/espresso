@@ -860,15 +860,15 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   return fct;
 }
 
-bool p4est_utils_check_alignment(const p4est *t1, const p4est *t2) {
+bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2) {
   if (!p4est_connectivity_is_equivalent(t1->connectivity, t2->connectivity)) return false;
   if (t1->first_local_tree != t2->first_local_tree) return false;
   if (t1->last_local_tree != t2->last_local_tree) return false;
-  p4est_quadrant_t *q1 = t1->global_first_position[t1->mpirank];
-  p4est_quadrant_t *q2 = t2->global_first_position[t2->mpirank];
+  p4est_quadrant_t *q1 = &t1->global_first_position[t1->mpirank];
+  p4est_quadrant_t *q2 = &t2->global_first_position[t2->mpirank];
   if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
-  q1 = t1->global_first_position[t1->mpirank+1];
-  q2 = t2->global_first_position[t2->mpirank+1];
+  q1 = &t1->global_first_position[t1->mpirank+1];
+  q2 = &t2->global_first_position[t2->mpirank+1];
   if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
   return true;
 }

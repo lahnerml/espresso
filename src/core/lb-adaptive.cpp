@@ -750,7 +750,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
       (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -767,7 +767,7 @@ int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float midpoint[3];
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    p4est_utils_get_midpoint(p8est, which_tree, quads[i], midpoint);
+    p4est_utils_get_midpoint(p8est, which_tree, quads[i], (double*) midpoint);
     if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
         (midpoint[0] <= coords_for_regional_refinement[1]) &&
         (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -790,7 +790,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float half_length = 0.6 * sqrt(3) * ((lb_float)base / (lb_float)root);
 
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+	  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -874,7 +874,7 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   double half_length = 0.6 * sqrt(3) * ((double)base / (double)root);
 
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -2190,6 +2190,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
  */
 void check_vel(int qid, double h, lbadapt_payload_t *data,
                std::vector<std::array<double, 3>> &vel) {
+#ifndef LB_ADAPTIVE_GPU
   double rho;
   if (vel[qid] == std::array<double, 3>{std::numeric_limits<double>::min(),
                                         std::numeric_limits<double>::min(),
@@ -2204,11 +2205,14 @@ void check_vel(int qid, double h, lbadapt_payload_t *data,
     vel[qid][1] = vel[qid][1] / rho * h_max / lbpar.tau;
     vel[qid][2] = vel[qid][2] / rho * h_max / lbpar.tau;
   }
+#endif //!LB_ADAPTIVE_GPU
 }
 
 void lbadapt_calc_vorticity(p8est_t *p4est,
                             std::vector<std::array<double, 3>> &vort,
                             std::string filename) {
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME port to GPU
   P4EST_ASSERT(vort.size() == p4est->local_num_quadrants);
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
@@ -2359,6 +2363,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
 
   sc_array_destroy(neighbor_qids);
   sc_array_destroy(neighbor_encs);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_boundary_status() {
@@ -2405,7 +2410,7 @@ void lbadapt_get_boundary_status() {
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
-        get_front_lower_left(mesh_iter, xyz_quad);
+        p4est_utils_get_front_lower_left(mesh_iter, (double*) xyz_quad);
         bool all_boundary = true;
 
         for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {

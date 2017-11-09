@@ -592,19 +592,25 @@ int p4est_utils_post_gridadapt_map_data(
                          tid_old, &local_data_levelwise[level_old][sid_old],
                          &mapped_data_flat[qid_new]);
 #ifdef LB_ADAPTIVE
+#ifndef LB_ADAPTIVE_GPU
+        // TODO remove debug or port to gpu
         for (int i = 0; i < lbmodel.n_veloc; ++i) {
           impulse_old +=
               0.125 * local_data_levelwise[level_old][sid_old].lbfluid[0][i];
         }
+#endif // !LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
         ++sid_old;
         ++tqid_old;
         ++qid_old;
       }
 #ifdef LB_ADAPTIVE
+#ifndef LB_ADAPTIVE_GPU
+      // TODO remove debug or port to gpu
       for (int i = 0; i < lbmodel.n_veloc; ++i) {
         impulse_new += mapped_data_flat[qid_new].lbfluid[0][i];
       }
+#endif // !LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
       ++tqid_new;
       ++qid_new;
@@ -619,6 +625,8 @@ int p4est_utils_post_gridadapt_map_data(
       }
       // DEBUG
 #ifdef LB_ADAPTIVE
+#ifndef LB_ADAPTIVE_GPU
+      // TODO remove debug or port to gpu
       int backup_qid_new = qid_new;
       qid_new -= P8EST_CHILDREN;
       for (int j = 0; j < P8EST_CHILDREN; ++j) {
@@ -631,6 +639,7 @@ int p4est_utils_post_gridadapt_map_data(
         impulse_old += local_data_levelwise[level_old][sid_old].lbfluid[0][i];
       }
       P4EST_ASSERT(backup_qid_new == qid_new);
+#endif // !LB_ADAPTIVE_GPU
 #endif // LB_ADAPTIVE
       ++tqid_old;
       ++qid_old;

@@ -5,16 +5,67 @@
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
+#include <memory>
 #include <p4est_to_p8est.h>
 #include <p8est.h>
+#include <p8est_connectivity.h>
+#include <p8est_ghost.h>
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
+#include <p8est_virtual.h>
 #include <stdint.h>
 #include <vector>
 
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
+
+namespace std
+{
+  template<>
+  struct default_delete<p4est_t>
+  {
+    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_ghost_t>
+  {
+    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_mesh_t>
+  {
+    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_virtual_t>
+  {
+    void operator()(p4est_virtual_t *p) const { if (p != nullptr) p4est_virtual_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_virtual_ghost_t>
+  {
+    void operator()(p4est_virtual_ghost_t *p) const { if (p != nullptr) p4est_virtual_ghost_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_connectivity_t>
+  {
+    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
+  };
+}
+
+// Don't use it. Can lead to nasty bugs.
+template <typename T>
+struct castable_unique_ptr: public std::unique_ptr<T> {
+  using Base = std::unique_ptr<T>;
+  constexpr castable_unique_ptr(): Base() {}
+  constexpr castable_unique_ptr(std::nullptr_t n): Base(n) {}
+  castable_unique_ptr(T* p): Base(p) {}
+  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
+  operator T*() const { return this->get(); }
+  operator void *() const { return this->get(); }
+};
+
 enum class forest_order {
 #ifdef DD_P4EST
   short_range = 0,

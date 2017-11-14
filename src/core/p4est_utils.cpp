@@ -219,7 +219,7 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
       maybe_tree_to_boxlcoords(c[ci].data());
     }
 
-    // find lower left and upper right corner of forest
+    // find lower left and upper right corner of tree
     std::array<double, 3> pos_min{{0., 0., 0.}};
     std::array<double, 3> pos_max{{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
@@ -391,7 +391,7 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
   P4EST_ASSERT(p8est_quadrant_overlaps(&q, quad));
 #endif // P4EST_ENABLE_DEBUG
 
-  P4EST_ASSERT(0 <= index && index < ghost->ghosts.elem_count);
+  P4EST_ASSERT(0 <= index && (size_t) index < ghost->ghosts.elem_count);
 
   return index;
 }
@@ -426,6 +426,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int p4est_utils_adapt_grid() {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   // 1st step: alter copied grid and map data between grids.
   const p4est_utils_forest_info_t &current_forest =
       p4est_utils_get_forest_info(forest_order::adaptive_LB);
@@ -445,21 +446,22 @@ int p4est_utils_adapt_grid() {
 
   // only perform data mapping, communication, etc. if the forests have actually
   // changed
-  if (!p8est_is_equal(lb_p8est, p4est_adapted, 0)) {
+  if (!p8est_is_equal(adapt_p4est, p4est_adapted, 0)) {
     // 0th step: de-allocate invalid storage and data-structures
     p4est_utils_deallocate_levelwise_storage(lbadapt_ghost_data);
-    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-    p8est_ghost_destroy(lbadapt_ghost);
+    adapt_ghost.reset();
 
     // 1st step: locally map data between forests.
     lbadapt_payload_t *mapped_data_flat =
         P4EST_ALLOC_ZERO(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
-    p4est_utils_post_gridadapt_map_data(lb_p8est, lbadapt_mesh, p4est_adapted,
-                                        lbadapt_local_data, mapped_data_flat);
+    p4est_utils_post_gridadapt_map_data(adapt_p4est, adapt_mesh, adapt_virtual,
+                                        p4est_adapted, lbadapt_local_data,
+                                        mapped_data_flat);
     // cleanup
     p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
-    p8est_mesh_destroy(lbadapt_mesh);
-    p8est_destroy(lb_p8est);
+    adapt_virtual.reset();
+    adapt_mesh.reset();
+    adapt_p4est.reset();
 
     // 2nd step: partition grid and transfer data to respective processors
     // FIXME: Interface to Steffen's partitioning logic
@@ -475,24 +477,27 @@ int p4est_utils_adapt_grid() {
 
     // 3rd step: Insert data into new levelwise data-structure and prepare next
     //           integration step
-    lbadapt_ghost = p8est_ghost_new(p4est_partitioned, P8EST_CONNECT_FULL);
-    lbadapt_mesh = p8est_mesh_new_ext(p4est_partitioned, lbadapt_ghost, 1, 1, 1,
-                                      P8EST_CONNECT_FULL);
-    lbadapt_ghost_virt =
-        p8est_ghostvirt_new(p4est_partitioned, lbadapt_ghost, lbadapt_mesh);
-    p4est_utils_allocate_levelwise_storage(lbadapt_local_data, lbadapt_mesh,
-                                           true);
-    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, lbadapt_mesh,
-                                           false);
+    adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+    adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                        btype));
+    adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                              adapt_mesh, btype, 1));
+    adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                      adapt_mesh, adapt_virtual,
+                                                      btype));
+    p4est_utils_allocate_levelwise_storage(lbadapt_local_data, adapt_mesh,
+                                           adapt_virtual, true);
+    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
+                                           adapt_virtual, false);
     p4est_utils_post_gridadapt_insert_data(
-        p4est_partitioned, lbadapt_mesh, data_partitioned, lbadapt_local_data);
-    lb_p8est = p4est_partitioned;
+        p4est_partitioned, adapt_mesh, adapt_virtual, data_partitioned, lbadapt_local_data);
+    adapt_p4est.reset(p4est_partitioned);
 
     std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
     forests.push_back(dd.p4est);
 #endif // DD_P4EST
-    forests.push_back(lb_p8est);
+    forests.push_back(adapt_p4est);
     p4est_utils_prepare(forests);
 #ifdef DD_P4EST
     p4est_utils_partition_multiple_forests(forest_order::short_range,
@@ -508,9 +513,12 @@ int p4est_utils_adapt_grid() {
 
     for (int level = new_forest.coarsest_level_global;
          level <= new_forest.finest_level_global; ++level) {
-      p8est_ghostvirt_exchange_data(
-          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)local_pointer.data(), (void **)ghost_pointer.data());
+      p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                               adapt_mesh, adapt_virtual,
+                                               adapt_virtual_ghost, level,
+                                               sizeof(lbadapt_payload_t),
+                                               (void**)local_pointer.data(),
+                                               (void**)ghost_pointer.data());
     }
   } else {
     p8est_destroy(p4est_adapted);
@@ -528,8 +536,9 @@ int p4est_utils_adapt_grid() {
 
 template <typename T>
 int p4est_utils_post_gridadapt_map_data(
-    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p8est_new,
-    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat) {
+    p4est_t *p4est_old, p4est_mesh_t *mesh_old, p4est_virtual_t *virtual_quads,
+    p4est_t *p8est_new, std::vector<std::vector<T>> &local_data_levelwise,
+    T *mapped_data_flat) {
   // counters
   int tid_old = p4est_old->first_local_tree;
   int tid_new = p4est_new->first_local_tree;
@@ -569,7 +578,7 @@ int p4est_utils_post_gridadapt_map_data(
     curr_quad_old =
         p8est_quadrant_array_index(&curr_tree_old->quadrants, tqid_old);
     level_old = curr_quad_old->level;
-    sid_old = mesh_old->quad_qreal_offset[qid_old];
+    sid_old = virtual_quads->quad_qreal_offset[qid_old];
 
     curr_quad_new =
         p8est_quadrant_array_index(&curr_tree_new->quadrants, tqid_new);
@@ -742,7 +751,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
 template <typename T>
 int p4est_utils_post_gridadapt_insert_data(
-    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    p8est_t *p4est_new, p8est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
     std::vector<std::vector<T>> &data_partitioned,
     std::vector<std::vector<T>> &data_levelwise) {
   int size = p4est_new->mpisize;
@@ -769,7 +778,7 @@ int p4est_utils_post_gridadapt_insert_data(
       }
       curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
       level = curr_quad->level;
-      sid = mesh_new->quad_qreal_offset[qid];
+      sid = virtual_quads->quad_qreal_offset[qid];
       std::memcpy(&data_levelwise[level][sid], &data_partitioned[p][q],
                   sizeof(T));
       ++tqid;

@@ -288,7 +288,8 @@ template <typename T>
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
 int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
-                                           p8est_mesh_t *mesh,
+                                           p4est_mesh_t *mesh,
+                                           p4est_virtual_t *virtual_quads,
                                            bool local_data) {
   P4EST_ASSERT(data.empty());
 
@@ -302,9 +303,9 @@ int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
     quads_on_level =
         local_data
             ? (mesh->quad_level + level)->elem_count +
-                  P8EST_CHILDREN * (mesh->virtual_qlevels + level)->elem_count
+                  P8EST_CHILDREN * (virtual_quads->virtual_qlevels + level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
-                  P8EST_CHILDREN * (mesh->virtual_glevels + level)->elem_count;
+                  P8EST_CHILDREN * (virtual_quads->virtual_glevels + level)->elem_count;
     data[level] = std::vector<T>(quads_on_level);
     P4EST_ASSERT(data[level].size() == quads_on_level);
   }
@@ -429,7 +430,8 @@ template <typename T>
  *                                   payload is supposed to be filled with 0.
  */
 int p4est_utils_post_gridadapt_map_data(
-    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p4est_new,
+    p4est_t *p4est_old, p4est_mesh_t *mesh_old,
+    p4est_virtual_t *virtual_quads, p4est_t *p4est_new,
     std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
 
 template <typename T>
@@ -464,7 +466,7 @@ template <typename T>
  * @return int
  */
 int p4est_utils_post_gridadapt_insert_data(
-    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    p4est_t *p4est_new, p4est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
     std::vector<std::vector<T>> &data_partitioned,
     std::vector<std::vector<T>> &data_levelwise);
 /*@}*/

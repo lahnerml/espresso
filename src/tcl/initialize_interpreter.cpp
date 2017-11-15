@@ -211,6 +211,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   /* in lb-adaptive.cpp */
 #ifdef LB_ADAPTIVE
   REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);
+  REGISTER_COMMAND("lbadapt_set_min_level", tclcommand_set_min_level);
   REGISTER_COMMAND("lbadapt_set_max_level", tclcommand_set_max_level);
   REGISTER_COMMAND("lbadapt-set-steps-before-grid-change",
                    tclcommand_set_steps_until_grid_change);

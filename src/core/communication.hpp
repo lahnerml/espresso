@@ -569,6 +569,13 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len);
 void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len);
 #endif // LB_ADAPTIVE_GPU
 
+/** Set minimum refinement level
+ *
+ * @param [in] node   The node on which this function is called (all)
+ * @param [in] l_max  New minimum refinement level
+ */
+void mpi_lbadapt_set_min_level (int node, int l_max);
+
 /** Set maximum refinement level
  *
  * @param [in] node   The node on which this function is called (all)

@@ -189,6 +189,7 @@ static int terminated = 0;
   CB(mpi_scafacos_set_parameters_slave)                                        \
   CB(mpi_mpiio_slave)                                                          \
   CB(mpi_lbadapt_grid_init)                                                    \
+  CB(mpi_lbadapt_set_min_level)                                                \
   CB(mpi_lbadapt_set_max_level)                                                \
   CB(mpi_lbadapt_set_steps_before_grid_change)                                 \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
@@ -2816,9 +2817,19 @@ void mpi_lbadapt_grid_init(int node, int level) {
 #endif // LB_ADAPTIVE
 }
 
+void mpi_lbadapt_set_min_level(int node, int l_min) {
+#ifdef LB_ADAPTIVE
+  lbpar.base_level = l_min;
+  assert (lbpar.base_level <= lbpar.max_refinement_level);
+
+  lbadapt_reinit_parameters();
+#endif // LB_ADAPTIVE
+}
+
 void mpi_lbadapt_set_max_level(int node, int l_max) {
 #ifdef LB_ADAPTIVE
   lbpar.max_refinement_level = l_max;
+  assert (lbpar.base_level <= lbpar.max_refinement_level);
 
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE

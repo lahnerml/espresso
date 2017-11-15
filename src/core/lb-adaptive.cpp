@@ -200,9 +200,20 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  if (lbadapt_local_data.empty()) {
-    lbadapt_allocate_data();
+  if (lbpar.base_level == -1) {
+    lbpar.base_level =
+        Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
   }
+
+  // reset p4est
+  mpi_lbadapt_grid_init(0, lbpar.base_level);
+
+  // reset data
+  lbadapt_local_data.clear();
+  lbadapt_ghost_data.clear();
+  lbadapt_allocate_data();
+
+
   int status;
   lbadapt_payload_t *data;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {

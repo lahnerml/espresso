@@ -87,7 +87,7 @@ LB_Parameters lbpar = {
     // base level for calculation of tau
     -1,
     // max level
-    P8EST_MAXLEVEL,
+    P8EST_QMAXLEVEL,
 #endif // LB_ADAPTIVE
     // friction
     {0.0},

@@ -477,6 +477,7 @@ int p4est_utils_adapt_grid() {
 
     // 3rd step: Insert data into new levelwise data-structure and prepare next
     //           integration step
+    adapt_p4est.reset(p4est_partitioned);
     adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
     adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
                                         btype));
@@ -491,7 +492,6 @@ int p4est_utils_adapt_grid() {
                                            adapt_virtual, false);
     p4est_utils_post_gridadapt_insert_data(
         p4est_partitioned, adapt_mesh, adapt_virtual, data_partitioned, lbadapt_local_data);
-    adapt_p4est.reset(p4est_partitioned);
 
     std::vector<p4est_t *> forests;
 #ifdef DD_P4EST

@@ -2225,6 +2225,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
                              std::numeric_limits<double>::min()}));
   int nq, enc;
   int c_level;
+  p4est_locidx_t lq = p4est->local_num_quadrants;
   const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
   sc_array_t *neighbor_qids = sc_array_new(sizeof(int));
   sc_array_t *neighbor_encs = sc_array_new(sizeof(int));
@@ -2255,19 +2256,17 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
       for (size_t i = 0; i < neighbor_qids->elem_count; ++i) {
         nq = *(int *)sc_array_index(neighbor_qids, i);
         enc = *(int *)sc_array_index(neighbor_encs, i);
-        bool is_ghost = (enc < 0);
+        bool is_ghost = (lq <= nq);
         if (!is_ghost) {
           quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nq);
           data = &lbadapt_local_data[quad->level]
                                     [adapt_virtual->quad_qreal_offset[nq]];
         } else {
-          quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, nq);
+          quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, nq - lq);
           data = &lbadapt_ghost_data[quad->level]
-                                    [adapt_virtual->quad_greal_offset[nq]];
+                                    [adapt_virtual->quad_greal_offset[nq - lq]];
         }
         h = (double)P8EST_QUADRANT_LEN(quad->level) / (double)P8EST_ROOT_LEN;
-        if (is_ghost)
-          nq += p4est->local_num_quadrants;
         check_vel(nq, h, data, fluid_vel);
         n_qids[dir_idx].push_back(nq);
       }

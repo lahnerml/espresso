@@ -173,11 +173,6 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #ifdef LB_ADAPTIVE_GPU
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
-
 // unit conversion: force density
   data->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
@@ -185,6 +180,16 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
       prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
   data->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#else  // LB_ADAPTIVE_GPU
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                   (lb_float)P8EST_ROOT_LEN;
+  data->lbfields.force[0] =
+      prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
+  data->lbfields.force[1] =
+      prefactors[level] * lbpar.ext_force[1] * SQR(h_max) * SQR(lbpar.tau);
+  data->lbfields.force[2] =
+      prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
+#endif // LB_ADAPTIVE_GPU
 #else  // EXTERNAL_FORCES
 #ifdef LB_ADAPTIVE_GPU
   data->force[0] = 0.0;

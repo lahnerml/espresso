@@ -22,7 +22,7 @@
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
 // number of (MD) intergration steps before grid changes
-int steps_until_grid_change = 50;
+int steps_until_grid_change = -1;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.

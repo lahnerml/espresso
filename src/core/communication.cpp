@@ -2809,16 +2809,10 @@ void mpi_lbadapt_grid_init(int node, int level) {
                                                     adapt_mesh, adapt_virtual,
                                                     btype));
 
-  lbadapt_local_data.clear();
-  lbadapt_ghost_data.clear();
-
 #ifdef LB_ADAPTIVE_GPU
   // regular grid
   local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-
-  lbpar.base_level = level;
-  lbpar.max_refinement_level = level;
 #endif // LB_ADAPTIVE
 }
 

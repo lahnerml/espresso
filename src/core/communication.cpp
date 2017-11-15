@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mpi.h>
+#include <utility>
 #ifdef OPEN_MPI
 #include <dlfcn.h>
 #endif // OPEN_MPI
@@ -351,6 +352,12 @@ void mpi_stop_slave(int node, int param) {
 
 #ifdef LB_ADAPTIVE
   lb_release();
+  adapt_p4est.reset();
+  adapt_conn.reset();
+  adapt_ghost.reset();
+  adapt_mesh.reset();
+  adapt_virtual.reset();
+  adapt_virtual_ghost.reset();
   sc_finalize();
 #endif // LB_ADAPTIVE
 
@@ -2767,14 +2774,19 @@ void mpi_lbadapt_grid_init(int node, int level) {
   lb_conn_brick[1] = box_l[1];
   lb_conn_brick[2] = box_l[2];
 
-  adapt_conn.reset(p4est_connectivity_new_brick(lb_conn_brick[0],
-                                                lb_conn_brick[1],
-                                                lb_conn_brick[2],
-                                                periodic & 1,
-                                                periodic & 2,
-                                                periodic & 4));
-  adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL,
-                                  NULL));
+  // Hack to satisfy p4est:  Calling p4est_destroy requires the corresponding
+  //                         p4est_connectivity struct to be valid.
+  {
+    auto old_conn = std::move (adapt_conn);
+    adapt_conn.reset(p4est_connectivity_new_brick(lb_conn_brick[0],
+                                                  lb_conn_brick[1],
+                                                  lb_conn_brick[2],
+                                                  periodic & 1,
+                                                  periodic & 2,
+                                                  periodic & 4));
+    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL,
+                                    NULL));
+  }
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST

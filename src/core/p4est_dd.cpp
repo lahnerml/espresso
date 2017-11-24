@@ -1650,7 +1650,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
 
   /* set up new domain decomposition cell structure */
-  dd_p4est_create_grid();
+  dd_p4est_create_grid(isRepart);
   /* mark cells */
   dd_p4est_mark_cells();
 

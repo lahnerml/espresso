@@ -706,15 +706,11 @@ void handle_collisions ()
 
     if (counts[this_node]>0) {
 
-      // If we don't have domain decomposition, we need to do a full sweep over all
-      // particles in the system. (slow)
-      if (cell_structure.type!=CELL_STRUCTURE_DOMDEC) {
+      if (cell_structure.type == CELL_STRUCTURE_DOMDEC
+          || cell_structure.type == CELL_STRUCTURE_P4EST)
+        three_particle_binding_domain_decomposition();
+      else
         three_particle_binding_full_search();
-    } // if cell structure != domain decomposition
-    else
-    {
-      three_particle_binding_domain_decomposition();
-    } // If we have doamin decomposition
 
    } // if number of collisions of this node > 0
        

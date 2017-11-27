@@ -124,8 +124,6 @@ std::vector<int> dd_fs_neigh;
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
 void dd_create_cell_grid () {
-  CALL_TRACE();
-
   int i,n_local_cells,new_cells,min_ind;
   double cell_range[3], min_size, scale, volume;
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid: max_range %f\n",this_node,max_range));
@@ -246,8 +244,6 @@ void dd_create_cell_grid () {
     decomposition.  \ref cells::cells is assumed to be a 3d grid with size
     \ref DomainDecomposition::ghost_cell_grid . */
 void dd_mark_cells () {
-  CALL_TRACE();
-
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
   DD_CELLS_LOOP(m,n,o) {
@@ -274,8 +270,6 @@ void dd_mark_cells () {
     \param hc          high up corner of the subgrid.
  */
 int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
-  CALL_TRACE();
-
   int i,m,n,o,c=0;
   /* sanity check */
   for(i=0; i<3; i++) {
@@ -297,8 +291,6 @@ int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
 
 /** Create communicators for cell structure domain decomposition. (see \ref GhostCommunicator) */
 void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
-  CALL_TRACE();
-
   int dir,lr,i,cnt, num, n_comm_cells[3];
   int lc[3],hc[3],done[3]={0,0,0};
 
@@ -414,7 +406,6 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
     communicator is working in reverted order with exchanged
     communication types GHOST_SEND <-> GHOST_RECV. */
 void dd_revert_comm_order (GhostCommunicator *comm) {
-  CALL_TRACE();
   int i,j,nlist2;
   GhostCommunication tmp;
   ParticleList *tmplist;
@@ -444,7 +435,6 @@ void dd_revert_comm_order (GhostCommunicator *comm) {
 
 /** Of every two communication rounds, set the first receivers to prefetch and poststore */
 void dd_assign_prefetches (GhostCommunicator *comm) {
-  CALL_TRACE();
   int cnt;
 
   for(cnt=0; cnt<comm->num; cnt += 2) {
@@ -461,7 +451,6 @@ void dd_assign_prefetches (GhostCommunicator *comm) {
     GHOSTTRANS_POSSHFTD or'd into 'data_parts' upon execution of \ref
     dd_prepare_comm. */
 void dd_update_communicators_w_boxl() {
-  CALL_TRACE();
   int cnt=0;
   
   /* direction loop: x, y, z */
@@ -590,8 +579,6 @@ void dd_init_cell_interactions () {
     the position is in the nodes spatial domain otherwise a NULL
     pointer. */
 Cell * dd_save_position_to_cell (double pos[3]) {
-  CALL_TRACE();
-
   int i,cpos[3];
   double lpos;
 
@@ -624,8 +611,6 @@ Cell * dd_save_position_to_cell (double pos[3]) {
 }
 
 Cell *dd_position_to_cell(double pos[3]) {
-  CALL_TRACE();
-
   int i,cpos[3];
   double lpos;
 
@@ -656,8 +641,6 @@ Cell *dd_position_to_cell(double pos[3]) {
 }
 
 void dd_position_to_cell_indices(double pos[3],int* idx) {
-  CALL_TRACE();
-
   int i;
   double lpos;
 
@@ -680,8 +663,6 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
 /** Append the particles in pl to \ref local_cells and update \ref local_particles.  
     @return 0 if all particles in pl reside in the nodes domain otherwise 1.*/
 int dd_append_particles(ParticleList *pl, int fold_dir) {
-  CALL_TRACE();
-
   int p, dir, c, cpos[3], flag=0, fold_coord=fold_dir/2;
 
   CELL_TRACE(fprintf(stderr, "%d: dd_append_particles %d\n", this_node, pl->n));
@@ -725,8 +706,6 @@ int dd_append_particles(ParticleList *pl, int fold_dir) {
 /************************************************************/
 
 void dd_on_geometry_change(int flags) {
-  CALL_TRACE();
-
   /* Realignment of comms along the periodic y-direction is needed */
   if (flags & CELL_FLAG_LEES_EDWARDS) {
     CELL_TRACE(fprintf(stderr,"%d: dd_on_geometry_change responding to Lees-Edwards offset change.\n", this_node);)
@@ -823,8 +802,6 @@ void dd_on_geometry_change(int flags) {
 
 /************************************************************/
 void dd_topology_init(CellPList *old) {
-  CALL_TRACE();
-
   int c,p,np;
   int exchange_data, update_data;
   Particle *part;
@@ -917,8 +894,6 @@ void dd_topology_init(CellPList *old) {
 
 /************************************************************/
 void dd_topology_release() {
-  CALL_TRACE();
-
   int i,j;
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
   /* release cell interactions */
@@ -948,8 +923,6 @@ void dd_topology_release() {
 
 /************************************************************/
 void dd_exchange_and_sort_particles (int global_flag) {
-  CALL_TRACE();
-
   int dir, c, p, i, finished=0;
   ParticleList *cell,*sort_cell, send_buf_l, send_buf_r, recv_buf_l, recv_buf_r;
   Particle *part;
@@ -1149,7 +1122,6 @@ void dd_exchange_and_sort_particles (int global_flag) {
 /*************************************************/
 
 int calc_processor_min_num_cells () {
-  CALL_TRACE();
   int i, min = 1;
   /* the minimal number of cells can be lower if there are at least two nodes serving a direction,
      since this also ensures that the cell size is at most half the box length. However, if there is
@@ -1161,8 +1133,6 @@ int calc_processor_min_num_cells () {
 }
 
 void calc_link_cell() {
-  CALL_TRACE();
-
   int c, np1, n, np2, i ,j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;
@@ -1279,8 +1249,6 @@ void calc_link_cell_runtime(int nsteps, std::vector<double>& ts) {
 
 void calculate_link_cell_energies()
 {
-  CALL_TRACE();
-
   int c, np1, np2, n, i, j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;
@@ -1339,8 +1307,6 @@ void calculate_link_cell_energies()
 
 void calculate_link_cell_virials(int v_comp)
 {
-  CALL_TRACE();
-
   int c, np1, np2, n, i, j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;

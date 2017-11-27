@@ -207,8 +207,6 @@ int dd_p4est_cellsize_even () {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_create_grid (bool isRepart) {
-  //printf("%i : new MD grid\n", this_node);
-  CALL_TRACE();
   // Clear data to prevent accidental use of old stuff
   comm_rank.clear();
   comm_proc.clear();
@@ -595,7 +593,6 @@ void dd_p4est_comm () {
 }
 #else
 void dd_p4est_comm () {
-  CALL_TRACE();
   // List of cell idx marked for send/recv for each process
   std::vector<std::vector<int>>      send_idx(n_nodes);
   std::vector<std::vector<int>>      recv_idx(n_nodes);
@@ -742,7 +739,6 @@ void dd_p4est_comm () {
 #endif //MINIMAL_GHOST
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
-  CALL_TRACE();
   prepare_comm(comm, data_part, num_comm_send + num_comm_recv, true);
   int cnt = 0;
   for (int i=0;i<num_comm_send;++i) {
@@ -802,7 +798,6 @@ void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_mark_cells () {
-  CALL_TRACE();
   // Take the memory map as they are. First local cells (along Morton curve).
   // This also means cells has the same ordering as p4est_shell
 #ifndef P4EST_NOCHANGE
@@ -820,7 +815,6 @@ void dd_p4est_update_communicators_w_boxl() {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
-  CALL_TRACE();
   int cnt = 0;
   for (int i=0;i<num_comm_send;++i) {
     // Reset shift according to communication direction
@@ -874,8 +868,6 @@ void dd_p4est_init_cell_interactions() {
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
-  CALL_TRACE();
-  
   // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain
   // by the error bounds
 
@@ -1621,7 +1613,6 @@ int dd_p4est_pos_to_proc(double pos[3]) {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_assign_prefetches (GhostCommunicator *comm) {
-  CALL_TRACE();
   int cnt;
 
   for(cnt=0; cnt<comm->num; cnt += 2) {

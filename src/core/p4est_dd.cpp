@@ -1049,7 +1049,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
     double op[3] = {recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2]};
     // Sender folds in global case to get the correct receiver rank.
     // Do not undo this folding here.
-    if (!global_flag)
+    //if (!global_flag)
       fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
 
     dynsiz += recvbuf->part[p].bl.n;
@@ -1335,7 +1335,7 @@ void dd_p4est_exchange_and_sort_particles (int global_flag) {
     for (int c = 0; c < local_cells.n; c++) {
       Cell *pl = local_cells.cell[c];
       for (int p = 0; p < pl->n; p++) {
-        fold_position(pl->part[p].r.p, pl->part[p].l.i);
+        //fold_position(pl->part[p].r.p, pl->part[p].l.i);
         Cell *nc = dd_p4est_save_position_to_cell(pl->part[p].r.p);
         if (nc == NULL) { // Belongs to other node
           int pid = pl->part[p].p.identity;

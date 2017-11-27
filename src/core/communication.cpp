@@ -2778,15 +2778,16 @@ void mpi_lbadapt_grid_init(int node, int level) {
   // Hack to satisfy p4est:  Calling p4est_destroy requires the corresponding
   //                         p4est_connectivity struct to be valid.
   {
-    auto old_conn = std::move (adapt_conn);
-    adapt_conn.reset(p4est_connectivity_new_brick(lb_conn_brick[0],
-                                                  lb_conn_brick[1],
-                                                  lb_conn_brick[2],
-                                                  periodic & 1,
-                                                  periodic & 2,
-                                                  periodic & 4));
-    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL,
-                                    NULL));
+    // turn adapt conn into an rvalue reference and move it to old_conn, thus
+    // preserving its value for call to p4est_destroy and void its destruction
+    auto old_conn = std::move(adapt_conn);
+    // substitute connectivity
+    adapt_conn.reset(p4est_connectivity_new_brick(
+        lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2], periodic & 1,
+        periodic & 2, periodic & 4));
+    // substitute and delete old p4est
+    adapt_p4est.reset(
+        p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL, NULL));
   }
 
   std::vector<p4est_t *> forests;
@@ -2845,7 +2846,6 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-  sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -2853,7 +2853,8 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  boundary = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> boundary =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_boundary_values(boundary);
 
@@ -2875,7 +2876,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                        1, /* write boundary index as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "boundary", boundary, context);
+                                       "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -2901,7 +2902,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                    1, /* write boundary index as scalar cell
                                          data */
                                    0, /* no custom cell vector data */
-                                   "boundary", boundary, context);
+                                   "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -2909,7 +2910,6 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-  sc_array_destroy(boundary);
 #endif // LB_ADAPTIVE
 }
 
@@ -2918,7 +2918,6 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -2926,7 +2925,8 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  density = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> density =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_density_values(density);
 
@@ -2948,7 +2948,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                        1, /* write density as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "density", density, context);
+                                       "density", density.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -2972,15 +2972,13 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                          1, /* write density as scalar cell
                                                data */
                                          0, /* no custom cell vector data */
-                                         "density", density, context);
+                                         "density", density.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(density);
 #endif // LB_ADAPTIVE
 }
 
@@ -2989,7 +2987,6 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -2997,7 +2994,8 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
+  castable_unique_ptr<sc_array_t> velocity =
+      sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
 
@@ -3019,7 +3017,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                        0, /* no custom cell scalar data */
                                        1, /* write velocity as vector cell
                                              data */
-                                       "velocity", velocity, context);
+                                       "velocity", velocity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -3043,16 +3041,13 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                          0, /* no custom cell scalar data */
                                          1, /* write velocity as vector cell
                                                data */
-                                         "velocity", velocity, context);
+                                         "velocity", velocity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  /* free memory */
-  sc_array_destroy(velocity);
 #endif // LB_ADAPTIVE
 }
 
@@ -3061,17 +3056,16 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  thread_block_container_t *a;
-  a = P4EST_ALLOC(thread_block_container_t, adapt_p4est->local_num_quadrants);
+  std::vector<thread_block_container_t> a(adapt_p4est->local_num_quadrants);
 
-  show_blocks_threads(a);
+  show_blocks_threads(a.data());
   lbadapt_vtk_context_t *c;
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
-  sc_array_t *values_thread, *values_block;
-  values_thread = sc_array_new_size(sizeof(double), num_cells);
-  values_block = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> values_thread, values_block;
+  values_thread.reset(sc_array_new_size(sizeof(double), num_cells));
+  values_block.reset(sc_array_new_size(sizeof(double), num_cells));
 
   double *block_ptr, *thread_ptr;
   for (int i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
@@ -3094,12 +3088,9 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len) {
   c = lbadapt_vtk_context_new(filename);
   c = lbadapt_vtk_write_header(c);
   c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0, "block",
-                                   values_block, "thread", values_thread, c);
+                                   values_block.get(), "thread",
+                                   values_thread.get(), c);
   lbadapt_vtk_write_footer(c);
-
-  sc_array_destroy(values_thread);
-  sc_array_destroy(values_block);
-  P4EST_FREE(a);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -3153,7 +3144,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   int start_idx = 0;
   // assert level 0 is refined
-  if ((size_t) adapt_p4est->global_num_quadrants ==
+  if ((size_t)adapt_p4est->global_num_quadrants ==
       adapt_p4est->trees->elem_count) {
     p8est_refine(adapt_p4est, 0, refine_uniform, NULL);
     ++start_idx;

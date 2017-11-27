@@ -684,7 +684,6 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   /* perform master IO routine here. */
-  sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -692,7 +691,8 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  boundary = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> boundary =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_boundary_values(boundary);
 
@@ -713,7 +713,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                        1, /* write boundary as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "boundary", boundary, context);
+                                       "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -738,15 +738,13 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                    1, /* write boundary index as scalar cell
                                          data */
                                    0, /* no custom cell vector data */
-                                   "boundary", boundary, context);
+                                   "boundary", boundary.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(boundary);
 #else // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
@@ -833,7 +831,6 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
 
-  sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -841,7 +838,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  density = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> density =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_density_values(density);
 
@@ -863,7 +861,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                        1, /* write density as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "density", density, context);
+                                       "density", density.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -886,15 +884,13 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                          1, /* write density as scalar cell
                                                data */
                                          0, /* no custom cell vector data */
-                                         "density", density, context);
+                                         "density", density.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(density);
 #else // LB_ADAPTIVE
   int ii;
 
@@ -967,7 +963,6 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
 
-  sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
@@ -975,7 +970,8 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
+  castable_unique_ptr<sc_array_t> velocity =
+      sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
 
@@ -998,7 +994,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        0, /* no custom cell scalar data */
                                        1, /* write velocities as cell vector
                                              data */
-                                       "velocity", velocity, context);
+                                       "velocity", velocity.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -1022,15 +1018,12 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                          0, /* no custom cell scalar data */
                                          1, /* write velocities as cell vector
                                                data */
-                                         "velocity", velocity, context);
+                                         "velocity", velocity.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
 #endif // LB_ADAPTIVE_GPU
-
-  /* free memory */
-  sc_array_destroy(velocity);
 #else // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
@@ -3359,7 +3352,6 @@ inline void lb_collide_stream() {
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
   bool hide_communication = false;
-
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {

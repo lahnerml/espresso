@@ -205,10 +205,8 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  if (lbpar.base_level == -1) {
-    lbpar.base_level =
-        Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
-  }
+  lbpar.base_level =
+      Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
 
   // reset p4est
   mpi_lbadapt_grid_init(0, lbpar.base_level);
@@ -221,12 +219,13 @@ void lbadapt_init() {
 
   int status;
   lbadapt_payload_t *data;
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST,
-        P8EST_TRAVERSE_REALVIRTUAL, P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_REALVIRTUAL, P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -255,7 +254,6 @@ void lbadapt_init() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 } // lbadapt_init();
 
@@ -297,14 +295,14 @@ void lbadapt_reinit_force_per_cell() {
   }
   int status;
   lbadapt_payload_t *data;
-
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
 
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -331,7 +329,6 @@ void lbadapt_reinit_force_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -348,6 +345,7 @@ void lbadapt_reinit_fluid_per_cell() {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
 #ifdef LB_ADAPTIVE_GPU
@@ -357,10 +355,10 @@ void lbadapt_reinit_fluid_per_cell() {
     lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -398,7 +396,6 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -553,7 +550,7 @@ void lbadapt_patches_populate_halos(int level) {
   // clang-format on
   lbadapt_payload_t *data, *neighbor_data;
   int status = 0;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, level, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
 
@@ -725,7 +722,6 @@ void lbadapt_patches_populate_halos(int level) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 }
 #endif // LB_ADAPTIVE_GPU
 
@@ -1600,7 +1596,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
   bool has_virtuals;
 
   lb_float modes[lbmodel.n_veloc];
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       P8EST_CONNECT_EDGE, quads_to_collide, P8EST_TRAVERSE_REAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -1651,7 +1647,6 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1695,7 +1690,7 @@ void lbadapt_stream(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p4est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -1711,7 +1706,6 @@ void lbadapt_stream(int level) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1735,7 +1729,7 @@ void lbadapt_bounce_back(int level) {
                       8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
 
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -1873,7 +1867,6 @@ void lbadapt_bounce_back(int level) {
 #endif // D3Q19
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1883,7 +1876,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int parent_sid;
   lbadapt_payload_t *data, *parent_data;
   int vel;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level + 1,
       P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -1914,7 +1907,6 @@ void lbadapt_update_populations_from_virtuals(int level) {
     }
   }
 
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1922,7 +1914,7 @@ void lbadapt_swap_pointers(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -1940,7 +1932,6 @@ void lbadapt_swap_pointers(int level) {
       std::swap(data->lbfluid[0], data->lbfluid[1]);
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1955,14 +1946,15 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
 #endif // LB_ADAPTIVE_GPU
 
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   /* get boundary status */
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
@@ -1990,7 +1982,6 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2011,14 +2002,14 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   lb_float h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
-
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -2090,7 +2081,6 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2111,13 +2101,14 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
 #ifdef LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(level) /
@@ -2182,7 +2173,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2227,8 +2217,8 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   int c_level;
   p4est_locidx_t lq = p4est->local_num_quadrants;
   const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
-  sc_array_t *neighbor_qids = sc_array_new(sizeof(int));
-  sc_array_t *neighbor_encs = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> neighbor_qids = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> neighbor_encs = sc_array_new(sizeof(int));
   std::array<std::vector<int>, 3> n_qids;
   std::array<double, 3> mesh_width;
   double h;
@@ -2316,11 +2306,11 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   if (filename == "") {
     filename = "vorticity_" + std::to_string((int)(sim_time / time_step));
   }
-  sc_array_t *vorticity, *velocity, *qid;
+  castable_unique_ptr<sc_array_t> vorticity, velocity, qid;
   p4est_locidx_t num_cells = p4est->local_num_quadrants;
-  vorticity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-  qid = sc_array_new_size(sizeof(double), num_cells);
+  vorticity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
+  velocity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
+  qid.reset(sc_array_new_size(sizeof(double), num_cells));
   for (int i = 0; i < num_cells; ++i) {
     double *ins = (double *)sc_array_index(vorticity, 3 * i);
     std::memcpy(ins, vort[i].data(), 3 * sizeof(double));
@@ -2348,23 +2338,15 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
                                        1, /* no custom cell scalar data */
                                        2, /* write velocity and vorticity as
                                              vector cell data */
-                                       "qid", qid,
-                                       "velocity", velocity,
-                                       "vorticity", vorticity, context);
+                                       "qid", qid.get(),
+                                       "velocity", velocity.get(),
+                                       "vorticity", vorticity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-
-  /* free memory */
-  sc_array_destroy(velocity);
-  sc_array_destroy(vorticity);
-  sc_array_destroy(qid);
   // FIXME remove DEBUG
-
-  sc_array_destroy(neighbor_qids);
-  sc_array_destroy(neighbor_encs);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -2381,6 +2363,7 @@ void lbadapt_get_boundary_status() {
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
                          ghost_pointer);
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
 
   for (level = forest.coarsest_level_global;
        level <= forest.finest_level_global; ++level) {
@@ -2394,10 +2377,10 @@ void lbadapt_get_boundary_status() {
 #endif // LB_ADAPTIVE_GPU
 
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
+    mesh_iter.reset(p4est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
         adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -2436,7 +2419,6 @@ void lbadapt_get_boundary_status() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
 
     p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                              adapt_mesh, adapt_virtual,
@@ -2731,10 +2713,12 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   int xidx = -1;
   int yidx = -1;
   int zidx = -1;
+  castable_unique_ptr<sc_array_t> ne, ni;
+  ne.reset(sc_array_new(sizeof(int)));
+  ni.reset(sc_array_new(sizeof(int)));
   for (int i = 0; i < 7; ++i) {
-    sc_array_t *ne, *ni;
-    ne = sc_array_new(sizeof(int));
-    ni = sc_array_new(sizeof(int));
+    sc_array_truncate(ni);
+    sc_array_truncate(ne);
     p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
                              nidx[corner][i], NULL, ne, ni);
     if (ne->elem_count == 0) {
@@ -2829,8 +2813,6 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
         ncnt += 1;
       }
     }
-    sc_array_destroy(ne);
-    sc_array_destroy(ni);
   }
   double dsum = 1.0;
   for (int i = 0; i < ncnt; ++i)

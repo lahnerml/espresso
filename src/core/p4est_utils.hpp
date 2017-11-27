@@ -52,6 +52,16 @@ namespace std
   {
     void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
   };
+  template<>
+  struct default_delete<p4est_meshiter_t>
+  {
+      void operator()(p4est_meshiter_t *p) const { if (p != nullptr) p4est_meshiter_destroy(p); }
+  };
+  template<>
+  struct default_delete<sc_array_t>
+  {
+      void operator()(sc_array_t *p) const { if (p != nullptr) sc_array_destroy(p); }
+  };
 }
 
 // Don't use it. Can lead to nasty bugs.

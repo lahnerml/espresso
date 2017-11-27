@@ -150,7 +150,14 @@ void build_verlet_lists()
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
           {
+#ifdef MINIMAL_GHOST
+            if (neighbor->use_mi_vec)
+              dist2 = get_mi_dist2(p1[i].r.p, p2[j].r.p);
+            else 
+              dist2 = distance2(p1[i].r.p, p2[j].r.p);
+#else
             dist2 = distance2(p1[i].r.p, p2[j].r.p);
+#endif
             if(verlet_list_criterion(p1+i, p2+j,dist2))
               add_pair(pl, &p1[i], &p2[j]);
           }
@@ -191,6 +198,7 @@ void calculate_verlet_ia()
 
     /* Loop cell neighbors */
     for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+      auto neighbor = &dd.cell_inter[c].nList[n];
       pairs = dd.cell_inter[c].nList[n].vList.pair;
       np    = dd.cell_inter[c].nList[n].vList.n;
       /* verlet list loop */
@@ -203,7 +211,14 @@ void calculate_verlet_ia()
             || (!(p1->p.smaller_timestep==0 && p2->p.smaller_timestep==0) && current_time_step_is_small==1))
 #endif 
         {
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1->r.p, p2->r.p, vec21);
+        else 
           dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#else
+        dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#endif
           add_non_bonded_pair_force(p1, p2, vec21, sqrt(dist2), dist2);
         }
       }
@@ -273,7 +288,14 @@ void build_verlet_lists_and_calc_verlet_ia()
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
           {
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
+        else 
           dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#else
+        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
+#endif
 
           VERLET_TRACE(fprintf(stderr,"%d: pair %d %d has distance %f\n",this_node,p1[i].p.identity,p2[j].p.identity,sqrt(dist2)));
 
@@ -333,6 +355,7 @@ void calculate_verlet_energies()
     VERLET_TRACE(fprintf(stderr,"%d: cell %d with %d neighbors\n",this_node,c, dd.cell_inter[c].n_neighbors));
     /* Loop cell neighbors */
     for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+      auto neighbor = &dd.cell_inter[c].nList[n];
       pairs = dd.cell_inter[c].nList[n].vList.pair;
       np    = dd.cell_inter[c].nList[n].vList.n;
       VERLET_TRACE(fprintf(stderr,"%d: neighbor %d has %d particles\n",this_node,n,np));
@@ -341,7 +364,14 @@ void calculate_verlet_energies()
       for(i=0; i<2*np; i+=2) {
         p1 = pairs[i];                    /* pointer to particle 1 */
         p2 = pairs[i+1];                  /* pointer to particle 2 */
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1->r.p, p2->r.p, vec21);
+        else 
+          dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#else
         dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#endif
         VERLET_TRACE(fprintf(stderr, "%d: %d <-> %d: dist2 dist2\n",this_node,p1->p.identity,p2->p.identity));
         add_non_bonded_pair_energy(p1, p2, vec21, sqrt(dist2), dist2);
       }
@@ -384,6 +414,7 @@ void calculate_verlet_virials(int v_comp)
     VERLET_TRACE(fprintf(stderr,"%d: cell %d with %d neighbors\n",this_node,c, dd.cell_inter[c].n_neighbors));
     /* Loop cell neighbors */
     for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
+      auto neighbor = &dd.cell_inter[c].nList[n];
       pairs = dd.cell_inter[c].nList[n].vList.pair;
       np    = dd.cell_inter[c].nList[n].vList.n;
       VERLET_TRACE(fprintf(stderr,"%d: neighbor %d has %d particles\n",this_node,n,np));
@@ -392,7 +423,14 @@ void calculate_verlet_virials(int v_comp)
       for(i=0; i<2*np; i+=2) {
         p1 = pairs[i];                    /* pointer to particle 1 */
         p2 = pairs[i+1];                  /* pointer to particle 2 */
+#ifdef MINIMAL_GHOST
+        if (neighbor->use_mi_vec)
+          dist2 = get_mi_dist2vec(p1->r.p, p2->r.p, vec21);
+        else 
+          dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#else
         dist2 = distance2vec(p1->r.p, p2->r.p, vec21);
+#endif
         add_non_bonded_pair_virials(p1, p2, vec21, sqrt(dist2), dist2);
       }
     }

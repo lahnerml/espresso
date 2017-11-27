@@ -209,6 +209,18 @@ inline double get_mi_dist2vec(double a[3], double b[3], double res[3])
   return SQR(res[0]) + SQR(res[1]) + SQR(res[2]);
 }
 
+inline double get_mi_dist2(double a[3], double b[3])
+{
+  double res[3];
+  for(int i = 0; i < 3; i++) {
+    res[i] = a[i] - b[i];
+    if (PERIODIC(i))
+      res[i] -= dround(res[i]*box_l_i[i])*box_l[i];
+  }
+  
+  return SQR(res[0]) + SQR(res[1]) + SQR(res[2]);
+}
+
 /** fold a coordinate to primary simulation box, including velocity (in case of LEES_EDWARDS,
     the velocity depends on the image we are in).
     \param pos         the position...

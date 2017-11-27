@@ -313,6 +313,8 @@ Cell *dd_save_position_to_cell(double pos[3]);
 void dd_assign_prefetches(GhostCommunicator *comm);
 
 void calc_link_cell_runtime(int nsteps, std::vector<double>& ts);
+
+int dd_full_shell_neigh(int cellidx, int neigh);
 /*@}*/
 
 #endif

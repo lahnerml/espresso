@@ -555,6 +555,21 @@ void three_particle_binding_full_search()
  }
 }
 
+static int
+full_shell_neigh(int cellidx, int neigh)
+{
+    switch (cell_structure.type) {
+    case CELL_STRUCTURE_DOMDEC:
+        return dd_full_shell_neigh(cellidx, neigh);
+        break;
+    case CELL_STRUCTURE_P4EST:
+        return dd_p4est_full_shell_neigh(cellidx, neigh);
+        break;
+    default:
+        fprintf(stderr, "This should not happen as the function is only supposed to be called for domdec & p4est domdec");
+        errexit();
+    }
+}
 
 // Do not call this method for particles p1(!) in ghost cells.
 // This method searches the full shell neighborhood of p1's cell
@@ -588,7 +603,7 @@ three_particle_binding_dd_do_search(Particle *p1, Particle *p2)
     }
 
     for (int i = 0; i < 27; ++i) {
-        int neighidx = dd_p4est_full_shell_neigh(cellidx, i);
+        int neighidx = full_shell_neigh(cellidx, i);
         Cell* cell = cells + neighidx;
 
         // Iterate over particles in this cell

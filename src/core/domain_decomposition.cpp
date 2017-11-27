@@ -66,6 +66,9 @@ int max_num_cells = CELLS_MAX_NUM_CELLS;
 int min_num_cells = 1;
 double max_skin   = 0.0;
 
+
+std::vector<int> dd_fs_neigh;
+
 /*@}*/
 
 /************************************************************/
@@ -504,9 +507,13 @@ void dd_update_communicators_w_boxl() {
  * algorithm (see verlet.cpp) to build the verlet lists.
  */
 void dd_init_cell_interactions () {
-  CALL_TRACE();
-
   int m,n,o,p,q,r,ind1,ind2,c_cnt=0,n_cnt;
+
+  dd_fs_neigh.clear();
+  for (p = -1; p <= 1; p++)
+    for (q = -1; q <= 1; q++)
+      for (r = -1; r <= 1; r++)
+        dd_fs_neigh.push_back(get_linear_index(r, q, p, dd.ghost_cell_grid));
  
   /* initialize cell neighbor structures */
   dd.cell_inter = (IA_Neighbor_List *) Utils::realloc(dd.cell_inter,local_cells.n*sizeof(IA_Neighbor_List));
@@ -1395,3 +1402,9 @@ void calculate_link_cell_virials(int v_comp)
 }
 
 /************************************************************/
+
+
+int dd_full_shell_neigh(int cellidx, int neigh)
+{
+    return cellidx + dd_fs_neigh[neigh];
+}

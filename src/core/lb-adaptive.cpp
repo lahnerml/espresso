@@ -205,8 +205,10 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  lbpar.base_level =
-      Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
+  if (lbpar.base_level == -1) {
+    lbpar.base_level =
+        Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
+  }
 
   // reset p4est
   mpi_lbadapt_grid_init(0, lbpar.base_level);

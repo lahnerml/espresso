@@ -703,7 +703,7 @@ void lbadapt_patches_populate_halos(int level) {
           // for dealing with arbitrary orientations and arbitrary neighbor
           // relations: copy first to intermediate array and fill halo in
           // current patch from that temporary storage.
-          // TODO: Implement that
+          // TODO: Implement that, at least in theory.
 
           // perform the actual data replication
           for (int patch_z = 0; patch_z < iter_max_z; ++patch_z) {

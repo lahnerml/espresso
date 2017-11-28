@@ -66,7 +66,7 @@ int ghmc_nmd = 1;
 // phi parameter for partial momentum update step in GHMC
 double ghmc_phi = 0;
 
-double langevin_pref1, langevin_pref2, langevin_pref3; // FIXME: Set langevin_pref3
+double langevin_pref1, langevin_pref2, langevin_pref3;
 #ifndef ROTATIONAL_INERTIA
 double langevin_pref2_rotation;
 #else

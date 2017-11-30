@@ -1731,10 +1731,10 @@ void lbadapt_bounce_back(int level) {
                       8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
 
-  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p4est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
-      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
-      P8EST_TRAVERSE_PARBOUNDINNER);
+      P8EST_CONNECT_EDGE, P4EST_TRAVERSE_LOCAL, P4EST_TRAVERSE_REALVIRTUAL,
+      P4EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -2215,7 +2215,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
       std::array<double, 3>({std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min()}));
-  int nq, enc;
+  int nq;
   int c_level;
   p4est_locidx_t lq = p4est->local_num_quadrants;
   const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
@@ -2247,7 +2247,6 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
                    neighbor_qids->elem_count <= P8EST_HALF);
       for (size_t i = 0; i < neighbor_qids->elem_count; ++i) {
         nq = *(int *)sc_array_index(neighbor_qids, i);
-        enc = *(int *)sc_array_index(neighbor_encs, i);
         bool is_ghost = (lq <= nq);
         if (!is_ghost) {
           quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nq);

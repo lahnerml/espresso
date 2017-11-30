@@ -1886,24 +1886,31 @@ void lbadapt_update_populations_from_virtuals(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
+      assert (mesh_iter->current_index % P4EST_CHILDREN ==
+              mesh_iter->current_vid);
       // virtual quads are local if their parent is local, ghost analogous
       if (!mesh_iter->current_is_ghost) {
-        parent_sid = mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];
+        parent_sid =
+            mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];
         data = &lbadapt_local_data[level + 1]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
         parent_data = &lbadapt_local_data[level][parent_sid];
       } else {
-        parent_sid = mesh_iter->virtual_quads->quad_greal_offset[mesh_iter->current_qid];
+        parent_sid =
+            mesh_iter->virtual_quads->quad_greal_offset[mesh_iter->current_qid];
         data = &lbadapt_ghost_data[level + 1]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
         parent_data = &lbadapt_ghost_data[level][parent_sid];
       }
+      if (!mesh_iter->current_vid) {
+        std::fill_n (std::begin(parent_data->lbfluid[0]), lbmodel.n_veloc, 0);
+        std::fill_n (std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
+      }
       for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-        if (mesh_iter->current_vid == 0) {
-          parent_data->lbfluid[1][vel] = 0.;
-        }
+        // child velocities have already been swapped here
+        parent_data->lbfluid[0][vel] += 0.125 * data->lbfluid[1][vel];
         parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
       }
     }

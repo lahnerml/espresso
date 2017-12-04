@@ -2268,22 +2268,14 @@ int lb_sanity_checks() {
 
 /** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
-#ifdef LB_ADAPTIVE
-#ifndef DD_P4EST
-  // one can define the verbosity of p4est and libsc here.
-  // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
-  sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  // p4est_init(NULL, SC_LP_VERBOSE);
-  p4est_init(NULL, SC_LP_PRODUCTION);
-#endif
-#else  // LB_ADAPTIVE
+#ifndef LB_ADAPTIVE
   lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
                                           lbmodel.n_veloc * sizeof(double));
   lbfluid[1] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[1][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
                                           lbmodel.n_veloc * sizeof(double));
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 }
 
 /** (Re-)allocate memory for the fluid and initialize pointers. */

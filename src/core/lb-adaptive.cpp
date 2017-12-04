@@ -335,6 +335,9 @@ void lbadapt_reinit_force_per_cell() {
 }
 
 void lbadapt_reinit_fluid_per_cell() {
+  if (adapt_p4est == nullptr) {
+    lbadapt_init();
+  }
   if (lbadapt_local_data.empty()) {
     lbadapt_allocate_data();
   }

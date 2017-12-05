@@ -1786,9 +1786,8 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 // p4est_dd grid. This only works if both grids have a common p4est_connectivity and the given forest
 // is on the same or finer level.
 void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn) {
-  p4est_locidx_t num_quad_per_proc[n_nodes];
-  p4est_locidx_t num_quad_per_proc_global[n_nodes];
-  for (int i=0;i<n_nodes;++i) num_quad_per_proc[i] = 0;
+  std::vector<p4est_locidx_t> num_quad_per_proc(n_nodes, 0);
+  std::vector<p4est_locidx_t> num_quad_per_proc_global(n_nodes);
   
   // Check for each of the quadrants of the given p4est, to which MD cell it maps
   for (int i=0;i<p4est->local_num_quadrants;++i) {
@@ -1808,17 +1807,17 @@ void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t
   }
 
   // Geather this information over all processes
-  MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes, P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
+  MPI_Allreduce(num_quad_per_proc.data(), num_quad_per_proc_global.data(), n_nodes, P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
-  p4est_locidx_t sum = 0;
-  for (int i=0;i<n_nodes;++i) sum += num_quad_per_proc_global[i];
+  p4est_locidx_t sum = std::accumulate(num_quad_per_proc_global.begin(), num_quad_per_proc_global.end(), 0);
+
   if (sum < p4est->global_num_quadrants) {
     printf("%i : quadrants lost while partitioning\n", this_node);
     return;
   }
 
   // Repartition with the computed distribution
-  p4est_partition_given(p4est, num_quad_per_proc_global);
+  p4est_partition_given(p4est, num_quad_per_proc_global.data());
 }
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

@@ -5,16 +5,77 @@
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
+#include <memory>
 #include <p4est_to_p8est.h>
 #include <p8est.h>
+#include <p8est_connectivity.h>
+#include <p8est_ghost.h>
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
+#include <p8est_virtual.h>
 #include <stdint.h>
 #include <vector>
 
 /*****************************************************************************/
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
+
+namespace std
+{
+  template<>
+  struct default_delete<p4est_t>
+  {
+    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_ghost_t>
+  {
+    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_mesh_t>
+  {
+    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_virtual_t>
+  {
+    void operator()(p4est_virtual_t *p) const { if (p != nullptr) p4est_virtual_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_virtual_ghost_t>
+  {
+    void operator()(p4est_virtual_ghost_t *p) const { if (p != nullptr) p4est_virtual_ghost_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_connectivity_t>
+  {
+    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
+  };
+  template<>
+  struct default_delete<p4est_meshiter_t>
+  {
+      void operator()(p4est_meshiter_t *p) const { if (p != nullptr) p4est_meshiter_destroy(p); }
+  };
+  template<>
+  struct default_delete<sc_array_t>
+  {
+      void operator()(sc_array_t *p) const { if (p != nullptr) sc_array_destroy(p); }
+  };
+}
+
+// Don't use it. Can lead to nasty bugs.
+template <typename T>
+struct castable_unique_ptr: public std::unique_ptr<T> {
+  using Base = std::unique_ptr<T>;
+  constexpr castable_unique_ptr(): Base() {}
+  constexpr castable_unique_ptr(std::nullptr_t n): Base(n) {}
+  castable_unique_ptr(T* p): Base(p) {}
+  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
+  operator T*() const { return this->get(); }
+  operator void *() const { return this->get(); }
+};
+
 enum class forest_order {
 #ifdef DD_P4EST
   short_range = 0,
@@ -237,7 +298,8 @@ template <typename T>
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
 int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
-                                           p8est_mesh_t *mesh,
+                                           p4est_mesh_t *mesh,
+                                           p4est_virtual_t *virtual_quads,
                                            bool local_data) {
   P4EST_ASSERT(data.empty());
 
@@ -251,9 +313,9 @@ int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
     quads_on_level =
         local_data
             ? (mesh->quad_level + level)->elem_count +
-                  P8EST_CHILDREN * (mesh->virtual_qlevels + level)->elem_count
+                  P8EST_CHILDREN * (virtual_quads->virtual_qlevels + level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
-                  P8EST_CHILDREN * (mesh->virtual_glevels + level)->elem_count;
+                  P8EST_CHILDREN * (virtual_quads->virtual_glevels + level)->elem_count;
     data[level] = std::vector<T>(quads_on_level);
     P4EST_ASSERT(data[level].size() == quads_on_level);
   }
@@ -378,7 +440,8 @@ template <typename T>
  *                                   payload is supposed to be filled with 0.
  */
 int p4est_utils_post_gridadapt_map_data(
-    p8est_t *p4est_old, p8est_mesh_t *mesh_old, p8est_t *p4est_new,
+    p4est_t *p4est_old, p4est_mesh_t *mesh_old,
+    p4est_virtual_t *virtual_quads, p4est_t *p4est_new,
     std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
 
 template <typename T>
@@ -413,7 +476,7 @@ template <typename T>
  * @return int
  */
 int p4est_utils_post_gridadapt_insert_data(
-    p8est_t *p4est_new, p8est_mesh_t *mesh_new,
+    p4est_t *p4est_new, p4est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
     std::vector<std::vector<T>> &data_partitioned,
     std::vector<std::vector<T>> &data_levelwise);
 /*@}*/
@@ -423,6 +486,8 @@ int p4est_utils_post_gridadapt_insert_data(
 /*****************************************************************************/
 /*@{*/
 /** Partition two different p4ests such that their partition boundaries match.
+ *  In case the reference is coarser or equal, the process boundaries are identical.
+ *  Otherwise, only finer cells match the process for the reference.
  *
  * @param[in]  p4est_ref   p4est with reference partition boundaries.
  * @param[out] p4est_mod   p4est to be modified such that its boundaries match
@@ -432,7 +497,39 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify);
 /*@}*/
 
+/** Returns true if the process boundaries of two p4ests are aligned.
+ *  
+ * @param[in] t1    First tree
+ * @param[in] t2    Second tree
+ */
+bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2);
+
+/** Computes the finest common tree out of two given p4est trees on the same
+ * connectivity.
+ * Requires all finer cells in t2 to match the process of t1. (see
+ * \ref p4est_utils_partition_multiple_forests)
+ *
+ * @param[in] t1  reference tree for FCT
+ * @param[in] t2  base tree for FCT. this tree is copied and coarsened.
+ *
+ */
 p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2);
+
+/** Repartitions t1 and t2 wrt. the FCT. The respective weights are combined
+ * with the factors a1 and a2.
+ * It is required for t1 and t2 to have identical process boundaries.
+ *
+ * @param[inout] t1   First tree
+ * @param[in]    w1   Weights for t1
+ * @param[in]    a1   Weight factor for w1
+ * @param[inout] t2   Second tree
+ * @param[in]    w2   Weights for t2
+ * @param[in]    a2   Weight factor for w2
+ *
+ */
+void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
+                                    double a1, p4est_t *t2,
+                                    const std::vector<double> &w2, double a2);
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)
 #endif // P4EST_UTILS_HPP

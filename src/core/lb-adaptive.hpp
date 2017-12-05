@@ -30,12 +30,11 @@
 
 #ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
-#include <p8est.h>
+#include "p4est_utils.hpp"
 #include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
 #include <p8est_ghost.h>
-#include <p8est_ghostvirt.h>
 #include <p8est_iterate.h>
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
@@ -49,13 +48,16 @@
 #include "utils.hpp"
 
 /* "global variables" */
-extern p8est_t *lb_p8est;
-extern p8est_connectivity_t *conn;
-extern p8est_ghost_t *lbadapt_ghost;
-extern p8est_ghostvirt_t *lbadapt_ghost_virt;
-extern p8est_mesh_t *lbadapt_mesh;
+extern castable_unique_ptr<p4est_t> adapt_p4est;
+extern castable_unique_ptr<p4est_connectivity_t> adapt_conn;
+extern castable_unique_ptr<p4est_ghost_t> adapt_ghost;
+extern castable_unique_ptr<p4est_mesh_t> adapt_mesh;
+extern castable_unique_ptr<p4est_virtual_t> adapt_virtual;
+extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
+
 extern int lb_conn_brick[3];
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,

@@ -29,6 +29,9 @@
 int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
                           char **argv);
 
+int tclcommand_set_min_level(ClientData data, Tcl_Interp *interp, int argc,
+                             char **argv);
+
 int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
                              char **argv);
 

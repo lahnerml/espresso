@@ -87,7 +87,7 @@ LB_Parameters lbpar = {
     // base level for calculation of tau
     -1,
     // max level
-    P8EST_MAXLEVEL,
+    P8EST_QMAXLEVEL,
 #endif // LB_ADAPTIVE
     // friction
     {0.0},
@@ -684,21 +684,21 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   /* perform master IO routine here. */
-  sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  boundary = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> boundary =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_boundary_values(boundary);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -713,7 +713,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                        1, /* write boundary as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "boundary", boundary, context);
+                                       "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -738,15 +738,13 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                    1, /* write boundary index as scalar cell
                                          data */
                                    0, /* no custom cell vector data */
-                                   "boundary", boundary, context);
+                                   "boundary", boundary.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(boundary);
 #else // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
@@ -833,21 +831,21 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
 
-  sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  density = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> density =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_density_values(density);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, *filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, *filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -863,7 +861,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                        1, /* write density as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "density", density, context);
+                                       "density", density.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -886,15 +884,13 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                          1, /* write density as scalar cell
                                                data */
                                          0, /* no custom cell vector data */
-                                         "density", density, context);
+                                         "density", density.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(density);
 #else // LB_ADAPTIVE
   int ii;
 
@@ -967,21 +963,21 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
 
-  sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
+  castable_unique_ptr<sc_array_t> velocity =
+      sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
   p8est_vtk_context_set_scale(context, 1);
 
   /* begin writing the output files */
@@ -998,7 +994,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        0, /* no custom cell scalar data */
                                        1, /* write velocities as cell vector
                                              data */
-                                       "velocity", velocity, context);
+                                       "velocity", velocity.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -1022,15 +1018,12 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                          0, /* no custom cell scalar data */
                                          1, /* write velocities as cell vector
                                                data */
-                                         "velocity", velocity, context);
+                                         "velocity", velocity.get(), context);
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
 #endif // LB_ADAPTIVE_GPU
-
-  /* free memory */
-  sc_array_destroy(velocity);
 #else // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
@@ -1485,9 +1478,9 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
       double xyz[3];
-      p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
+      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx = p4est_utils_cell_morton_idx(
           xyz[0] * (1 << lbpar.max_refinement_level),
           xyz[1] * (1 << lbpar.max_refinement_level),
@@ -1553,9 +1546,9 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
       double xyz[3];
-      p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
+      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx = p4est_utils_cell_morton_idx(
           xyz[0] * (1 << lbpar.max_refinement_level),
           xyz[1] * (1 << lbpar.max_refinement_level),
@@ -1736,9 +1729,9 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = 0;
     for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &lb_p8est->global_first_position[proc];
+      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
       double xyz[3];
-      p8est_qcoord_to_vertex(conn, q->p.which_tree, q->x, q->y, q->z, xyz);
+      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx = p4est_utils_cell_morton_idx(
           xyz[0] * (1 << lbpar.max_refinement_level),
           xyz[1] * (1 << lbpar.max_refinement_level),
@@ -2275,22 +2268,14 @@ int lb_sanity_checks() {
 
 /** (Pre-)allocate memory for data structures or setup p4est*/
 void lb_pre_init() {
-#ifdef LB_ADAPTIVE
-#ifndef DD_P4EST
-  // one can define the verbosity of p4est and libsc here.
-  // sc_init(comm_cart, 1, 1, NULL, SC_LP_VERBOSE);
-  sc_init(comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  // p4est_init(NULL, SC_LP_VERBOSE);
-  p4est_init(NULL, SC_LP_PRODUCTION);
-#endif
-#else  // LB_ADAPTIVE
+#ifndef LB_ADAPTIVE
   lbfluid[0] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[0][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
                                           lbmodel.n_veloc * sizeof(double));
   lbfluid[1] = (double **)Utils::malloc(lbmodel.n_veloc * sizeof(double *));
   lbfluid[1][0] = (double *)Utils::malloc(lblattice.halo_grid_volume *
                                           lbmodel.n_veloc * sizeof(double));
-#endif // LB_ADAPTIVE
+#endif // !LB_ADAPTIVE
 }
 
 /** (Re-)allocate memory for the fluid and initialize pointers. */
@@ -2380,6 +2365,7 @@ static void lb_prepare_communication() {
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_parameters() {
+  int i;
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
 #else  // LB_ADAPTIVE
@@ -2434,7 +2420,6 @@ void lb_reinit_parameters() {
     mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
          (lbpar.agrid * lbpar.agrid);
 // mu *= agrid*agrid*agrid;  // Marcello's conjecture
-#if 0
 #ifdef D3Q19
     double(*e)[19] = d3q19_modebase;
 #else  // D3Q19
@@ -2442,9 +2427,9 @@ void lb_reinit_parameters() {
 #endif // D3Q19
     for (i = 0; i < 4; i++)
       lb_phi[i] = 0.0;
-    lb_phi[4] = sqrt(mu * e[19][4] * (1. - SQR(gamma_bulk))); // SQR(x) == x*x
+    lb_phi[4] = sqrt(mu * e[19][4] * (1. - SQR(gamma_bulk[lbpar.max_refinement_level]))); // SQR(x) == x*x
     for (i = 5; i < 10; i++)
-      lb_phi[i] = sqrt(mu * e[19][i] * (1. - SQR(gamma_shear)));
+      lb_phi[i] = sqrt(mu * e[19][i] * (1. - SQR(gamma_shear[lbpar.max_refinement_level])));
     for (i = 10; i < 16; i++)
       lb_phi[i] = sqrt(mu * e[19][i] * (1 - SQR(gamma_odd)));
     for (i = 16; i < 19; i++)
@@ -2459,7 +2444,6 @@ void lb_reinit_parameters() {
     lb_coupl_pref =
         sqrt(12. * 2. * lbpar.friction[0] * temperature / time_step);
     lb_coupl_pref2 = sqrt(2. * lbpar.friction[0] * temperature / time_step);
-#endif // 0
   } else {
     /* no fluctuations at zero temperature */
     fluct = 0;
@@ -3324,9 +3308,17 @@ inline void lb_collide_stream() {
     lbadapt_gpu_retrieve_data(level);
 
     // ghost exchange
-    p8est_ghostvirt_exchange_data(
-        lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-        (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+
+    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                             adapt_mesh, adapt_virtual,
+                                             adapt_virtual_ghost, level,
+                                             sizeof(lbadapt_payload_t),
+                                             (void**)local_pointer.data(),
+                                             (void**)ghost_pointer.data());
   }
 #else  // LB_ADAPTIVE_GPU
   int lvl_diff;
@@ -3352,7 +3344,6 @@ inline void lb_collide_stream() {
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
   bool hide_communication = false;
-
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
@@ -3392,9 +3383,12 @@ inline void lb_collide_stream() {
 
       // TODO: do not use convenience function here
       // if comm_hiding (exchange_data_begin)
-      p8est_ghostvirt_exchange_data(
-          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)local_pointer.data(), (void **)ghost_pointer.data());
+      p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                               adapt_mesh, adapt_virtual,
+                                               adapt_virtual_ghost, level,
+                                               sizeof(lbadapt_payload_t),
+                                               (void**)local_pointer.data(),
+                                               (void**)ghost_pointer.data());
     }
   }
 #endif // LB_ADAPTIVE_GPU
@@ -3636,7 +3630,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   }
   if (dcnt <= 0)
     return;
-  double h = 1.0 / (double)(1 << level[0]);
   double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
 #endif // !LB_ADAPTIVE
 
@@ -4103,9 +4096,18 @@ void calc_particle_lattice_ia() {
     // update ghost layer on all levels
     for (int level = lbpar.base_level; level <= lbpar.max_refinement_level;
          ++level) {
-      p8est_ghostvirt_exchange_data(
-          lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-          (void **)lbadapt_local_data, (void **)lbadapt_ghost_data);
+      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+      prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                             lbadapt_ghost_data, ghost_pointer);
+
+      // if comm_hiding (exchange_data_begin)
+      p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                               adapt_mesh, adapt_virtual,
+                                               adapt_virtual_ghost, level,
+                                               sizeof(lbadapt_payload_t),
+                                               (void**)local_pointer.data(),
+                                               (void**)ghost_pointer.data());
     }
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE
@@ -4276,7 +4278,7 @@ void lb_calc_average_rho() {
 #ifdef LB_ADAPTIVE
   double rho;
   rho = 0.0;
-  p8est_iterate(lb_p8est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL,
+  p8est_iterate(adapt_p4est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL,
                 NULL, NULL);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE

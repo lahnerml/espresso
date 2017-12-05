@@ -392,7 +392,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef LB_ADAPTIVE
     int n_integration_steps = (sim_time / time_step) + 0.5;
-    if ((n_integration_steps != 0) &&
+    if ((steps_until_grid_change != -1) && (n_integration_steps != 0) &&
         (0 == n_integration_steps % steps_until_grid_change)) {
           p4est_utils_adapt_grid();
         }

@@ -18,44 +18,7 @@ LB_Boundary *d_lb_boundaries;
 lb_float *d_d3q19_lattice = NULL;
 lb_float *d_d3q19_w = NULL;
 
-void print_device_info() {
-  int device = -1;
-  cudaGetDevice(&device);
-  cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, device);
-  printf("Device Number: %d\n", device);
-  printf("  Device name: %s\n", prop.name);
-  printf("  Memory Clock Rate (KHz): %d\n", prop.memoryClockRate);
-  printf("  Memory Bus Width (bits): %d\n", prop.memoryBusWidth);
-  printf("  Warp size: %i\n", prop.warpSize);
-  printf("  Max memory pitch allowed: %zu\n", prop.memPitch);
-  printf("  Constant memory available: %zu\n", prop.totalConstMem);
-  printf("  Peak Memory Bandwidth (GB/s): %f\n",
-         2.0 * prop.memoryClockRate * (prop.memoryBusWidth / 8.0) / 1.0e6);
-  printf("  Number of Streaming Multiprocessors: %i\n",
-         prop.multiProcessorCount);
-  printf("  Maximum number of Threads per streaming multiprocessor: %i\n",
-         prop.maxThreadsPerMultiProcessor);
-  printf("  Maximum number of Threads per block: %i\n",
-         prop.maxThreadsPerBlock);
-  printf("  Maximum thread size: [%i, %i, %i]\n", prop.maxThreadsDim[0],
-         prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
-  printf("  Maximum grid size: [%i, %i, %i]\n", prop.maxGridSize[0],
-         prop.maxGridSize[1], prop.maxGridSize[2]);
-  printf("  Maximum amount of shared memory per block: %zu\n",
-         prop.sharedMemPerBlock);
-  printf("  Maximum amount of shared memory per streaming multiprocessor %zu\n",
-         prop.sharedMemPerMultiprocessor);
-#if CUDART_VERSION >= 8000
-  printf("  Single to double performance ratio: %i\n",
-         prop.singleToDoublePrecisionPerfRatio);
-#endif // CUDART_VERSION > 8
-  printf("\n");
-}
-
 void lbadapt_gpu_init() {
-  // print_device_info();
-
   // avoid allocating containers multiple times
   if (d_d3q19_lattice == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_lattice, sizeof(lb_float) * 3 * 19));

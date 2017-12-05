@@ -88,6 +88,7 @@ int dd_p4est_full_shell_neigh(int cell, int neighidx) {
     fprintf(stderr, "dd_p4est_full_shell_neigh: Require 0 <= neighidx < 27.\n");
     errexit();
   }
+  return 0;
 }
 //-----------------------------------------------------------------------------------------
 // Init Callback for internal structure

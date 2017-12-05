@@ -61,11 +61,13 @@
        // !defined(GAUSSRANDOM))
 
 /* "external variables" */
-p8est_connectivity_t *conn;
-p8est_t *lb_p8est = 0;
-p8est_ghost_t *lbadapt_ghost;
-p8est_ghostvirt_t *lbadapt_ghost_virt;
-p8est_mesh_t *lbadapt_mesh;
+castable_unique_ptr<p4est_t> adapt_p4est;
+castable_unique_ptr<p4est_connectivity_t> adapt_conn;
+castable_unique_ptr<p4est_ghost_t> adapt_ghost;
+castable_unique_ptr<p4est_mesh_t> adapt_mesh;
+castable_unique_ptr<p4est_virtual_t> adapt_virtual;
+castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 int lb_conn_brick[3] = {0, 0, 0};
@@ -101,28 +103,19 @@ double coords_for_regional_refinement[6] = {
 
 /*** SETUP ***/
 void lbadapt_allocate_data() {
+  p4est_utils_allocate_levelwise_storage(lbadapt_local_data, adapt_mesh,
+                                         adapt_virtual, true);
 
-  p4est_utils_allocate_levelwise_storage(lbadapt_local_data, lbadapt_mesh,
-                                         true);
-
-  int coarsest_level_ghost = -1;
   /** ghost */
-  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
-    if ((((lbadapt_mesh->ghost_level + level)->elem_count > 0) ||
-         ((lbadapt_mesh->virtual_glevels + level)->elem_count > 0)) &&
-        coarsest_level_ghost == -1) {
-      coarsest_level_ghost = level;
-    }
-  }
-  if (coarsest_level_ghost == -1) {
+  if (adapt_ghost->ghosts.elem_count == 0) {
     return;
   } else {
-    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, lbadapt_mesh,
-                                           false);
+    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
+                                           adapt_virtual, false);
   }
 
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lbadapt_mesh->local_num_quadrants;
+  local_num_quadrants = adapt_mesh->local_num_quadrants;
   lbadapt_gpu_allocate_device_memory();
 #endif // LB_ADAPTIVE_GPU
 } // lbadapt_allocate_data();
@@ -176,17 +169,11 @@ void lbadapt_set_force(lbadapt_payload_t *data, int level)
 void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 {
+#ifdef EXTERNAL_FORCES
 #ifdef LB_ADAPTIVE_GPU
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
-
-#ifdef EXTERNAL_FORCES
 // unit conversion: force density
-#ifdef LB_ADAPTIVE_GPU
   data->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   data->force[1] =
@@ -194,6 +181,8 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   data->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // LB_ADAPTIVE_GPU
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                   (lb_float)P8EST_ROOT_LEN;
   data->lbfields.force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   data->lbfields.force[1] =
@@ -216,17 +205,29 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  if (lbadapt_local_data.empty()) {
-    lbadapt_allocate_data();
+  if (lbpar.base_level == -1) {
+    lbpar.base_level =
+        Utils::nat_log2_floor((int) (lb_conn_brick[0] / lbpar.agrid));
   }
+
+  // reset p4est
+  mpi_lbadapt_grid_init(0, lbpar.base_level);
+
+  // reset data
+  lbadapt_local_data.clear();
+  lbadapt_ghost_data.clear();
+  lbadapt_allocate_data();
+
+
   int status;
   lbadapt_payload_t *data;
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REALVIRTUAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST,
+        P8EST_TRAVERSE_REALVIRTUAL, P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -255,7 +256,6 @@ void lbadapt_init() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 } // lbadapt_init();
 
@@ -297,14 +297,14 @@ void lbadapt_reinit_force_per_cell() {
   }
   int status;
   lbadapt_payload_t *data;
-
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
 
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -331,11 +331,13 @@ void lbadapt_reinit_force_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
 void lbadapt_reinit_fluid_per_cell() {
+  if (adapt_p4est == nullptr) {
+    lbadapt_init();
+  }
   if (lbadapt_local_data.empty()) {
     lbadapt_allocate_data();
   }
@@ -348,6 +350,7 @@ void lbadapt_reinit_fluid_per_cell() {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
 #ifdef LB_ADAPTIVE_GPU
@@ -357,10 +360,10 @@ void lbadapt_reinit_fluid_per_cell() {
     lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
 
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-        P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -398,7 +401,6 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -553,8 +555,8 @@ void lbadapt_patches_populate_halos(int level) {
   // clang-format on
   lbadapt_payload_t *data, *neighbor_data;
   int status = 0;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, level, P8EST_CONNECT_EDGE,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
@@ -706,7 +708,7 @@ void lbadapt_patches_populate_halos(int level) {
           // for dealing with arbitrary orientations and arbitrary neighbor
           // relations: copy first to intermediate array and fill halo in
           // current patch from that temporary storage.
-          // TODO: Implement that
+          // TODO: Implement that, at least in theory.
 
           // perform the actual data replication
           for (int patch_z = 0; patch_z < iter_max_z; ++patch_z) {
@@ -725,7 +727,6 @@ void lbadapt_patches_populate_halos(int level) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 }
 #endif // LB_ADAPTIVE_GPU
 
@@ -750,7 +751,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
       (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -767,7 +768,7 @@ int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float midpoint[3];
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    p4est_utils_get_midpoint(p8est, which_tree, quads[i], midpoint);
+    p4est_utils_get_midpoint(p8est, which_tree, quads[i], (double*) midpoint);
     if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
         (midpoint[0] <= coords_for_regional_refinement[1]) &&
         (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -790,7 +791,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float half_length = 0.6 * sqrt(3) * ((lb_float)base / (lb_float)root);
 
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+	  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -874,7 +875,7 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   double half_length = 0.6 * sqrt(3) * ((double)base / (double)root);
 
   lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint);
+  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -1256,17 +1257,12 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
   j[1] = mode[2];
   j[2] = mode[3];
 
-/* if forces are present, the momentum density is redefined to
- * include one half-step of the force action.  See the
- * Chapman-Enskog expansion in [Ladd & Verberg]. */
-#ifndef EXTERNAL_FORCES
-  if (lbfields[index].has_force)
-#endif // !EXTERNAL_FORCES
-  {
-    j[0] += 0.5 * force[0];
-    j[1] += 0.5 * force[1];
-    j[2] += 0.5 * force[2];
-  }
+  /* if forces are present, the momentum density is redefined to
+   * include one half-step of the force action.  See the
+   * Chapman-Enskog expansion in [Ladd & Verberg]. */
+  j[0] += 0.5 * force[0];
+  j[1] += 0.5 * force[1];
+  j[2] += 0.5 * force[2];
 
   /* equilibrium part of the stress modes */
   pi_eq[0] = scalar(j, j) / rho;
@@ -1605,9 +1601,10 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
   bool has_virtuals;
 
   lb_float modes[lbmodel.n_veloc];
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      quads_to_collide, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, quads_to_collide, P8EST_TRAVERSE_REAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1615,11 +1612,13 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
       if (mesh_iter->current_is_ghost) {
         data = &lbadapt_ghost_data[level][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
-        has_virtuals = mesh_iter->mesh->virtual_gflags[mesh_iter->current_qid];
+        has_virtuals =
+            (-1 != mesh_iter->virtual_quads->virtual_gflags[mesh_iter->current_qid]);
       } else {
         data = &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
             mesh_iter)];
-        has_virtuals = mesh_iter->mesh->virtual_qflags[mesh_iter->current_qid];
+        has_virtuals =
+            (-1 != mesh_iter->virtual_quads->virtual_qflags[mesh_iter->current_qid]);
       }
 #ifdef LB_BOUNDARIES
       if (!data->lbfields.boundary)
@@ -1642,7 +1641,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
         if (data->lbfields.has_force) {
-          lbadapt_apply_forces(modes, &data->lbfields.force, h);
+          lbadapt_apply_forces(modes, data->lbfields.force, h);
         }
 #endif // EXTERNAL_FORCES
 
@@ -1653,7 +1652,6 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1669,13 +1667,13 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
   bool is_ghost = mesh_iter->current_is_ghost;
 
   if (is_ghost) {
-    virtual_sid = mesh_iter->mesh->quad_gvirtual_offset[parent_qid];
+    virtual_sid = mesh_iter->virtual_quads->quad_gvirtual_offset[parent_qid];
     source_data =
         &lbadapt_ghost_data[mesh_iter->current_level]
                            [p8est_meshiter_get_current_storage_id(mesh_iter)];
     virtual_data = &lbadapt_ghost_data[lvl][virtual_sid];
   } else {
-    virtual_sid = mesh_iter->mesh->quad_qvirtual_offset[parent_qid];
+    virtual_sid = mesh_iter->virtual_quads->quad_qvirtual_offset[parent_qid];
     source_data =
         &lbadapt_local_data[mesh_iter->current_level]
                            [p8est_meshiter_get_current_storage_id(mesh_iter)];
@@ -1697,9 +1695,9 @@ void lbadapt_stream(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p4est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
@@ -1713,7 +1711,6 @@ void lbadapt_stream(int level) {
       }
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1737,10 +1734,10 @@ void lbadapt_bounce_back(int level) {
                       8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
   // clang-format on
 
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
-      P8EST_TRAVERSE_PARBOUNDINNER);
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p4est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, P4EST_TRAVERSE_LOCAL, P4EST_TRAVERSE_REALVIRTUAL,
+      P4EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1875,7 +1872,6 @@ void lbadapt_bounce_back(int level) {
 #endif // D3Q19
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1885,38 +1881,46 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int parent_sid;
   lbadapt_payload_t *data, *parent_data;
   int vel;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level + 1, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level + 1,
+      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
+      assert (mesh_iter->current_index % P4EST_CHILDREN ==
+              mesh_iter->current_vid);
       // virtual quads are local if their parent is local, ghost analogous
       if (!mesh_iter->current_is_ghost) {
-        parent_sid = mesh_iter->mesh->quad_qreal_offset[mesh_iter->current_qid];
+        parent_sid =
+            mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];
         data = &lbadapt_local_data[level + 1]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
         parent_data = &lbadapt_local_data[level][parent_sid];
       } else {
-        parent_sid = mesh_iter->mesh->quad_greal_offset[mesh_iter->current_qid];
+        parent_sid =
+            mesh_iter->virtual_quads->quad_greal_offset[mesh_iter->current_qid];
         data = &lbadapt_ghost_data[level + 1]
                                   [p8est_meshiter_get_current_storage_id(
                                       mesh_iter)];
         parent_data = &lbadapt_ghost_data[level][parent_sid];
       }
-      for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
-        if (mesh_iter->current_vid == 0) {
-          parent_data->lbfluid[1][vel] = 0.;
+      if (!data->lbfields.boundary) {
+        if (!mesh_iter->current_vid) {
+          std::fill_n (std::begin(parent_data->lbfluid[0]), lbmodel.n_veloc, 0);
+          std::fill_n (std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
         }
-        parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+          // child velocities have already been swapped here
+          parent_data->lbfluid[0][vel] += 0.125 * data->lbfluid[1][vel];
+          parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
+        }
       }
     }
   }
 
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1924,9 +1928,9 @@ void lbadapt_swap_pointers(int level) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   lbadapt_payload_t *data;
-  p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
@@ -1942,7 +1946,6 @@ void lbadapt_swap_pointers(int level) {
       std::swap(data->lbfluid[0], data->lbfluid[1]);
     }
   }
-  p8est_meshiter_destroy(mesh_iter);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1957,14 +1960,15 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
 #endif // LB_ADAPTIVE_GPU
 
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   /* get boundary status */
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
@@ -1992,7 +1996,6 @@ void lbadapt_get_boundary_values(sc_array_t *boundary_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2013,14 +2016,14 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   lb_float h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
-
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -2092,7 +2095,6 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2113,13 +2115,14 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
                    (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
 #ifdef LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(level) /
@@ -2184,7 +2187,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p8est_meshiter_destroy(mesh_iter);
   }
 }
 
@@ -2195,6 +2197,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
  */
 void check_vel(int qid, double h, lbadapt_payload_t *data,
                std::vector<std::array<double, 3>> &vel) {
+#ifndef LB_ADAPTIVE_GPU
   double rho;
   if (vel[qid] == std::array<double, 3>{std::numeric_limits<double>::min(),
                                         std::numeric_limits<double>::min(),
@@ -2209,23 +2212,27 @@ void check_vel(int qid, double h, lbadapt_payload_t *data,
     vel[qid][1] = vel[qid][1] / rho * h_max / lbpar.tau;
     vel[qid][2] = vel[qid][2] / rho * h_max / lbpar.tau;
   }
+#endif //!LB_ADAPTIVE_GPU
 }
 
 void lbadapt_calc_vorticity(p8est_t *p4est,
                             std::vector<std::array<double, 3>> &vort,
                             std::string filename) {
-  P4EST_ASSERT(vort.size() == p4est->local_num_quadrants);
+#ifndef LB_ADAPTIVE_GPU
+  // FIXME port to GPU
+  P4EST_ASSERT(vort.size() == (size_t) p4est->local_num_quadrants);
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
-      p4est->local_num_quadrants + lbadapt_ghost->ghosts.elem_count,
+      p4est->local_num_quadrants + adapt_ghost->ghosts.elem_count,
       std::array<double, 3>({std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min()}));
-  int nq, enc;
+  int nq;
   int c_level;
+  p4est_locidx_t lq = p4est->local_num_quadrants;
   const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
-  sc_array_t *neighbor_qids = sc_array_new(sizeof(int));
-  sc_array_t *neighbor_encs = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> neighbor_qids = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> neighbor_encs = sc_array_new(sizeof(int));
   std::array<std::vector<int>, 3> n_qids;
   std::array<double, 3> mesh_width;
   double h;
@@ -2234,38 +2241,35 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
 
   for (int qid = 0; qid < p4est->local_num_quadrants; ++qid) {
     // get neighboring quads and their velocity
-    for (int dir_idx = 0; dir_idx < neighbor_dirs.size(); ++dir_idx) {
+    for (unsigned int dir_idx = 0; dir_idx < neighbor_dirs.size(); ++dir_idx) {
       sc_array_truncate(neighbor_qids);
       sc_array_truncate(neighbor_encs);
 
-      quad = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, qid);
+      quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
       c_level = quad->level;
       currCellData =
-          &lbadapt_local_data[c_level][lbadapt_mesh->quad_qreal_offset[qid]];
+          &lbadapt_local_data[c_level][adapt_virtual->quad_qreal_offset[qid]];
       h = (double)P8EST_QUADRANT_LEN(c_level) / (double)P8EST_ROOT_LEN;
       check_vel(qid, h, currCellData, fluid_vel);
 
-      p8est_mesh_get_neighbors(p4est, lbadapt_ghost, lbadapt_mesh, qid, -1,
-                               neighbor_dirs[dir_idx], 0, 0, neighbor_encs,
+      p4est_mesh_get_neighbors(p4est, adapt_ghost, adapt_mesh, qid,
+                               neighbor_dirs[dir_idx], nullptr, neighbor_encs,
                                neighbor_qids);
       P4EST_ASSERT(0 <= neighbor_qids->elem_count &&
                    neighbor_qids->elem_count <= P8EST_HALF);
-      for (int i = 0; i < neighbor_qids->elem_count; ++i) {
+      for (size_t i = 0; i < neighbor_qids->elem_count; ++i) {
         nq = *(int *)sc_array_index(neighbor_qids, i);
-        enc = *(int *)sc_array_index(neighbor_encs, i);
-        bool is_ghost = (enc < 0);
+        bool is_ghost = (lq <= nq);
         if (!is_ghost) {
-          quad = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, nq);
+          quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nq);
           data = &lbadapt_local_data[quad->level]
-                                    [lbadapt_mesh->quad_qreal_offset[nq]];
+                                    [adapt_virtual->quad_qreal_offset[nq]];
         } else {
-          quad = p4est_quadrant_array_index(&lbadapt_ghost->ghosts, nq);
+          quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, nq - lq);
           data = &lbadapt_ghost_data[quad->level]
-                                    [lbadapt_mesh->quad_greal_offset[nq]];
+                                    [adapt_virtual->quad_greal_offset[nq - lq]];
         }
         h = (double)P8EST_QUADRANT_LEN(quad->level) / (double)P8EST_ROOT_LEN;
-        if (is_ghost)
-          nq += p4est->local_num_quadrants;
         check_vel(nq, h, data, fluid_vel);
         n_qids[dir_idx].push_back(nq);
       }
@@ -2277,7 +2281,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
     // calculate vorticity from velocity
     vort[qid][0] = 0;
     if (!currCellData->lbfields.boundary) {
-      for (int i = 0; i < n_qids[0].size(); ++i) {
+      for (size_t i = 0; i < n_qids[0].size(); ++i) {
         vort[qid][0] += ((1. / n_qids[0].size()) *
                          (((fluid_vel[n_qids[0][i]][2] - fluid_vel[qid][2]) /
                            mesh_width[1]) -
@@ -2288,7 +2292,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
     n_qids[0].clear();
     vort[qid][1] = 0;
     if (!currCellData->lbfields.boundary) {
-      for (int i = 0; i < n_qids[1].size(); ++i) {
+      for (size_t i = 0; i < n_qids[1].size(); ++i) {
         vort[qid][1] += ((1. / n_qids[1].size()) *
                          (((fluid_vel[n_qids[1][i]][0] - fluid_vel[qid][0]) /
                            mesh_width[2]) -
@@ -2299,7 +2303,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
     n_qids[1].clear();
     vort[qid][2] = 0;
     if (!currCellData->lbfields.boundary) {
-      for (int i = 0; i < n_qids[2].size(); ++i) {
+      for (size_t i = 0; i < n_qids[2].size(); ++i) {
         vort[qid][2] += ((1. / n_qids[2].size()) *
                          (((fluid_vel[n_qids[2][i]][1] - fluid_vel[qid][1]) /
                            mesh_width[0]) -
@@ -2315,11 +2319,11 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
   if (filename == "") {
     filename = "vorticity_" + std::to_string((int)(sim_time / time_step));
   }
-  sc_array_t *vorticity, *velocity, *qid;
+  castable_unique_ptr<sc_array_t> vorticity, velocity, qid;
   p4est_locidx_t num_cells = p4est->local_num_quadrants;
-  vorticity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
-  qid = sc_array_new_size(sizeof(double), num_cells);
+  vorticity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
+  velocity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
+  qid.reset(sc_array_new_size(sizeof(double), num_cells));
   for (int i = 0; i < num_cells; ++i) {
     double *ins = (double *)sc_array_index(vorticity, 3 * i);
     std::memcpy(ins, vort[i].data(), 3 * sizeof(double));
@@ -2331,7 +2335,7 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
 
   /* create VTK output context and set its parameters */
   p8est_vtk_context_t *context =
-      p8est_vtk_context_new(lb_p8est, filename.c_str());
+      p8est_vtk_context_new(adapt_p4est, filename.c_str());
   p8est_vtk_context_set_scale(context, 1); /* quadrants at full scale */
 
   /* begin writing the output files */
@@ -2347,23 +2351,16 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
                                        1, /* no custom cell scalar data */
                                        2, /* write velocity and vorticity as
                                              vector cell data */
-                                       "qid", qid,
-                                       "velocity", velocity,
-                                       "vorticity", vorticity, context);
+                                       "qid", qid.get(),
+                                       "velocity", velocity.get(),
+                                       "vorticity", vorticity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-
-  /* free memory */
-  sc_array_destroy(velocity);
-  sc_array_destroy(vorticity);
-  sc_array_destroy(qid);
   // FIXME remove DEBUG
-
-  sc_array_destroy(neighbor_qids);
-  sc_array_destroy(neighbor_encs);
+#endif // LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_boundary_status() {
@@ -2379,6 +2376,7 @@ void lbadapt_get_boundary_status() {
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
                          ghost_pointer);
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter;
 
   for (level = forest.coarsest_level_global;
        level <= forest.finest_level_global; ++level) {
@@ -2392,10 +2390,10 @@ void lbadapt_get_boundary_status() {
 #endif // LB_ADAPTIVE_GPU
 
     status = 0;
-    p8est_meshiter_t *mesh_iter = p8est_meshiter_new_ext(
-        lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
-        P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER);
+    mesh_iter.reset(p4est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+        adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
 
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
@@ -2410,7 +2408,7 @@ void lbadapt_get_boundary_status() {
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
-        get_front_lower_left(mesh_iter, xyz_quad);
+        p4est_utils_get_front_lower_left(mesh_iter, (double*) xyz_quad);
         bool all_boundary = true;
 
         for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
@@ -2435,11 +2433,12 @@ void lbadapt_get_boundary_status() {
       }
     }
 
-    p8est_meshiter_destroy(mesh_iter);
-
-    p8est_ghostvirt_exchange_data(
-        lb_p8est, lbadapt_ghost_virt, level, sizeof(lbadapt_payload_t),
-        (void **)local_pointer.data(), (void **)ghost_pointer.data());
+    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                             adapt_mesh, adapt_virtual,
+                                             adapt_virtual_ghost, level,
+                                             sizeof(lbadapt_payload_t),
+                                             (void**)local_pointer.data(),
+                                             (void**)ghost_pointer.data());
   }
 }
 
@@ -2561,7 +2560,7 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
   lb_float bnd; /* local meshwidth */
   p4est_locidx_t arrayoffset;
 
-  tree = p8est_tree_array_index(lb_p8est->trees, which_tree);
+  tree = p8est_tree_array_index(adapt_p4est->trees, which_tree);
   local_id += tree->quadrants_offset; /* now the id is relative to the MPI
                                          process */
   arrayoffset =
@@ -2606,7 +2605,7 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   int x, y, z;
   double xyz[3];
-  p8est_qcoord_to_vertex(conn, tree, q->x, q->y, q->z, xyz);
+  p8est_qcoord_to_vertex(adapt_conn, tree, q->x, q->y, q->z, xyz);
   x = xyz[0] * (1 << lbpar.max_refinement_level);
   y = xyz[1] * (1 << lbpar.max_refinement_level);
   z = xyz[2] * (1 << lbpar.max_refinement_level);
@@ -2618,7 +2617,7 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
                                int displace[3]) {
   int x, y, z;
   double xyz[3];
-  p8est_qcoord_to_vertex(conn, tree, q->x, q->y, q->z, xyz);
+  p8est_qcoord_to_vertex(adapt_conn, tree, q->x, q->y, q->z, xyz);
   x = xyz[0] * (1 << lbpar.max_refinement_level) + displace[0];
   y = xyz[1] * (1 << lbpar.max_refinement_level) + displace[1];
   z = xyz[2] * (1 << lbpar.max_refinement_level) + displace[2];
@@ -2659,15 +2658,15 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   int64_t qidx, zlvlfill;
   // idea: iterate through all ghost quadrants and check if searched position
   //       is contained in current ghost quadrant. if yes, return ghost index
-  for (size_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
-    q = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
+  for (size_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
+    q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
     qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
     zlvlfill = 1 << (3 * (lbpar.max_refinement_level - q->level));
     if (qidx <= pidx && pidx < qidx + zlvlfill)
       idx_a = i;
   }
   idx_b =
-      p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, lbadapt_ghost, pos);
+      p4est_utils_pos_qid_ghost(forest_order::adaptive_LB, adapt_ghost, pos);
   P4EST_ASSERT(idx_a == idx_b);
   return idx_b;
 }
@@ -2704,9 +2703,9 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   }
   int lvl, sid;
   p8est_quadrant_t *quad;
-  quad = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, qidx);
+  quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qidx);
   lvl = quad->level;
-  sid = lbadapt_mesh->quad_qreal_offset[qidx];
+  sid = adapt_virtual->quad_qreal_offset[qidx];
   nodes[0] = &lbadapt_local_data[lvl][sid];
   level[0] = lvl;
   int corner = 0;
@@ -2727,12 +2726,14 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   int xidx = -1;
   int yidx = -1;
   int zidx = -1;
+  castable_unique_ptr<sc_array_t> ne, ni;
+  ne.reset(sc_array_new(sizeof(int)));
+  ni.reset(sc_array_new(sizeof(int)));
   for (int i = 0; i < 7; ++i) {
-    sc_array_t *ne, *ni;
-    ne = sc_array_new(sizeof(int));
-    ni = sc_array_new(sizeof(int));
-    p8est_mesh_get_neighbors(lb_p8est, lbadapt_ghost, lbadapt_mesh, qidx, -1,
-                             nidx[corner][i], 0, NULL, ne, ni);
+    sc_array_truncate(ni);
+    sc_array_truncate(ne);
+    p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
+                             nidx[corner][i], NULL, ne, ni);
     if (ne->elem_count == 0) {
       switch (i) {
       case 2: // X-Y edge
@@ -2796,9 +2797,9 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
           if (i == 3)
             zidx = ncnt;
         }
-        quad = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, nidx);
+        quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nidx);
         lvl = quad->level;
-        sid = lbadapt_mesh->quad_qreal_offset[nidx];
+        sid = adapt_virtual->quad_qreal_offset[nidx];
         nodes[ncnt] = &lbadapt_local_data[lvl][sid];
         delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                       delta_loc[didx[i + 1][2]];
@@ -2814,9 +2815,9 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
           if (i == 3)
             zidx = ncnt;
         }
-        quad = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, nidx);
+        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, nidx);
         lvl = quad->level;
-        sid = lbadapt_mesh->quad_greal_offset[nidx];
+        sid = adapt_virtual->quad_greal_offset[nidx];
         nodes[ncnt] = &lbadapt_ghost_data[lvl][sid];
         delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                       delta_loc[didx[i + 1][2]];
@@ -2825,8 +2826,6 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
         ncnt += 1;
       }
     }
-    sc_array_destroy(ne);
-    sc_array_destroy(ni);
   }
   double dsum = 1.0;
   for (int i = 0; i < ncnt; ++i)
@@ -2857,10 +2856,10 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   int lvl, sid, tree, zarea, zsize;
   p8est_quadrant_t *quad;
 
-  quad = p8est_quadrant_array_index(&lbadapt_ghost->ghosts, qidx);
+  quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, qidx);
   tree = quad->p.piggy3.which_tree;
   lvl = quad->level;
-  sid = lbadapt_mesh->quad_greal_offset[qidx];
+  sid = adapt_virtual->quad_greal_offset[qidx];
   nodes[0] = &lbadapt_ghost_data[lvl][sid];
   level[0] = lvl;
 
@@ -2906,12 +2905,12 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         displace[2] = -zsize;
     }
     int64_t nidx = lbadapt_get_global_idx(quad, tree, displace);
-    for (int64_t i = 0; i < lbadapt_ghost->mirrors.elem_count; ++i) {
+    for (uint64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q =
-          p8est_quadrant_array_index(&lbadapt_ghost->mirrors, i);
+          p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
-        sid = lbadapt_mesh->quad_qreal_offset[q->p.piggy3.local_num];
+        sid = adapt_virtual->quad_qreal_offset[q->p.piggy3.local_num];
         nodes[ncnt] = &lbadapt_local_data[q->level][sid];
         level[ncnt] = q->level;
         delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] *
@@ -2926,12 +2925,12 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         cnt_dir |= 1 << dir;
       }
     }
-    for (int64_t i = 0; i < lbadapt_ghost->ghosts.elem_count; ++i) {
+    for (uint64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
       p8est_quadrant_t *q =
-          p8est_quadrant_array_index(&lbadapt_ghost->ghosts, i);
+          p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
       qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
-        sid = lbadapt_mesh->quad_greal_offset[i];
+        sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level][sid];
         level[ncnt] = q->level;
         delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] *

@@ -5,6 +5,7 @@
 #include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "lb-d3q19.hpp"
+#include "p4est_utils.hpp"
 
 #include <assert.h>
 #include <mpi.h>
@@ -96,22 +97,23 @@ void lbadapt_gpu_offload_data(int level) {
   next_real = tmp_real;
   next_virt = tmp_virt;
   p8est_meshiter_t *m = p8est_meshiter_new_ext(
-      p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
+      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
   int status = 0;
+  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(m);
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
         memcpy(next_real,
-               &lbadapt_local_data[level - coarsest_level_local]
+               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(m)],
                sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
-               &lbadapt_local_data[level - coarsest_level_local]
+               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(m)],
                P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
@@ -134,20 +136,21 @@ void lbadapt_gpu_retrieve_data(int level) {
   next_virt = tmp_virt;
   lbadapt_gpu_copy_data_from_device(tmp_real, tmp_virt, level);
   p8est_meshiter_t *m = p8est_meshiter_new_ext(
-      p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
+      lb_p8est, lbadapt_ghost, lbadapt_mesh, level, lbadapt_ghost->btype,
       P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
   int status = 0;
+  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(m);
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
-        memcpy(&lbadapt_local_data[level - coarsest_level_local]
+        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_real, sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
-        memcpy(&lbadapt_local_data[level - coarsest_level_local]
+        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_virt, P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
@@ -178,19 +181,19 @@ int lbadapt_print_gpu_utilization(char *filename) {
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   thread_block_container_t *a;
-  a = P4EST_ALLOC(thread_block_container_t, p8est->local_num_quadrants);
+  a = P4EST_ALLOC(thread_block_container_t, lb_p8est->local_num_quadrants);
 
   show_blocks_threads(a);
   lbadapt_vtk_context_t *c;
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
   sc_array_t *values_thread, *values_block;
   values_thread = sc_array_new_size(sizeof(double), num_cells);
   values_block = sc_array_new_size(sizeof(double), num_cells);
 
   double *block_ptr, *thread_ptr;
-  for (int i = 0; i < p8est->local_num_quadrants; ++i) {
+  for (int i = 0; i < lb_p8est->local_num_quadrants; ++i) {
     block_ptr = (double *)sc_array_index(values_block, cells_per_patch * i);
     thread_ptr = (double *)sc_array_index(values_thread, cells_per_patch * i);
     int patch_count = 0;
@@ -259,7 +262,7 @@ void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context) {
   /* Close paraview master file */
   if (context->pvtufile != NULL) {
     /* Only the root process opens/closes these files. */
-    P4EST_ASSERT(p8est->mpirank == 0);
+    P4EST_ASSERT(lb_p8est->mpirank == 0);
     if (fclose(context->pvtufile)) {
       P4EST_LERRORF(P8EST_STRING "_vtk: Error closing <%s>.\n",
                     context->pvtufilename);
@@ -270,7 +273,7 @@ void lbadapt_vtk_context_destroy(lbadapt_vtk_context_t *context) {
   /* Close visit master file */
   if (context->visitfile != NULL) {
     /* Only the root process opens/closes these files. */
-    P4EST_ASSERT(p8est->mpirank == 0);
+    P4EST_ASSERT(lb_p8est->mpirank == 0);
     if (fclose(context->visitfile)) {
       P4EST_LERRORF(P8EST_STRING "_vtk: Error closing <%s>.\n",
                     context->visitfilename);
@@ -324,7 +327,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
   cont->writing = 1;
 
   /* grab context variables */
-  p4est = p8est;
+  p4est = lb_p8est;
   filename = cont->filename;
   P4EST_ASSERT(filename != NULL);
 
@@ -401,7 +404,7 @@ lbadapt_vtk_context_t *lbadapt_vtk_write_header(lbadapt_vtk_context_t *cont) {
       patch_offset = ((double)base / (LBADAPT_PATCHSIZE * (double)root));
 
       // lower left corner of quadrant
-      lbadapt_get_front_lower_left(p8est, jt, quad, xyz_quad);
+      p4est_utils_get_front_lower_left(lb_p8est, jt, quad, xyz_quad);
 
       patch_count = 0;
       for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {
@@ -592,7 +595,7 @@ lbadapt_vtk_write_cell_scalar(lbadapt_vtk_context_t *cont,
                               const char *scalar_name, sc_array_t *values) {
   const p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
+  const p4est_locidx_t Ncells = cells_per_patch * lb_p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
   double *float_data;
@@ -641,7 +644,7 @@ lbadapt_vtk_write_cell_vector(lbadapt_vtk_context_t *cont,
                               const char *vector_name, sc_array_t *values) {
   const p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
+  const p4est_locidx_t Ncells = cells_per_patch * lb_p8est->local_num_quadrants;
   p4est_locidx_t il;
   int retval;
   double *float_data;
@@ -715,19 +718,19 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
         num_cell_vectors || num_cell_vectors))
     return cont;
 
-  const int mpirank = p8est->mpirank;
+  const int mpirank = lb_p8est->mpirank;
   int retval;
   int i, all = 0;
   int scalar_strlen, vector_strlen;
 
-  sc_array_t *trees = p8est->trees;
+  sc_array_t *trees = lb_p8est->trees;
   p8est_tree_t *tree;
-  const p4est_topidx_t first_local_tree = p8est->first_local_tree;
-  const p4est_topidx_t last_local_tree = p8est->last_local_tree;
+  const p4est_topidx_t first_local_tree = lb_p8est->first_local_tree;
+  const p4est_topidx_t last_local_tree = lb_p8est->last_local_tree;
 
   const p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  const p4est_locidx_t Ncells = cells_per_patch * p8est->local_num_quadrants;
+  const p4est_locidx_t Ncells = cells_per_patch * lb_p8est->local_num_quadrants;
 
   char cell_scalars[BUFSIZ], cell_vectors[BUFSIZ];
   const char *name, **names;
@@ -928,7 +931,7 @@ lbadapt_vtk_write_cell_datav(lbadapt_vtk_context_t *cont, int write_tree,
     fprintf(cont->vtufile, "        <DataArray type=\"%s\" Name=\"qid\""
                            " format=\"%s\">\n",
             P4EST_VTK_LOCIDX, "binary");
-    int offset = p8est->global_first_quadrant[mpirank];
+    int offset = lb_p8est->global_first_quadrant[mpirank];
     for (il = 0, jt = first_local_tree; jt <= last_local_tree; ++jt) {
       tree = p8est_tree_array_index(trees, jt);
       num_quads = tree->quadrants.elem_count;
@@ -1079,8 +1082,8 @@ lbadapt_vtk_write_cell_dataf(lbadapt_vtk_context_t *cont, int write_tree,
 
 int lbadapt_vtk_write_footer(lbadapt_vtk_context_t *cont) {
   int p;
-  int procRank = p8est->mpirank;
-  int numProcs = p8est->mpisize;
+  int procRank = lb_p8est->mpirank;
+  int numProcs = lb_p8est->mpisize;
 
   P4EST_ASSERT(cont != NULL && cont->writing);
 

@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <mpi.h>
+#include <utility>
 #ifdef OPEN_MPI
 #include <dlfcn.h>
 #endif // OPEN_MPI
@@ -188,6 +189,7 @@ static int terminated = 0;
   CB(mpi_scafacos_set_parameters_slave)                                        \
   CB(mpi_mpiio_slave)                                                          \
   CB(mpi_lbadapt_grid_init)                                                    \
+  CB(mpi_lbadapt_set_min_level)                                                \
   CB(mpi_lbadapt_set_max_level)                                                \
   CB(mpi_lbadapt_set_steps_before_grid_change)                                 \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
@@ -297,7 +299,7 @@ void mpi_init(int *argc, char ***argv) {
 
   Communication::initialize_callbacks(comm_cart);
 
-  for (int i = 0; i < slave_callbacks.size(); ++i) {
+  for (unsigned int i = 0; i < slave_callbacks.size(); ++i) {
     mpiCallbacks().add(slave_callbacks[i]);
   }
 
@@ -351,22 +353,12 @@ void mpi_stop_slave(int node, int param) {
 
 #ifdef LB_ADAPTIVE
   lb_release();
-  if (lbadapt_ghost_virt) {
-    p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  }
-  if (lbadapt_mesh) {
-    p8est_mesh_destroy(lbadapt_mesh);
-  }
-  if (lbadapt_ghost) {
-    p8est_ghost_destroy(lbadapt_ghost);
-  }
-  if (lb_p8est) {
-    p8est_destroy(lb_p8est);
-  }
-  if (conn) {
-    p8est_connectivity_destroy(conn);
-  }
-
+  adapt_p4est.reset();
+  adapt_conn.reset();
+  adapt_ghost.reset();
+  adapt_mesh.reset();
+  adapt_virtual.reset();
+  adapt_virtual_ghost.reset();
   sc_finalize();
 #endif // LB_ADAPTIVE
 
@@ -2652,9 +2644,9 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 #else  // !LB_ADAPTIVE
     int quad;
     int lvl = 0;
-    for (int64_t i = 0; i < lb_p8est->local_num_quadrants; ++i) {
-      p8est_quadrant_t *q = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, i);
-      int64_t qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]);
+    for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
+      p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
+      int64_t qidx = lbadapt_get_global_idx(q, adapt_mesh->quad_to_tree[i]);
       if (qidx > index) {
         quad = i - 1;
         break;
@@ -2662,7 +2654,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
       lvl = q->level;
     }
     lbadapt_payload_t *data =
-        &lbadapt_local_data[lvl][lbadapt_mesh->quad_qreal_offset[quad]];
+        &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                               data->lbfields.boundary, data->lbfields.has_force,
                               1.0 / double(lvl), rho, j, pi);
@@ -2697,9 +2689,9 @@ void mpi_recv_fluid_slave(int node, int index) {
 #else  // !LB_ADAPTIVE
     int quad;
     int lvl = 0;
-    for (int64_t i = 0; i < lb_p8est->local_num_quadrants; ++i) {
-      p8est_quadrant_t *q = p8est_mesh_get_quadrant(lb_p8est, lbadapt_mesh, i);
-      int64_t qidx = lbadapt_get_global_idx(q, lbadapt_mesh->quad_to_tree[i]);
+    for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
+      p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
+      int64_t qidx = lbadapt_get_global_idx(q, adapt_mesh->quad_to_tree[i]);
       if (qidx > index) {
         quad = i - 1;
         break;
@@ -2707,7 +2699,7 @@ void mpi_recv_fluid_slave(int node, int index) {
       lvl = q->level;
     }
     lbadapt_payload_t *dat =
-        &lbadapt_local_data[lvl][lbadapt_mesh->quad_qreal_offset[quad]];
+        &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(dat->lbfluid, dat->lbfields.force,
                               dat->lbfields.boundary, dat->lbfields.has_force,
                               1.0 / double(lvl), &data[0], &data[1], &data[4]);
@@ -2777,59 +2769,68 @@ void mpi_lbadapt_grid_reset(int node, int dummy) {
 
 void mpi_lbadapt_grid_init(int node, int level) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   /* create connectivity and octree */
   lb_conn_brick[0] = box_l[0];
   lb_conn_brick[1] = box_l[1];
   lb_conn_brick[2] = box_l[2];
 
-  conn = p8est_connectivity_new_brick(lb_conn_brick[0], lb_conn_brick[1],
-                                      lb_conn_brick[2], periodic & 1,
-                                      periodic & 2, periodic & 4);
-  // clang-format off
-  lb_p8est = p8est_new_ext(comm_cart, /* mpi communicator */
-                           conn,      /* connectivity */
-                           0,         /* min octants per process */
-                           level,     /* min level */
-                           1,         /* fill uniform */
-                           0,         /* data size */
-                           NULL,      /* init function */
-                           NULL       /* user pointer */);
-  // clang-format on
+  // Hack to satisfy p4est:  Calling p4est_destroy requires the corresponding
+  //                         p4est_connectivity struct to be valid.
+  {
+    // turn adapt conn into an rvalue reference and move it to old_conn, thus
+    // preserving its value for call to p4est_destroy and void its destruction
+    auto old_conn = std::move(adapt_conn);
+    // substitute connectivity
+    adapt_conn.reset(p4est_connectivity_new_brick(
+        lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2], periodic & 1,
+        periodic & 2, periodic & 4));
+    // substitute and delete old p4est
+    adapt_p4est.reset(
+        p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL, NULL));
+  }
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
 
-  // build initial versions of ghost, mesh, and ghost_virt
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
-  lbadapt_local_data.clear();
-  lbadapt_ghost_data.clear();
+  // build initial versions of ghost, mesh, virtual, and virtual_ghost
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
 #ifdef LB_ADAPTIVE_GPU
   // regular grid
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
+#endif // LB_ADAPTIVE
+}
 
-  lbpar.base_level = level;
-  lbpar.max_refinement_level = level;
+void mpi_lbadapt_set_min_level(int node, int l_min) {
+#ifdef LB_ADAPTIVE
+  lbpar.base_level = l_min;
+  assert(lbpar.base_level <= lbpar.max_refinement_level);
+
+  lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
 
 void mpi_lbadapt_set_max_level(int node, int l_max) {
 #ifdef LB_ADAPTIVE
   lbpar.max_refinement_level = l_max;
+  assert(lbpar.base_level <= lbpar.max_refinement_level);
 
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
@@ -2845,21 +2846,21 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-  sc_array_t *boundary;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  boundary = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> boundary =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_boundary_values(boundary);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -2875,7 +2876,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                        1, /* write boundary index as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "boundary", boundary, context);
+                                       "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -2901,7 +2902,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                    1, /* write boundary index as scalar cell
                                          data */
                                    0, /* no custom cell vector data */
-                                   "boundary", boundary, context);
+                                   "boundary", boundary.get(), context);
   // clang-format on
 
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
@@ -2909,7 +2910,6 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-  sc_array_destroy(boundary);
 #endif // LB_ADAPTIVE
 }
 
@@ -2918,21 +2918,21 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  sc_array_t *density;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  density = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> density =
+      sc_array_new_size(sizeof(double), num_cells);
 
   lbadapt_get_density_values(density);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -2948,7 +2948,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                        1, /* write density as scalar cell
                                              data */
                                        0, /* no custom cell vector data */
-                                       "density", density, context);
+                                       "density", density.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -2972,15 +2972,13 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                          1, /* write density as scalar cell
                                                data */
                                          0, /* no custom cell vector data */
-                                         "density", density, context);
+                                         "density", density.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  sc_array_destroy(density);
 #endif // LB_ADAPTIVE
 }
 
@@ -2989,21 +2987,21 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  sc_array_t *velocity;
 #ifndef LB_ADAPTIVE_GPU
-  p4est_locidx_t num_cells = lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
 #else  // LB_ADAPTIVE_GPU
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
-  velocity = sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
+  castable_unique_ptr<sc_array_t> velocity =
+      sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(lb_p8est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
 
   /* begin writing the output files */
@@ -3019,7 +3017,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                        0, /* no custom cell scalar data */
                                        1, /* write velocity as vector cell
                                              data */
-                                       "velocity", velocity, context);
+                                       "velocity", velocity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
@@ -3043,16 +3041,13 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                          0, /* no custom cell scalar data */
                                          1, /* write velocity as vector cell
                                                data */
-                                         "velocity", velocity, context);
+                                         "velocity", velocity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-
-  /* free memory */
-  sc_array_destroy(velocity);
 #endif // LB_ADAPTIVE
 }
 
@@ -3061,20 +3056,19 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len) {
   char filename[len];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  thread_block_container_t *a;
-  a = P4EST_ALLOC(thread_block_container_t, lb_p8est->local_num_quadrants);
+  std::vector<thread_block_container_t> a(adapt_p4est->local_num_quadrants);
 
-  show_blocks_threads(a);
+  show_blocks_threads(a.data());
   lbadapt_vtk_context_t *c;
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-  p4est_locidx_t num_cells = cells_per_patch * lb_p8est->local_num_quadrants;
-  sc_array_t *values_thread, *values_block;
-  values_thread = sc_array_new_size(sizeof(double), num_cells);
-  values_block = sc_array_new_size(sizeof(double), num_cells);
+  p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
+  castable_unique_ptr<sc_array_t> values_thread, values_block;
+  values_thread.reset(sc_array_new_size(sizeof(double), num_cells));
+  values_block.reset(sc_array_new_size(sizeof(double), num_cells));
 
   double *block_ptr, *thread_ptr;
-  for (int i = 0; i < lb_p8est->local_num_quadrants; ++i) {
+  for (int i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
     block_ptr = (double *)sc_array_index(values_block, cells_per_patch * i);
     thread_ptr = (double *)sc_array_index(values_thread, cells_per_patch * i);
     int patch_count = 0;
@@ -3094,20 +3088,19 @@ void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len) {
   c = lbadapt_vtk_context_new(filename);
   c = lbadapt_vtk_write_header(c);
   c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0, "block",
-                                   values_block, "thread", values_thread, c);
+                                   values_block.get(), "thread",
+                                   values_thread.get(), c);
   lbadapt_vtk_write_footer(c);
-
-  sc_array_destroy(values_thread);
-  sc_array_destroy(values_block);
-  P4EST_FREE(a);
 #endif // LB_ADAPTIVE_GPU
 }
 
 void mpi_unif_refinement(int node, int ref_iterations) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
+
   for (int i = 0; i < ref_iterations; i++) {
     // clang-format off
-    p8est_refine_ext(lb_p8est,             // forest
+    p8est_refine_ext(adapt_p4est,             // forest
                      0,                    // no recursive refinement
                      lbpar.max_refinement_level, // maximum refinement level
                      refine_regional,      // return true to refine cell
@@ -3117,30 +3110,28 @@ void mpi_unif_refinement(int node, int ref_iterations) {
     // neither re-balancing nor re-partitioning needed here
   }
 
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3150,10 +3141,12 @@ void mpi_unif_refinement(int node, int ref_iterations) {
 
 void mpi_rand_refinement(int node, int ref_iterations) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   int start_idx = 0;
   // assert level 0 is refined
-  if (lb_p8est->global_num_quadrants == lb_p8est->trees->elem_count) {
-    p8est_refine(lb_p8est, 0, refine_uniform, NULL);
+  if ((size_t)adapt_p4est->global_num_quadrants ==
+      adapt_p4est->trees->elem_count) {
+    p8est_refine(adapt_p4est, 0, refine_uniform, NULL);
     ++start_idx;
   }
 
@@ -3161,45 +3154,44 @@ void mpi_rand_refinement(int node, int ref_iterations) {
   // refinement function is defined in lb-adaptive.hpp/lb-adaptive.cpp
   for (int i = start_idx; i < ref_iterations; i++) {
     // clang-format off
-    p8est_refine_ext(lb_p8est,             // forest
+    p8est_refine_ext(adapt_p4est,             // forest
                      0,                    // no recursive refinement
                      lbpar.max_refinement_level, // maximum refinement level
                      refine_random,        // return true to refine cell
                      NULL,                 // init data
                      NULL);                // replace data
 
-    p8est_balance_ext(lb_p8est,            // forest
+    p8est_balance_ext(adapt_p4est,            // forest
                       P8EST_CONNECT_CORNER,// connection type
                       NULL,                // init data
                       NULL);               // replace data
     // clang-format on
-    p8est_partition(lb_p8est, 0, lbadapt_partition_weight);
+    p8est_partition(adapt_p4est, 0, lbadapt_partition_weight);
   }
 
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
+
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3215,44 +3207,43 @@ void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
 
 void mpi_reg_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   // clang-format off
-  p8est_refine_ext(lb_p8est,                // forest
+  p8est_refine_ext(adapt_p4est,                // forest
                    0,                    // no recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_regional,      // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
 
-  p8est_balance_ext(lb_p8est,               // forest
+  p8est_balance_ext(adapt_p4est,               // forest
                     P8EST_CONNECT_CORNER, // connection type
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
 
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
@@ -3263,8 +3254,9 @@ void mpi_reg_refinement(int node, int param) {
 
 void mpi_reg_coarsening(int node, int param) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   // clang-format off
-  p8est_coarsen_ext(lb_p8est,            // forest
+  p8est_coarsen_ext(adapt_p4est,            // forest
                     0,                   // no recursive refinement
                     0,                   // do not callback on orphans
                     coarsen_regional,    // return true to coarsen group of
@@ -3272,36 +3264,35 @@ void mpi_reg_coarsening(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
 
-  p8est_balance_ext(lb_p8est,            // forest
+  p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
 
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
 
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3311,46 +3302,45 @@ void mpi_reg_coarsening(int node, int param) {
 
 void mpi_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   // clang-format off
-  p8est_refine_ext(lb_p8est,             // forest
+  p8est_refine_ext(adapt_p4est,             // forest
                    1,                    // recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
 
-  p8est_balance_ext(lb_p8est,            // forest
+  p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
 
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
-
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
 
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
 
-  // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
@@ -3359,45 +3349,45 @@ void mpi_geometric_refinement(int node, int param) {
 
 void mpi_inv_geometric_refinement(int node, int param) {
 #ifdef LB_ADAPTIVE
+  p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   // clang-format off
-  p8est_refine_ext(lb_p8est,             // forest
+  p8est_refine_ext(adapt_p4est,             // forest
                    1,                    // recursive refinement
                    lbpar.max_refinement_level, // maximum refinement level
                    refine_inv_geometric, // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
 
-  p8est_balance_ext(lb_p8est,            // forest
+  p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
-  p8est_ghostvirt_destroy(lbadapt_ghost_virt);
-  p8est_mesh_destroy(lbadapt_mesh);
-  p8est_ghost_destroy(lbadapt_ghost);
 
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd.p4est);
 #endif // DD_P4EST
-  forests.push_back(lb_p8est);
+  forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
 #endif // DD_P4EST
 
-  lbadapt_ghost = p8est_ghost_new(lb_p8est, P8EST_CONNECT_CORNER);
-  lbadapt_mesh = p8est_mesh_new_ext(lb_p8est, lbadapt_ghost, 1, 1, 1,
-                                    P8EST_CONNECT_CORNER);
-  lbadapt_ghost_virt =
-      p8est_ghostvirt_new(lb_p8est, lbadapt_ghost, lbadapt_mesh);
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 
 #ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = lb_p8est->local_num_quadrants;
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIGVE_GPU
 
-  // FIXME: Implement mapping between two trees
   lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();

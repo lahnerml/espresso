@@ -119,12 +119,11 @@ void on_program_start() {
   min_num_cells = calc_processor_min_num_cells();
 
 #ifdef DD_P4EST
-  //sc_init (comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
-  sc_init (comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  //p4est_init (NULL, SC_LP_PRODUCTION);
-  //sc_init(MPI_COMM_WORLD, 1, 1, NULL, SC_LP_PRODUCTION);
-  //p4est_init(NULL, SC_LP_VERBOSE);
-  p4est_init(NULL, SC_LP_PRODUCTION);
+  auto verbosity = SC_LP_ESSENTIAL;
+  //auto verbosity = SC_LP_PRODUCTION;
+  // auto verbosity = SC_LP_VERBOSE;
+  sc_init (comm_cart, 1, 1, NULL, verbosity);
+  p4est_init(NULL, verbosity);
 #endif
 
   /* initially go for domain decomposition */

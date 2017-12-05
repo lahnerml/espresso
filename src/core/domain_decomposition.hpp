@@ -62,9 +62,7 @@
 #include "thermostat.hpp"
 
 #ifdef DD_P4EST
-#include <p4est_to_p8est.h>
-#include <p8est_ghost.h>
-#include <p8est_mesh.h>
+#include "p4est_utils.hpp"
 
 enum class CellType { inner = 0, boundary, ghost };
 // Structure that stores basic grid information
@@ -132,44 +130,6 @@ typedef struct {
   /** Interacting neighbor cell list  */
   IA_Neighbor *nList;
 } IA_Neighbor_List;
-
-#ifdef DD_P4EST
-namespace std
-{
-  template<>
-  struct default_delete<p4est_t>
-  {
-    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_ghost_t>
-  {
-    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_mesh_t>
-  {
-    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_connectivity_t>
-  {
-    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
-  };
-}
-
-// Don't use it. Can lead to nasty bugs.
-template <typename T>
-struct castable_unique_ptr: public std::unique_ptr<T> {
-  using Base = std::unique_ptr<T>;
-  constexpr castable_unique_ptr(): Base() {}
-  constexpr castable_unique_ptr(std::nullptr_t n): Base(n) {}
-  castable_unique_ptr(T* p): Base(p) {}
-  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
-  operator T*() const { return this->get(); }
-  operator void *() const { return this->get(); }
-};
-#endif
 
 /** Structure containing the information about the cell grid used for domain decomposition. */
 typedef struct {

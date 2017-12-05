@@ -183,7 +183,10 @@ inline void friction_thermo_langevin(Particle *p)
 {
   extern double langevin_pref1, langevin_pref2;
   
-  double langevin_pref1_temp, langevin_pref2_temp, langevin_temp_coeff;
+  double langevin_pref1_temp, langevin_pref2_temp;
+#ifdef LANGEVIN_PER_PARTICLE
+  double langevin_temp_coeff;
+#endif
 
 #ifdef MULTI_TIMESTEP
   extern double langevin_pref1_small;

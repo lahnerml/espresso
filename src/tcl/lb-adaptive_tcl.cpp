@@ -61,6 +61,38 @@ int tclcommand_setup_grid(ClientData data, Tcl_Interp *interp, int argc,
   return TCL_OK;
 }
 
+int tclcommand_set_min_level(ClientData data, Tcl_Interp *interp, int argc,
+                             char **argv) {
+  int level;
+  if (argc != 2) {
+    Tcl_AppendResult(interp, "Setting a minimum refinement level requires one "
+                             "parameter, specifying that level.",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  if (!ARG_IS_I(1, level)) {
+    Tcl_AppendResult(interp,
+                     "Setting l_min needs 1 parameter of type and meaning:\n",
+                     (char *)NULL);
+    Tcl_AppendResult(interp, "INT\n", (char *)NULL);
+    Tcl_AppendResult(interp, "<min_refinement_level>\n", (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  /* check input for semantic correctness */
+  if ((level > 18) || (level < 0)) {
+    Tcl_AppendResult(interp, "allowed refinement levels are [0, 18]\n",
+                     (char *)NULL);
+    return TCL_ERROR;
+  }
+
+  mpi_call(mpi_lbadapt_set_min_level, -1, level);
+  mpi_lbadapt_set_min_level(0, level);
+
+  return TCL_OK;
+}
+
 int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
                              char **argv) {
   int level;

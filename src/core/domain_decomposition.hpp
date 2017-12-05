@@ -61,36 +61,6 @@
 #include "verlet.hpp"
 #include "thermostat.hpp"
 
-#ifdef DD_P4EST
-#include <p4est_to_p8est.h>
-#include <p8est_ghost.h>
-#include <p8est_mesh.h>
-
-// Structure that stores basic grid information
-typedef struct {
-  int64_t idx; // a unique index within all cells (as used by p4est for locals)
-  int rank; // the rank of this cell (equals this_node for locals)
-  int shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
-  int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-                // Cells with shell-type 0 or those located within the domain are always 0
-                // Cells with shell-type 1 store information about which face is a boundary
-                // Cells with shell-type 2 are set if the are in the periodic halo
-  int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
-  int coord[3]; // cartesian coordinates of the cell
-  int p_cnt; // periodic count of this cell, local cells are always 0, for each new periodic occurence
-             // the new occurence is increased by one
-} local_shell_t;
-
-// Structure to store communications
-typedef struct {
-  int rank; // Rank of the communication partner
-  int cnt;  // number of cells to communicate
-  int dir;  // Bitmask for communication direction. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-  std::vector<int> idx; // List of cell indexes
-} comm_t;
-
-#endif
-
 /** Structure containing information about non bonded interactions
     with particles in a neighbor cell. */
 typedef struct {
@@ -136,44 +106,6 @@ typedef struct {
   IA_Neighbor *nList;
 } IA_Neighbor_List;
 
-#ifdef DD_P4EST
-namespace std
-{
-  template<>
-  struct default_delete<p4est_t>
-  {
-    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_ghost_t>
-  {
-    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_mesh_t>
-  {
-    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_connectivity_t>
-  {
-    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
-  };
-}
-
-// Don't use it. Can lead to nasty bugs.
-template <typename T>
-struct castable_unique_ptr: public std::unique_ptr<T> {
-  using Base = std::unique_ptr<T>;
-  constexpr castable_unique_ptr(): Base() {}
-  constexpr castable_unique_ptr(nullptr_t n): Base(n) {}
-  castable_unique_ptr(T* p): Base(p) {}
-  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
-  operator T*() const { return this->get(); }
-  operator void *() const { return this->get(); }
-};
-#endif
-
 /** Structure containing the information about the cell grid used for domain decomposition. */
 typedef struct {
   /** flag for using Verlet List */
@@ -189,11 +121,6 @@ typedef struct {
   double inv_cell_size[3];
   /** Array containing information about the interactions between the cells. */
   IA_Neighbor_List *cell_inter;
-#ifdef DD_P4EST
-  castable_unique_ptr<p4est_t> p4est;
-  castable_unique_ptr<p4est_connectivity_t> p4est_conn;
-  std::vector<local_shell_t> p4est_shell;
-#endif
 }  DomainDecomposition;
 
 /************************************************************/

@@ -56,11 +56,7 @@
 #ifdef LEES_EDWARDS
 le_dd_comms_manager le_mgr;
 #endif
-DomainDecomposition dd = { 1, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, NULL
-#ifdef DD_P4EST
-  , nullptr, nullptr, {}
-#endif
-};
+DomainDecomposition dd = { 1, {0,0,0}, {0,0,0}, {0,0,0}, {0,0,0}, NULL };
 
 int max_num_cells = CELLS_MAX_NUM_CELLS;
 int min_num_cells = 1;

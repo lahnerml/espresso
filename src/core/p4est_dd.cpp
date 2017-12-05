@@ -86,8 +86,41 @@ namespace ds {
 }
 
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
-void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
+
+// Creates the irregular DD using p4est
+static void dd_p4est_create_grid (bool isRepart = false);
+// Compute communication partners for this node and fill internal lists
+static void dd_p4est_comm ();
+// Mark all cells either local or ghost. Local cells are arranged before ghost cells
+static void dd_p4est_mark_cells ();
+// Prepare a GhostCommunicator using the internal lists
+static void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part);
+
+// Fill the IA_NeighborList and compute the half-shell for p4est based DD
+static void dd_p4est_init_cell_interactions();
+
+// Map a position to a cell, returns NULL if not in local (+ ROUND_ERR_PREC*boxl) domain
+static Cell* dd_p4est_save_position_to_cell(double pos[3]);
+// Map a position to a cell, returns NULL if not in local domain
+static Cell* dd_p4est_position_to_cell(double pos[3]);
+//void dd_p4est_position_to_cell(double pos[3], int* idx);
+static Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+
+// Send particles after a repartition
+static void dd_p4est_repart_exchange_part(CellPList *old);
+
+// Map a position to a global processor index
+static int dd_p4est_pos_to_proc(double pos[3]);
+// Compute a Morton index for a position (this is not equal to the p4est index)
+static int64_t dd_p4est_pos_morton_idx(double pos[3]);
+
+/** Revert the order of a communicator: After calling this the
+    communicator is working in reverted order with exchanged
+    communication types GHOST_SEND <-> GHOST_RECV. */
+static void dd_p4est_revert_comm_order (GhostCommunicator *comm);
+
+static void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
+static void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14
 //--------------------------------------------------------------------------------------------------
@@ -875,26 +908,6 @@ void dd_p4est_mark_cells () {
   for (int c=0;c<num_ghost_cells;++c)
     ghost_cells.cell[c] = &cells[num_local_cells + c];
 #endif
-}
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_update_communicators_w_boxl() {
-  dd_p4est_update_comm_w_boxl(&cell_structure.exchange_ghosts_comm);
-  dd_p4est_update_comm_w_boxl(&cell_structure.update_ghost_pos_comm);
-}
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_update_comm_w_boxl(GhostCommunicator *comm) {
-  int cnt = 0;
-  for (int i=0;i<num_comm_send;++i) {
-    // Reset shift according to communication direction
-    comm->comm[cnt].shift[0] = comm->comm[cnt].shift[1] = comm->comm[cnt].shift[2] = 0.0;
-    if ((comm_send[i].dir &  1)) comm->comm[cnt].shift[0] =  box_l[0];
-    if ((comm_send[i].dir &  2)) comm->comm[cnt].shift[0] = -box_l[0];
-    if ((comm_send[i].dir &  4)) comm->comm[cnt].shift[1] =  box_l[1];
-    if ((comm_send[i].dir &  8)) comm->comm[cnt].shift[1] = -box_l[1];
-    if ((comm_send[i].dir & 16)) comm->comm[cnt].shift[2] =  box_l[2];
-    if ((comm_send[i].dir & 32)) comm->comm[cnt].shift[2] = -box_l[2];
-    ++cnt;
-  }
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_cell_interactions() {
@@ -1845,109 +1858,6 @@ void dd_p4est_on_geometry_change(int flags) {
   cells_re_init(CELL_STRUCTURE_CURRENT);
 #endif
 }
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_write_particle_vtk(char *filename) {
-  // strip file endings
-  char *pos_file_ending = strrchr(filename, '.');
-  if (pos_file_ending != 0) {
-    *pos_file_ending = '\0';
-  } else {
-    pos_file_ending = strpbrk(filename, "\0");
-  }
-  char fname[1024];
-  // node 0 writes the header file
-  if (this_node == 0) {
-    sprintf(fname,"%s.pvtp",filename);
-    FILE *h = fopen(fname, "w");
-    fprintf(h,"<?xml version=\"1.0\"?>\n");
-    fprintf(h,"<VTKFile type=\"PPolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n\t");
-    fprintf(h,"<PPolyData GhostLevel=\"0\">\n\t\t<PPoints>\n\t\t\t");
-    fprintf(h,"<PDataArray type=\"Float32\" Name=\"Position\" NumberOfComponents=\"3\" format=\"ascii\"/>\n");
-    fprintf(h,"\t\t</PPoints>\n\t\t");
-    fprintf(h,"<PPointData Scalars=\"mpirank,part_id,cell_id\" Vectors=\"velocity\">\n\t\t\t");
-    fprintf(h,"<PDataArray type=\"Int32\" Name=\"mpirank\" format=\"ascii\"/>\n\t\t\t");
-    fprintf(h,"<PDataArray type=\"Int32\" Name=\"part_id\" format=\"ascii\"/>\n\t\t\t");
-    fprintf(h,"<PDataArray type=\"Int32\" Name=\"cell_id\" format=\"ascii\"/>\n\t\t\t");
-    fprintf(h,"<PDataArray type=\"Float32\" Name=\"velocity\" NumberOfComponents=\"3\" format=\"ascii\"/>\n\t\t");
-    fprintf(h,"</PPointData>\n");
-    for (int p=0;p<n_nodes;++p)
-      fprintf(h,"\t\t<Piece Source=\"%s_%04i.vtp\"/>\n",filename, p);
-    fprintf(h,"\t</PPolyData>\n</VTKFile>\n");
-    fclose(h);
-  }
-  // write the actual parallel particle files
-  sprintf(fname,"%s_%04i.vtp",filename,this_node);
-  int num_p=0;
-  for (int c = 0; c < local_cells.n; c++) {
-    num_p += local_cells.cell[c]->n;
-  }
-  FILE *h = fopen(fname, "w");
-  fprintf(h,"<?xml version=\"1.0\"?>\n");
-  fprintf(h,"<VTKFile type=\"PolyData\" version=\"0.1\" byte_order=\"LittleEndian\">\n\t");
-  fprintf(h,"<PolyData>\n\t\t<Piece NumberOfPoints=\"%i\" NumberOfVerts=\"0\" ",num_p);
-  fprintf(h,"NumberOfLines=\"0\" NumberOfStrips=\"0\" NumberOfPolys=\"0\">\n\t\t\t<Points>\n\t\t\t\t");
-  fprintf(h,"<DataArray type=\"Float32\" Name=\"Position\" NumberOfComponents=\"3\" format=\"ascii\">\n");
-  for (int c = 0; c < local_cells.n; c++) {
-    int np = local_cells.cell[c]->n;
-    Particle *part = local_cells.cell[c]->part;
-    for (int p=0;p<np;++p) {
-      fprintf(h,"\t\t\t\t\t%le %le %le\n",part[p].r.p[0],part[p].r.p[1],part[p].r.p[2]);
-    }
-  }
-  fprintf(h,"\t\t\t\t</DataArray>\n\t\t\t</Points>\n\t\t\t");
-  fprintf(h,"<PointData Scalars=\"mpirank,part_id,cell_id\" Vectors=\"velocity\">\n\t\t\t\t");
-  fprintf(h,"<DataArray type=\"Int32\" Name=\"mpirank\" format=\"ascii\">\n\t\t\t\t\t");
-  for (int c = 0; c < local_cells.n; c++) {
-    int np = local_cells.cell[c]->n;
-    for (int p=0;p<np;++p) {
-      fprintf(h,"%i ",this_node);
-    }
-  }
-  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Int32\" Name=\"part_id\" format=\"ascii\">\n\t\t\t\t\t");
-  for (int c = 0; c < local_cells.n; c++) {
-    int np = local_cells.cell[c]->n;
-    Particle *part = local_cells.cell[c]->part;
-    for (int p=0;p<np;++p) {
-      fprintf(h,"%i ",part[p].p.identity);
-    }
-  }
-  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Int32\" Name=\"cell_id\" format=\"ascii\">\n\t\t\t\t\t");
-  for (int c = 0; c < local_cells.n; c++) {
-    int np = local_cells.cell[c]->n;
-    for (int p=0;p<np;++p) {
-      fprintf(h,"%i ",c);
-    }
-  }
-  fprintf(h,"\n\t\t\t\t</DataArray>\n\t\t\t\t<DataArray type=\"Float32\" Name=\"velocity\" NumberOfComponents=\"3\" format=\"ascii\">\n");
-  for (int c = 0; c < local_cells.n; c++) {
-    int np = local_cells.cell[c]->n;
-    Particle *part = local_cells.cell[c]->part;
-    for (int p=0;p<np;++p) {
-      fprintf(h,"\t\t\t\t\t%le %le %le\n",
-        part[p].m.v[0]/time_step,part[p].m.v[1]/time_step,part[p].m.v[2]/time_step);
-    }
-  }
-  fprintf(h,"\t\t\t\t</DataArray>\n\t\t\t</PointData>\n");
-  fprintf(h,"\t\t</Piece>\n\t</PolyData>\n</VTKFile>\n");
-  fclose(h);
-}
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_write_vtk() {
-  // write cells to VTK with a given streching
-  //p4est_vtk_write_file_scale (p4est, NULL, P4EST_STRING "_dd", box_l[0]/(double)brick_size[0]);
-  
-  /*char fname[100];
-  sprintf(fname,"cells_conn_%i.list",this_node);
-  FILE* h = fopen(fname,"w");
-  for (int i=0;i<num_cells;++i) {
-    fprintf(h,"%i %i:%li (%i) %i %i [ ",i, p4est_shell[i].rank, p4est_shell[i].idx,
-      p4est_shell[i].p_cnt, p4est_shell[i].shell, p4est_shell[i].boundary);
-    for (int n=0;n<26;++n) fprintf(h,"%i ",p4est_shell[i].neighbor[n]);
-    fprintf(h,"]\n");
-  }
-  fclose(h);*/
-}
-
 
 //--------------------------------------------------------------------------------------------------
 // Purely MD Repartitioning functions follow now.

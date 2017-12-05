@@ -66,7 +66,6 @@
 #include "minimize_energy_tcl.hpp"
 #include "h5mdfile_tcl.hpp"
 #include "mpiio_tcl.hpp"
-#include "p4est_dd_tcl.hpp"
 
 
 #ifdef TK
@@ -204,10 +203,6 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbfluid", tclcommand_lbfluid);
   REGISTER_COMMAND("lbnode", tclcommand_lbnode);
   REGISTER_COMMAND("lbboundary", tclcommand_lbboundary);
-  /* in p4est_dd.cpp */
-#ifdef DD_P4EST
-  REGISTER_COMMAND("md_vtk", tclcommand_md_vtk);
-#endif
   /* in lb-adaptive.cpp */
 #ifdef LB_ADAPTIVE
   REGISTER_COMMAND("lbadapt-init", tclcommand_setup_grid);

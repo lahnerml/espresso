@@ -196,7 +196,6 @@ static int terminated = 0;
   CB(mpi_geometric_refinement)                                                 \
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
-  CB(mpi_dd_p4est_write_particle_vtk)                                          \
   CB(mpi_lbadapt_grid_reset)                                                   \
   CB(mpi_p4est_repart_slave)                                                   \
   CB(mpi_p4est_imbalance_slave)
@@ -3676,15 +3675,6 @@ void mpi_mpiio_slave(int dummy, int flen) {
 
   rebuild_verletlist = 1;
   on_particle_change();
-}
-
-void mpi_dd_p4est_write_particle_vtk(int node, int len) {
-#ifdef DD_P4EST
-  char filename[len];
-  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-
-  dd_p4est_write_particle_vtk(filename);
-#endif
 }
 
 void mpi_p4est_repart_slave(int dummy, int len);

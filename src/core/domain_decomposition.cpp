@@ -36,8 +36,6 @@
 #include "initialize.hpp"
 #include "external_potential.hpp"
 
-#include "call_trace.hpp"
-
 /************************************************/
 /** \name Defines */
 /************************************************/

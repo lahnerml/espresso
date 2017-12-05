@@ -38,8 +38,6 @@
 #include "particle_data.hpp"
 #include "forces_inline.hpp"
 
-#include "call_trace.hpp"
-
 /** Tag for communication in ghost_comm. */
 #define REQ_GHOST_SEND 100
 
@@ -81,8 +79,6 @@ int ghosts_have_v = 0;
 
 void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
 {
-  CALL_TRACE();
-  
   int i;
   comm->data_parts = data_parts;
   comm->async = async;
@@ -155,8 +151,6 @@ int calc_transmit_size(GhostCommunication *gc, int data_parts)
 
 void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_parts)
 {
-  CALL_TRACE();
-  
   GHOST_TRACE(fprintf(stderr, "%d: prepare sending to/bcast from %d\n", this_node, gc->node));
 
   /* reallocate send buffer */
@@ -254,8 +248,6 @@ void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_par
 
 static void prepare_ghost_cell(Cell *cell, int size)
 {
-  CALL_TRACE();
-  
 #ifdef GHOSTS_HAVE_BONDS
   // free all allocated information, will be resent
   {
@@ -292,8 +284,6 @@ static void prepare_ghost_cell(Cell *cell, int size)
 
 void prepare_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
 {
-  CALL_TRACE();
-  
   GHOST_TRACE(fprintf(stderr, "%d: prepare receiving from %d\n", this_node, gc->node));
   /* reallocate recv buffer */
   r_buffer.ensure_and_set_size(calc_transmit_size(gc, data_parts));

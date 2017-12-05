@@ -42,8 +42,6 @@
 #include "nsquare.hpp"
 #include "layered.hpp"
 
-#include "call_trace.hpp"
-
 #ifdef DD_P4EST
 #include "p4est_dd.hpp"
 #endif
@@ -204,8 +202,6 @@ static void cells_adapt_after_repart() {
 
 void cells_re_init (int new_cs, bool isRepart)
 {
-  CALL_TRACE();
-  
   CellPList tmp_local;
   Cell *tmp_cells;
   int tmp_n_cells,i;

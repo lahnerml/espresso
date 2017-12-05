@@ -13,7 +13,6 @@
 #include <p8est_extended.h>
 #include <p8est_bits.h>
 #include <p8est_algorithms.h>
-#include "call_trace.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
 #include "repart.hpp"

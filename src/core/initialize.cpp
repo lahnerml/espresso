@@ -67,8 +67,6 @@
 #include "cuda_interface.hpp"
 #include "scafacos.hpp"
 
-#include "call_trace.hpp"
-
 #ifdef DD_P4EST
 #include <p4est_to_p8est.h>
 #endif
@@ -87,8 +85,6 @@ static int reinit_particle_comm_gpu = 1;
 
 void on_program_start ()
 {
-  CALL_TRACE();
-  
   EVENT_TRACE(fprintf(stderr, "%d: on_program_start\n", this_node));
 
   /* tell Electric fence that we do realloc(0) on purpose. */
@@ -370,8 +366,6 @@ void on_coulomb_change()
 
 void on_short_range_ia_change ()
 {
-  CALL_TRACE();
-  
   EVENT_TRACE(fprintf(stderr, "%d: on_short_range_ia_changes\n", this_node));
   invalidate_obs();
 
@@ -567,8 +561,6 @@ void on_temperature_change()
 
 void on_parameter_change(int field)
 {
-  CALL_TRACE();
-  
   EVENT_TRACE(fprintf(stderr, "%d: on_parameter_change %s\n", this_node, fields[field].name));
 
   switch (field) {

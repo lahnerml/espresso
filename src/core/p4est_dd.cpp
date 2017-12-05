@@ -362,9 +362,7 @@ void dd_p4est_create_grid (bool isRepart) {
   auto p4est_mesh = castable_unique_ptr<p4est_mesh_t>(
       p4est_mesh_new_ext(ds::p4est, p4est_ghost, 1, 1, 0, P8EST_CONNECT_CORNER));
 
-  CELL_TRACE(printf("%i : %i %i-%i %i\n",
-    this_node,periodic,p4est->first_local_tree,p4est->last_local_tree,p4est->local_num_quadrants));
-  
+
   // create space filling inforamtion about first quads per node from p4est
   p4est_space_idx.resize(n_nodes + 1);
   for (int i=0;i<=n_nodes;++i) {
@@ -381,9 +379,6 @@ void dd_p4est_create_grid (bool isRepart) {
       while(tmp < grid_size[1]) tmp <<= 1;
       while(tmp < grid_size[2]) tmp <<= 1;
       p4est_space_idx[i] = tmp*tmp*tmp;
-    }
-    if (i == this_node + 1) {
-      CELL_TRACE(printf("%i : %i - %i\n", this_node, p4est_space_idx[i-1], p4est_space_idx[i] - 1));
     }
   }
 
@@ -884,12 +879,8 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
-  int i;
-
-  CELL_TRACE(fprintf(stderr,"%d: dd_revert_comm_order: anz comm: %d\n",this_node,comm->num));
-
   /* exchange SEND/RECV */
-  for(i = 0; i < comm->num; i++) {
+  for(int i = 0; i < comm->num; i++) {
     if (comm->comm[i].type == GHOST_SEND)
       comm->comm[i].type = GHOST_RECV;
     else if (comm->comm[i].type == GHOST_RECV)
@@ -1074,7 +1065,6 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
         nidx = shell->neighbor[neighbor_lut[z][y][x]];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
           if (ds::p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
-            CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part %d\n",this_node,part->p.identity));
             // With minimal ghost this condition is always true
             if (ds::p4est_shell[nidx].rank != this_node) { // It is a remote process
               // copy data to sendbuf according to rank
@@ -1435,8 +1425,6 @@ void dd_p4est_exchange_and_sort_particles (int global_flag) {
   } else { // do the local resorting (particles move at most on cell)
     dd_p4est_local_exchange_and_sort_particles();
   }
-
-  CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles finished\n",this_node));
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_repart_exchange_part (CellPList *old) {
@@ -1709,8 +1697,6 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   int exchange_data, update_data;
   Particle *part;
 
-  CELL_TRACE(fprintf(stderr, "%d: dd_p4est_topology_init: Number of recieved cells=%d\n", this_node, old->n));
-
   /** broadcast the flag for using verlet list */
   MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
 
@@ -1820,25 +1806,17 @@ void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t
     }*/
     num_quad_per_proc[dd_p4est_pos_to_proc(xyz)] += 1;
   }
-  CELL_TRACE(printf("%i : repartition %i cells: ", this_node, p4est->local_num_quadrants));
-  for (int i=0;i<n_nodes;++i) {
-    CELL_TRACE(printf("%i ",num_quad_per_proc[i]));
-  }
-  
-  CELL_TRACE(printf("\n"));
-  
+
   // Geather this information over all processes
   MPI_Allreduce(num_quad_per_proc, num_quad_per_proc_global, n_nodes, P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
-  
+
   p4est_locidx_t sum = 0;
   for (int i=0;i<n_nodes;++i) sum += num_quad_per_proc_global[i];
   if (sum < p4est->global_num_quadrants) {
     printf("%i : quadrants lost while partitioning\n", this_node);
     return;
   }
-  
-  CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node, num_quad_per_proc_global[this_node]));
-  
+
   // Repartition with the computed distribution
   p4est_partition_given(p4est, num_quad_per_proc_global);
 }

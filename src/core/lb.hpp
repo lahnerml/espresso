@@ -287,6 +287,8 @@ extern double lblambda;
 extern double lblambda_bulk;
 
 #ifdef LB_ADAPTIVE
+extern lb_float h[P8EST_MAXLEVEL];
+
 extern lb_float prefactors[P8EST_MAXLEVEL];
 
 extern lb_float gamma_shear[P8EST_MAXLEVEL];

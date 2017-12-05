@@ -2771,9 +2771,19 @@ void mpi_lbadapt_grid_init(int node, int level) {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   /* create connectivity and octree */
-  lb_conn_brick[0] = box_l[0];
-  lb_conn_brick[1] = box_l[1];
-  lb_conn_brick[2] = box_l[2];
+#ifdef DD_P4EST
+  if (dd.p4est != NULL) {
+    for (int i = 0; i < P4EST_DIM; ++i) {
+      lb_conn_brick[i] = dd_p4est_num_trees_in_dir(i);
+    }
+  } else
+#endif // DD_P4EST
+  {
+    int gcd = Utils::gcd(box_l[0], box_l[1], box_l[2]);
+    lb_conn_brick[0] = box_l[0] / gcd;
+    lb_conn_brick[1] = box_l[1] / gcd;
+    lb_conn_brick[2] = box_l[2] / gcd;
+  }
 
   // Hack to satisfy p4est:  Calling p4est_destroy requires the corresponding
   //                         p4est_connectivity struct to be valid.

@@ -407,16 +407,16 @@ inline int calc_factors(int n, int *factors, int max) {
   return i;
 }
 
-namespace utils {
+namespace Utils {
   /** verify that a double has at most log_10(div) trailing digits
    *
    * @param ai     integer representation of a * div
    * @param ad     double representation of a
    * @param div    measure the maximum allowed precision of ad
    */
-  static bool verify_prec(int ai, double ad, double div) {
-      return (((ad - ROUND_ERROR_PREC) <= (ai / div)) &&
-              ((ad + ROUND_ERROR_PREC) >= (ai / div)));
+  inline bool verify_prec(int ai, double ad, double div) {
+    return (((ad - ROUND_ERROR_PREC) <= (ai / div)) &&
+            ((ad + ROUND_ERROR_PREC) >= (ai / div)));
   }
 
   /** Calculate greatest common divisor of two integer-type variables
@@ -424,10 +424,10 @@ namespace utils {
    * @param [in] a, b  Integers to find gcd for
    */
   template <typename T>
-  static inline T gcd(T a, T b) {
-      static_assert(std::is_integral<T>::value,
-                    "GCD is only implemented for integer types\n");
-      return b == 0 ? a : gcd(b, a % b);
+  inline T gcd(T a, T b) {
+    static_assert(std::is_integral<T>::value,
+                  "GCD is only implemented for integer types\n");
+    return b == 0 ? a : gcd(b, a % b);
   }
 
   /** Calculate greatest common divisor of arbitrary many variables
@@ -436,8 +436,8 @@ namespace utils {
    * @param [in] args   Remaining elements, may be empty
    */
   template <typename T, typename... Ts>
-  static inline T gcd(T a, T b, Ts... args) {
-      return (gcd(gcd(a, b), args...));
+  inline T gcd(T a, T b, Ts... args) {
+    return (gcd(gcd(a, b), args...));
   }
 
   /** Specialize greatest common divisor algorithm for doubles based using
@@ -446,36 +446,36 @@ namespace utils {
    * @param [in] a, b  Doubles to find GCD for.
    */
   template <>
-  double gcd<double>(double a, double b) {
-      // allow at max 5 digits after .
-      int factor = 1e5;
-      int aa = factor * a;
-      int bb = factor * b;
-      if (!verify_prec(aa, a, factor)) {
-          fprintf(stderr, "input is not representable as int(d) + d-int(d)/%i. "
-                  "(%lf)\n", factor, a);
-          return -1.0;
-      }
-      if (!verify_prec(bb, b, factor)) {
-          fprintf(stderr, "input is not representable as int(d) + d-int(d)/%i. "
-                  "(%lf)\n", factor, b);
-          return -1.0;
-      }
+  inline double gcd<double>(double a, double b) {
+    // allow at max 5 digits after .
+    int factor = 1e5;
+    int aa = factor * a;
+    int bb = factor * b;
+    if (!verify_prec(aa, a, factor)) {
+      fprintf(stderr, "input is not representable as int(d) + d-int(d)/%i. "
+              "(%lf)\n", factor, a);
+      return -1.0;
+    }
+    if (!verify_prec(bb, b, factor)) {
+      fprintf(stderr, "input is not representable as int(d) + d-int(d)/%i. "
+              "(%lf)\n", factor, b);
+      return -1.0;
+    }
 
-      // reduce aa/factor and bb/factor
-      int gcd_a = gcd(aa, factor);
-      int gcd_b = gcd(bb, factor);
+    // reduce aa/factor and bb/factor
+    int gcd_a = gcd(aa, factor);
+    int gcd_b = gcd(bb, factor);
 
-      // calculate shares of a and b to a naive common denominator
-      int common_denom_a = factor / gcd_a;
-      int common_denom_b = factor / gcd_b;
+    // calculate shares of a and b to a naive common denominator
+    int common_denom_a = factor / gcd_a;
+    int common_denom_b = factor / gcd_b;
 
-      // calculate greatest common denominiator for numerator and denominator
-      int gcd_denom =
-          gcd(common_denom_b * factor / gcd_a, common_denom_a * factor / gcd_b);
-      int gcd_num = gcd(common_denom_b * aa / gcd_a, common_denom_a * bb / gcd_b);
+    // calculate greatest common denominiator for numerator and denominator
+    int gcd_denom =
+        gcd(common_denom_b * factor / gcd_a, common_denom_a * factor / gcd_b);
+    int gcd_num = gcd(common_denom_b * aa / gcd_a, common_denom_a * bb / gcd_b);
 
-      return (double)gcd_num / (double)gcd_denom;
+    return (double)gcd_num / (double)gcd_denom;
   }
 }
 /*@}*/

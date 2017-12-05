@@ -170,9 +170,8 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 {
 #ifdef EXTERNAL_FORCES
+  lb_float h_max = h[lbpar.max_refinement_level];
 #ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 // unit conversion: force density
   data->force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
@@ -181,8 +180,6 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   data->force[2] =
       prefactors[level] * lbpar.ext_force[2] * SQR(h_max) * SQR(lbpar.tau);
 #else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
   data->lbfields.force[0] =
       prefactors[level] * lbpar.ext_force[0] * SQR(h_max) * SQR(lbpar.tau);
   data->lbfields.force[1] =
@@ -264,21 +261,22 @@ void lbadapt_reinit_parameters() {
     prefactors[i] = 1 << (lbpar.max_refinement_level - i);
 
 #ifdef LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(i) /
-               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
+    h[i] = ((double)P8EST_QUADRANT_LEN(i) * box_l[0]) /
+        ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN * lb_conn_brick[0]);
 #else  // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
+    h[i] = ((double)P8EST_QUADRANT_LEN(i) * box_l[0]) /
+        ((double)P8EST_ROOT_LEN * lb_conn_brick[0]);
 #endif // LB_ADAPTIVE_GPU
     if (lbpar.viscosity[0] > 0.0) {
       gamma_shear[i] =
           1. -
-          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h)) +
+          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau / (SQR(h[i])) +
                 1.);
     }
     if (lbpar.bulk_viscosity[0] > 0.0) {
       gamma_bulk[i] = 1. -
                       2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-                                (prefactors[i] * SQR(h)) +
+                                (prefactors[i] * SQR(h[i])) +
                             1.);
     }
   }
@@ -343,22 +341,10 @@ void lbadapt_reinit_fluid_per_cell() {
   }
   int status;
   lbadapt_payload_t *data;
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
-#ifdef LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) /
-                 ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-    lb_float h = (lb_float)P8EST_QUADRANT_LEN(level) / (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
 
     mesh_iter.reset(p8est_meshiter_new_ext(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
@@ -383,7 +369,7 @@ void lbadapt_reinit_fluid_per_cell() {
         lb_float j[3] = {0., 0., 0.};
         lb_float pi[6] = {0., 0., 0., 0., 0., 0.};
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h);
+        lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h[level]);
 #ifdef LB_BOUNDARIES
         data->lbfields.boundary = 0;
 #endif // LB_BOUNDARIES
@@ -393,7 +379,7 @@ void lbadapt_reinit_fluid_per_cell() {
             for (int patch_x = 1; patch_x <= LBADAPT_PATCHSIZE; ++patch_x) {
               lbadapt_calc_n_from_rho_j_pi(
                   data->patch[patch_x][patch_y][patch_z].lbfluid, rho, j, pi,
-                  h);
+                  h[level]);
               data->patch[patch_x][patch_y][patch_z].boundary = 0;
             }
           }
@@ -953,16 +939,10 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
 /*** HELPER FUNCTIONS ***/
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
-                                 lb_float *j, lb_float *pi, lb_float h) {
+                                 lb_float *j, lb_float *pi, lb_float local_h) {
   int i;
   lb_float local_rho, local_j[3], local_pi[6], trace;
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
   const lb_float avg_rho = lbpar.rho[0] * h_max * h_max * h_max;
 
@@ -1063,16 +1043,10 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
 }
 
 int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
-                              int boundary, int has_force, lb_float h,
+                              int boundary, int has_force, lb_float local_h,
                               lb_float *rho, lb_float *j, lb_float *pi) {
-  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
+  lb_float h_max = h[lbpar.max_refinement_level];
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
@@ -1234,19 +1208,13 @@ int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
   return 0;
 }
 
-int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
+int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 #ifndef LB_ADAPTIVE_GPU
   lb_float rho, j[3], pi_eq[6];
 
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
-  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
 
   /* re-construct the real density
    * remember that the populations are stored as differences to their
@@ -1304,13 +1272,7 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float h) {
 }
 
 int lbadapt_thermalize_modes(lb_float *mode) {
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
   lb_float fluct[6];
 #ifdef GAUSSRANDOM
@@ -1398,18 +1360,12 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   return 0;
 }
 
-int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float h) {
+int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float local_h) {
   lb_float rho, u[3], C[6];
 
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
-  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / h);
+  int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
 
   rho = mode[0] + lbpar.rho[0] * h_max * h_max * h_max;
 
@@ -1719,13 +1675,7 @@ void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
 
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
@@ -2009,13 +1959,9 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
 #ifdef LB_ADAPTIVE_GPU
   int cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-
-  double h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
+
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
@@ -2108,13 +2054,9 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 #ifdef LB_ADAPTIVE_GPU
   int cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
-
-  double h_max = (double)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                 ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
+
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
@@ -2195,7 +2137,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
  * @param[in]       data       Numerical payload of quadrant
  * @param[in, out]  vel        Vector of velocities that are already known
  */
-void check_vel(int qid, double h, lbadapt_payload_t *data,
+void check_vel(int qid, double local_h, lbadapt_payload_t *data,
                std::vector<std::array<double, 3>> &vel) {
 #ifndef LB_ADAPTIVE_GPU
   double rho;
@@ -2204,10 +2146,9 @@ void check_vel(int qid, double h, lbadapt_payload_t *data,
                                         std::numeric_limits<double>::min()}) {
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                               data->lbfields.boundary, data->lbfields.has_force,
-                              h, &rho, vel[qid].data(), 0);
+                              local_h, &rho, vel[qid].data(), 0);
 
-    lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                     ((lb_float)P8EST_ROOT_LEN);
+    lb_float h_max = h[lbpar.max_refinement_level];
     vel[qid][0] = vel[qid][0] / rho * h_max / lbpar.tau;
     vel[qid][1] = vel[qid][1] / rho * h_max / lbpar.tau;
     vel[qid][2] = vel[qid][2] / rho * h_max / lbpar.tau;
@@ -2444,13 +2385,7 @@ void lbadapt_get_boundary_status() {
 
 void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho) {
 #ifndef LB_ADAPTIVE_GPU
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
   lbadapt_payload_t *data;
   data = &lbadapt_local_data[mesh_iter->current_level]
@@ -2512,13 +2447,7 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
   p8est_quadrant_t *q = info->quad;      /* get current global cell id */
   lbadapt_payload_t *data =
       (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
-#ifdef LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
+  lb_float h_max = h[lbpar.max_refinement_level];
 
 #ifndef D3Q19
 #error Only D3Q19 is implemened!

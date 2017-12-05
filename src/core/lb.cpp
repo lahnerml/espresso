@@ -140,6 +140,8 @@ HaloCommunicator update_halo_comm = {0, NULL};
 int fluct;
 
 #ifdef LB_ADAPTIVE
+lb_float h[P8EST_MAXLEVEL] =          {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
 lb_float prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                        0., 0., 0., 0., 0., 0., 0., 0., 0.};
 lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,

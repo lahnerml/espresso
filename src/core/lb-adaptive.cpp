@@ -419,6 +419,10 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   double new_mp[3];
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  for (int i = 0; i < P4EST_DIM; ++i) {
+    new_mp[i] *= box_l[i] / lb_conn_brick[i];
+  }
+
   new_boundary = lbadapt_is_boundary(new_mp);
 
   if (new_boundary) {
@@ -453,6 +457,10 @@ int data_interpolation<lbadapt_payload_t>(
   lb_float new_mp[3];
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  for (int i = 0; i < P4EST_DIM; ++i) {
+    new_mp[i] *= box_l[i] / lb_conn_brick[i];
+  }
+
   new_boundary = lbadapt_is_boundary(new_mp);
 
   if (new_boundary) {
@@ -738,6 +746,9 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
   lb_float midpoint[3];
   p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
+  for (int i = 0; i < P4EST_DIM; ++i) {
+    midpoint[i] *= box_l[i] / lb_conn_brick[i];
+  }
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
       (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -755,6 +766,9 @@ int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     p4est_utils_get_midpoint(p8est, which_tree, quads[i], (double*) midpoint);
+    for (int i = 0; i < P4EST_DIM; ++i) {
+      midpoint[i] *= box_l[i] / lb_conn_brick[i];
+    }
     if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
         (midpoint[0] <= coords_for_regional_refinement[1]) &&
         (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -777,7 +791,10 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   lb_float half_length = 0.6 * sqrt(3) * ((lb_float)base / (lb_float)root);
 
   lb_float midpoint[3];
-	  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
+  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
+  for (int i = 0; i < P4EST_DIM; ++i) {
+    midpoint[i] *= box_l[i] / lb_conn_brick[i];
+  }
 
   double mp[3];
   mp[0] = midpoint[0];
@@ -2267,10 +2284,16 @@ void lbadapt_get_boundary_status() {
 #ifndef LB_ADAPTIVE_GPU
         double midpoint[3];
         p4est_utils_get_midpoint(mesh_iter, midpoint);
+        for (int i = 0; i < 3; ++i) {
+          midpoint[i] *= box_l[i] / lb_conn_brick[i];
+        }
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
         p4est_utils_get_front_lower_left(mesh_iter, (double*) xyz_quad);
+        for (int i = 0; i < 3; ++i) {
+          xyz_quad[i] *= box_l[i] / lb_conn_brick[i];
+        }
         bool all_boundary = true;
 
         for (int patch_z = 0; patch_z < LBADAPT_PATCHSIZE; ++patch_z) {

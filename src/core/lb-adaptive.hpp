@@ -315,6 +315,10 @@ void lbadapt_get_density_values(sc_array_t *density_values);
  */
 void lbadapt_get_velocity_values(sc_array_t *velocity_values);
 
+/** Obtain velocity values of each quadrant for vtk output
+ */
+void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values);
+
 /** Calculate vorticity value of each local quadrant for refinement/coarsening
  *
  * @param [in]  p4est    Current forest

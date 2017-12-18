@@ -1644,7 +1644,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
           lbadapt_apply_forces(modes, data->lbfields.force, h);
         }
 #endif // EXTERNAL_FORCES
-
+        // perform back transformation
         lbadapt_calc_pop_from_modes(data->lbfluid[0], modes);
       }
       if (has_virtuals) {
@@ -2188,6 +2188,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
       }
     }
   }
+}
+
+void lbadapt_get_velocity_values_nodes(sc_array_t * velocity_values) {
+    return;
 }
 
 /** Check if velocity for a given quadrant is set and if not set it

@@ -587,12 +587,12 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   // Zero the size of *all* bondbufs since we rely of zero size receive
   // bondbufs and we cannot guarantee that all comm_types are ordered the same
   // way for each GhostCommunicator.
-  for (int i = 0; i < commbufs.size(); ++i)
+  for (unsigned int i = 0; i < commbufs.size(); ++i)
     commbufs[i].bondbuf().resize(0);
 
 
   // Ensure minimum size of buffers
-  if (commbufs.size() < gc->num) {
+  if (commbufs.size() < (size_t) gc->num) {
     commbufs.resize(gc->num);
     reqs.resize(2 * gc->num);
     // Since the second half of reqs stores only request for sends, we need to
@@ -632,7 +632,7 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   // Wait for requests and postprocess them if they are receives
   int outcount;
   static std::vector<int> idxs;
-  if (idxs.size() < gc->num)
+  if (idxs.size() < (size_t) gc->num)
     idxs.resize(gc->num);
 
   while (true) {

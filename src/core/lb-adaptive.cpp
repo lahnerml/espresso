@@ -1909,12 +1909,12 @@ void lbadapt_update_populations_from_virtuals(int level) {
       }
       if (!data->lbfields.boundary) {
         if (!mesh_iter->current_vid) {
-          std::fill_n (std::begin(parent_data->lbfluid[0]), lbmodel.n_veloc, 0);
+          //std::fill_n (std::begin(parent_data->lbfluid[0]), lbmodel.n_veloc, 0);
           std::fill_n (std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
         }
         for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
           // child velocities have already been swapped here
-          parent_data->lbfluid[0][vel] += 0.125 * data->lbfluid[1][vel];
+          //parent_data->lbfluid[0][vel] += 0.125 * data->lbfluid[1][vel];
           parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
         }
       }

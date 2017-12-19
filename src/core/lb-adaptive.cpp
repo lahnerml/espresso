@@ -556,8 +556,9 @@ void lbadapt_patches_populate_halos(int level) {
   lbadapt_payload_t *data, *neighbor_data;
   int status = 0;
   castable_unique_ptr<p8est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
-      adapt_p4est, adapt_ghost, adapt_mesh, level, P8EST_CONNECT_EDGE,
-      P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL, P8EST_TRAVERSE_PARBOUNDINNER);
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
@@ -1077,9 +1078,15 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
   if (boundary) {
     // set all to 0 on boundary
     *rho = lbpar.rho[0] * h_max * h_max * h_max;
+#if 0
+    for (int i = 0; i < P4EST_DIM; ++i) {
+      j[i] = lb_boundaries[boundary - 1].velocity[i];
+    }
+#else
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
+#endif
     if (pi) {
       pi[0] = 0.;
       pi[1] = 0.;
@@ -1910,7 +1917,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
       if (!data->lbfields.boundary) {
         if (!mesh_iter->current_vid) {
           //std::fill_n (std::begin(parent_data->lbfluid[0]), lbmodel.n_veloc, 0);
-          std::fill_n (std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
+          std::fill_n(std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
         }
         for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
           // child velocities have already been swapped here
@@ -2145,12 +2152,13 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                                   data->lbfields.boundary,
                                   data->lbfields.has_force, h, &rho, j, NULL);
+        if (!data->lbfields.boundary) {
+          j[0] = j[0] / rho * h_max / lbpar.tau;
+          j[1] = j[1] / rho * h_max / lbpar.tau;
+          j[2] = j[2] / rho * h_max / lbpar.tau;
+        }
 
-        j[0] = j[0] / rho * h_max / lbpar.tau;
-        j[1] = j[1] / rho * h_max / lbpar.tau;
-        j[2] = j[2] / rho * h_max / lbpar.tau;
-
-        veloc_ptr = (lb_float *)sc_array_index(
+        veloc_ptr = (lb_float *) sc_array_index(
             velocity_values, P8EST_DIM * mesh_iter->current_qid);
 
         /* pass it into solution vector */
@@ -2168,9 +2176,11 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
                   &tmp_rho, tmp_j, NULL);
 
               rho = tmp_rho;
-              j[0] = tmp_j[0] / rho * h_max / lbpar.tau;
-              j[1] = tmp_j[1] / rho * h_max / lbpar.tau;
-              j[2] = tmp_j[2] / rho * h_max / lbpar.tau;
+              if (!data->boundary) {
+                j[0] = tmp_j[0] / rho * h_max / lbpar.tau;
+                j[1] = tmp_j[1] / rho * h_max / lbpar.tau;
+                j[2] = tmp_j[2] / rho * h_max / lbpar.tau;
+              }
 
               veloc_ptr = (double *)sc_array_index(
                   velocity_values,
@@ -2190,8 +2200,183 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   }
 }
 
-void lbadapt_get_velocity_values_nodes(sc_array_t * velocity_values) {
-    return;
+// inefficient implementation (i.e. without dynamic programming)
+void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
+  // FIXME Port to GPU
+#ifndef LB_ADAPTIVE_GPU
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  int status;
+  int level;
+  double rho;
+  double vels[P4EST_DIM * P4EST_CHILDREN];
+  double *veloc_ptr;
+  lbadapt_payload_t *data;
+  castable_unique_ptr<p4est_meshiter_t> m;
+  bool smaller, larger;
+
+  // neighbor search directions
+  static const int n_idx[8][7] =
+      {{0, 2, 14, 4, 10, 6, 18},  // left, front, bottom
+       {1, 2, 15, 4, 11, 6, 19},  // right, front, bottom
+       {0, 3, 16, 4, 10, 7, 20},  // left, back, bottom
+       {1, 3, 17, 4, 11, 7, 21},  // right, back, bottom
+       {0, 2, 14, 5, 12, 8, 22},  // left, front, top
+       {1, 2, 15, 5, 13, 8, 23},  // right, front, top
+       {0, 3, 16, 5, 12, 9, 24},  // left, back, top
+       {1, 3, 17, 5, 13, 9, 25}}; // right, back, top
+
+  lb_float h_max = (lb_float) P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+                   (lb_float) P8EST_ROOT_LEN;
+
+  for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
+       ++level) {
+    // local mesh width
+    lb_float h =
+        (lb_float) P8EST_QUADRANT_LEN(level) / ((lb_float) P8EST_ROOT_LEN);
+
+    m.reset(p4est_meshiter_new_ext(adapt_p4est, adapt_ghost, adapt_mesh,
+                                   adapt_virtual, level, adapt_ghost->btype,
+                                   P4EST_TRAVERSE_LOCAL, P4EST_TRAVERSE_REAL,
+                                   P4EST_TRAVERSE_PARBOUNDINNER));
+    status = 0;
+    while (status != P4EST_MESHITER_DONE) {
+      status = p4est_meshiter_next(m);
+      if (status != P4EST_MESHITER_DONE) {
+        // collect 8 velocity values
+        for (int c = 0; c < P4EST_CHILDREN; ++c) {
+          data =
+              &lbadapt_local_data[level][p8est_meshiter_get_current_storage_id(
+                  m)];
+          lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
+                                    data->lbfields.boundary,
+                                    data->lbfields.has_force, h, &rho, vels,
+                                    NULL);
+
+          if (!data->lbfields.boundary) {
+            vels[0] = vels[0] / rho * h_max / lbpar.tau;
+            vels[1] = vels[1] / rho * h_max / lbpar.tau;
+            vels[2] = vels[2] / rho * h_max / lbpar.tau;
+          }
+
+          for (int idx = 0; idx < 7; ++idx) {
+            smaller = larger = false;
+            p4est_meshiter_set_neighbor_quad_info(m, n_idx[c][idx]);
+            if (m->neighbor_vid != -1) {
+              larger = true;
+            }
+
+            // catch that neighbor may be smaller if nothing is found
+            if (m->neighbor_qid == -1) {
+              // need to set qid, vid, and is_ghost
+              p4est_virtual_get_neighbor(adapt_p4est, adapt_ghost, adapt_mesh,
+                                         adapt_virtual, m->current_qid, c,
+                                         n_idx[c][idx], &m->neighbor_encs,
+                                         &m->neighbor_qids, &m->neighbor_vids);
+              P4EST_ASSERT (0 == m->neighbor_qids.elem_count
+                            || 1 == m->neighbor_qids.elem_count);
+              for (size_t i = 0; i < m->neighbor_qids.elem_count; ++i) {
+                smaller = true;
+                m->neighbor_qid = *(int *) sc_array_index(&m->neighbor_qids, i);
+                if (adapt_p4est->local_num_quadrants <= m->neighbor_qid) {
+                  m->neighbor_qid -= adapt_p4est->local_num_quadrants;
+                  m->neighbor_is_ghost = 1;
+                }
+                else {
+                  m->neighbor_is_ghost = 0;
+                }
+                m->neighbor_vid = -1;
+              }
+            }
+            if (!smaller && !larger) {
+              if (!m->neighbor_is_ghost) {
+                data =
+                    &lbadapt_local_data[level]
+                        [p8est_meshiter_get_neighbor_storage_id(m)];
+              } else {
+                data =
+                    &lbadapt_ghost_data[level]
+                        [p8est_meshiter_get_neighbor_storage_id(m)];
+              }
+            } else if (smaller && !larger) {
+              if (!m->neighbor_is_ghost) {
+                data =
+                    &lbadapt_local_data[level + 1]
+                    [adapt_virtual->quad_qreal_offset[m->neighbor_qid]];
+              } else {
+                data =
+                    &lbadapt_ghost_data[level + 1]
+                    [adapt_virtual->quad_greal_offset[m->neighbor_qid]];
+              }
+            } else if (!smaller && larger) {
+              if (!m->neighbor_is_ghost) {
+                data =
+                    &lbadapt_local_data[level - 1]
+                    [adapt_virtual->quad_qreal_offset[m->neighbor_qid]];
+              } else {
+                data =
+                    &lbadapt_ghost_data[level - 1]
+                    [adapt_virtual->quad_greal_offset[m->neighbor_qid]];
+              }
+            } else {
+              assert(false);
+            }
+            lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
+                                      data->lbfields.boundary,
+                                      data->lbfields.has_force, h, &rho,
+                                      &vels[P4EST_DIM * (idx + 1)], NULL);
+
+            if (!data->lbfields.boundary) {
+              vels[P4EST_DIM * (idx + 1) + 0] =
+                  vels[P4EST_DIM * (idx + 1) + 0] / rho * h_max / lbpar.tau;
+              vels[P4EST_DIM * (idx + 1) + 1] =
+                  vels[P4EST_DIM * (idx + 1) + 1] / rho * h_max / lbpar.tau;
+              vels[P4EST_DIM * (idx + 1) + 2] =
+                  vels[P4EST_DIM * (idx + 1) + 2] / rho * h_max / lbpar.tau;
+            }
+
+          }
+          // perform trilinear interpolation ignoring the interpolation error
+          // introduced by non-regular grid
+          // x - direction
+          for (int i = 0; i < P4EST_HALF; ++i) {
+            vels[i * P4EST_DIM + 0] =
+                0.5 * (vels[2 * i * P4EST_DIM + 0] +
+                       vels[(2 * i + 1) * P4EST_DIM + 0]);
+            vels[i * P4EST_DIM + 1] =
+                0.5 * (vels[2 * i * P4EST_DIM + 1] +
+                       vels[(2 * i + 1) * P4EST_DIM + 1]);
+            vels[i * P4EST_DIM + 2] =
+                0.5 * (vels[2 * i * P4EST_DIM + 2] +
+                       vels[(2 * i + 1) * P4EST_DIM + 2]);
+          }
+          // y - direction
+          for (int i = 0; i < 2; ++i) {
+            vels[i * P4EST_DIM + 0] =
+                0.5 * (vels[2 * i * P4EST_DIM + 0] +
+                       vels[(2 * i + 1) * P4EST_DIM + 0]);
+            vels[i * P4EST_DIM + 1] =
+                0.5 * (vels[2 * i * P4EST_DIM + 1] +
+                       vels[(2 * i + 1) * P4EST_DIM + 1]);
+            vels[i * P4EST_DIM + 2] =
+                0.5 * (vels[2 * i * P4EST_DIM + 2] +
+                       vels[(2 * i + 1) * P4EST_DIM + 2]);
+          }
+          // z - direction
+          vels[0] = 0.5 * (vels[0] + vels[P4EST_DIM + 0]);
+          vels[1] = 0.5 * (vels[1] + vels[P4EST_DIM + 1]);
+          vels[2] = 0.5 * (vels[2] + vels[P4EST_DIM + 2]);
+
+          // write velocity to result array
+          veloc_ptr =
+              (double *) sc_array_index(velocity_values,
+                                        (P4EST_CHILDREN * P4EST_DIM *
+                                         m->current_qid) + (P4EST_DIM * c));
+          std::memcpy(veloc_ptr, vels, P8EST_DIM * sizeof(double));
+        }
+      }
+    }
+  }
+#endif // LB_ADAPTIVE_GPU
 }
 
 /** Check if velocity for a given quadrant is set and if not set it

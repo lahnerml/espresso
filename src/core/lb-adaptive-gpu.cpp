@@ -96,7 +96,7 @@ void lbadapt_gpu_offload_data(int level) {
                          (adapt_virtual->virtual_qlevels + level)->elem_count);
   next_real = tmp_real;
   next_virt = tmp_virt;
-  p8est_meshiter_t *m = p8est_meshiter_new_ext(
+  castable_unique_ptr <p8est_meshiter_t> m = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -123,7 +123,6 @@ void lbadapt_gpu_offload_data(int level) {
   lbadapt_gpu_copy_data_to_device(tmp_real, tmp_virt, level);
   P4EST_FREE(tmp_real);
   P4EST_FREE(tmp_virt);
-  p8est_meshiter_destroy(m);
 }
 
 void lbadapt_gpu_retrieve_data(int level) {
@@ -135,7 +134,7 @@ void lbadapt_gpu_retrieve_data(int level) {
   next_real = tmp_real;
   next_virt = tmp_virt;
   lbadapt_gpu_copy_data_from_device(tmp_real, tmp_virt, level);
-  p8est_meshiter_t *m = p8est_meshiter_new_ext(
+  castable_unique_ptr<p8est_meshiter_t> m = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
@@ -159,7 +158,6 @@ void lbadapt_gpu_retrieve_data(int level) {
   }
   P4EST_FREE(tmp_real);
   P4EST_FREE(tmp_virt);
-  p8est_meshiter_destroy(m);
 }
 
 int lbadapt_print_gpu_utilization(char *filename) {
@@ -188,9 +186,10 @@ int lbadapt_print_gpu_utilization(char *filename) {
   p4est_locidx_t cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
   p4est_locidx_t num_cells = cells_per_patch * adapt_p4est->local_num_quadrants;
-  sc_array_t *values_thread, *values_block;
-  values_thread = sc_array_new_size(sizeof(double), num_cells);
-  values_block = sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> values_thread =
+      sc_array_new_size(sizeof(double), num_cells);
+  castable_unique_ptr<sc_array_t> values_block =
+      sc_array_new_size(sizeof(double), num_cells);
 
   double *block_ptr, *thread_ptr;
   for (int i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
@@ -216,8 +215,6 @@ int lbadapt_print_gpu_utilization(char *filename) {
                                    values_block, "thread", values_thread, c);
   lbadapt_vtk_write_footer(c);
 
-  sc_array_destroy(values_thread);
-  sc_array_destroy(values_block);
   P4EST_FREE(a);
 
   return 0;

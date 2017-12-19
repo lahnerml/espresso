@@ -211,8 +211,9 @@ int lbadapt_print_gpu_utilization(char *filename) {
 
   c = lbadapt_vtk_context_new(filename);
   c = lbadapt_vtk_write_header(c);
-  c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0, "block",
-                                   values_block, "thread", values_thread, c);
+  c = lbadapt_vtk_write_cell_dataf(c, 1, 1, 1, 0, 1, 2, 0,
+                                   "block", values_block.get(),
+                                   "thread", values_thread.get(), c);
   lbadapt_vtk_write_footer(c);
 
   P4EST_FREE(a);

@@ -2427,7 +2427,11 @@ void lb_reinit_parameters() {
          (lbpar.agrid * lbpar.agrid);
 // mu *= agrid*agrid*agrid;  // Marcello's conjecture
 #ifdef D3Q19
+#ifdef LB_ADAPTIVE_GPU
+    lb_float(*e)[19] = d3q19_modebase;
+#else // LB_ADAPTIVE_GPU
     double(*e)[19] = d3q19_modebase;
+#endif // LB_ADAPTIVE_GPU
 #else  // D3Q19
     double **e = lbmodel.e;
 #endif // D3Q19

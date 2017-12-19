@@ -309,7 +309,7 @@ int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
 
   int quads_on_level;
 
-  for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
+  for (size_t level = 0; level < P8EST_QMAXLEVEL; ++level) {
     quads_on_level =
         local_data
             ? (mesh->quad_level + level)->elem_count +
@@ -317,7 +317,7 @@ int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
             : (mesh->ghost_level + level)->elem_count +
                   P8EST_CHILDREN * (virtual_quads->virtual_glevels + level)->elem_count;
     data[level] = std::vector<T>(quads_on_level);
-    P4EST_ASSERT(data[level].size() == quads_on_level);
+    P4EST_ASSERT(data[level].size() == (size_t) quads_on_level);
   }
 
   return 0;
@@ -349,7 +349,7 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
                            std::vector<T *> &ghost_pointer) {
   P4EST_ASSERT(ghost_data.size() == 0 ||
                ghost_data.size() == local_data.size());
-  for (int i = 0; i < local_data.size(); ++i) {
+  for (unsigned int i = 0; i < local_data.size(); ++i) {
     local_pointer[i] = local_data[i].data();
     if (ghost_data.size() != 0) {
       ghost_pointer[i] = ghost_data[i].data();

@@ -540,10 +540,10 @@ int p4est_utils_post_gridadapt_map_data(
     p4est_t *p8est_new, std::vector<std::vector<T>> &local_data_levelwise,
     T *mapped_data_flat) {
   // counters
-  int tid_old = p4est_old->first_local_tree;
-  int tid_new = p4est_new->first_local_tree;
-  int qid_old = 0, qid_new = 0;
-  int tqid_old = 0, tqid_new = 0;
+  unsigned int tid_old = p4est_old->first_local_tree;
+  unsigned int tid_new = p4est_new->first_local_tree;
+  unsigned int qid_old = 0, qid_new = 0;
+  unsigned int tqid_old = 0, tqid_new = 0;
 
   // trees
   p8est_tree_t *curr_tree_old =
@@ -558,8 +558,8 @@ int p4est_utils_post_gridadapt_map_data(
 
   double impulse_old = 0.0;
   double impulse_new = 0.0;
-  while (qid_old < p4est_old->local_num_quadrants &&
-         qid_new < p4est_new->local_num_quadrants) {
+  while (qid_old < (size_t) p4est_old->local_num_quadrants &&
+         qid_new < (size_t) p4est_new->local_num_quadrants) {
     // wrap multiple trees
     if (tqid_old == curr_tree_old->quadrants.elem_count) {
       ++tid_old;
@@ -636,7 +636,7 @@ int p4est_utils_post_gridadapt_map_data(
 #ifdef LB_ADAPTIVE
 #ifndef LB_ADAPTIVE_GPU
       // TODO remove debug or port to gpu
-      int backup_qid_new = qid_new;
+      unsigned int backup_qid_new = qid_new;
       qid_new -= P8EST_CHILDREN;
       for (int j = 0; j < P8EST_CHILDREN; ++j) {
         for (int i = 0; i < lbmodel.n_veloc; ++i) {
@@ -661,8 +661,8 @@ int p4est_utils_post_gridadapt_map_data(
     P4EST_ASSERT(tqid_new + curr_tree_new->quadrants_offset == qid_new);
     P4EST_ASSERT(tid_old == tid_new);
   }
-  P4EST_ASSERT(qid_old == p4est_old->local_num_quadrants);
-  P4EST_ASSERT(qid_new == p4est_new->local_num_quadrants);
+  P4EST_ASSERT(qid_old == (size_t) p4est_old->local_num_quadrants);
+  P4EST_ASSERT(qid_new == (size_t) p4est_new->local_num_quadrants);
 
   fprintf(stderr, "[p4est %i] old impulse: %lf, new impulse %lf\n",
           p4est_new->mpirank, impulse_old, impulse_new);
@@ -756,9 +756,9 @@ int p4est_utils_post_gridadapt_insert_data(
     std::vector<std::vector<T>> &data_levelwise) {
   int size = p4est_new->mpisize;
   // counters
-  int tid = p4est_new->first_local_tree;
+  unsigned int tid = p4est_new->first_local_tree;
   int qid = 0;
-  int tqid = 0;
+  unsigned int tqid = 0;
 
   // trees
   p8est_tree_t *curr_tree = p8est_tree_array_index(p4est_new->trees, tid);
@@ -768,7 +768,7 @@ int p4est_utils_post_gridadapt_insert_data(
   int level, sid;
 
   for (int p = 0; p < size; ++p) {
-    for (int q = 0; q < data_partitioned[p].size(); ++q) {
+    for (unsigned int q = 0; q < data_partitioned[p].size(); ++q) {
       // wrap multiple trees
       if (tqid == curr_tree->quadrants.elem_count) {
         ++tid;
@@ -804,8 +804,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
   std::vector<p4est_locidx_t> num_quad_per_proc(p4est_ref->mpisize, 0);
   std::vector<p4est_locidx_t> num_quad_per_proc_global(p4est_ref->mpisize, 0);
 
-  int tid = p4est_mod->first_local_tree;
-  int tqid = 0;
+  unsigned int tid = p4est_mod->first_local_tree;
+  unsigned int tqid = 0;
   // trees
   p8est_tree_t *curr_tree;
   // quadrants
@@ -863,7 +863,7 @@ int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
                    p4est_quadrant_t *quad[]) {
   p4est_t *cmp = (p4est_t *)p4est->user_pointer;
   p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
-  for (int i = 0; i < tree->quadrants.elem_count; ++i) {
+  for (unsigned int i = 0; i < tree->quadrants.elem_count; ++i) {
     p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
     if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level)
       return 0;
@@ -941,9 +941,9 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   }
   
   // complain if counters haven't reached the end
-  P4EST_ASSERT(w_idx == fct->local_num_quadrants);
-  P4EST_ASSERT(w_id1 == t1->local_num_quadrants);
-  P4EST_ASSERT(w_id2 == t2->local_num_quadrants);
+  P4EST_ASSERT(w_idx == (size_t) fct->local_num_quadrants);
+  P4EST_ASSERT(w_id1 == (size_t) t1->local_num_quadrants);
+  P4EST_ASSERT(w_id2 == (size_t) t2->local_num_quadrants);
 
   double localsum = std::accumulate(w_fct.begin(), w_fct.end(), 0.0);
   double sum, prefix = 0; // Initialization is necessary on rank 0!
@@ -951,7 +951,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / fct->mpisize;
 
-  for (size_t idx = 0; idx < fct->local_num_quadrants; ++idx) {
+  for (size_t idx = 0; idx < (size_t) fct->local_num_quadrants; ++idx) {
     int proc = std::min<int>(w_fct[idx] / target, fct->mpisize - 1);
     t1_quads_per_proc[proc] += t1_quads_per_fct_quad[idx];
     t2_quads_per_proc[proc] += t2_quads_per_fct_quad[idx];

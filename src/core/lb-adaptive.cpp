@@ -1531,10 +1531,6 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
   // clang-format on
   lbadapt_payload_t *data;
 
-#ifdef P4EST_ENABLE_DEBUG
-  int neighbor_cnt = 0;
-#endif // P4EST_ENABLE_DEBUG
-
   // copy resting population
   currCellData->lbfluid[1][0] = currCellData->lbfluid[0][0];
 
@@ -1544,11 +1540,20 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
     p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
 
-    if (mesh_iter->neighbor_qid != -1) {
-#ifdef P4EST_ENABLE_DEBUG
-      ++neighbor_cnt;
-#endif
-      int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+    int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+    // stream if we found a neighbor.
+    // however, do not stream between two real quadrants that both hold virtual
+    // children
+    if (mesh_iter->neighbor_qid != -1
+        && ((-1 != mesh_iter->current_vid)
+            || (-1 != mesh_iter->neighbor_vid)
+            || (-1 == adapt_virtual->virtual_qflags[mesh_iter->current_qid])
+            || (!mesh_iter->neighbor_is_ghost
+                && -1 ==
+                   adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
+            || (mesh_iter->neighbor_is_ghost
+                && -1 ==
+                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
       assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
@@ -1571,11 +1576,6 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
       }
     }
   }
-  P4EST_ASSERT((mesh_iter->current_level <
-                p4est_utils_get_forest_info(forest_order::adaptive_LB)
-                    .finest_level_global) ||
-               (-1 < mesh_iter->current_vid) ||
-               ((lbmodel.n_veloc - 1) == neighbor_cnt));
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -1689,8 +1689,9 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     std::memcpy(virtual_data->lbfluid[0], source_data->lbfluid[0],
                 lbmodel.n_veloc * sizeof(lb_float));
-    std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
-                lbmodel.n_veloc * sizeof(lb_float));
+    std::fill_n(std::begin(virtual_data->lbfluid[1]), lbmodel.n_veloc, 0);
+    //std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
+    //            lbmodel.n_veloc * sizeof(lb_float));
     // make sure that boundary is not occupied by some memory clutter
     virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
@@ -1793,7 +1794,19 @@ void lbadapt_bounce_back(int level) {
         int inv_dir_p4est = ci_to_p4est[inv[dir_ESPR] - 1];
         p8est_meshiter_set_neighbor_quad_info(mesh_iter, inv_dir_p4est);
 
-        if (mesh_iter->neighbor_qid != -1) {
+        // bounce back if we found a neighbor.
+        // however, do not bounce back between two quadrants that hold virtual
+        // children
+        if (mesh_iter->neighbor_qid != -1
+            && ((-1 != mesh_iter->current_vid)
+                || (-1 != mesh_iter->neighbor_vid)
+                || (-1 == adapt_virtual->virtual_qflags[mesh_iter->current_qid])
+                || (!mesh_iter->neighbor_is_ghost
+                    && -1 ==
+                       adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
+                || (mesh_iter->neighbor_is_ghost
+                    && -1 ==
+                       adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
           /** read c_i in neighbors orientation and p4est's direction system.
            * Convert it to ESPResSo's directions.
            * The inverse direction of that result is the correct value to bounce
@@ -1842,6 +1855,9 @@ void lbadapt_bounce_back(int level) {
                      population_shift) *
                     lbmodel.c[dir_ESPR][l];
               }
+
+              // add if we bounce back from a cell without virtual quadrants
+              // into a coarse cell hosting virtual quadrants
               data->lbfluid[1][inv_neigh_dir_ESPR] =
                   currCellData->lbfluid[1][dir_ESPR] + population_shift;
             } else {
@@ -1951,6 +1967,9 @@ void lbadapt_swap_pointers(int level) {
             mesh_iter)];
       }
       std::swap(data->lbfluid[0], data->lbfluid[1]);
+      if (-1 == mesh_iter->current_vid) {
+        std::fill_n(std::begin(data->lbfluid[1]), lbmodel.n_veloc, 0);
+      }
     }
   }
 #endif // LB_ADAPTIVE_GPU

@@ -974,9 +974,12 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
       sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
   castable_unique_ptr<sc_array_t> vel_pts =
       sc_array_new_size(sizeof(double), P4EST_CHILDREN * P4EST_DIM * num_cells);
+  castable_unique_ptr<sc_array_t> vorticity =
+      sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
   lbadapt_get_velocity_values(velocity);
   lbadapt_get_velocity_values_nodes(vel_pts);
+  lbadapt_get_vorticity_values(vorticity);
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
@@ -995,8 +998,9 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        1, /* write the mpi process id */
                                        0, /* do not wrap the mpi rank */
                                        0, /* no custom cell scalar data */
-                                       1, /* write velocities as cell vector
+                                       2, /* write velocities as cell vector
                                              data */
+                                       "vorticity", vorticity.get(),
                                        "velocity", velocity.get(), context);
   // clang-format on
   SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");

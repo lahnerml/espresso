@@ -527,6 +527,12 @@ void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3]);
 /** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
 void mpi_bcast_constraint(int del_num);
 
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
+/** Callback to adapt p4est grid
+ */
+void mpi_adapt_grid (int node, int param);
+#endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
+
 #ifdef LB_ADAPTIVE
 /** initialize adaptive grid.
  * If LB_ADAPTIVE_GPU is set, a CUDA device is reserved here.

@@ -188,6 +188,7 @@ static int terminated = 0;
   CB(mpi_thermalize_cpu_slave)                                                 \
   CB(mpi_scafacos_set_parameters_slave)                                        \
   CB(mpi_mpiio_slave)                                                          \
+  CB(mpi_adapt_grid)                                                           \
   CB(mpi_lbadapt_grid_init)                                                    \
   CB(mpi_lbadapt_set_min_level)                                                \
   CB(mpi_lbadapt_set_max_level)                                                \
@@ -2765,6 +2766,12 @@ void mpi_lbadapt_grid_reset(int node, int dummy) {
   lbadapt_get_boundary_status();
 // printf("Resetting LB fluid\n");
 #endif // LB_ADAPTIVE
+}
+
+void mpi_adapt_grid(int node, int level) {
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
+  p4est_utils_adapt_grid();
+#endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }
 
 void mpi_lbadapt_grid_init(int node, int level) {

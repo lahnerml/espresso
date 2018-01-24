@@ -44,6 +44,7 @@
 #include "metadynamics_tcl.hpp"
 #include "p3m-dipolar_tcl.hpp"
 #include "p3m_tcl.hpp"
+#include "p4est_utils_tcl.hpp"
 #include "polymer_tcl.hpp"
 #include "pressure_tcl.hpp"
 #include "random_tcl.hpp"
@@ -204,6 +205,12 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   REGISTER_COMMAND("lbfluid", tclcommand_lbfluid);
   REGISTER_COMMAND("lbnode", tclcommand_lbnode);
   REGISTER_COMMAND("lbboundary", tclcommand_lbboundary);
+
+  /* in p4est_utils.cpp */
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
+  REGISTER_COMMAND("adapt-grid", tclcommand_adapt_grid);
+#endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
+
   /* in p4est_dd.cpp */
 #ifdef DD_P4EST
   REGISTER_COMMAND("md_vtk", tclcommand_md_vtk);

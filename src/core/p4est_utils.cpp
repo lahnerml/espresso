@@ -582,14 +582,10 @@ int p4est_utils_adapt_grid() {
   // balance forest after grid change
   p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, 0, 0);
 
-  // only perform data mapping, communication, etc. if the forests have actually
-  // changed
-  if (!p8est_is_equal(adapt_p4est, p4est_adapted, 0)) {
-    // 0th step: de-allocate invalid storage and data-structures
+  // 2nd step: locally map data between forests.
+  // de-allocate invalid storage and data-structures
     p4est_utils_deallocate_levelwise_storage(lbadapt_ghost_data);
-    adapt_ghost.reset();
-
-    // 1st step: locally map data between forests.
+  // locally map data between forests.
     lbadapt_payload_t *mapped_data_flat =
         P4EST_ALLOC_ZERO(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
     p4est_utils_post_gridadapt_map_data(adapt_p4est, adapt_mesh, adapt_virtual,
@@ -601,20 +597,20 @@ int p4est_utils_adapt_grid() {
     adapt_mesh.reset();
     adapt_p4est.reset();
 
-    // 2nd step: partition grid and transfer data to respective processors
+  // 3rd step: partition grid and transfer data to respective new owner ranks
     // FIXME: Interface to Steffen's partitioning logic
+  // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
     p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
     p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
     std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
         p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
     p4est_utils_post_gridadapt_data_partition_transfer(
         p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
-    // cleanup
-    p8est_destroy(p4est_adapted);
+
+  p4est_destroy(p4est_adapted);
     P4EST_FREE(mapped_data_flat);
 
-    // 3rd step: Insert data into new levelwise data-structure and prepare next
-    //           integration step
+  // 4th step: Insert received data into new levelwise data-structure
     adapt_p4est.reset(p4est_partitioned);
     adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
     adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
@@ -629,18 +625,16 @@ int p4est_utils_adapt_grid() {
     p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
                                            adapt_virtual, false);
     p4est_utils_post_gridadapt_insert_data(
-        p4est_partitioned, adapt_mesh, adapt_virtual, data_partitioned, lbadapt_local_data);
+      p4est_partitioned, adapt_mesh, adapt_virtual, data_partitioned,
+      lbadapt_local_data);
 
+  // 5th step: Prepare next integration step
     std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
     forests.push_back(dd.p4est);
 #endif // DD_P4EST
     forests.push_back(adapt_p4est);
     p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-    p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                           forest_order::adaptive_LB);
-#endif // DD_P4EST
     const p4est_utils_forest_info_t new_forest =
         p4est_utils_get_forest_info(forest_order::adaptive_LB);
     // synchronize ghost data for next collision step
@@ -648,7 +642,6 @@ int p4est_utils_adapt_grid() {
     std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
-
     for (int level = new_forest.coarsest_level_global;
          level <= new_forest.finest_level_global; ++level) {
       p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
@@ -658,16 +651,7 @@ int p4est_utils_adapt_grid() {
                                                (void**)local_pointer.data(),
                                                (void**)ghost_pointer.data());
     }
-  } else {
-    p8est_destroy(p4est_adapted);
-  }
 
-  // calculate vorticity
-  vorticity_values.clear();
-  vorticity_values.resize(current_forest.p4est->local_num_quadrants);
-  std::string filename_post =
-      "post_gridchange_" + std::to_string((int)(sim_time / time_step));
-  lbadapt_calc_vorticity(current_forest.p4est, vorticity_values, filename_post);
 #endif // LB_ADAPTIVE
   return 0;
 }

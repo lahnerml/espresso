@@ -44,6 +44,7 @@
 #include <limits>
 #include <stdlib.h>
 
+#define USE_BGK
 #ifdef LB_ADAPTIVE
 
 /* Code duplication from lb.cpp */
@@ -269,6 +270,7 @@ void lbadapt_reinit_parameters() {
 #else  // LB_ADAPTIVE_GPU
     double h = (double)P8EST_QUADRANT_LEN(i) / (double)P8EST_ROOT_LEN;
 #endif // LB_ADAPTIVE_GPU
+#ifndef USE_BGK
     if (lbpar.viscosity[0] > 0.0) {
       gamma_shear[i] =
           1. -
@@ -281,6 +283,12 @@ void lbadapt_reinit_parameters() {
                                 (prefactors[i] * SQR(h)) +
                             1.);
     }
+#else
+    gamma_shear[i] = 0.0; //uncomment for special case of BGK
+    gamma_bulk[i] = 0.0;
+    gamma_odd = 0.0;
+    gamma_even = 0.0;
+#endif
   }
 #ifdef LB_ADAPTIVE_GPU
   memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(lb_float));

@@ -2431,44 +2431,47 @@ void check_vel(int qid, double h, lbadapt_payload_t *data,
 #endif //!LB_ADAPTIVE_GPU
 }
 
-void lbadapt_calc_vorticity(p8est_t *p4est,
-                            std::vector<std::array<double, 3>> &vort,
-                            std::string filename) {
+void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
 #ifndef LB_ADAPTIVE_GPU
   // FIXME port to GPU
-  P4EST_ASSERT(vort.size() == (size_t) p4est->local_num_quadrants);
+  P4EST_ASSERT(vort_values->elem_count ==
+               (size_t) P4EST_DIM * adapt_p4est->local_num_quadrants);
+
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
-      p4est->local_num_quadrants + adapt_ghost->ghosts.elem_count,
+      adapt_p4est->local_num_quadrants + adapt_ghost->ghosts.elem_count,
       std::array<double, 3>({std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min(),
                              std::numeric_limits<double>::min()}));
+
   int nq;
   int c_level;
-  p4est_locidx_t lq = p4est->local_num_quadrants;
+  p4est_locidx_t lq = adapt_p4est->local_num_quadrants;
   const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
   castable_unique_ptr<sc_array_t> neighbor_qids = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> neighbor_encs = sc_array_new(sizeof(int));
   std::array<std::vector<int>, 3> n_qids;
   std::array<double, 3> mesh_width;
-  double h;
+  double c_h, h;
   p8est_quadrant_t *quad;
   lbadapt_payload_t *data, *currCellData;
+  double *ins;
+  double vort[3];
 
-  for (int qid = 0; qid < p4est->local_num_quadrants; ++qid) {
-    // get neighboring quads and their velocity
-    for (unsigned int dir_idx = 0; dir_idx < neighbor_dirs.size(); ++dir_idx) {
-      sc_array_truncate(neighbor_qids);
-      sc_array_truncate(neighbor_encs);
-
+  for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
       quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
       c_level = quad->level;
       currCellData =
           &lbadapt_local_data[c_level][adapt_virtual->quad_qreal_offset[qid]];
-      h = (double)P8EST_QUADRANT_LEN(c_level) / (double)P8EST_ROOT_LEN;
-      check_vel(qid, h, currCellData, fluid_vel);
+    c_h = (double)P8EST_QUADRANT_LEN(c_level) / (double)P8EST_ROOT_LEN;
+    check_vel(qid, c_h, currCellData, fluid_vel);
 
-      p4est_mesh_get_neighbors(p4est, adapt_ghost, adapt_mesh, qid,
+    // get neighboring quads, their mesh width, and their velocity
+    for (unsigned int dir_idx = 0; dir_idx < neighbor_dirs.size(); ++dir_idx) {
+      sc_array_truncate(neighbor_qids);
+      sc_array_truncate(neighbor_encs);
+
+      p4est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid,
                                neighbor_dirs[dir_idx], nullptr, neighbor_encs,
                                neighbor_qids);
       P4EST_ASSERT(0 <= neighbor_qids->elem_count &&
@@ -2494,88 +2497,42 @@ void lbadapt_calc_vorticity(p8est_t *p4est,
           (((double)P8EST_QUADRANT_LEN(c_level) / (double)P8EST_ROOT_LEN) +
            ((double)P8EST_QUADRANT_LEN(quad->level) / (double)P8EST_ROOT_LEN));
     }
-    // calculate vorticity from velocity
-    vort[qid][0] = 0;
+
+    // calculate vorticity from neighboring quadrants' velocities
+    vort[0] = 0;
+    vort[1] = 0;
+    vort[2] = 0;
     if (!currCellData->lbfields.boundary) {
       for (size_t i = 0; i < n_qids[0].size(); ++i) {
-        vort[qid][0] += ((1. / n_qids[0].size()) *
+        vort[0] += ((1. / n_qids[0].size()) *
                          (((fluid_vel[n_qids[0][i]][2] - fluid_vel[qid][2]) /
                            mesh_width[1]) -
                           ((fluid_vel[n_qids[0][i]][1] - fluid_vel[qid][1]) /
                            mesh_width[2])));
       }
-    }
-    n_qids[0].clear();
-    vort[qid][1] = 0;
-    if (!currCellData->lbfields.boundary) {
       for (size_t i = 0; i < n_qids[1].size(); ++i) {
-        vort[qid][1] += ((1. / n_qids[1].size()) *
+        vort[1] += ((1. / n_qids[1].size()) *
                          (((fluid_vel[n_qids[1][i]][0] - fluid_vel[qid][0]) /
                            mesh_width[2]) -
                           ((fluid_vel[n_qids[1][i]][2] - fluid_vel[qid][2]) /
                            mesh_width[0])));
       }
-    }
-    n_qids[1].clear();
-    vort[qid][2] = 0;
-    if (!currCellData->lbfields.boundary) {
       for (size_t i = 0; i < n_qids[2].size(); ++i) {
-        vort[qid][2] += ((1. / n_qids[2].size()) *
+        vort[2] += ((1. / n_qids[2].size()) *
                          (((fluid_vel[n_qids[2][i]][1] - fluid_vel[qid][1]) /
                            mesh_width[0]) -
                           ((fluid_vel[n_qids[2][i]][0] - fluid_vel[qid][0]) /
                            mesh_width[1])));
       }
     }
+    // clear neighbor lists and copy result into array
+    n_qids[0].clear();
+    n_qids[1].clear();
     n_qids[2].clear();
+
+    ins = (double *) sc_array_index(vort_values, 3 * qid);
+    std::memcpy(ins, vort, 3 * sizeof(double));
   }
-
-  // vtk output
-  // FIXME remove DEBUG
-  if (filename == "") {
-    filename = "vorticity_" + std::to_string((int)(sim_time / time_step));
-  }
-  castable_unique_ptr<sc_array_t> vorticity, velocity, qid;
-  p4est_locidx_t num_cells = p4est->local_num_quadrants;
-  vorticity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
-  velocity.reset(sc_array_new_size(sizeof(double), P8EST_DIM * num_cells));
-  qid.reset(sc_array_new_size(sizeof(double), num_cells));
-  for (int i = 0; i < num_cells; ++i) {
-    double *ins = (double *)sc_array_index(vorticity, 3 * i);
-    std::memcpy(ins, vort[i].data(), 3 * sizeof(double));
-    ins = (double *)sc_array_index(qid, i);
-    *ins = i + p4est->global_first_quadrant[p4est->mpirank];
-  }
-
-  lbadapt_get_velocity_values(velocity);
-
-  /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context =
-      p8est_vtk_context_new(adapt_p4est, filename.c_str());
-  p8est_vtk_context_set_scale(context, 1); /* quadrants at full scale */
-
-  /* begin writing the output files */
-  context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
-                 P8EST_STRING "_vtk: Error writing vtk header");
-  // clang-format off
-  context = p8est_vtk_write_cell_dataf(context,
-                                       1, /* write tree indices */
-                                       1, /* write the refinement level */
-                                       1, /* write the mpi process id */
-                                       0, /* do not wrap the mpi rank */
-                                       1, /* no custom cell scalar data */
-                                       2, /* write velocity and vorticity as
-                                             vector cell data */
-                                       "qid", qid.get(),
-                                       "velocity", velocity.get(),
-                                       "vorticity", vorticity.get(), context);
-  // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
-
-  const int retval = p8est_vtk_write_footer(context);
-  SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
-  // FIXME remove DEBUG
 #endif // LB_ADAPTIVE_GPU
 }
 

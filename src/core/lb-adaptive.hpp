@@ -321,12 +321,9 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values);
 
 /** Calculate vorticity value of each local quadrant for refinement/coarsening
  *
- * @param [in]  p4est    Current forest
  * @param [out] vort     Container for storing vorticity values
  */
-void lbadapt_calc_vorticity(p8est_t *p4est,
-                            std::vector<std::array<double, 3>> &vort,
-                            std::string filename = "");
+void lbadapt_get_vorticity_values(sc_array_t *vort_values);
 
 
 /** Verify stability of chosen LBM parameters

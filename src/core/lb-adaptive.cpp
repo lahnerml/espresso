@@ -493,7 +493,7 @@ int data_interpolation<lbadapt_payload_t>(
 
 int lbadapt_is_boundary(double *pos) {
   double dist, dist_tmp, dist_vec[3];
-  dist = DBL_MAX;
+  dist = std::numeric_limits<double>::max();
   int the_boundary = -1;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {
@@ -808,7 +808,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   mp[2] = midpoint[2];
 
   double dist, dist_tmp, dist_vec[3];
-  dist = DBL_MAX;
+  dist = std::numeric_limits<double>::max();
   std::vector<int>::iterator it;
 
   for (int n = 0; n < n_lb_boundaries; ++n) {

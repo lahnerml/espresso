@@ -224,8 +224,8 @@ static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
     std::array<double, 3> pos_max{{box_l[0], box_l[1], box_l[2]}};
     int idx_min, idx_max;
     double dist;
-    double dist_min = DBL_MAX;
-    double dist_max = DBL_MAX;
+    double dist_min = std::numeric_limits<double>::max();
+    double dist_max = std::numeric_limits<double>::max();
     for (int ci = 0; ci < P4EST_CHILDREN; ++ci) {
       dist = distance(c[ci], pos_min);
       if (dist < dist_min) {

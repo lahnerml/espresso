@@ -118,7 +118,7 @@ void on_program_start() {
    */
   min_num_cells = calc_processor_min_num_cells();
 
-#ifdef DD_P4EST
+#if (defined(DD_P4EST) || defined(LB_ADAPTIVE))
   auto verbosity = SC_LP_ESSENTIAL;
   //auto verbosity = SC_LP_PRODUCTION;
   // auto verbosity = SC_LP_VERBOSE;

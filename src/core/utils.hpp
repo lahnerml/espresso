@@ -117,6 +117,11 @@ typedef struct {
 
 namespace Utils {
 /**
+ * \brief Check if we have unprocessed messages in the system
+ */
+int check_dangling_MPI_messages (MPI_Comm comm);
+
+/**
  * \brief Calculate integer powers.
  * This functions calculates x^n, where
  * n is a positive integer that is known

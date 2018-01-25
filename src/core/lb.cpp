@@ -178,7 +178,7 @@ static int failcounter = 0;
 static int fluidstep = 0;
 
 #ifdef LB_ADAPTIVE
-static int n_lbsteps = 0;
+int n_lbsteps = 0;
 #endif // LB_ADAPTIVE
 #endif // LB
 

@@ -286,6 +286,8 @@ extern double lblambda;
 /** Eigenvalue of collision operator corresponding to bulk viscosity. */
 extern double lblambda_bulk;
 
+extern int n_lbsteps;
+
 #ifdef LB_ADAPTIVE
 extern lb_float prefactors[P8EST_MAXLEVEL];
 

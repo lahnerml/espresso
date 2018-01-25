@@ -1618,9 +1618,9 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     std::memcpy(virtual_data->lbfluid[0], source_data->lbfluid[0],
                 lbmodel.n_veloc * sizeof(lb_float));
-    std::fill_n(std::begin(virtual_data->lbfluid[1]), lbmodel.n_veloc, 0);
-    //std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
-    //            lbmodel.n_veloc * sizeof(lb_float));
+    //std::fill_n(std::begin(virtual_data->lbfluid[1]), lbmodel.n_veloc, 0);
+    std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
+                lbmodel.n_veloc * sizeof(lb_float));
     // make sure that boundary is not occupied by some memory clutter
     virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
@@ -1896,9 +1896,9 @@ void lbadapt_swap_pointers(int level) {
             mesh_iter)];
       }
       std::swap(data->lbfluid[0], data->lbfluid[1]);
-      if (-1 == mesh_iter->current_vid) {
-        std::fill_n(std::begin(data->lbfluid[1]), lbmodel.n_veloc, 0);
-      }
+      //if (-1 == mesh_iter->current_vid) {
+      //  std::fill_n(std::begin(data->lbfluid[1]), lbmodel.n_veloc, 0);
+      //}
     }
   }
 #endif // LB_ADAPTIVE_GPU

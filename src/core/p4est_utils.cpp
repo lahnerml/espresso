@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iterator>
 #include <mpi.h>
 #include <p8est_algorithms.h>
@@ -410,7 +411,6 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   p4est_tree_t *tree = p4est_tree_array_index(p8est->trees, which_tree);
   p4est_quadrant_t *first = p4est_quadrant_array_index(&tree->quadrants, 0);
   int qid = std::distance(first, quads[0]);
-  //P4EST_ASSERT(0 <= qid && qid < p8est->local_num_quadrants);
 
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
@@ -427,10 +427,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
   // get quad id
-  p4est_tree_t *tree = p4est_tree_array_index(p8est->trees, which_tree);
-  p4est_quadrant_t *first = p4est_quadrant_array_index(&tree->quadrants, 0);
   int qid = quad_ctr;
-  //P4EST_ASSERT(0 <= qid && qid < p8est->local_num_quadrants);
 
   // perform geometric refinement
   int refine = refine_geometric(p8est, which_tree, q);
@@ -450,7 +447,32 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
-  // get criteria
+  // get refinement string for first grid change operation
+#if 1
+  std::fstream fs;
+  fs.open("refinement.txt", std::fstream::in);
+  int flag;
+  char comma;
+  int ctr = 0;
+  int ctr_ones = 0;
+  int ctr_twos = 0;
+  while (fs >> flag) {
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= ctr) &&
+        (ctr < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      if (flag == 1)
+        ++ctr_ones;
+      if (flag == 2)
+        ++ctr_twos;
+      flags->push_back(flag);
+    }
+    ++ctr;
+    // fetch comma to prevent early loop exit
+    fs >> comma;
+  }
+  std::cout << "[p4est " << adapt_p4est->mpirank << "] ones: " << ctr_ones
+            << " twos: " << ctr_twos << " total: " << ctr << std::endl;
+  fs.close();
+#else // 0
   // velocity
   // Euclidean norm
   castable_unique_ptr<sc_array_t> vel_values =
@@ -557,6 +579,7 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VEL_CRIT
 #endif // USE_VORT_CRIT
   }
+#endif //0
 
   return 0;
 }

@@ -13,10 +13,10 @@
 #include "utils.hpp"
 
 LB_Parameters *d_lbpar = NULL;
-LB_Model *d_lbmodel = NULL;
 LB_Boundary *d_lb_boundaries;
 lb_float *d_d3q19_lattice = NULL;
 lb_float *d_d3q19_w = NULL;
+
 
 void lbadapt_gpu_init() {
   // avoid allocating containers multiple times
@@ -29,12 +29,6 @@ void lbadapt_gpu_init() {
   if (d_d3q19_w == NULL) {
     CUDA_CALL(cudaMalloc(&d_d3q19_w, sizeof(lb_float) * 19));
     CUDA_CALL(cudaMemcpy(d_d3q19_w, &d3q19_w, sizeof(lb_float) * 19,
-                         cudaMemcpyHostToDevice));
-  }
-
-  if (d_lbmodel == NULL) {
-    CUDA_CALL(cudaMalloc(&d_lbmodel, sizeof(LB_Model)));
-    CUDA_CALL(cudaMemcpy(d_lbmodel, &lbmodel, sizeof(LB_Model),
                          cudaMemcpyHostToDevice));
   }
 
@@ -869,9 +863,8 @@ void lbadapt_gpu_execute_populate_virtuals_kernel(int level) {}
 void lbadapt_gpu_execute_update_from_virtuals_kernel(int level) {}
 
 __global__ void lbadapt_gpu_stream(lbadapt_payload_t *quad_data,
-                                   LB_Model *d_lbmodel,
                                    lb_float *d_d3q19_lattice) {
-  for (int i = 0; i < d_lbmodel->n_veloc; ++i) {
+  for (int i = 0; i < 19; ++i) {
     // add 1 for halo offset
     quad_data
         ->patch[1 + threadIdx.x + (int)d_d3q19_lattice[3 * i + 0]]
@@ -894,22 +887,21 @@ void lbadapt_gpu_execute_streaming_kernel(int level) {
     blocks_per_grid.x = local_num_real_quadrants_level[level];
 
     lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-        dev_local_real_quadrants[level], d_lbmodel, d_d3q19_lattice);
+        dev_local_real_quadrants[level], d_d3q19_lattice);
   }
 
   if (local_num_virt_quadrants_level[level]) {
     blocks_per_grid.x = local_num_virt_quadrants_level[level];
 
     lbadapt_gpu_stream<<<blocks_per_grid, threads_per_block>>>(
-        dev_local_virt_quadrants[level], d_lbmodel, d_d3q19_lattice);
+        dev_local_virt_quadrants[level], d_d3q19_lattice);
   }
 }
 
 __global__ void
 lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
                         LB_Boundary *d_lb_boundaries, LB_Parameters *d_lbpar,
-                        LB_Model *d_lbmodel, lb_float *d_d3q19_lattice,
-                        lb_float *d_d3q19_w) {
+                        lb_float *d_d3q19_lattice, lb_float *d_d3q19_w) {
   lb_float population_shift;
   /** if current quadrant is boundary: reset resting velocity to 0 and stream
    * all obtained velocities back to neighboring quadrants */
@@ -923,7 +915,7 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
      * mirrored back into the original cell, i.e. lbfluid[1][i] has to be
      * written to lbfluid[1][inv(i)] of neighbor in direction inv(i).
      */
-    for (int i = 1; i < d_lbmodel->n_veloc; i += 2) {
+    for (int i = 1; i < 19; i += 2) {
       // 2 step loop to avoid if statement
       // first step: inverse velocity is i + 1
 
@@ -937,8 +929,7 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
                      .boundary -
-                 1].velocity[l] /
-            d_lbmodel->c_sound_sq;
+                 1].velocity[l] * 3.;
       }
       // sum up the force that is applied by the fluid
       for (int l = 0; l < 3; ++l) {
@@ -974,8 +965,7 @@ lbadapt_gpu_bounce_back(lbadapt_payload_t *quad_data, lb_float h_max,
                 [quad_data
                      ->patch[1 + threadIdx.x][1 + threadIdx.y][1 + threadIdx.z]
                      .boundary -
-                 1].velocity[l] /
-            d_lbmodel->c_sound_sq;
+                 1].velocity[l] * 3.;
       }
       // sum up the force that is applied by the fluid
       for (int l = 0; l < 3; ++l) {
@@ -1030,7 +1020,7 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
 
     lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
         dev_local_real_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-        d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+        d_d3q19_lattice, d_d3q19_w);
 
     // swap pointers
     lbadapt_gpu_swap_pointers<<<blocks_per_grid, threads_per_block>>>(
@@ -1042,7 +1032,7 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
 
     lbadapt_gpu_bounce_back<<<blocks_per_grid, threads_per_block>>>(
         dev_local_virt_quadrants[level], h_max, d_lb_boundaries, d_lbpar,
-        d_lbmodel, d_d3q19_lattice, d_d3q19_w);
+        d_d3q19_lattice, d_d3q19_w);
 
     // swap pointers
     lbadapt_gpu_swap_pointers<<<blocks_per_grid, threads_per_block>>>(

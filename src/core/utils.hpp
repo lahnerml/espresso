@@ -116,10 +116,12 @@ typedef struct {
    procedures. */
 
 namespace Utils {
+#ifndef __CUDACC__
 /**
  * \brief Check if we have unprocessed messages in the system
  */
 int check_dangling_MPI_messages (MPI_Comm comm);
+#endif // __CUDACC__
 
 /**
  * \brief Calculate integer powers.

@@ -15,6 +15,7 @@ char *strcat_alloc(char *left, const char *right) {
   }
 }
 
+#ifndef __CUDACC__
 int Utils::check_dangling_MPI_messages (MPI_Comm comm) {
   int flag;
   MPI_Status status;
@@ -30,3 +31,4 @@ int Utils::check_dangling_MPI_messages (MPI_Comm comm) {
   }
   return 0;
 }
+#endif // __CUDACC__

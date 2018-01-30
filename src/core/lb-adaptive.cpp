@@ -214,6 +214,9 @@ void lbadapt_init() {
   // reset data
   lbadapt_local_data.clear();
   lbadapt_ghost_data.clear();
+#ifdef LB_ADAPTIVE_GPU
+  lbadapt_gpu_deallocate_device_memory();
+#endif // LB_ADAPTIVE_GPU
   lbadapt_allocate_data();
 
 

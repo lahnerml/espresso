@@ -41,6 +41,14 @@ LB_Parameters lbpar = {
     {0.0, 0.0, 0.0},
     // rho_lb_units
     {0.},
+    // prefactors
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    // h
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
+    // gamma_bulk
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
+    // gamma_shear
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
     // gamma_odd
     {0.},
     // gamma_even
@@ -67,23 +75,24 @@ int transfer_momentum = 0;
 /** flag indicating if there is brownian motion */
 int fluct;
 
-double prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+lb_float h[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                            0., 0., 0., 0., 0., 0., 0., 0., 0.};
+int prefactors[P8EST_MAXLEVEL] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
-double gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+lb_float gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
 /** relaxation of the odd kinetic modes */
-double gamma_odd = 0.0;
+lb_float gamma_odd = 0.0;
 /** relaxation of the even kinetic modes */
-double gamma_even = 0.0;
+lb_float gamma_even = 0.0;
 /** amplitudes of the fluctuations of the modes */
-double lb_phi[19];
+lb_float lb_phi[19];
 /** amplitude of the fluctuations in the viscous coupling */
-double lb_coupl_pref = 0.0;
+lb_float lb_coupl_pref = 0.0;
 /** amplitude of the fluctuations in the viscous coupling with gaussian random
  * numbers */
-double lb_coupl_pref2 = 0.0;
+lb_float lb_coupl_pref2 = 0.0;
 
 void lbadapt_gpu_offload_data(int level) {
   if (dev_local_real_quadrants == NULL) {
@@ -107,13 +116,13 @@ void lbadapt_gpu_offload_data(int level) {
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
         memcpy(next_real,
-               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
+               &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
-               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
+               &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
@@ -144,12 +153,12 @@ void lbadapt_gpu_retrieve_data(int level) {
     status = p8est_meshiter_next(m);
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
-        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
+        memcpy(&lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_real, sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
-        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
+        memcpy(&lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_virt, P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;

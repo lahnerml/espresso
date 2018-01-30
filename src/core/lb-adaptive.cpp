@@ -214,6 +214,9 @@ void lbadapt_init() {
   // reset data
   lbadapt_local_data.clear();
   lbadapt_ghost_data.clear();
+#ifdef LB_ADAPTIVE_GPU
+  lbadapt_gpu_deallocate_device_memory();
+#endif // LB_ADAPTIVE_GPU
   lbadapt_allocate_data();
 
 
@@ -289,7 +292,8 @@ void lbadapt_reinit_parameters() {
 #endif
   }
 #ifdef LB_ADAPTIVE_GPU
-  memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(lb_float));
+  memcpy(lbpar.prefactors, prefactors, P8EST_MAXLEVEL * sizeof(int));
+  memcpy(lbpar.h, h, P8EST_MAXLEVEL * sizeof(lb_float));
   memcpy(lbpar.gamma_bulk, gamma_bulk, P8EST_MAXLEVEL * sizeof(lb_float));
   memcpy(lbpar.gamma_shear, gamma_shear, P8EST_MAXLEVEL * sizeof(lb_float));
 

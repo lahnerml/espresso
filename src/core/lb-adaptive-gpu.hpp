@@ -93,7 +93,9 @@ typedef struct {
   lb_float ext_force[3]; /* Open question: Do we want a local force or global
                             force? */
   lb_float rho_lb_units[LB_COMPONENTS];
-  lb_float prefactors[P8EST_MAXLEVEL];
+
+  int prefactors[P8EST_MAXLEVEL];
+  lb_float h[P8EST_MAXLEVEL];
   lb_float gamma_bulk[P8EST_MAXLEVEL];
   lb_float gamma_shear[P8EST_MAXLEVEL];
   lb_float gamma_odd[LB_COMPONENTS];
@@ -168,22 +170,21 @@ extern int fluct;
 extern int transfer_momentum;
 
 /** Eigenvalue of collision operator corresponding to shear viscosity. */
-extern double lblambda;
+extern lb_float lblambda;
 
 /** Eigenvalue of collision operator corresponding to bulk viscosity. */
-extern double lblambda_bulk;
+extern lb_float lblambda_bulk;
 
-extern double prefactors[P8EST_MAXLEVEL];
+extern lb_float h[P8EST_MAXLEVEL];
+extern int prefactors[P8EST_MAXLEVEL];
+extern lb_float gamma_shear[P8EST_MAXLEVEL];
+extern lb_float gamma_bulk[P8EST_MAXLEVEL];
 
-extern double gamma_shear[P8EST_MAXLEVEL];
-
-extern double gamma_bulk[P8EST_MAXLEVEL];
-
-extern double gamma_odd;
-extern double gamma_even;
-extern double lb_phi[19];
-extern double lb_coupl_pref;
-extern double lb_coupl_pref2;
+extern lb_float gamma_odd;
+extern lb_float gamma_even;
+extern lb_float lb_phi[19];
+extern lb_float lb_coupl_pref;
+extern lb_float lb_coupl_pref2;
 
 /** Helper-function to invoke the kernel that writes into each patch cell its
  * respective blockIdx and threadIdx.

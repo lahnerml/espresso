@@ -116,13 +116,13 @@ void lbadapt_gpu_offload_data(int level) {
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
         memcpy(next_real,
-               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
+               &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
-               &lbadapt_local_data[level - forest_lb.coarsest_level_local]
+               &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
@@ -153,12 +153,12 @@ void lbadapt_gpu_retrieve_data(int level) {
     status = p8est_meshiter_next(m);
     if (status != P8EST_MESHITER_DONE) {
       if (m->current_vid == -1) {
-        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
+        memcpy(&lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_real, sizeof(lbadapt_payload_t));
         ++next_real;
       } else if (0 == m->current_vid) {
-        memcpy(&lbadapt_local_data[level - forest_lb.coarsest_level_local]
+        memcpy(&lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                next_virt, P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;

@@ -373,6 +373,8 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
 int lbadapt_interpolate_pos_ghost(double pos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]);
 
+void lbadapt_dump2file_synced(std::string &filename);
+
 /*** ITERATION CALLBACKS ***/
 void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 

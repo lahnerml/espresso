@@ -2611,6 +2611,40 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
 #endif // LB_ADAPTIVE_GPU
 }
 
+void lbadapt_dump2file_synced(std::string &filename) {
+#ifndef LB_ADAPTIVE_GPU
+  int nqid = 0;
+  p4est_quadrant_t *q;
+  for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
+    MPI_Barrier(adapt_p4est->mpicomm);
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= qid) &&
+        (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      lbadapt_payload_t *data =
+          &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
+      std::ofstream myfile;
+      myfile.open(filename, std::ofstream::out | std::ofstream::app);
+      myfile << "id: " << qid
+             << "; boundary: " << data->lbfields.boundary << std::endl
+             << " - distributions: " << std::endl;
+      for (int i = 0; i < 19; ++i) {
+        myfile << data->lbfluid[0][i] << " - ";
+      }
+      myfile << std::endl;
+      for (int i = 0; i < 19; ++i) {
+        myfile << data->lbfluid[1][i] << " - ";
+      }
+      myfile << std::endl << std::endl;
+
+      myfile.flush();
+      myfile.close();
+      ++nqid;
+    }
+  }
+  P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
+#endif // LB_ADAPTIVE_GPU
+}
+
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
   p8est_quadrant_t *q = info->quad;

@@ -2613,22 +2613,26 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  lbadapt_payload_t *data = (lbadapt_payload_t *)info->quad->p.user_data;
   p8est_quadrant_t *q = info->quad;
+  lbadapt_payload_t *data =
+      &lbadapt_local_data[q->level]
+                         [adapt_virtual->quad_qreal_offset[info->quadid]];
 
   std::string *filename = (std::string *)user_data;
   std::ofstream myfile;
   myfile.open(*filename, std::ofstream::out | std::ofstream::app);
-  myfile << "id: " << info->quadid
+  myfile << "id: "
+         << info->quadid +
+                adapt_p4est->global_first_quadrant[adapt_p4est->mpirank]
          << "; coords: " << (q->x / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->y / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->z / (1 << (P8EST_MAXLEVEL - q->level)))
          << "; boundary: " << data->lbfields.boundary << std::endl
-         << " - distributions: pre streaming: ";
+         << " - distributions: " << std::endl;
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[0][i] << " - ";
   }
-  myfile << std::endl << "post streaming: ";
+  myfile << std::endl;
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[1][i] << " - ";
   }

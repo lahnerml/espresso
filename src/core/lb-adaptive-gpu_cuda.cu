@@ -36,8 +36,7 @@ void lbadapt_gpu_init() {
     CUDA_CALL(cudaMalloc(&d_lbpar, sizeof(LB_Parameters)));
   }
   // update agrid value
-  lbpar.agrid = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
+  lbpar.agrid = lbpar.h[lbpar.max_refinement_level];
   CUDA_CALL(cudaMemcpy(d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
 }

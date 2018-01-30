@@ -67,6 +67,8 @@ int transfer_momentum = 0;
 /** flag indicating if there is brownian motion */
 int fluct;
 
+double h[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+                            0., 0., 0., 0., 0., 0., 0., 0., 0.};
 double prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
 double gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,

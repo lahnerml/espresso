@@ -93,6 +93,8 @@ typedef struct {
   lb_float ext_force[3]; /* Open question: Do we want a local force or global
                             force? */
   lb_float rho_lb_units[LB_COMPONENTS];
+
+  lb_float h[P8EST_MAXLEVEL];
   lb_float prefactors[P8EST_MAXLEVEL];
   lb_float gamma_bulk[P8EST_MAXLEVEL];
   lb_float gamma_shear[P8EST_MAXLEVEL];
@@ -172,6 +174,8 @@ extern double lblambda;
 
 /** Eigenvalue of collision operator corresponding to bulk viscosity. */
 extern double lblambda_bulk;
+
+extern double h[P8EST_MAXLEVEL];
 
 extern double prefactors[P8EST_MAXLEVEL];
 

@@ -2626,22 +2626,44 @@ void lbadapt_dump2file_synced(std::string &filename) {
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
       lbadapt_payload_t *data =
           &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
+      if (!data->lbfields.boundary) {
       std::ofstream myfile;
       myfile.open(filename, std::ofstream::out | std::ofstream::app);
-      myfile << "id: " << qid
-             << "; boundary: " << data->lbfields.boundary << std::endl
-             << " - distributions: " << std::endl;
+        myfile << "id: " << qid << " level: " << (int)q->level << std::endl
+               << " has virtuals: "
+               << (-1 != adapt_virtual->virtual_qflags[nqid]) << std::endl
+               << " - distributions: " << std::endl
+               << "0: ";
       for (int i = 0; i < 19; ++i) {
         myfile << data->lbfluid[0][i] << " - ";
       }
+        myfile << std::endl << "1: ";
+        for (int i = 0; i < 19; ++i) {
+          myfile << data->lbfluid[1][i] << " - ";
+        }
       myfile << std::endl;
+        if (-1 != adapt_virtual->virtual_qflags[nqid]) {
+          for (int v = 0; v < P4EST_CHILDREN; ++v) {
+            data =
+                &lbadapt_local_data[q->level + 1]
+                                   [adapt_virtual->quad_qvirtual_offset[nqid] +
+                                    v];
+            myfile << "virtual distributions: v" << v << std::endl << "0: ";
+            for (int i = 0; i < 19; ++i) {
+              myfile << data->lbfluid[0][i] << " - ";
+            }
+            myfile << std::endl << "1: ";
       for (int i = 0; i < 19; ++i) {
         myfile << data->lbfluid[1][i] << " - ";
       }
-      myfile << std::endl << std::endl;
+            myfile << std::endl;
+          }
+        }
+        myfile << std::endl;
 
       myfile.flush();
       myfile.close();
+      }
       ++nqid;
     }
   }

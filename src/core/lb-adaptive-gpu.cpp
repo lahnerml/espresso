@@ -109,6 +109,8 @@ void lbadapt_gpu_offload_data(int level) {
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
+  local_num_real_quadrants_level[level] = 0;
+  local_num_virt_quadrants_level[level] = 0;
   int status = 0;
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   while (status != P8EST_MESHITER_DONE) {
@@ -120,12 +122,14 @@ void lbadapt_gpu_offload_data(int level) {
                                   [p8est_meshiter_get_current_storage_id(m)],
                sizeof(lbadapt_payload_t));
         ++next_real;
+        ++local_num_real_quadrants_level[level];
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
                &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
+        ++local_num_virt_quadrants_level[level];
       }
     }
   }

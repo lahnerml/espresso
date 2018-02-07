@@ -95,14 +95,12 @@ lb_float lb_coupl_pref = 0.0;
 lb_float lb_coupl_pref2 = 0.0;
 
 void lbadapt_gpu_offload_data(int level) {
-  if (dev_local_real_quadrants == NULL) {
-    lbadapt_gpu_allocate_device_memory();
-  }
   lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
   tmp_real = P4EST_ALLOC(lbadapt_payload_t,
                          (adapt_mesh->quad_level + level)->elem_count);
   tmp_virt = P4EST_ALLOC(lbadapt_payload_t,
-                         (adapt_virtual->virtual_qlevels + level)->elem_count);
+                         P8EST_CHILDREN * (adapt_virtual->virtual_qlevels +
+                                           level)->elem_count);
   next_real = tmp_real;
   next_virt = tmp_virt;
   castable_unique_ptr <p8est_meshiter_t> m = p8est_meshiter_new_ext(
@@ -133,6 +131,9 @@ void lbadapt_gpu_offload_data(int level) {
       }
     }
   }
+  lbadapt_gpu_deallocate_device_memory();
+  lbadapt_gpu_allocate_device_memory();
+
   lbadapt_gpu_copy_data_to_device(tmp_real, tmp_virt, level);
   P4EST_FREE(tmp_real);
   P4EST_FREE(tmp_virt);

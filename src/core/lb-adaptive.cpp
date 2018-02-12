@@ -1446,6 +1446,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     // stream if we found a neighbor.
     // however, do not stream between two real quadrants that both hold virtual
     // children
+  #if 0
     if (mesh_iter->neighbor_qid != -1
         && ((-1 != mesh_iter->current_vid)
             || (-1 != mesh_iter->neighbor_vid)
@@ -1455,7 +1456,11 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
                    adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
             || (mesh_iter->neighbor_is_ghost
                 && -1 ==
-                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
+                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
+#else // 0
+    if (mesh_iter->neighbor_qid != -1)
+#endif // 0
+    {
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
       assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
@@ -1693,6 +1698,7 @@ void lbadapt_bounce_back(int level) {
         // bounce back if we found a neighbor.
         // however, do not bounce back between two quadrants that hold virtual
         // children
+#if 0
         if (mesh_iter->neighbor_qid != -1
             && ((-1 != mesh_iter->current_vid)
                 || (-1 != mesh_iter->neighbor_vid)
@@ -1702,7 +1708,11 @@ void lbadapt_bounce_back(int level) {
                        adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
                 || (mesh_iter->neighbor_is_ghost
                     && -1 ==
-                       adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
+                       adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
+#else // 0
+        if (mesh_iter->neighbor_qid != -1)
+#endif // 0
+        {
           /** read c_i in neighbors orientation and p4est's direction system.
            * Convert it to ESPResSo's directions.
            * The inverse direction of that result is the correct value to bounce

@@ -55,6 +55,8 @@
 #include <sc.h>
 #endif // LB_ADAPTIVE
 
+#define DUMP_GRID
+
 // global variable holding the number of fluid components (see global.cpp)
 int lb_components = LB_COMPONENTS;
 
@@ -3386,9 +3388,40 @@ inline void lb_collide_stream() {
     lvl_diff = lbpar.max_refinement_level - level;
 
     if (n_lbsteps % (1 << lvl_diff) == 0) {
+#ifdef DUMP_GRID
+      std::string filename_upd = "size_" + std::to_string(n_nodes) +
+                                 "_step_update_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_upd);
+#endif // DUMP_GRID
       lbadapt_update_populations_from_virtuals(level);
+
+#ifdef DUMP_GRID
+      std::string filename_str = "size_" + std::to_string(n_nodes) +
+                                 "_step_stream_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_str);
+#endif // DUMP_GRID
       lbadapt_stream(level);
+
+#ifdef DUMP_GRID
+      std::string filename_bb = "size_" + std::to_string(n_nodes) +
+                                 "_step_bounce_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_bb);
+#endif // DUMP_GRID
       lbadapt_bounce_back(level);
+
+#ifdef DUMP_GRID
+      std::string filename_swp = "size_" + std::to_string(n_nodes) +
+                                 "_step_swap_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_swp);
+#endif // DUMP_GRID
       lbadapt_swap_pointers(level);
 
       // synchronize ghost data for next collision step
@@ -3396,6 +3429,14 @@ inline void lb_collide_stream() {
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
+
+#ifdef DUMP_GRID
+      std::string filename_pre = "size_" + std::to_string(n_nodes) +
+                                 "_step_precomm_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_pre);
+#endif // DUMP_GRID
 
       // TODO: do not use convenience function here
       // if comm_hiding (exchange_data_begin)
@@ -3405,6 +3446,13 @@ inline void lb_collide_stream() {
                                                sizeof(lbadapt_payload_t),
                                                (void**)local_pointer.data(),
                                                (void**)ghost_pointer.data());
+#ifdef DUMP_GRID
+      std::string filename_post = "size_" + std::to_string(n_nodes) +
+                                 "_step_postcomm_" + std::to_string(n_lbsteps) +
+                                 "_level_" + std::to_string(level) +
+                                 ".txt";
+      lbadapt_dump2file_synced(filename_post);
+#endif // DUMP_GRID
     }
   }
 #endif // LB_ADAPTIVE_GPU

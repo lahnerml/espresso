@@ -44,8 +44,10 @@
 #include <limits>
 #include <stdlib.h>
 
-#define USE_BGK
 #ifdef LB_ADAPTIVE
+
+#define USE_BGK
+#define DUMP_VIRTUALS
 
 /* Code duplication from lb.cpp */
 /* For the D3Q19 model most functions have a separate implementation
@@ -2627,21 +2629,22 @@ void lbadapt_dump2file_synced(std::string &filename) {
       lbadapt_payload_t *data =
           &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
       if (!data->lbfields.boundary) {
-      std::ofstream myfile;
-      myfile.open(filename, std::ofstream::out | std::ofstream::app);
+        std::ofstream myfile;
+        myfile.open(filename, std::ofstream::out | std::ofstream::app);
         myfile << "id: " << qid << " level: " << (int)q->level << std::endl
                << " has virtuals: "
                << (-1 != adapt_virtual->virtual_qflags[nqid]) << std::endl
                << " - distributions: " << std::endl
                << "0: ";
-      for (int i = 0; i < 19; ++i) {
-        myfile << data->lbfluid[0][i] << " - ";
-      }
+        for (int i = 0; i < 19; ++i) {
+          myfile << data->lbfluid[0][i] << " - ";
+        }
         myfile << std::endl << "1: ";
         for (int i = 0; i < 19; ++i) {
           myfile << data->lbfluid[1][i] << " - ";
         }
-      myfile << std::endl;
+        myfile << std::endl;
+#ifdef DUMP_VIRTUALS
         if (-1 != adapt_virtual->virtual_qflags[nqid]) {
           for (int v = 0; v < P4EST_CHILDREN; ++v) {
             data =
@@ -2653,16 +2656,17 @@ void lbadapt_dump2file_synced(std::string &filename) {
               myfile << data->lbfluid[0][i] << " - ";
             }
             myfile << std::endl << "1: ";
-      for (int i = 0; i < 19; ++i) {
-        myfile << data->lbfluid[1][i] << " - ";
-      }
+            for (int i = 0; i < 19; ++i) {
+              myfile << data->lbfluid[1][i] << " - ";
+            }
             myfile << std::endl;
           }
         }
+#endif // DUMP_VIRTUALS
         myfile << std::endl;
 
-      myfile.flush();
-      myfile.close();
+        myfile.flush();
+        myfile.close();
       }
       ++nqid;
     }

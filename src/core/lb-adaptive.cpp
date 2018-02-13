@@ -1818,9 +1818,9 @@ void lbadapt_update_populations_from_virtuals(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
-      assert (mesh_iter->current_index % P4EST_CHILDREN ==
-              mesh_iter->current_vid);
-      // virtual quads are local if their parent is local, ghost analogous
+      P4EST_ASSERT(mesh_iter->current_index % P4EST_CHILDREN ==
+                   mesh_iter->current_vid);
+      // virtual quads are local iff their parent is local
       if (!mesh_iter->current_is_ghost) {
         parent_sid =
             mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];

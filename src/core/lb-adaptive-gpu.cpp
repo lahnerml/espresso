@@ -95,20 +95,20 @@ lb_float lb_coupl_pref = 0.0;
 lb_float lb_coupl_pref2 = 0.0;
 
 void lbadapt_gpu_offload_data(int level) {
-  if (dev_local_real_quadrants == NULL) {
-    lbadapt_gpu_allocate_device_memory();
-  }
   lbadapt_payload_t *tmp_real, *tmp_virt, *next_real, *next_virt;
   tmp_real = P4EST_ALLOC(lbadapt_payload_t,
                          (adapt_mesh->quad_level + level)->elem_count);
   tmp_virt = P4EST_ALLOC(lbadapt_payload_t,
-                         (adapt_virtual->virtual_qlevels + level)->elem_count);
+                         P8EST_CHILDREN * (adapt_virtual->virtual_qlevels +
+                                           level)->elem_count);
   next_real = tmp_real;
   next_virt = tmp_virt;
   castable_unique_ptr <p8est_meshiter_t> m = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
+  local_num_real_quadrants_level[level] = 0;
+  local_num_virt_quadrants_level[level] = 0;
   int status = 0;
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   while (status != P8EST_MESHITER_DONE) {
@@ -120,15 +120,20 @@ void lbadapt_gpu_offload_data(int level) {
                                   [p8est_meshiter_get_current_storage_id(m)],
                sizeof(lbadapt_payload_t));
         ++next_real;
+        ++local_num_real_quadrants_level[level];
       } else if (0 == m->current_vid) {
         memcpy(next_virt,
                &lbadapt_local_data[level]
                                   [p8est_meshiter_get_current_storage_id(m)],
                P8EST_CHILDREN * sizeof(lbadapt_payload_t));
         next_virt += P8EST_CHILDREN;
+        ++local_num_virt_quadrants_level[level];
       }
     }
   }
+  lbadapt_gpu_deallocate_device_memory();
+  lbadapt_gpu_allocate_device_memory();
+
   lbadapt_gpu_copy_data_to_device(tmp_real, tmp_virt, level);
   P4EST_FREE(tmp_real);
   P4EST_FREE(tmp_virt);

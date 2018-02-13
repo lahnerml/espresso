@@ -1849,7 +1849,6 @@ void lbadapt_update_populations_from_virtuals(int level) {
       }
     }
   }
-
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -2631,18 +2630,30 @@ void lbadapt_dump2file_synced(std::string &filename) {
 #ifndef LB_ADAPTIVE_GPU
   int nqid = 0;
   p4est_quadrant_t *q;
+
   for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
+    // Synchronization point
     MPI_Barrier(adapt_p4est->mpicomm);
+
+    // MPI rank holding current quadrant will open the file, append its
+    // information, flush it, and close the file afterwards.
     if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= qid) &&
         (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      // get quadrant for level information
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      // fetch payload
       lbadapt_payload_t *data =
           &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
+      // we are not interested in boundary quadrants
       if (!data->lbfields.boundary) {
         std::ofstream myfile;
         myfile.open(filename, std::ofstream::out | std::ofstream::app);
         myfile << "id: " << qid << " level: " << (int)q->level << std::endl
-               << " has virtuals: "
+#if 0
+               << " is parallel boundary: "
+               << (-1 != adapt_mesh->parallel_boundary[nqid])
+#endif // 0
+               << "; has virtuals: "
                << (-1 != adapt_virtual->virtual_qflags[nqid]) << std::endl
                << " - distributions: " << std::endl
                << "0: ";
@@ -2678,9 +2689,11 @@ void lbadapt_dump2file_synced(std::string &filename) {
         myfile.flush();
         myfile.close();
       }
+      // increment local quadrant index
       ++nqid;
     }
   }
+  // make sure that we have inspected all local quadrants.
   P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
 #endif // LB_ADAPTIVE_GPU
 }

@@ -448,7 +448,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
   // get refinement string for first grid change operation
-#if 1
+#if 0
   std::fstream fs;
   fs.open("refinement.txt", std::fstream::in);
   int flag;

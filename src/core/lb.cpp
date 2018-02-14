@@ -55,7 +55,7 @@
 #include <sc.h>
 #endif // LB_ADAPTIVE
 
-#define DUMP_GRID
+// #define DUMP_GRID
 
 // global variable holding the number of fluid components (see global.cpp)
 int lb_components = LB_COMPONENTS;

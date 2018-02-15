@@ -2816,6 +2816,8 @@ void mpi_lbadapt_grid_init(int node, int level) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
 
   // build initial versions of ghost, mesh, virtual, and virtual_ghost
@@ -3151,6 +3153,8 @@ void mpi_unif_refinement(int node, int ref_iterations) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
   adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
@@ -3194,7 +3198,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
                       NULL,                // init data
                       NULL);               // replace data
     // clang-format on
-    p8est_partition(adapt_p4est, 0, lbadapt_partition_weight);
+    p8est_partition(adapt_p4est, 1, lbadapt_partition_weight);
   }
 
 #ifdef LB_ADAPTIVE_GPU
@@ -3210,6 +3214,8 @@ void mpi_rand_refinement(int node, int ref_iterations) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
 
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
@@ -3263,6 +3269,8 @@ void mpi_reg_refinement(int node, int param) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
   adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
@@ -3311,6 +3319,8 @@ void mpi_reg_coarsening(int node, int param) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
 
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
@@ -3354,6 +3364,8 @@ void mpi_geometric_refinement(int node, int param) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
 
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
@@ -3401,6 +3413,8 @@ void mpi_inv_geometric_refinement(int node, int param) {
 #ifdef DD_P4EST
   p4est_utils_partition_multiple_forests(forest_order::short_range,
                                          forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
 #endif // DD_P4EST
 
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));

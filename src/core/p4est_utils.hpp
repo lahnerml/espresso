@@ -123,8 +123,10 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo);
 void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 
 /** 
- * Destroy and rebuild p4est_ghost, p4est_mesh, p4est_virtual, and
- * p4est_virtual_ghost.
+ * Destroy and rebuild forest_info, partition the forests, and recreate
+ * p4est_ghost, p4est_mesh, p4est_virtual, and p4est_virtual_ghost.
+ * This function leaves payload untouched and is most helpful for static grid
+ * refinement before the simulation has started.
  * 
  * @param btype      Neighbor information that is to be included
  */

@@ -169,6 +169,33 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
                  std::back_inserter(forest_info), p4est_to_forest_info);
 }
 
+void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
+  std::vector<p4est_t *> forests;
+#ifdef DD_P4EST
+  forests.push_back(dd.p4est);
+#endif // DD_P4EST
+  forests.push_back(adapt_p4est);
+  p4est_utils_prepare(forests);
+#ifdef DD_P4EST
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
+#endif // DD_P4EST
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
+
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
+}
+
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
   const p4est_utils_forest_info_t &current_forest =
       forest_info.at(static_cast<int>(forest));

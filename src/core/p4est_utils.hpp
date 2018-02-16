@@ -122,6 +122,14 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo);
  */
 void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 
+/** 
+ * Destroy and rebuild p4est_ghost, p4est_mesh, p4est_virtual, and
+ * p4est_virtual_ghost.
+ * 
+ * @param btype      Neighbor information that is to be included
+ */
+void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
+
 /*****************************************************************************/
 /** \name Mapping geometric positions                                        */
 /*****************************************************************************/

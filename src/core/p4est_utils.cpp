@@ -472,6 +472,57 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   return 0;
 }
 
+void dump_decisions_synced(sc_array_t * vel, sc_array_t * vort,
+                           double vel_thresh_coarse, double vel_thresh_refine,
+                           double vort_thresh_coarse, double vort_thresh_refine)
+{
+#ifndef LB_ADAPTIVE_GPU
+  int nqid = 0;
+  p4est_quadrant_t *q;
+  std::string filename = "refinement_decision_size_" +
+                         std::to_string(adapt_p4est->mpisize) +
+                         ".txt";
+
+  for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
+    // Synchronization point
+    MPI_Barrier(adapt_p4est->mpicomm);
+
+    // MPI rank holding current quadrant will open the file, append its
+    // information, flush it, and close the file afterwards.
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= qid) &&
+        (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      // get quadrant for level information
+      q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      std::ofstream myfile;
+      myfile.open(filename, std::ofstream::out | std::ofstream::app);
+      myfile << "id: " << qid << " level: " << (int)q->level << std::endl;
+
+      double v = sqrt(SQR(*(double*) sc_array_index(vel, 3 * qid)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * qid + 1)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * qid + 2)));
+      myfile << "v: coarse: " << vel_thresh_coarse << " refine: "
+             << vel_thresh_refine << " actual: " << v << std::endl;
+      myfile << "vort: coarse: " << vort_thresh_coarse << " refine: "
+             << vort_thresh_refine << " actual: ";
+      for (int d = 0; d < P4EST_DIM; ++d) {
+        myfile << abs(*(double*) sc_array_index(vort, 3 * qid + d));
+        if (d < 2) myfile << ", ";
+        else myfile << std::endl;
+      }
+      myfile << "decision: " << (*flags)[qid] << std::endl;
+      myfile << std::endl;
+
+      myfile.flush();
+      myfile.close();
+      // increment local quadrant index
+      ++nqid;
+    }
+  }
+  // make sure that we have inspected all local quadrants.
+  P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
+#endif // !defined (LB_ADAPTIVE_GPU)
+}
+
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
   // get refinement string for first grid change operation
@@ -552,12 +603,14 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   MPI_Allreduce(&vort_temp, &vort_max, 1, MPI_DOUBLE, MPI_MAX,
                 adapt_p4est->mpicomm);
 
+  double v_thresh_coarse = 0.05;
+  double v_thresh_refine = 0.15;
+  double vort_thresh_coarse = 0.02;
+  double vort_thresh_refine = 0.05;
   // traverse forest and decide if the current quadrant is to be refined or
   // coarsened
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
 #ifdef USE_VEL_CRIT
-    double v_thresh_coarse = 0.05;
-    double v_thresh_refine = 0.15;
     // velocity
     double v = sqrt(SQR(*(double*) sc_array_index(vel_values, 3 * qid)) +
                     SQR(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
@@ -576,8 +629,6 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VEL_CRIT
 #ifdef USE_VORT_CRIT
     // vorticity
-    double vort_thresh_coarse = 0.02;
-    double vort_thresh_refine = 0.05;
     double vort = std::numeric_limits<double>::min();
     for (int d = 0; d < P4EST_DIM; ++d) {
       vort_temp = abs(*(double*) sc_array_index(vort_values, 3 * qid + d));
@@ -607,7 +658,11 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VORT_CRIT
   }
 #endif //0
-
+  dump_decisions_synced(vel_values, vort_values,
+                        v_thresh_coarse * (v_max - v_min),
+                        v_thresh_refine * (v_max - v_min),
+                        vort_thresh_coarse * (vort_max - vort_min),
+                        vort_thresh_refine * (vort_max - vort_min));
   return 0;
 }
 

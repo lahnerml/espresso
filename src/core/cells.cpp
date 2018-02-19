@@ -200,7 +200,7 @@ static void cells_adapt_after_repart() {
 
 /************************************************************/
 
-void cells_re_init (int new_cs, bool isRepart)
+void cells_re_init(int new_cs, bool isRepart)
 {
   CellPList tmp_local;
   Cell *tmp_cells;
@@ -444,7 +444,7 @@ void local_sort_particles()
 
 /*************************************************/
 
-void cells_on_geometry_change (int flags)
+void cells_on_geometry_change(int flags)
 {
   if (max_cut > 0.0) {
     max_range = max_cut + skin;

@@ -178,7 +178,6 @@ espressoSystemInterface.update();
   case CELL_STRUCTURE_LAYERED:
     layered_calculate_ia();
     break;
-  case CELL_STRUCTURE_P4EST:
   case CELL_STRUCTURE_DOMDEC:
     if(dd.use_vList) {
       if (rebuild_verletlist)
@@ -191,7 +190,7 @@ espressoSystemInterface.update();
     break;
   case CELL_STRUCTURE_NSQUARE:
     nsq_calculate_ia();
-    break;
+
   }
 
 #ifdef OIF_GLOBAL_FORCES

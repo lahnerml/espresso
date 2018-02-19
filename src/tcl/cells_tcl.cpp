@@ -30,10 +30,6 @@
 #include "ghosts.hpp"
 #include "verlet.hpp"
 
-#include <sstream>
-#include <iostream>
-#include <string>
-
 /************************************************************
  *            Exported Functions                            *
  ************************************************************/
@@ -70,23 +66,6 @@ int tclcommand_cellsystem(ClientData data, Tcl_Interp *interp,
     else dd.use_vList = 1;
     mpi_bcast_cell_structure(CELL_STRUCTURE_DOMDEC);
   }
-  else if (ARG1_IS_S("p4est_domain_decomposition")) {
-    if (argc > 2) {
-      if (ARG_IS_S(2,"-verlet_list"))
-	dd.use_vList = 1;
-      else if(ARG_IS_S(2,"-no_verlet_list")) 
-	dd.use_vList = 0;
-      else{
-	Tcl_AppendResult(interp, "wrong flag to",argv[0],
-			 " : should be \" -verlet_list or -no_verlet_list \"",
-			 (char *) NULL);
-	return (TCL_ERROR);
-      }
-    }
-    /** by default use verlet list */
-    else dd.use_vList = 1;
-    mpi_bcast_cell_structure(CELL_STRUCTURE_P4EST);
-  }
   else if (ARG1_IS_S("nsquare"))
     mpi_bcast_cell_structure(CELL_STRUCTURE_NSQUARE);
   else if (ARG1_IS_S("layered")) {
@@ -120,27 +99,3 @@ int tclcommand_cellsystem(ClientData data, Tcl_Interp *interp,
   return gather_runtime_errors(interp, TCL_OK);
 }
 
-int tclcommand_repart(ClientData data, Tcl_Interp *interp,
-              int argc, char **argv)
-{
-  if (argc < 2) {
-    Tcl_AppendResult(interp, "usage: repart <how> [debug]", (char *)NULL);
-    return TCL_ERROR;
-  }
-  mpi_p4est_repart(argv[1], argc > 2 && ARG_IS_S(2, "debug"));
-  return TCL_OK;
-}
-
-int tclcommand_imbalance(ClientData data, Tcl_Interp *interp,
-              int argc, char **argv)
-{
-  if (argc < 2) {
-    Tcl_AppendResult(interp, "usage: imbalance <metric>", (char *)NULL);
-    return TCL_ERROR;
-  }
-  double imb = mpi_p4est_imbalance(argv[1]);
-  std::stringstream s;
-  s << imb;
-  Tcl_AppendResult(interp, s.str().c_str(), (char *)NULL);
-  return TCL_OK;
-}

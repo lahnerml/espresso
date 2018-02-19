@@ -34,12 +34,6 @@ int tclcommand_cellsystem(ClientData data, Tcl_Interp *interp,
 int tclcommand_sort_particles(ClientData data, Tcl_Interp *interp,
                               int argc, char **argv);
 
-int tclcommand_repart(ClientData data, Tcl_Interp *interp,
-                      int argc, char **argv);
-
-int tclcommand_imbalance(ClientData data, Tcl_Interp *interp,
-                         int argc, char **argv);
-
 /*@}*/
 
 #endif

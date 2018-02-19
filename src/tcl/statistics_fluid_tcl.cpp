@@ -103,9 +103,7 @@ static int tclcommand_analyze_fluid_parse_temp(Tcl_Interp *interp, int argc, cha
 }
 
 static int tclcommand_analyze_fluid_parse_densprof(Tcl_Interp *interp, int argc, char **argv) {
-#ifdef LB_ADAPTIVE
-  // not implemented
-#else // LB_ADAPTIVE
+  
   int i, pdir, x1, x2;
   char buffer[TCL_DOUBLE_SPACE];
   double *profile;
@@ -135,16 +133,12 @@ static int tclcommand_analyze_fluid_parse_densprof(Tcl_Interp *interp, int argc,
     Tcl_AppendResult(interp, buffer, "\n", (char *)NULL);
   }
   free(profile);
-#endif // LB_ADAPTIVE
   
   return TCL_OK;
 
 }
 
 static int tclcommand_analyze_fluid_parse_velprof(Tcl_Interp *interp, int argc, char **argv) {
-#ifdef LB_ADAPTIVE
-  // not implemented
-#else // LB_ADAPTIVE
     int i, pdir, vcomp, x1, x2;
     char buffer[TCL_DOUBLE_SPACE];
     double *velprof;
@@ -189,7 +183,6 @@ static int tclcommand_analyze_fluid_parse_velprof(Tcl_Interp *interp, int argc, 
     }	
 
     free(velprof);
-#endif // LB_ADAPTIVE
 
     return TCL_OK;
 

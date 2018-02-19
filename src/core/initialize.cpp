@@ -83,7 +83,7 @@ static int lb_reinit_particles_gpu = 1;
 static int reinit_particle_comm_gpu = 1;
 #endif
 
-void on_program_start ()
+void on_program_start()
 {
   EVENT_TRACE(fprintf(stderr, "%d: on_program_start\n", this_node));
 
@@ -106,7 +106,6 @@ void on_program_start ()
   /*
     call the initialization of the modules here
   */
-  
   Random::init_random();
 
   init_node_grid();
@@ -114,11 +113,7 @@ void on_program_start ()
   min_num_cells = calc_processor_min_num_cells();
 
 #ifdef DD_P4EST
-  //sc_init (comm_cart, 1, 1, NULL, SC_LP_ESSENTIAL);
   sc_init (comm_cart, 1, 1, NULL, SC_LP_PRODUCTION);
-  //p4est_init (NULL, SC_LP_PRODUCTION);
-  //sc_init(MPI_COMM_WORLD, 1, 1, NULL, SC_LP_PRODUCTION);
-  //p4est_init(NULL, SC_LP_VERBOSE);
   p4est_init(NULL, SC_LP_PRODUCTION);
 #endif
 
@@ -158,7 +153,6 @@ void on_program_start ()
     /* interaction_data.c: make sure 0<->0 ia always exists */
     make_particle_type_exist(0);
   }
-  
 }
 
 
@@ -364,7 +358,7 @@ void on_coulomb_change()
   recalc_forces = 1;
 }
 
-void on_short_range_ia_change ()
+void on_short_range_ia_change()
 {
   EVENT_TRACE(fprintf(stderr, "%d: on_short_range_ia_changes\n", this_node));
   invalidate_obs();

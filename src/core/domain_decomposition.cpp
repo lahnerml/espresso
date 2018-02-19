@@ -107,6 +107,7 @@ std::vector<int> dd_fs_neigh;
     n == 0 || n >= dd.ghost_cell_grid[1] - 1 || \
     o == 0 || o == dd.ghost_cell_grid[2] - 1 )
 #endif
+
 /** Calculate cell grid dimensions, cell sizes and number of cells.
  *  Calculates the cell grid, based on \ref local_box_l and \ref
  *  max_range. If the number of cells is larger than \ref
@@ -117,7 +118,8 @@ std::vector<int> dd_fs_neigh;
  *  DomainDecomposition::cell_size, \ref
  *  DomainDecomposition::inv_cell_size, and \ref n_cells.
  */
-void dd_create_cell_grid () {
+void dd_create_cell_grid()
+{
   int i,n_local_cells,new_cells,min_ind;
   double cell_range[3], min_size, scale, volume;
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid: max_range %f\n",this_node,max_range));
@@ -125,7 +127,7 @@ void dd_create_cell_grid () {
   
   /* initialize */
   cell_range[0]=cell_range[1]=cell_range[2] = max_range;
-  
+
   if (max_range < ROUND_ERROR_PREC*box_l[0]) {
     /* this is the initialization case */
 #ifdef LEES_EDWARDS
@@ -148,21 +150,21 @@ void dd_create_cell_grid () {
       cell_range[i] = local_box_l[i]/dd.cell_grid[i];
 
       if ( cell_range[i] < max_range ) {
-        /* ok, too many cells for this direction, set to minimum */
-        dd.cell_grid[i] = (int)floor(local_box_l[i]/max_range);
-        if ( dd.cell_grid[i] < 1 ) {
-          runtimeErrorMsg() << "interaction range " << max_range << " in direction "
-              << i << " is larger than the local box size " << local_box_l[i];
-          dd.cell_grid[i] = 1;
-        }
+	/* ok, too many cells for this direction, set to minimum */
+	dd.cell_grid[i] = (int)floor(local_box_l[i]/max_range);
+	if ( dd.cell_grid[i] < 1 ) {
+	  runtimeErrorMsg() << "interaction range " << max_range << " in direction "
+	      << i << " is larger than the local box size " << local_box_l[i];
+	  dd.cell_grid[i] = 1;
+	}
 #ifdef LEES_EDWARDS
         if ( (i == 0) && (dd.cell_grid[0] < 2) ) {
-          runtimeErrorMsg() << "interaction range " << max_range << " in direction "
-            << i << " is larger than half the local box size " << local_box_l[i] << "/2";
-            dd.cell_grid[0] = 2;
+	  runtimeErrorMsg() << "interaction range " << max_range << " in direction "
+	      << i << " is larger than half the local box size " << local_box_l[i] << "/2";
+	  dd.cell_grid[0] = 2;
         }
 #endif
-        cell_range[i] = local_box_l[i]/dd.cell_grid[i];
+	cell_range[i] = local_box_l[i]/dd.cell_grid[i];
       }
     }
 
@@ -181,15 +183,14 @@ void dd_create_cell_grid () {
       min_size = cell_range[0];
 
 #ifdef LEES_EDWARDS
-      for (i = 2; i >= 1; i--) /*preferably have thin slices in z or y... this is more efficient for Lees Edwards*/
+      for (i = 2; i >= 1; i--) {/*preferably have thin slices in z or y... this is more efficient for Lees Edwards*/
 #else
-      for (i = 1; i < 3; i++)
-#endif
-      {
-        if (dd.cell_grid[i] > 1 && cell_range[i] < min_size) {
-          min_ind = i;
-          min_size = cell_range[i];
-        }
+      for (i = 1; i < 3; i++) {
+#endif       
+          if (dd.cell_grid[i] > 1 && cell_range[i] < min_size) {
+                min_ind = i;
+                min_size = cell_range[i];
+              }
       }
       CELL_TRACE(fprintf(stderr, "%d: minimal coordinate %d, size %f, grid %d\n", this_node,min_ind, min_size, dd.cell_grid[min_ind]));
 
@@ -200,8 +201,8 @@ void dd_create_cell_grid () {
 
     /* sanity check */
     if (n_local_cells < min_num_cells) {
-      runtimeErrorMsg() << "number of cells "<< n_local_cells << " is smaller than minimum " << min_num_cells <<
-        " (interaction range too large or min_num_cells too large)";
+        runtimeErrorMsg() << "number of cells "<< n_local_cells << " is smaller than minimum " << min_num_cells <<
+               " (interaction range too large or min_num_cells too large)";
     }
   }
 
@@ -209,7 +210,7 @@ void dd_create_cell_grid () {
   if(n_local_cells > max_num_cells) {
       runtimeErrorMsg() << "no suitable cell grid found ";
   }
-  
+
   /* now set all dependent variables */
   new_cells=1;
   for(i=0;i<3;i++) {
@@ -230,14 +231,14 @@ void dd_create_cell_grid () {
   realloc_cellplist(&local_cells, local_cells.n = n_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = new_cells-n_local_cells);
 
-
   CELL_TRACE(fprintf(stderr, "%d: dd_create_cell_grid, n_cells=%d, local_cells.n=%d, ghost_cells.n=%d, dd.ghost_cell_grid=(%d,%d,%d)\n", this_node, n_cells,local_cells.n,ghost_cells.n,dd.ghost_cell_grid[0],dd.ghost_cell_grid[1],dd.ghost_cell_grid[2]));
 }
 
 /** Fill local_cells list and ghost_cells list for use with domain
     decomposition.  \ref cells::cells is assumed to be a 3d grid with size
     \ref DomainDecomposition::ghost_cell_grid . */
-void dd_mark_cells () {
+void dd_mark_cells()
+{
   int m,n,o,cnt_c=0,cnt_l=0,cnt_g=0;
   
   DD_CELLS_LOOP(m,n,o) {
@@ -251,7 +252,8 @@ void dd_mark_cells () {
 
     if(DD_IS_LOCAL_CELL(m,n,o)) local_cells.cell[cnt_l++] = &cells[cnt_c++]; 
     else                        ghost_cells.cell[cnt_g++] = &cells[cnt_c++];
-  }
+  } 
+
 }
 
 /** Fill a communication cell pointer list. Fill the cell pointers of
@@ -263,7 +265,8 @@ void dd_mark_cells () {
     \param lc          lower left corner of the subgrid.
     \param hc          high up corner of the subgrid.
  */
-int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
+int dd_fill_comm_cell_lists(Cell **part_lists, int lc[3], int hc[3])
+{
   int i,m,n,o,c=0;
   /* sanity check */
   for(i=0; i<3; i++) {
@@ -284,7 +287,8 @@ int dd_fill_comm_cell_lists (Cell **part_lists, int lc[3], int hc[3]) {
 }
 
 /** Create communicators for cell structure domain decomposition. (see \ref GhostCommunicator) */
-void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
+void  dd_prepare_comm(GhostCommunicator *comm, int data_parts)
+{
   int dir,lr,i,cnt, num, n_comm_cells[3];
   int lc[3],hc[3],done[3]={0,0,0};
 
@@ -300,7 +304,7 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
        }
     }
   }
-  
+
   /* prepare communicator */
   CELL_TRACE(fprintf(stderr,"%d Create Communicator: prep_comm data_parts %d num %d\n",this_node,data_parts,num));
   prepare_comm(comm, data_parts, num);
@@ -324,35 +328,36 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
     for(lr=0; lr<2; lr++) {
       if(node_grid[dir] == 1) {
         /* just copy cells on a single node */
-        if( PERIODIC(dir ) || (boundary[2*dir+lr] == 0) ) {
-          comm->comm[cnt].type          = GHOST_LOCL;
-          comm->comm[cnt].node          = this_node;
+      if( PERIODIC(dir ) || (boundary[2*dir+lr] == 0) )
+      {
+        comm->comm[cnt].type          = GHOST_LOCL;
+        comm->comm[cnt].node          = this_node;
 
-          /* Buffer has to contain Send and Recv cells -> factor 2 */
-          comm->comm[cnt].part_lists    = (ParticleList**)Utils::malloc(2*n_comm_cells[dir]*sizeof(ParticleList *));
-          comm->comm[cnt].n_part_lists  = 2*n_comm_cells[dir];
-          /* prepare folding of ghost positions */
-          if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
-            comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
-          }        
-          
-          /* fill send comm cells */
-          lc[dir] = hc[dir] = 1 + lr * (dd.cell_grid[dir]-1);
-          
-          dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
-          CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy to          grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
-          
-          /* fill recv comm cells */
-          lc[dir] = hc[dir] = 0 +( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
-      
-          /* place recieve cells after send cells */
-          dd_fill_comm_cell_lists(&comm->comm[cnt].part_lists[n_comm_cells[dir]],lc,hc);
-          CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy from        grid (%d,%d,%d)-(%d,%d,%d)\n",
-            this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
-          
-          cnt++;
-        }
-      } else {
+        /* Buffer has to contain Send and Recv cells -> factor 2 */
+        comm->comm[cnt].part_lists    = (ParticleList**)Utils::malloc(2*n_comm_cells[dir]*sizeof(ParticleList *));
+        comm->comm[cnt].n_part_lists  = 2*n_comm_cells[dir];
+        /* prepare folding of ghost positions */
+        if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
+             comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
+        }        
+
+            /* fill send comm cells */
+        lc[dir] = hc[dir] = 1 + lr * (dd.cell_grid[dir]-1);
+        
+            dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
+            CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy to          grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
+                               lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+        
+        /* fill recv comm cells */
+            lc[dir] = hc[dir] = 0 +( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
+        
+            /* place recieve cells after send cells */
+            dd_fill_comm_cell_lists(&comm->comm[cnt].part_lists[n_comm_cells[dir]],lc,hc);
+            CELL_TRACE(fprintf(stderr,"%d: prep_comm %d copy from        grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+            cnt++;
+          }
+      }
+      else {
         /* i: send/recv loop */
         for(i=0; i<2; i++) {
           if( PERIODIC(dir) || (boundary[2*dir+lr] == 0) )
@@ -364,15 +369,14 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
               /* prepare folding of ghost positions */
               if((data_parts & GHOSTTRANS_POSSHFTD) && boundary[2*dir+lr] != 0) {
                  comm->comm[cnt].shift[dir] = boundary[2*dir+lr]*box_l[dir];
-              }        
+          }        
   
               lc[dir] = hc[dir] = 1 + lr * ( dd.cell_grid[dir] - 1 );
           
               dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
         
-              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d send to   node %d grid (%d,%d,%d)-(%d,%d,%d)\n",
-                this_node,cnt,comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
-              
+              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d send to   node %d grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
+                                 comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
               cnt++;
             }
           if( PERIODIC(dir) || (boundary[2*dir+(1-lr)] == 0) )
@@ -383,10 +387,10 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
               comm->comm[cnt].n_part_lists  = n_comm_cells[dir];
         
               lc[dir] = hc[dir] = ( 1 - lr ) * ( dd.cell_grid[dir] + 1 );
-      
-              dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
-              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d recv from node %d grid (%d,%d,%d)-(%d,%d,%d)\n",
-                this_node,cnt,comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
+        
+          dd_fill_comm_cell_lists(comm->comm[cnt].part_lists,lc,hc);
+              CELL_TRACE(fprintf(stderr,"%d: prep_comm %d recv from node %d grid (%d,%d,%d)-(%d,%d,%d)\n",this_node,cnt,
+                                 comm->comm[cnt].node,lc[0],lc[1],lc[2],hc[0],hc[1],hc[2]));
               cnt++;
             }
         }
@@ -399,7 +403,8 @@ void dd_prepare_comm (GhostCommunicator *comm, int data_parts) {
 /** Revert the order of a communicator: After calling this the
     communicator is working in reverted order with exchanged
     communication types GHOST_SEND <-> GHOST_RECV. */
-void dd_revert_comm_order (GhostCommunicator *comm) {
+void dd_revert_comm_order(GhostCommunicator *comm)
+{
   int i,j,nlist2;
   GhostCommunication tmp;
   ParticleList *tmplist;
@@ -428,7 +433,8 @@ void dd_revert_comm_order (GhostCommunicator *comm) {
 }
 
 /** Of every two communication rounds, set the first receivers to prefetch and poststore */
-void dd_assign_prefetches (GhostCommunicator *comm) {
+void dd_assign_prefetches(GhostCommunicator *comm)
+{
   int cnt;
 
   for(cnt=0; cnt<comm->num; cnt += 2) {
@@ -444,7 +450,8 @@ void dd_assign_prefetches (GhostCommunicator *comm) {
     (see \ref dd_prepare_comm for the original), i.e. all which have
     GHOSTTRANS_POSSHFTD or'd into 'data_parts' upon execution of \ref
     dd_prepare_comm. */
-void dd_update_communicators_w_boxl() {
+void dd_update_communicators_w_boxl()
+{
   int cnt=0;
   
   /* direction loop: x, y, z */
@@ -489,7 +496,8 @@ void dd_update_communicators_w_boxl() {
  * created list of interacting neighbor cells is used by the verlet
  * algorithm (see verlet.cpp) to build the verlet lists.
  */
-void dd_init_cell_interactions () {
+void dd_init_cell_interactions()
+{
   int m,n,o,p,q,r,ind1,ind2,c_cnt=0,n_cnt;
 
   dd_fs_neigh.clear();
@@ -572,7 +580,8 @@ void dd_init_cell_interactions () {
 /** Returns pointer to the cell which corresponds to the position if
     the position is in the nodes spatial domain otherwise a NULL
     pointer. */
-Cell * dd_save_position_to_cell (double pos[3]) {
+Cell *dd_save_position_to_cell(double pos[3]) 
+{
   int i,cpos[3];
   double lpos;
 
@@ -604,7 +613,8 @@ Cell * dd_save_position_to_cell (double pos[3]) {
   return &(cells[i]);  
 }
 
-Cell *dd_position_to_cell(double pos[3]) {
+Cell *dd_position_to_cell(double pos[3])
+{
   int i,cpos[3];
   double lpos;
 
@@ -634,7 +644,8 @@ Cell *dd_position_to_cell(double pos[3]) {
   return &cells[i];
 }
 
-void dd_position_to_cell_indices(double pos[3],int* idx) {
+void dd_position_to_cell_indices(double pos[3],int* idx)
+{
   int i;
   double lpos;
 
@@ -656,7 +667,8 @@ void dd_position_to_cell_indices(double pos[3],int* idx) {
 
 /** Append the particles in pl to \ref local_cells and update \ref local_particles.  
     @return 0 if all particles in pl reside in the nodes domain otherwise 1.*/
-int dd_append_particles(ParticleList *pl, int fold_dir) {
+int dd_append_particles(ParticleList *pl, int fold_dir)
+{
   int p, dir, c, cpos[3], flag=0, fold_coord=fold_dir/2;
 
   CELL_TRACE(fprintf(stderr, "%d: dd_append_particles %d\n", this_node, pl->n));
@@ -700,6 +712,7 @@ int dd_append_particles(ParticleList *pl, int fold_dir) {
 /************************************************************/
 
 void dd_on_geometry_change(int flags) {
+
   /* Realignment of comms along the periodic y-direction is needed */
   if (flags & CELL_FLAG_LEES_EDWARDS) {
     CELL_TRACE(fprintf(stderr,"%d: dd_on_geometry_change responding to Lees-Edwards offset change.\n", this_node);)
@@ -783,8 +796,7 @@ void dd_on_geometry_change(int flags) {
       cells_re_init(CELL_STRUCTURE_DOMDEC);
       return;
     }
-  } 
-
+  }
 #ifdef LEES_EDWARDS
   le_dd_update_communicators_w_boxl(&le_mgr);
 #else
@@ -795,7 +807,8 @@ void dd_on_geometry_change(int flags) {
 }
 
 /************************************************************/
-void dd_topology_init(CellPList *old) {
+void dd_topology_init(CellPList *old)
+{
   int c,p,np;
   int exchange_data, update_data;
   Particle *part;
@@ -804,7 +817,7 @@ void dd_topology_init(CellPList *old) {
 
   /** broadcast the flag for using verlet list */
   MPI_Bcast(&dd.use_vList, 1, MPI_INT, 0, comm_cart);
-
+ 
   cell_structure.type             = CELL_STRUCTURE_DOMDEC;
   cell_structure.position_to_node = map_position_node_array;
   cell_structure.position_to_cell = dd_position_to_cell;
@@ -837,6 +850,7 @@ void dd_topology_init(CellPList *old) {
 
   /* collect forces has to be done in reverted order! */
   dd_revert_comm_order(&cell_structure.collect_ghost_force_comm);
+
   dd_assign_prefetches(&cell_structure.ghost_cells_comm);
   dd_assign_prefetches(&cell_structure.exchange_ghosts_comm);
   dd_assign_prefetches(&cell_structure.update_ghost_pos_comm);
@@ -887,7 +901,8 @@ void dd_topology_init(CellPList *old) {
 }
 
 /************************************************************/
-void dd_topology_release() {
+void dd_topology_release()
+{
   int i,j;
   CELL_TRACE(fprintf(stderr,"%d: dd_topology_release:\n",this_node));
   /* release cell interactions */
@@ -916,7 +931,8 @@ void dd_topology_release() {
 }
 
 /************************************************************/
-void dd_exchange_and_sort_particles (int global_flag) {
+void  dd_exchange_and_sort_particles(int global_flag)
+{
   int dir, c, p, i, finished=0;
   ParticleList *cell,*sort_cell, send_buf_l, send_buf_r, recv_buf_l, recv_buf_r;
   Particle *part;
@@ -934,59 +950,62 @@ void dd_exchange_and_sort_particles (int global_flag) {
     /* direction loop: x, y, z */  
     for(dir=0; dir<3; dir++) { 
       if(node_grid[dir] > 1) {
-        /* Communicate particles that have left the node domain */
-        /* particle loop */
-        for(c=0; c<local_cells.n; c++) {
-          cell = local_cells.cell[c];
-          for (p = 0; p < cell->n; p++) {
-            part = &cell->part[p];
-            /* Move particles to the left side */
-            // Without the factor 0.5 in front of ROUND_ERROR_PREC, particles sitting exactly on the boundary 
-            // may be accepted (i.e. not sent) here and rejected later on by dd_save_position_to_cell
-            if(part->r.p[dir] - my_left[dir] < -0.5*ROUND_ERROR_PREC*box_l[dir]) {
-              if( PERIODIC(dir) || (boundary[2*dir]==0) ) {
-                CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part left %d\n",this_node,part->p.identity));
-                local_particles[part->p.identity] = NULL;
-                move_indexed_particle(&send_buf_l, cell, p);
-                if(p < cell->n) p--;
-              }
-            }
-            /* Move particles to the right side */
-            // Factor 0.5 see above
-            else if(part->r.p[dir] - my_right[dir] >= 0.5*ROUND_ERROR_PREC*box_l[dir]) {
-              if( PERIODIC(dir) || (boundary[2*dir+1]==0) ) {
-                CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part right %d\n",this_node,part->p.identity));
-                local_particles[part->p.identity] = NULL;
-                move_indexed_particle(&send_buf_r, cell, p);
-                if(p < cell->n) p--;
-              }
-            }
-            /* Sort particles in cells of this node during last direction */
-            else if(dir==2) {
-              sort_cell = dd_save_position_to_cell(part->r.p);
-              if(sort_cell != cell) {
-                if(sort_cell==NULL) {
-                  CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles: Take another loop",this_node));
-                  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: CP1 Particle %d (%f,%f,%f) not inside node domain.\n",
-                    this_node,part->p.identity,part->r.p[0],part->r.p[1],part->r.p[2]));		 
-                  finished=0;
-                  sort_cell = local_cells.cell[0];
-                  if(sort_cell != cell) {
-                    move_indexed_particle(sort_cell, cell, p);
-                    if(p < cell->n) p--;
-                  }
-                } else {
-                  move_indexed_particle(sort_cell, cell, p);
-                  if(p < cell->n) p--;
-                }
-              }
-            }
-          }
-        }
+	/* Communicate particles that have left the node domain */
+	/* particle loop */
+	for(c=0; c<local_cells.n; c++) {
+	  cell = local_cells.cell[c];
+	  for (p = 0; p < cell->n; p++) {
+	    part = &cell->part[p];
+	    /* Move particles to the left side */
+	    // Without the factor 0.5 in front of ROUND_ERROR_PREC, particles sitting exactly on the boundary 
+	    // may be accepted (i.e. not sent) here and rejected later on by dd_save_position_to_cell
+	    if(part->r.p[dir] - my_left[dir] < -0.5*ROUND_ERROR_PREC*box_l[dir]) {
+	      if( PERIODIC(dir) || (boundary[2*dir]==0) ) 
+		{
+		  CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part left %d\n",this_node,part->p.identity));
+		  local_particles[part->p.identity] = NULL;
+		  move_indexed_particle(&send_buf_l, cell, p);
+		  if(p < cell->n) p--;
+		}
+	    }
+	    /* Move particles to the right side */
+	    // Factor 0.5 see above
+	    else if(part->r.p[dir] - my_right[dir] >= 0.5*ROUND_ERROR_PREC*box_l[dir]) {
+	      if( PERIODIC(dir) || (boundary[2*dir+1]==0) ) 
+		{
+		  CELL_TRACE(fprintf(stderr,"%d: dd_ex_and_sort_p: send part right %d\n",this_node,part->p.identity));
+		  local_particles[part->p.identity] = NULL;
+		  move_indexed_particle(&send_buf_r, cell, p);
+		  if(p < cell->n) p--;
+		}
+	    }
+	    /* Sort particles in cells of this node during last direction */
+	    else if(dir==2) {
+	      sort_cell = dd_save_position_to_cell(part->r.p);
+	      if(sort_cell != cell) {
+		if(sort_cell==NULL) {
+		  CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles: Take another loop",this_node));
+		  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: CP1 Particle %d (%f,%f,%f) not inside node domain.\n",
+				     this_node,part->p.identity,part->r.p[0],part->r.p[1],part->r.p[2]));		 
+		  finished=0;
+		  sort_cell = local_cells.cell[0];
+		  if(sort_cell != cell) {
+		    move_indexed_particle(sort_cell, cell, p);
+		    if(p < cell->n) p--;
+		  }
+		}
+		else {
+		  move_indexed_particle(sort_cell, cell, p);
+		  if(p < cell->n) p--;
+		}
+	      }
+	    }
+	  }
+	}
 
         /* Exchange particles */
 #ifndef LEES_EDWARDS
-        CELL_TRACE(fprintf(stderr,"%d: send receive %d\n",this_node, dir));
+ 	CELL_TRACE(fprintf(stderr,"%d: send receive %d\n",this_node, dir));
         
         if(node_pos[dir]%2==0) {
           send_particles(&send_buf_l, node_neighbors[2*dir]);
@@ -1001,29 +1020,30 @@ void dd_exchange_and_sort_particles (int global_flag) {
           send_particles(&send_buf_r, node_neighbors[2*dir+1]);
         }
 #else
-        int ii, nn, lr;
-        for( ii = 0; ii <2; ii++) {
-          nn = node_neighbors[2*dir+ii];
-          lr = node_neighbor_lr[2*dir+ii];
+    int ii, nn, lr;
+    for( ii = 0; ii <2; ii++){
+
+            nn = node_neighbors[2*dir+ii];
+            lr = node_neighbor_lr[2*dir+ii];
             
-          if( lr == 1 ) {
-            if( nn > this_node ) {
-              send_particles(&send_buf_r, nn);
-              recv_particles(&recv_buf_r, nn);
-            } else {
-              recv_particles(&recv_buf_r, nn);
-              send_particles(&send_buf_r, nn);
+            if( lr == 1 ){
+                if( nn > this_node ){
+                        send_particles(&send_buf_r, nn);
+                        recv_particles(&recv_buf_r, nn);
+                }else{
+                        recv_particles(&recv_buf_r, nn);
+                        send_particles(&send_buf_r, nn);
+                }
+            }else{
+                if( nn > this_node ){
+                        send_particles(&send_buf_l, nn);
+                        recv_particles(&recv_buf_l, nn);
+                }else{
+                        recv_particles(&recv_buf_l, nn);
+                        send_particles(&send_buf_l, nn);
+                }
             }
-          } else {
-            if( nn > this_node ) {
-              send_particles(&send_buf_l, nn);
-              recv_particles(&recv_buf_l, nn);
-            } else {
-              recv_particles(&recv_buf_l, nn);
-              send_particles(&send_buf_l, nn);
-            }
-          }
-        }
+    }
 #endif
 
         /* sort received particles to cells, folding of coordinates also happens in here. */
@@ -1034,68 +1054,67 @@ void dd_exchange_and_sort_particles (int global_flag) {
         send_buf_r.n = 0;
         recv_buf_l.n = 0;
         recv_buf_r.n = 0;
-      } else {
-        /* Single node direction case (no communication) */
-        /* Fold particles that have left the box */
-        /* particle loop */
-        for(c=0; c<local_cells.n; c++) {
-          cell = local_cells.cell[c];
-          for (p = 0; p < cell->n; p++) {
-            part = &cell->part[p];
-            if( PERIODIC(dir) ) {
+      }
+      else {
+	/* Single node direction case (no communication) */
+	/* Fold particles that have left the box */
+	/* particle loop */
+	for(c=0; c<local_cells.n; c++) {
+	  cell = local_cells.cell[c];
+	  for (p = 0; p < cell->n; p++) {
+	    part = &cell->part[p];
+	    if( PERIODIC(dir) ) {
               fold_coordinate(part->r.p, part->m.v, part->l.i, dir);
             }
-            if (dir==2) {
-              sort_cell = dd_save_position_to_cell(part->r.p);
-              if(sort_cell != cell) {
-                if(sort_cell==NULL) {
-                  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: CP2 Particle %d (%f,%f,%f) not inside node domain.\n",
-                  this_node,part->p.identity,part->r.p[0],part->r.p[1],part->r.p[2]));
-                  finished=0;
-                  sort_cell = local_cells.cell[0];
-                  if(sort_cell != cell) {
-                    move_indexed_particle(sort_cell, cell, p);
-                    if(p < cell->n) p--;
-                  }      
-                } else {
-                  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: move particle id %d\n", this_node,part->p.identity));
-                  move_indexed_particle(sort_cell, cell, p);
-                  if(p < cell->n) p--;
-                }
-              }
-            }
-          }
-        }
+	    if (dir==2) {
+	      sort_cell = dd_save_position_to_cell(part->r.p);
+	      if(sort_cell != cell) {
+		if(sort_cell==NULL) {
+		  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: CP2 Particle %d (%f,%f,%f) not inside node domain.\n",
+				     this_node,part->p.identity,part->r.p[0],part->r.p[1],part->r.p[2]));
+		  finished=0;
+		  sort_cell = local_cells.cell[0];
+		  if(sort_cell != cell) {
+		    move_indexed_particle(sort_cell, cell, p);
+		    if(p < cell->n) p--;
+		  }      
+		}
+		else {
+		  CELL_TRACE(fprintf(stderr, "%d: dd_exchange_and_sort_particles: move particle id %d\n", this_node,part->p.identity));
+		  move_indexed_particle(sort_cell, cell, p);
+		  if(p < cell->n) p--;
+		}
+	      }
+	    }
+	  }
+	}
       }
     }
 
     /* Communicate wether particle exchange is finished */
     if(global_flag == CELL_GLOBAL_EXCHANGE) {
       if(this_node==0) {
-        int sum;
-        MPI_Reduce(&finished, &sum, 1, MPI_INT, MPI_SUM, 0, comm_cart);
-        if( sum < n_nodes ) 
-          finished=0; 
-        else 
-          finished=sum; 
+	int sum;
+	MPI_Reduce(&finished, &sum, 1, MPI_INT, MPI_SUM, 0, comm_cart);
+	if( sum < n_nodes ) finished=0; else finished=sum; 
       } else {
-        MPI_Reduce(&finished, NULL, 1, MPI_INT, MPI_SUM, 0, comm_cart);
+	MPI_Reduce(&finished, NULL, 1, MPI_INT, MPI_SUM, 0, comm_cart);
       }
       MPI_Bcast(&finished, 1, MPI_INT, 0, comm_cart);
     } else {
       if(finished == 0) {
-        runtimeErrorMsg() << "some particles moved more than min_local_box_l, reduce the time step";
-        /* the bad guys are all in cell 0, but probably their interactions are of no importance anyways.
-        However, their positions have to be made valid again. */
-        finished = 1;
-        /* all out of range coordinates in the left overs cell are moved to (0,0,0) */
-        cell = local_cells.cell[0];
-        for (p = 0; p < cell->n; p++) {
-          part = &cell->part[p];
-          if(dir < 3 && (part->r.p[dir] < my_left[dir] || part->r.p[dir] > my_right[dir]))
-            for (i = 0; i < 3; i++)
-              part->r.p[i] = 0;
-        }
+      runtimeErrorMsg() << "some particles moved more than min_local_box_l, reduce the time step";
+	/* the bad guys are all in cell 0, but probably their interactions are of no importance anyways.
+	   However, their positions have to be made valid again. */
+	finished = 1;
+	/* all out of range coordinates in the left overs cell are moved to (0,0,0) */
+	cell = local_cells.cell[0];
+	for (p = 0; p < cell->n; p++) {
+	  part = &cell->part[p];
+	  if(dir < 3 && (part->r.p[dir] < my_left[dir] || part->r.p[dir] > my_right[dir]))
+	    for (i = 0; i < 3; i++)
+	      part->r.p[i] = 0;
+	}
       }
     }
     CELL_TRACE(fprintf(stderr,"%d: dd_exchange_and_sort_particles: finished value: %d\n",this_node,finished));
@@ -1115,7 +1134,8 @@ void dd_exchange_and_sort_particles (int global_flag) {
 
 /*************************************************/
 
-int calc_processor_min_num_cells () {
+int calc_processor_min_num_cells()
+{
   int i, min = 1;
   /* the minimal number of cells can be lower if there are at least two nodes serving a direction,
      since this also ensures that the cell size is at most half the box length. However, if there is
@@ -1126,7 +1146,8 @@ int calc_processor_min_num_cells () {
   return min;
 }
 
-void calc_link_cell() {
+void calc_link_cell()
+{
   int c, np1, n, np2, i ,j, j_start;
   Cell *cell;
   IA_Neighbor *neighbor;
@@ -1140,60 +1161,6 @@ void calc_link_cell() {
     p1   = cell->part;
     np1  = cell->n;
 
-    /* Loop cell neighbors */
-    for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
-      neighbor = &dd.cell_inter[c].nList[n];
-      p2  = neighbor->pList->part;
-      np2 = neighbor->pList->n;
-      /* Loop cell particles */
-      for(i=0; i < np1; i++) {
-        j_start = 0;
-        /* Tasks within cell: bonded forces */
-        if(n == 0) {
-                add_single_particle_force(&p1[i]);
-          if (rebuild_verletlist)
-            memcpy(p1[i].l.p_old, p1[i].r.p, 3*sizeof(double));
-
-          j_start = i+1;
-        }
-        /* Loop neighbor cell particles */
-        for(j = j_start; j < np2; j++) {
-#ifdef EXCLUSIONS
-          if(do_nonbonded(&p1[i], &p2[j]))
-#endif
-          {
-#ifdef MINIMAL_GHOST
-            if (neighbor->use_mi_vec)
-              dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
-            else 
-              dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#else
-            dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#endif
-            add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
-          }
-        }
-      }
-    }
-  }
-  rebuild_verletlist = 0;
-}
-
-static void __calc_link_cell_runtime(std::vector<double>& ts) {
-  int c, np1, n, np2, i ,j, j_start;
-  Cell *cell;
-  IA_Neighbor *neighbor;
-  Particle *p1, *p2;
-  double dist2, vec21[3];
-
-  /* Loop local cells */
-  for (c = 0; c < local_cells.n; c++) {
-
-    cell = local_cells.cell[c];
-    p1   = cell->part;
-    np1  = cell->n;
-
-    double tstart = MPI_Wtime();
     /* Loop cell neighbors */
     for (n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
       neighbor = &dd.cell_inter[c].nList[n];
@@ -1216,27 +1183,14 @@ static void __calc_link_cell_runtime(std::vector<double>& ts) {
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-#ifdef MINIMAL_GHOST
-        if (neighbor->use_mi_vec)
-          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
-        else 
-          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#else
-        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#endif
+	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
 	      add_non_bonded_pair_force(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}
       }
     }
-    ts[c] += MPI_Wtime() - tstart;
   }
   rebuild_verletlist = 0;
-}
-
-void calc_link_cell_runtime(int nsteps, std::vector<double>& ts) {
-    for (int i = 0; i < nsteps; ++i)
-        __calc_link_cell_runtime(ts);
 }
 
 /************************************************************/
@@ -1280,14 +1234,7 @@ void calculate_link_cell_energies()
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-#ifdef MINIMAL_GHOST
-        if (neighbor->use_mi_vec)
-          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
-        else 
-          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#else
-        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#endif
+	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
 	      add_non_bonded_pair_energy(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}
@@ -1344,14 +1291,7 @@ void calculate_link_cell_virials(int v_comp)
           if(do_nonbonded(&p1[i], &p2[j]))
 #endif
 	    {
-#ifdef MINIMAL_GHOST
-        if (neighbor->use_mi_vec)
-          dist2 = get_mi_dist2vec(p1[i].r.p, p2[j].r.p, vec21);
-        else 
-          dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#else
-        dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
-#endif
+	      dist2 = distance2vec(p1[i].r.p, p2[j].r.p, vec21);
 	      add_non_bonded_pair_virials(&(p1[i]), &(p2[j]), vec21, sqrt(dist2), dist2);
 	    }
 	}

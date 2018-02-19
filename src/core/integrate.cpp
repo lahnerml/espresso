@@ -28,10 +28,11 @@
 #include "integrate.hpp"
 #include "cells.hpp"
 #include "communication.hpp"
+#include "correlators.hpp"
 #include "domain_decomposition.hpp"
 #include "electrokinetics.hpp"
 #include "errorhandling.hpp"
-#include "forces.hpp"
+#include "forces_inline.hpp"
 #include "ghmc.hpp"
 #include "ghosts.hpp"
 #include "grid.hpp"
@@ -40,24 +41,24 @@
 #include "initialize.hpp"
 #include "interaction_data.hpp"
 #include "lattice.hpp"
-#include "layered.hpp"
 #include "lb.hpp"
 #include "lees_edwards.hpp"
 #include "maggs.hpp"
 #include "minimize_energy.hpp"
 #include "nemd.hpp"
-#include "nsquare.hpp"
+#include "observables.hpp"
+#include "accumulators.hpp"
 #include "p3m.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
 #include "rattle.hpp"
 #include "reaction.hpp"
 #include "rotation.hpp"
-#include "statistics_correlation.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
-#include "verlet.hpp"
 #include "virtual_sites.hpp"
+#include "npt.hpp"
+#include "collision.hpp"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -84,7 +85,6 @@ double skin = 0.0;
 double skin2 = 0.0;
 bool skin_set = false;
 
-int resort_particles = 1;
 int recalc_forces = 1;
 
 double verlet_reuse = 0.0;
@@ -99,9 +99,6 @@ double scal_store[3] = {0., 0., 0.};
 double virial_store[3] = {0., 0., 0.};
 #endif
 #endif
-
-/** For configurational temperature only */
-double configtemp[2] = {0., 0.};
 
 #ifdef ADDITIONAL_CHECKS
 double db_max_force = 0.0, db_max_vel = 0.0;
@@ -133,8 +130,6 @@ void propagate_vel_pos();
     \f[ v(t+\Delta t) = v(t+0.5 \Delta t) + 0.5 \Delta t f(t+\Delta t) \f] */
 void rescale_forces_propagate_vel();
 
-/** Integrator stability check (see compile flag ADDITIONAL_CHECKS). */
-void force_and_velocity_check(Particle *p);
 /** Integrator stability check (see compile flag ADDITIONAL_CHECKS). */
 void force_and_velocity_display();
 
@@ -217,9 +212,6 @@ void integrate_ensemble_init() {
       nptiso.p_inst = 0.0;
       nptiso.p_vir[0] = nptiso.p_vir[1] = nptiso.p_vir[2] = 0.0;
       nptiso.p_vel[0] = nptiso.p_vel[1] = nptiso.p_vel[2] = 0.0;
-#ifdef CONFIGTEMP
-      configtemp[0] = configtemp[1] = 0.0;
-#endif
     }
   }
 #endif
@@ -269,7 +261,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #endif
 
   /* Verlet list criterion */
-  skin2 = SQR(0.5 * skin);
+  skin2 = Utils::sqr(0.5 * skin);
 
   INTEG_TRACE(fprintf(
       stderr, "%d: integrate_vv: integrating %d steps (recalc_forces=%d)\n",
@@ -333,9 +325,6 @@ void integrate_vv(int n_steps, int reuse_forces) {
     ghmc_init();
 #endif
 
-  if (thermo_switch & THERMO_CPU)
-    mpi_thermalize_cpu(temperature);
-
   if (check_runtime_errors())
     return;
 
@@ -350,22 +339,15 @@ void integrate_vv(int n_steps, int reuse_forces) {
     INTEG_TRACE(fprintf(stderr, "%d: STEP %d\n", this_node, step));
 
 #ifdef BOND_CONSTRAINT
+  if (n_rigidbonds)
     save_old_pos();
+
 #endif
 
 #ifdef GHMC
     if (thermo_switch & THERMO_GHMC) {
       if (step % ghmc_nmd == 0)
         ghmc_momentum_update();
-    }
-#endif
-
-#ifdef SD
-    if (thermo_switch & THERMO_SD) {
-      runtimeWarning("Use integrate_sd to use Stokesian Dynamics Thermalizer.");
-    }
-    if (thermo_switch & THERMO_BD) {
-      runtimeWarning("Use integrate_sd to use Brownian Dynamics Thermalizer.");
     }
 #endif
 
@@ -394,9 +376,11 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #ifdef BOND_CONSTRAINT
     /**Correct those particle positions that participate in a rigid/constrained
      * bond */
+  if (n_rigidbonds) {
     cells_update_ghosts();
 
     correct_pos_shake();
+  }
 #endif
 
 #ifdef ELECTROSTATICS
@@ -405,10 +389,6 @@ void integrate_vv(int n_steps, int reuse_forces) {
     }
 #endif
 
-#ifdef NPT
-    if (check_runtime_errors())
-      break;
-#endif
 
 #ifdef MULTI_TIMESTEP
     if (smaller_time_step > 0) {
@@ -469,7 +449,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
       IBM_ForcesIntoFluid_CPU();
 #ifdef LB_GPU
     if (lattice_switch & LATTICE_LB_GPU)
-      IBM_ForcesIntoFluid_GPU();
+      IBM_ForcesIntoFluid_GPU(local_cells.particles());
 #endif
 #endif
 
@@ -477,8 +457,6 @@ void integrate_vv(int n_steps, int reuse_forces) {
     integrate_reaction();
 #endif
 
-    if (check_runtime_errors())
-      break;
 
 #ifdef MULTI_TIMESTEP
 #ifdef NPT
@@ -497,15 +475,17 @@ void integrate_vv(int n_steps, int reuse_forces) {
     }
 // SHAKE velocity updates
 #ifdef BOND_CONSTRAINT
+  if (n_rigidbonds) {
     ghost_communicator(&cell_structure.update_ghost_pos_comm);
     correct_vel_shake();
+  }
 #endif
 // VIRTUAL_SITES update vel
 #ifdef VIRTUAL_SITES
-    ghost_communicator(&cell_structure.update_ghost_pos_comm);
-    update_mol_vel();
-    if (check_runtime_errors())
-      break;
+    if (virtual_sites()->need_ghost_comm_before_vel_update()) {
+      ghost_communicator(&cell_structure.update_ghost_pos_comm);
+    }
+    virtual_sites()->update(false); // Recalc positions = false
 #endif
 
 // progagate one-step functionalities
@@ -535,7 +515,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 // IMMERSED_BOUNDARY
 #ifdef IMMERSED_BOUNDARY
 
-    IBM_UpdateParticlePositions();
+    IBM_UpdateParticlePositions(local_cells.particles());
 // We reset all since otherwise the halo nodes may not be reset
 // NB: the normal Espresso reset is also done after applying the forces
 //    if (lattice_switch & LATTICE_LB) IBM_ResetLBForces_CPU();
@@ -579,6 +559,8 @@ void integrate_vv(int n_steps, int reuse_forces) {
 #ifdef COLLISION_DETECTION
     handle_collisions();
 #endif
+    if (check_runtime_errors())
+      break;
   }
 
 #ifdef VALGRIND_INSTRUMENTATION
@@ -612,66 +594,49 @@ void integrate_vv(int n_steps, int reuse_forces) {
 /************************************************************/
 
 void rescale_velocities(double scale) {
-  Particle *p;
-  int i, np, c;
-  Cell *cell;
-
-  for (c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c];
-    p = cell->part;
-    np = cell->n;
-    for (i = 0; i < np; i++) {
-      p[i].m.v[0] *= scale;
-      p[i].m.v[1] *= scale;
-      p[i].m.v[2] *= scale;
-    }
+  for (auto &p : local_cells.particles()) {
+    p.m.v[0] *= scale;
+    p.m.v[1] *= scale;
+    p.m.v[2] *= scale;
   }
 }
 
 /* Privat functions */
 /************************************************************/
 
-void rescale_forces() {
-  Particle *p;
-  int i, np, c;
-  Cell *cell;
-  double scale;
-
-  INTEG_TRACE(fprintf(stderr, "%d: rescale_forces:\n", this_node));
-
-  scale = 0.5 * time_step * time_step;
+namespace {
+double calc_scale() {
 #ifdef MULTI_TIMESTEP
   if (smaller_time_step > 0.) {
     if (current_time_step_is_small)
-      scale = 0.5 * smaller_time_step * smaller_time_step;
+      return 0.5 * smaller_time_step * smaller_time_step;
     else
-      scale = 0.5 * smaller_time_step * time_step;
+      return 0.5 * smaller_time_step * time_step;
   }
 #endif
-  for (c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c];
-    p = cell->part;
-    np = cell->n;
-    for (i = 0; i < np; i++) {
-      check_particle_force(&p[i]);
-      p[i].f.f[0] *= scale / (p[i]).p.mass;
-      p[i].f.f[1] *= scale / (p[i]).p.mass;
-      p[i].f.f[2] *= scale / (p[i]).p.mass;
+  return 0.5 * time_step * time_step;
+}
+}
 
-      ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-          stderr,
-          "%d: OPT: SCAL f = (%.3e,%.3e,%.3e) v_old = (%.3e,%.3e,%.3e)\n",
-          this_node, p[i].f.f[0], p[i].f.f[1], p[i].f.f[2], p[i].m.v[0],
-          p[i].m.v[1], p[i].m.v[2]));
-    }
+void rescale_forces() {
+  auto const scale = calc_scale();
+
+  INTEG_TRACE(fprintf(stderr, "%d: rescale_forces:\n", this_node));
+
+  for (auto &p : local_cells.particles()) {
+    check_particle_force(&p);
+    p.f.f[0] *= scale / p.p.mass;
+    p.f.f[1] *= scale / p.p.mass;
+    p.f.f[2] *= scale / p.p.mass;
+
+    ONEPART_TRACE(if (p.p.identity == check_id) fprintf(
+        stderr, "%d: OPT: SCAL f = (%.3e,%.3e,%.3e) v_old = (%.3e,%.3e,%.3e)\n",
+        this_node, p.f.f[0], p.f.f[1], p.f.f[2], p.m.v[0], p.m.v[1], p.m.v[2]));
   }
 }
 
 void rescale_forces_propagate_vel() {
-  Cell *cell;
-  Particle *p;
-  int i, j, np, c;
-  double scale;
+  auto const scale = calc_scale();
 
 #ifdef NPT
   if (integ_switch == INTEG_METHOD_NPT_ISO) {
@@ -679,69 +644,52 @@ void rescale_forces_propagate_vel() {
   }
 #endif
 
-  scale = 0.5 * time_step * time_step;
-#ifdef MULTI_TIMESTEP
-  if (smaller_time_step > 0.) {
-    if (current_time_step_is_small)
-      scale = 0.5 * smaller_time_step * smaller_time_step;
-    else
-      scale = 0.5 * smaller_time_step * time_step;
-  }
-#endif
   INTEG_TRACE(
       fprintf(stderr, "%d: rescale_forces_propagate_vel:\n", this_node));
 
-  for (c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c];
-    p = cell->part;
-    np = cell->n;
-    for (i = 0; i < np; i++) {
-      check_particle_force(&p[i]);
-      /* Rescale forces: f_rescaled = 0.5*dt*dt * f_calculated * (1/mass) */
-      p[i].f.f[0] *= scale / (p[i]).p.mass;
-      p[i].f.f[1] *= scale / (p[i]).p.mass;
-      p[i].f.f[2] *= scale / (p[i]).p.mass;
+  for (auto &p : local_cells.particles()) {
+    check_particle_force(&p);
+    /* Rescale forces: f_rescaled = 0.5*dt*dt * f_calculated * (1/mass) */
+    p.f.f[0] *= scale / p.p.mass;
+    p.f.f[1] *= scale / p.p.mass;
+    p.f.f[2] *= scale / p.p.mass;
 
-      ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-          stderr,
-          "%d: OPT: SCAL f = (%.3e,%.3e,%.3e) v_old = (%.3e,%.3e,%.3e)\n",
-          this_node, p[i].f.f[0], p[i].f.f[1], p[i].f.f[2], p[i].m.v[0],
-          p[i].m.v[1], p[i].m.v[2]));
+    ONEPART_TRACE(if (p.p.identity == check_id) fprintf(
+        stderr, "%d: OPT: SCAL f = (%.3e,%.3e,%.3e) v_old = (%.3e,%.3e,%.3e)\n",
+        this_node, p.f.f[0], p.f.f[1], p.f.f[2], p.m.v[0], p.m.v[1], p.m.v[2]));
 #ifdef VIRTUAL_SITES
-      // Virtual sites are not propagated during integration
-      if (ifParticleIsVirtual(&p[i]))
-        continue;
+    // Virtual sites are not propagated during integration
+    if (p.p.isVirtual)
+      continue;
 #endif
-      for (j = 0; j < 3; j++) {
+    for (int j = 0; j < 3; j++) {
 #ifdef EXTERNAL_FORCES
-        if (!(p[i].p.ext_flag & COORD_FIXED(j))) {
+      if (!(p.p.ext_flag & COORD_FIXED(j))) {
 #endif
 #ifdef NPT
-          if (integ_switch == INTEG_METHOD_NPT_ISO &&
-              (nptiso.geometry & nptiso.nptgeom_dir[j])) {
-            nptiso.p_vel[j] += SQR(p[i].m.v[j]) * (p[i]).p.mass;
+        if (integ_switch == INTEG_METHOD_NPT_ISO &&
+            (nptiso.geometry & nptiso.nptgeom_dir[j])) {
+          nptiso.p_vel[j] += Utils::sqr(p.m.v[j]) * p.p.mass;
 #ifdef MULTI_TIMESTEP
-            if (smaller_time_step > 0. && current_time_step_is_small == 1)
-              p[i].m.v[j] += p[i].f.f[j];
-            else
+          if (smaller_time_step > 0. && current_time_step_is_small == 1)
+            p.m.v[j] += p.f.f[j];
+          else
 #endif
-              p[i].m.v[j] +=
-                  p[i].f.f[j] +
-                  friction_therm0_nptiso(p[i].m.v[j]) / (p[i]).p.mass;
-          } else
+            p.m.v[j] += p.f.f[j] + friction_therm0_nptiso(p.m.v[j]) / p.p.mass;
+        } else
 #endif
-            /* Propagate velocity: v(t+dt) = v(t+0.5*dt) + 0.5*dt * f(t+dt) */
-            p[i].m.v[j] += p[i].f.f[j];
+          /* Propagate velocity: v(t+dt) = v(t+0.5*dt) + 0.5*dt * f(t+dt) */
+          p.m.v[j] += p.f.f[j];
 #ifdef EXTERNAL_FORCES
-        }
-#endif
       }
-
-      ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-          stderr, "%d: OPT: PV_2 v_new = (%.3e,%.3e,%.3e)\n", this_node,
-          p[i].m.v[0], p[i].m.v[1], p[i].m.v[2]));
+#endif
     }
+
+    ONEPART_TRACE(if (p.p.identity == check_id) fprintf(
+        stderr, "%d: OPT: PV_2 v_new = (%.3e,%.3e,%.3e)\n", this_node, p.m.v[0],
+        p.m.v[1], p.m.v[2]));
   }
+
 #ifdef NPT
 #ifdef MULTI_TIMESTEP
   if (smaller_time_step < 0. || current_time_step_is_small == 0)
@@ -761,10 +709,10 @@ void finalize_p_inst_npt() {
       if (nptiso.geometry & nptiso.nptgeom_dir[i]) {
 #ifdef MULTI_TIMESTEP
         if (smaller_time_step > 0.)
-          nptiso.p_vel[i] /= SQR(smaller_time_step);
+          nptiso.p_vel[i] /= Utils::sqr(smaller_time_step);
         else
 #endif
-          nptiso.p_vel[i] /= SQR(time_step);
+          nptiso.p_vel[i] /= Utils::sqr(time_step);
         nptiso.p_inst += nptiso.p_vir[i] + nptiso.p_vel[i];
       }
     }
@@ -783,9 +731,6 @@ void finalize_p_inst_npt() {
 void propagate_press_box_pos_and_rescale_npt() {
 #ifdef NPT
   if (integ_switch == INTEG_METHOD_NPT_ISO) {
-    Cell *cell;
-    Particle *p;
-    int i, j, np, c;
     double scal[3] = {0., 0., 0.}, L_new = 0.0;
 
 /* finalize derivation of p_inst */
@@ -794,14 +739,15 @@ void propagate_press_box_pos_and_rescale_npt() {
 #endif
       finalize_p_inst_npt();
 
-    /* adjust \ref nptiso_struct::nptiso.volume; prepare pos- and vel-rescaling
+    /* adjust \ref nptiso_struct::nptiso.volume; prepare pos- and
+     * vel-rescaling
      */
     if (this_node == 0) {
 #ifdef MULTI_TIMESTEP
       if (smaller_time_step < 0. || current_time_step_is_small == 0)
 #endif
         nptiso.volume += nptiso.inv_piston * nptiso.p_diff * 0.5 * time_step;
-      scal[2] = SQR(box_l[nptiso.non_const_dim]) /
+      scal[2] = Utils::sqr(box_l[nptiso.non_const_dim]) /
                 pow(nptiso.volume, 2.0 / nptiso.dimension);
 #ifdef MULTI_TIMESTEP
       if (smaller_time_step < 0. || current_time_step_is_small == 0)
@@ -843,66 +789,59 @@ void propagate_press_box_pos_and_rescale_npt() {
     MPI_Bcast(scal, 3, MPI_DOUBLE, 0, comm_cart);
 
     /* propagate positions while rescaling positions and velocities */
-    for (c = 0; c < local_cells.n; c++) {
-      cell = local_cells.cell[c];
-      p = cell->part;
-      np = cell->n;
-      for (i = 0; i < np; i++) {
+    for (auto &p : local_cells.particles()) {
 #ifdef VIRTUAL_SITES
-        if (ifParticleIsVirtual(&p[i]))
-          continue;
+      if (p.p.isVirtual)
+        continue;
 #endif
-        for (j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++) {
 #ifdef EXTERNAL_FORCES
-          if (!(p[i].p.ext_flag & COORD_FIXED(j))) {
+        if (!(p.p.ext_flag & COORD_FIXED(j))) {
 #endif
-            if (nptiso.geometry & nptiso.nptgeom_dir[j]) {
+          if (nptiso.geometry & nptiso.nptgeom_dir[j]) {
 #ifdef MULTI_TIMESTEP
-              if (smaller_time_step > 0.) {
-                if (current_time_step_is_small == 1) {
-                  if (mts_index == mts_max - 1) {
-                    p[i].r.p[j] =
-                        scal[1] * (p[i].r.p[j] + scal[2] * p[i].m.v[j]);
-                    p[i].l.p_old[j] *= scal[1];
-                    p[i].m.v[j] *= scal[0];
-                  } else
-                    p[i].r.p[j] += p[i].m.v[j];
-                }
-              } else
-#endif
-              {
-                p[i].r.p[j] = scal[1] * (p[i].r.p[j] + scal[2] * p[i].m.v[j]);
-                p[i].l.p_old[j] *= scal[1];
-                p[i].m.v[j] *= scal[0];
+            if (smaller_time_step > 0.) {
+              if (current_time_step_is_small == 1) {
+                if (mts_index == mts_max - 1) {
+                  p.r.p[j] = scal[1] * (p.r.p[j] + scal[2] * p.m.v[j]);
+                  p.l.p_old[j] *= scal[1];
+                  p.m.v[j] *= scal[0];
+                } else
+                  p.r.p[j] += p.m.v[j];
               }
-            } else {
-#ifdef MULTI_TIMESTEP
-              if (smaller_time_step < 0. || current_time_step_is_small == 1)
+            } else
 #endif
-                p[i].r.p[j] += p[i].m.v[j];
+            {
+              p.r.p[j] = scal[1] * (p.r.p[j] + scal[2] * p.m.v[j]);
+              p.l.p_old[j] *= scal[1];
+              p.m.v[j] *= scal[0];
             }
+          } else {
+#ifdef MULTI_TIMESTEP
+            if (smaller_time_step < 0. || current_time_step_is_small == 1)
+#endif
+              p.r.p[j] += p.m.v[j];
+          }
 
 #ifdef EXTERNAL_FORCES
-          }
-#endif
         }
-        ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-            stderr, "%d: OPT:PV_1 v_new=(%.3e,%.3e,%.3e)\n", this_node,
-            p[i].m.v[0], p[i].m.v[1], p[i].m.v[2]));
-        ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-            stderr, "%d: OPT:PPOS p=(%.3f,%.3f,%.3f)\n", this_node, p[i].r.p[0],
-            p[i].r.p[1], p[i].r.p[2]));
-#ifdef ADDITIONAL_CHECKS
-        force_and_velocity_check(&p[i]);
 #endif
       }
+      ONEPART_TRACE(if (p.p.identity == check_id)
+                        fprintf(stderr, "%d: OPT:PV_1 v_new=(%.3e,%.3e,%.3e)\n",
+                                this_node, p.m.v[0], p.m.v[1], p.m.v[2]));
+      ONEPART_TRACE(if (p.p.identity == check_id)
+                        fprintf(stderr, "%d: OPT:PPOS p=(%.3f,%.3f,%.3f)\n",
+                                this_node, p.r.p[0], p.r.p[1], p.r.p[2]));
     }
-    resort_particles = 1;
+
+
+    set_resort_particles(Cells::RESORT_LOCAL);
 
     /* Apply new volume to the box-length, communicate it, and account for
      * necessary adjustments to the cell geometry */
     if (this_node == 0) {
-      for (i = 0; i < 3; i++) {
+      for (int i = 0; i < 3; i++) {
         if (nptiso.geometry & nptiso.nptgeom_dir[i]) {
           box_l[i] = L_new;
         } else if (nptiso.cubic_box) {
@@ -921,67 +860,55 @@ void propagate_press_box_pos_and_rescale_npt() {
 }
 
 void propagate_vel() {
-  Cell *cell;
-  Particle *p;
-  int c, i, j, np;
 #ifdef NPT
   nptiso.p_vel[0] = nptiso.p_vel[1] = nptiso.p_vel[2] = 0.0;
 #endif
 
   INTEG_TRACE(fprintf(stderr, "%d: propagate_vel:\n", this_node));
 
-  for (c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c];
-    p = cell->part;
-    np = cell->n;
-    for (i = 0; i < np; i++) {
+  for (auto &p : local_cells.particles()) {
 #ifdef ROTATION
-      propagate_omega_quat_particle(&p[i]);
+    propagate_omega_quat_particle(&p);
 #endif
 
 // Don't propagate translational degrees of freedom of vs
 #ifdef VIRTUAL_SITES
-      if (ifParticleIsVirtual(&p[i]))
-        continue;
+    if (p.p.isVirtual)
+      continue;
 #endif
-      for (j = 0; j < 3; j++) {
+    for (int j = 0; j < 3; j++) {
 #ifdef EXTERNAL_FORCES
-        if (!(p[i].p.ext_flag & COORD_FIXED(j)))
+      if (!(p.p.ext_flag & COORD_FIXED(j)))
 #endif
-        {
+      {
 #ifdef NPT
-          if (integ_switch == INTEG_METHOD_NPT_ISO &&
-              (nptiso.geometry & nptiso.nptgeom_dir[j])) {
+        if (integ_switch == INTEG_METHOD_NPT_ISO &&
+            (nptiso.geometry & nptiso.nptgeom_dir[j])) {
 #ifdef MULTI_TIMESTEP
-            if (smaller_time_step > 0. && current_time_step_is_small == 1)
-              p[i].m.v[j] += p[i].f.f[j];
-            else
+          if (smaller_time_step > 0. && current_time_step_is_small == 1)
+            p.m.v[j] += p.f.f[j];
+          else
 #endif
-              p[i].m.v[j] +=
-                  p[i].f.f[j] +
-                  friction_therm0_nptiso(p[i].m.v[j]) / (p[i]).p.mass;
-            nptiso.p_vel[j] += SQR(p[i].m.v[j]) * (p[i]).p.mass;
-          } else
+            p.m.v[j] += p.f.f[j] + friction_therm0_nptiso(p.m.v[j]) / p.p.mass;
+          nptiso.p_vel[j] += Utils::sqr(p.m.v[j]) * p.p.mass;
+        } else
 #endif
-            /* Propagate velocities: v(t+0.5*dt) = v(t) + 0.5*dt * f(t) */
-            p[i].m.v[j] += p[i].f.f[j];
+          /* Propagate velocities: v(t+0.5*dt) = v(t) + 0.5*dt * f(t) */
+          p.m.v[j] += p.f.f[j];
 
 /* SPECIAL TASKS in particle loop */
 #ifdef NEMD
-          if (j == 0)
-            nemd_get_velocity(p[i]);
-#endif
-        }
-
-        ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-            stderr, "%d: OPT: PV_1 v_new = (%.3e,%.3e,%.3e)\n", this_node,
-            p[i].m.v[0], p[i].m.v[1], p[i].m.v[2]));
-#ifdef ADDITIONAL_CHECKS
-        force_and_velocity_check(&p[i]);
+        if (j == 0)
+          nemd_get_velocity(p);
 #endif
       }
+
+      ONEPART_TRACE(if (p.p.identity == check_id) fprintf(
+          stderr, "%d: OPT: PV_1 v_new = (%.3e,%.3e,%.3e)\n", this_node,
+          p.m.v[0], p.m.v[1], p.m.v[2]));
     }
   }
+
 #ifdef ADDITIONAL_CHECKS
   force_and_velocity_display();
 #endif
@@ -1001,48 +928,36 @@ void propagate_pos() {
        positions and velocities and check verlet list criterion (only NPT) */
     propagate_press_box_pos_and_rescale_npt();
   else {
-    Cell *cell;
-    Particle *p;
-    int c, i, j, np;
-
-    for (c = 0; c < local_cells.n; c++) {
-      cell = local_cells.cell[c];
-      p = cell->part;
-      np = cell->n;
-      for (i = 0; i < np; i++) {
+    for (auto &p : local_cells.particles()) {
 #ifdef VIRTUAL_SITES
-        if (ifParticleIsVirtual(&p[i]))
-          continue;
+      if (p.p.isVirtual)
+        continue;
 #endif
-        for (j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++) {
 #ifdef EXTERNAL_FORCES
-          if (!(p[i].p.ext_flag & COORD_FIXED(j)))
+        if (!(p.p.ext_flag & COORD_FIXED(j)))
 #endif
-          {
+        {
 #ifdef NEMD
-            /* change momentum of each particle in top and bottom slab */
-            if (j == 0)
-              nemd_add_velocity(&p[i]);
+          /* change momentum of each particle in top and bottom slab */
+          if (j == 0)
+            nemd_add_velocity(&p);
 #endif
-            /* Propagate positions (only NVT): p(t + dt)   = p(t) + dt *
-             * v(t+0.5*dt) */
-            p[i].r.p[j] += p[i].m.v[j];
-          }
+          /* Propagate positions (only NVT): p(t + dt)   = p(t) + dt *
+           * v(t+0.5*dt) */
+          p.r.p[j] += p.m.v[j];
         }
-        /* Verlet criterion check */
-        if (distance2(p[i].r.p, p[i].l.p_old) > skin2)
-          resort_particles = 1;
       }
+      /* Verlet criterion check */
+      if (distance2(p.r.p, p.l.p_old) > skin2)
+        set_resort_particles(Cells::RESORT_LOCAL);
     }
   }
+
   announce_resort_particles();
 }
 
 void propagate_vel_pos() {
-  Cell *cell;
-  Particle *p;
-  int c, i, j, np;
-
   INTEG_TRACE(fprintf(stderr, "%d: propagate_vel_pos:\n", this_node));
 
 #ifdef ADDITIONAL_CHECKS
@@ -1050,148 +965,102 @@ void propagate_vel_pos() {
   db_maxf_id = db_maxv_id = -1;
 #endif
 
-  for (c = 0; c < local_cells.n; c++) {
-    cell = local_cells.cell[c];
-    p = cell->part;
-    np = cell->n;
-    for (i = 0; i < np; i++) {
-
+  for (auto &p : local_cells.particles()) {
 #ifdef ROTATION
-      propagate_omega_quat_particle(&p[i]);
+    propagate_omega_quat_particle(&p);
 #endif
 
 // Don't propagate translational degrees of freedom of vs
 #ifdef VIRTUAL_SITES
-      if (ifParticleIsVirtual(&p[i]))
-        continue;
+    if (p.p.isVirtual)
+      continue;
 #endif
-      for (j = 0; j < 3; j++) {
+    for (int j = 0; j < 3; j++) {
 #ifdef EXTERNAL_FORCES
-        if (!(p[i].p.ext_flag & COORD_FIXED(j)))
+      if (!(p.p.ext_flag & COORD_FIXED(j)))
 #endif
-        {
-          /* Propagate velocities: v(t+0.5*dt) = v(t) + 0.5*dt * f(t) */
-          p[i].m.v[j] += p[i].f.f[j];
+      {
+        /* Propagate velocities: v(t+0.5*dt) = v(t) + 0.5*dt * f(t) */
+        p.m.v[j] += p.f.f[j];
 
 #ifdef MULTI_TIMESTEP
-          if (smaller_time_step < 0. || current_time_step_is_small == 1)
+        if (smaller_time_step < 0. || current_time_step_is_small == 1)
 #endif
-            /* Propagate positions (only NVT): p(t + dt)   = p(t) + dt *
-             * v(t+0.5*dt) */
-            p[i].r.p[j] += p[i].m.v[j];
-        }
+          /* Propagate positions (only NVT): p(t + dt)   = p(t) + dt *
+           * v(t+0.5*dt) */
+          p.r.p[j] += p.m.v[j];
       }
+    }
 
-      ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-          stderr, "%d: OPT: PV_1 v_new = (%.3e,%.3e,%.3e)\n", this_node,
-          p[i].m.v[0], p[i].m.v[1], p[i].m.v[2]));
-      ONEPART_TRACE(if (p[i].p.identity == check_id) fprintf(
-          stderr, "%d: OPT: PPOS p = (%.3e,%.3e,%.3e)\n", this_node,
-          p[i].r.p[0], p[i].r.p[1], p[i].r.p[2]));
-
-#ifdef ADDITIONAL_CHECKS
-      force_and_velocity_check(&p[i]);
-#endif
+    ONEPART_TRACE(if (p.p.identity == check_id) fprintf(
+        stderr, "%d: OPT: PV_1 v_new = (%.3e,%.3e,%.3e)\n", this_node, p.m.v[0],
+        p.m.v[1], p.m.v[2]));
+    ONEPART_TRACE(if (p.p.identity == check_id)
+                      fprintf(stderr, "%d: OPT: PPOS p = (%.3e,%.3e,%.3e)\n",
+                              this_node, p.r.p[0], p.r.p[1], p.r.p[2]));
 
 #ifdef LEES_EDWARDS
-      /* test for crossing of a y-pbc: requires adjustment of velocity.*/
-      {
-        int b1, delta_box;
-        b1 = (int)floor(p[i].r.p[1] * box_l_i[1]);
-        if (b1 != 0) {
-          delta_box = b1 - (int)floor((p[i].r.p[1] - p[i].m.v[1]) * box_l_i[1]);
-          if (abs(delta_box) > 1) {
-            fprintf(
-                stderr,
-                "Error! Particle moved more than one box length in 1 step\n");
-            errexit();
-          }
-          p[i].m.v[0] -= delta_box * lees_edwards_rate;
-          p[i].r.p[0] -= delta_box * lees_edwards_offset;
-          p[i].r.p[1] -= delta_box * box_l[1];
-          p[i].l.i[1] += delta_box;
-          while (p[i].r.p[1] > box_l[1]) {
-            p[i].r.p[1] -= box_l[1];
-            p[i].l.i[1]++;
-          }
-          while (p[i].r.p[1] < 0.0) {
-            p[i].r.p[1] += box_l[1];
-            p[i].l.i[1]--;
-          }
-          resort_particles = 1;
+    /* test for crossing of a y-pbc: requires adjustment of velocity.*/
+    {
+      int b1, delta_box;
+      b1 = (int)floor(p.r.p[1] * box_l_i[1]);
+      if (b1 != 0) {
+        delta_box = b1 - (int)floor((p.r.p[1] - p.m.v[1]) * box_l_i[1]);
+        if (abs(delta_box) > 1) {
+          fprintf(stderr,
+                  "Error! Particle moved more than one box length in 1 step\n");
+          errexit();
         }
-        /* Branch prediction on most systems should mean there is minimal cost
-         * here */
-        while (p[i].r.p[0] > box_l[0]) {
-          p[i].r.p[0] -= box_l[0];
-          p[i].l.i[0]++;
+        p.m.v[0] -= delta_box * lees_edwards_rate;
+        p.r.p[0] -= delta_box * lees_edwards_offset;
+        p.r.p[1] -= delta_box * box_l[1];
+        p.l.i[1] += delta_box;
+        while (p.r.p[1] > box_l[1]) {
+          p.r.p[1] -= box_l[1];
+          p.l.i[1]++;
         }
-        while (p[i].r.p[0] < 0.0) {
-          p[i].r.p[0] += box_l[0];
-          p[i].l.i[0]--;
+        while (p.r.p[1] < 0.0) {
+          p.r.p[1] += box_l[1];
+          p.l.i[1]--;
         }
-        while (p[i].r.p[2] > box_l[2]) {
-          p[i].r.p[2] -= box_l[2];
-          p[i].l.i[2]++;
-        }
-        while (p[i].r.p[2] < 0.0) {
-          p[i].r.p[2] += box_l[2];
-          p[i].l.i[2]--;
-        }
+        set_resort_particles(Cells::RESORT_LOCAL);
       }
+      /* Branch prediction on most systems should mean there is minimal cost
+       * here */
+      while (p.r.p[0] > box_l[0]) {
+        p.r.p[0] -= box_l[0];
+        p.l.i[0]++;
+      }
+      while (p.r.p[0] < 0.0) {
+        p.r.p[0] += box_l[0];
+        p.l.i[0]--;
+      }
+      while (p.r.p[2] > box_l[2]) {
+        p.r.p[2] -= box_l[2];
+        p.l.i[2]++;
+      }
+      while (p.r.p[2] < 0.0) {
+        p.r.p[2] += box_l[2];
+        p.l.i[2]--;
+      }
+    }
 #endif
 
-      /* Verlet criterion check*/
-      if (SQR(p[i].r.p[0] - p[i].l.p_old[0]) +
-              SQR(p[i].r.p[1] - p[i].l.p_old[1]) +
-              SQR(p[i].r.p[2] - p[i].l.p_old[2]) >
-          skin2)
-        resort_particles = 1;
-    }
+    /* Verlet criterion check*/
+    if (Utils::sqr(p.r.p[0] - p.l.p_old[0]) + Utils::sqr(p.r.p[1] - p.l.p_old[1]) +
+            Utils::sqr(p.r.p[2] - p.l.p_old[2]) >
+        skin2)
+      set_resort_particles(Cells::RESORT_LOCAL);
   }
 
 #ifdef LEES_EDWARDS /* would be nice to be more refined about this */
-  resort_particles = 1;
+  set_resort_particles(Cells::RESORT_GLOBAL);
 #endif
 
   announce_resort_particles();
 
 #ifdef ADDITIONAL_CHECKS
   force_and_velocity_display();
-#endif
-}
-
-void force_and_velocity_check(Particle *p) {
-#ifdef ADDITIONAL_CHECKS
-  int i;
-  double db_force, db_vel;
-  /* distance_check */
-  for (i = 0; i < 3; i++)
-    if (fabs(p->r.p[i] - p->l.p_old[i]) > local_box_l[i]) {
-      fprintf(stderr, "%d: particle %d moved further than local box length by "
-                      "%lf %lf %lf\n",
-              this_node, p->p.identity, p->r.p[0] - p->l.p_old[0],
-              p->r.p[1] - p->l.p_old[1], p->r.p[2] - p->l.p_old[2]);
-    }
-
-  /* force check */
-  db_force = SQR(p->f.f[0]) + SQR(p->f.f[1]) + SQR(p->f.f[2]);
-  if (db_force > skin2)
-    fprintf(stderr, "%d: Part %d has force %f (%f,%f,%f)\n", this_node,
-            p->p.identity, sqrt(db_force), p->f.f[0], p->f.f[1], p->f.f[2]);
-  if (db_force > db_max_force) {
-    db_max_force = db_force;
-    db_maxf_id = p->p.identity;
-  }
-  /* velocity check */
-  db_vel = SQR(p->m.v[0]) + SQR(p->m.v[1]) + SQR(p->m.v[2]);
-  if (db_vel > skin2)
-    fprintf(stderr, "%d: Part %d has velocity %f (%f,%f,%f)\n", this_node,
-            p->p.identity, sqrt(db_vel), p->m.v[0], p->m.v[1], p->m.v[2]);
-  if (db_vel > db_max_vel) {
-    db_max_vel = db_vel;
-    db_maxv_id = p->p.identity;
-  }
 #endif
 }
 
@@ -1212,8 +1081,9 @@ void force_and_velocity_display() {
 
 /** @TODO: This needs to go!! */
 
-int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces) {
-
+int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
+  int reuse_forces = 0;
+  reuse_forces = reuse_forces_par;
   INTEG_TRACE(fprintf(stderr, "%d: integrate:\n", this_node));
 
   if (recalc_forces) {
@@ -1236,12 +1106,14 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces) {
           << "cannot automatically determine skin, please set it manually";
       return ES_ERROR;
     }
-    skin = 0.4 * max_cut;
+    skin = std::min(0.4 * max_cut,max_skin);
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
   /* perform integration */
-  if (!correlations_autoupdate && !observables_autoupdate) {
+  if (!Correlators::auto_update_enabled() &&
+      !Observables::auto_update_enabled() &&
+      !Accumulators::auto_update_enabled()) {
     if (mpi_integrate(n_steps, reuse_forces))
       return ES_ERROR;
   } else {
@@ -1249,8 +1121,13 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces) {
       if (mpi_integrate(1, reuse_forces))
         return ES_ERROR;
       reuse_forces = 1;
-      autoupdate_observables();
-      autoupdate_correlations();
+      Observables::auto_update();
+      Correlators::auto_update();
+      Accumulators::auto_update();
+
+      if (Observables::auto_write_enabled()) {
+        Observables::auto_write();
+      }
     }
     if (n_steps == 0) {
       if (mpi_integrate(0, reuse_forces))
@@ -1316,26 +1193,20 @@ int integrate_set_npt_isotropic(double ext_pressure, double piston, int xdir,
 
 /* Sanity Checks */
 #ifdef ELECTROSTATICS
-  if (nptiso.dimension < 3 && !nptiso.cubic_box && coulomb.bjerrum > 0) {
-    fprintf(stderr, "WARNING: If electrostatics is being used you must use the "
-                    "-cubic_box option!\n");
-    fprintf(stderr,
-            "Automatically reverting to a cubic box for npt integration.\n");
-    fprintf(stderr, "Be aware though that all of the coulombic pressure is "
-                    "added to the x-direction only!\n");
-    nptiso.cubic_box = 1;
-  }
+  if (nptiso.dimension < 3 && !nptiso.cubic_box && coulomb.prefactor > 0) {
+    runtimeErrorMsg() << "WARNING: If electrostatics is being used you must use the the cubic box npt." ;
+    integ_switch = INTEG_METHOD_NVT;
+    mpi_bcast_parameter(FIELD_INTEG_SWITCH);
+    return ES_ERROR;
+ }
 #endif
 
 #ifdef DIPOLES
-  if (nptiso.dimension < 3 && !nptiso.cubic_box && coulomb.Dbjerrum > 0) {
-    fprintf(stderr, "WARNING: If magnetostatics is being used you must use the "
-                    "-cubic_box option!\n");
-    fprintf(stderr,
-            "Automatically reverting to a cubic box for npt integration.\n");
-    fprintf(stderr, "Be aware though that all of the magnetostatic pressure is "
-                    "added to the x-direction only!\n");
-    nptiso.cubic_box = 1;
+  if (nptiso.dimension < 3 && !nptiso.cubic_box && coulomb.Dprefactor > 0) {
+    runtimeErrorMsg() << "WARNING: If magnetostatics is being used you must use the the cubic box npt." ;
+    integ_switch = INTEG_METHOD_NVT;
+    mpi_bcast_parameter(FIELD_INTEG_SWITCH);
+    return ES_ERROR;
   }
 #endif
 
@@ -1352,6 +1223,8 @@ int integrate_set_npt_isotropic(double ext_pressure, double piston, int xdir,
   /* set integrator switch */
   integ_switch = INTEG_METHOD_NPT_ISO;
   mpi_bcast_parameter(FIELD_INTEG_SWITCH);
+  mpi_bcast_parameter(FIELD_NPTISO_PISTON);
+  mpi_bcast_parameter(FIELD_NPTISO_PEXT);
 
   /* broadcast npt geometry information to all nodes */
   mpi_bcast_nptiso_geom();

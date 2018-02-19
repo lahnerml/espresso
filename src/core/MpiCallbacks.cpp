@@ -39,10 +39,10 @@ void MpiCallbacks::call(int id, int par1, int par2) const {
     throw std::out_of_range("Callback does not exists.");
   }
 
-  std::array<int, 3> request{id, par1, par2};
+  std::array<int, 3> request{{id, par1, par2}};
 
   /** Send request to slaves */
-  boost::mpi::broadcast(m_comm, request, 0);
+  boost::mpi::broadcast(m_comm, request.data(), request.size(), 0);
 }
 
 void MpiCallbacks::call(func_ptr_type fp, int par1, int par2) const {
@@ -74,36 +74,20 @@ int MpiCallbacks::add(func_ptr_type fp) {
 
 void MpiCallbacks::remove(const int id) { m_callbacks.remove(id); }
 
-void MpiCallbacks::slave(int id, int par1, int par2) const {
-  m_callbacks[id](par1, par2);
-}
-
 void MpiCallbacks::abort_loop() const { call(LOOP_ABORT, 0, 0); }
 
 void MpiCallbacks::loop() const {
   for (;;) {
     std::array<int, 3> request;
     /** Communicate callback id and parameters */
-    boost::mpi::broadcast(m_comm, request, 0);
+    boost::mpi::broadcast(m_comm, request.data(), request.size(), 0);
     /** id == 0 is loop_abort. */
     if (request[0] == LOOP_ABORT) {
       break;
     } else {
       /** Call the callback */
-      slave(request[0], request[1], request[2]);
+      m_callbacks[request[0]](request[1], request[2]);
     }
   }
 }
-
-namespace {
-std::unique_ptr<MpiCallbacks> m_global_callback;
-} /* namespace */
-
-void initialize_callbacks(boost::mpi::communicator const &comm) {
-  m_global_callback = Utils::make_unique<MpiCallbacks>(comm);
-}
-
-/* We use a singelton callback class for now. */
-MpiCallbacks &mpiCallbacks() { return *m_global_callback; }
-
 } /* namespace Communication */

@@ -64,9 +64,6 @@ extern double virial_store[3];
 #endif
 #endif
 
-/** Store configurational temperature terms (numerator/denominator) */
-extern double configtemp[2];
-
 /** Old time step needed for rescaling of forces. */
 extern double old_time_step;
 /** Actual simulation time (only on MASTER NODE). */
@@ -78,8 +75,6 @@ extern double skin;
 /** True iff the user has changed the skin setting. */
 extern bool skin_set;
 
-/** If non-zero, the particle data will be resorted before the next integration. */
-extern int    resort_particles;
 /** If non-zero, the forces will be recalculated before the next integration. */
 extern int    recalc_forces;
 /** Average number of integration steps the verlet list has been re

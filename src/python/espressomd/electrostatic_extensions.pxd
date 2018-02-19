@@ -20,7 +20,7 @@
 
 from __future__ import print_function, absolute_import
 include "myconfig.pxi"
-from espressomd._system cimport *
+from espressomd.system cimport *
 from espressomd.utils cimport *
 from espressomd.electrostatics cimport *
 
@@ -32,8 +32,13 @@ IF ELECTROSTATICS and P3M:
             double gap_size
             double far_cut
             int neutralize
+            double delta_mid_top,
+            double delta_mid_bot,
+            int const_pot,
+            double pot_diff
 
-        int ELC_set_params(double maxPWerror, double min_dist, double far_cut, int neutralize, double top, double bottom, int const_pot_on, double pot_diff)
+        int ELC_set_params(double maxPWerror, double min_dist, double far_cut,
+        int neutralize, double delta_mid_top, double delta_mid_bot, int const_pot, double pot_diff)
 
         # links intern C-struct with python object
         ELC_struct elc_params
@@ -67,5 +72,5 @@ IF ELECTROSTATICS and P3M:
         void iccp3m_set_initialized()
         void iccp3m_alloc_lists()
 
-        cdef extern from "communication.hpp":
-            int mpi_iccp3m_init(int dummy)
+    cdef extern from "communication.hpp":
+        int mpi_iccp3m_init(int dummy)

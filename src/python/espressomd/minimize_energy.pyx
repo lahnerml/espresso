@@ -20,15 +20,31 @@
 
 from __future__ import print_function, absolute_import
 from . cimport minimize_energy
+from espressomd.utils import is_valid_type
 
 cdef class MinimizeEnergy(object):
+    """
+    Initialize steepest descent energy minimization.
+
+    Parameters
+    ----------
+    f_max : :obj:`float`
+            Maximal allowed force.
+    gamma : :obj:`float`
+            Dampening constant.
+    max_steps : :obj:`int`
+                Maximal number of iterations.
+    max_displacement : :obj:`float`
+                       Maximal allowed displacement per step.
+
+    """
     cdef object _params
 
     def __init__(self, *args, **kwargs):
         if len(args) == 0:
             # Initialize default values
             self._params = self.default_params()
-            return 
+            return
 
             # Check if all required keys are given
         for k in self.required_keys():
@@ -49,7 +65,7 @@ cdef class MinimizeEnergy(object):
         self.validate_params()
 
     def default_params(self):
-        para=dict()
+        para = dict()
         para["f_max"] = 0.0
         para["gamma"] = 0.0
         para["max_steps"] = 0
@@ -60,19 +76,24 @@ cdef class MinimizeEnergy(object):
         return "f_max", "gamma", "max_steps", "max_displacement"
 
     def validate_params(self):
-        if self._params["f_max"] < 0 :
+        if self._params["f_max"] < 0:
             raise ValueError(
-                    "f_max has to be a positive floating point number" )
-        if self._params["gamma"] < 0 :
+                "f_max has to be a positive floating point number")
+        if self._params["gamma"] < 0:
             raise ValueError(
-                    "gamma has to be a positive floating point number" )
-        if self._params["max_steps"] < 0 or not isinstance(self._params["max_steps"], int):
+                "gamma has to be a positive floating point number")
+        if self._params["max_steps"] < 0 or not is_valid_type(self._params["max_steps"], int):
             raise ValueError(
-                    "max_steps has to be a positive integer" )
-        if self._params["max_displacement"] < 0 :
+                "max_steps has to be a positive integer")
+        if self._params["max_displacement"] < 0:
             raise ValueError(
-                    "max_displacement has to be a positive floating point number")
+                "max_displacement has to be a positive floating point number")
 
     def minimize(self):
-        minimize_energy_init(self._params["f_max"], self._params["gamma"], self._params["max_steps"], self._params["max_displacement"] )
+        """
+        Perform energy minimization sweep.
+
+        """
+        minimize_energy_init(self._params["f_max"], self._params["gamma"], self._params[
+                             "max_steps"], self._params["max_displacement"])
         mpi_minimize_energy()

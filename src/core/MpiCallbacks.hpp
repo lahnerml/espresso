@@ -23,6 +23,7 @@
 #define COMMUNICATION_MPI_CALLBACKS
 
 #include <functional>
+#include <initializer_list>
 
 #include <boost/mpi/communicator.hpp>
 
@@ -34,15 +35,29 @@ namespace Communication {
  * @brief  The interface of the MPI callback mechanism.
  */
 class MpiCallbacks {
+  /* Avoid accidental copy, leads to mpi deadlock
+     or split brain */
+  MpiCallbacks(MpiCallbacks const &) = delete;
+  MpiCallbacks &operator=(MpiCallbacks const &) = delete;
+
 public:
   /** Function type of static callbacks. */
   typedef void (*func_ptr_type)(int, int);
   /** Type of the callback functions. */
   typedef std::function<void(int, int)> function_type;
 
-  explicit MpiCallbacks(boost::mpi::communicator const& comm) : m_comm(comm) {
+  explicit MpiCallbacks(boost::mpi::communicator &comm,
+                        bool abort_on_exit = true)
+      : m_abort_on_exit(abort_on_exit), m_comm(comm) {
     /** Add a dummy at id 0 for loop abort. */
     m_callbacks.add(function_type());
+  }
+
+  ~MpiCallbacks() {
+    /* Release the clients on exit */
+    if (m_abort_on_exit && (m_comm.rank() == 0)) {
+      abort_loop();
+    }
   }
 
   /**
@@ -89,7 +104,7 @@ public:
    * @param par1 First parameter to pass to the callback.
    * @param par2 Second parameter to pass to the callback.
    */
-  void call(int id, int par1, int par2) const;
+  void call(int id, int par1 = 0, int par2 = 0) const;
 
   /**
    * @brief call a callback.
@@ -103,7 +118,7 @@ public:
    * @param par1 First parameter to pass to the callback.
    * @param par2 Second parameter to pass to the callback.
    */
-  void call(func_ptr_type fp, int par1, int par2) const;
+  void call(func_ptr_type fp, int par1 = 0, int par2 = 0) const;
 
   /**
    * @brief Mpi slave loop.
@@ -126,30 +141,29 @@ public:
   /**
    * @brief The boost mpi communicator used by this instance
    */
-  boost::mpi::communicator const& comm() const { return m_comm; }
+  boost::mpi::communicator const &comm() const { return m_comm; }
+
+  /**
+   * Set the MPI communicator for the callbacks.
+   */
+  void set_comm(boost::mpi::communicator &comm) { m_comm = comm; }
 
 private:
   /**
    * @brief Id for the loop_abort. Has to be 0.
    */
   enum { LOOP_ABORT = 0 };
+
   /**
-   * @brief Callback to integrate with the old callback mechanism.
-   *
-   * MPI callback for integration with the old callback mechanism,
-   * This is called on the slaves by the MPI loop. This should
-   * be removed when the new mechanism is used everywhere
-   *
-   * @param id The id of the callback to run.
-   * @param par2 First parameter to pass to the callback function.
-   * @param par2 Second parameter to pass to the callback function.
+   * @brief If loop_abort should be called on destruction
+   *        on the head node.
    */
-  void slave(int id, int par1, int par2) const;
+  bool m_abort_on_exit;
 
   /**
    * The MPI communicator used for the callbacks.
    */
-  boost::mpi::communicator const& m_comm;
+  boost::mpi::communicator &m_comm;
 
   /**
    * Internal storage for the callback functions.
@@ -162,19 +176,6 @@ private:
    */
   std::unordered_map<func_ptr_type, int> m_func_ptr_to_id;
 };
-
-/**
- * @brief Initialize the callback singelton.
- * This sets the communicator to use.
- */
-  void initialize_callbacks(boost::mpi::communicator const& comm);
-
-/**
- * @brief Returns a reference to the global callback class instance.
- *
- */
-MpiCallbacks &mpiCallbacks();
-
 } /* namespace Communication */
 
 #endif

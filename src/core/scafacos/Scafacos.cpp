@@ -2,14 +2,21 @@
 #include "Scafacos.hpp"
 #include "errorhandling.hpp"
 #include <cassert>
+#include "communication.hpp"
+#include "integrate.hpp"
+
 
 namespace Scafacos {
 
 #define handle_error(stmt) { const FCSResult res = stmt; if(res) runtimeError(fcs_result_get_message(res)); }
 
 std::string Scafacos::get_parameters() {
-  return method + " " + m_last_parameters;
+  return m_last_parameters;
 }
+std::string Scafacos::get_method() {
+  return method;
+}
+
 
 std::list<std::string> Scafacos::available_methods() {
   std::list<std::string> methods;
@@ -116,10 +123,9 @@ void Scafacos::run_dipolar(std::vector<double> &dipoles, std::vector<double> &po
   fields.resize(6*local_n_part);
   potentials.resize(3*local_n_part);
 
-  //handle_error(fcs_tune(handle, local_n_part, &(positions[0]), &(charges[0])));
   
   handle_error(fcs_set_dipole_particles(handle, local_n_part,&(positions[0]),&(dipoles[0]), &(fields[0]),&(potentials[0])));
-  handle_error(fcs_run(handle, 0, NULL, NULL, NULL, NULL));
+  handle_error(fcs_run(handle, 0, nullptr, nullptr, nullptr, nullptr));
 }
 #endif
 
@@ -143,9 +149,11 @@ void Scafacos::set_common_parameters(double *box_l, int *periodicity, int total_
    // Scafacos does near field calc
    sr=1;
   }
-  int d=dipolar();
-//  printf("Short range switch %d, dipolar=%d, has_near=%d\n",sr,d,has_near);
   handle_error(fcs_set_common(handle, sr, boxa, boxb, boxc, off, periodicity, total_particles));
+#ifdef SCAFACOS_DIPOLES
+  if (m_dipolar)
+    handle_error(fcs_set_total_dipole_particles(handle, total_particles));
+#endif
 }
 
 void Scafacos::set_dipolar(bool d) {

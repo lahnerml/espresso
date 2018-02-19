@@ -76,15 +76,6 @@ inline int calc_harmonic_pair_force(Particle *p1, Particle *p2, Bonded_ia_parame
   ONEPART_TRACE(if(p1->p.identity==check_id) fprintf(stderr,"%d: OPT: HARMONIC f = (%.3e,%.3e,%.3e) with part id=%d at dist %f fac %.3e\n",this_node,p1->f.f[0],p1->f.f[1],p1->f.f[2],p2->p.identity,dist2,fac));
   ONEPART_TRACE(if(p2->p.identity==check_id) fprintf(stderr,"%d: OPT: HARMONIC f = (%.3e,%.3e,%.3e) with part id=%d at dist %f fac %.3e\n",this_node,p2->f.f[0],p2->f.f[1],p2->f.f[2],p1->p.identity,dist2,fac));
 
-#ifdef CONFIGTEMP
-  extern double configtemp[2];
-  int numfac = 0;
-  if (p1->p.configtemp) numfac+=1;
-  if (p2->p.configtemp) numfac+=1;
-  configtemp[0] += numfac*SQR(iaparams->p.harmonic.k * dr);
-  configtemp[1] -= numfac*iaparams->p.harmonic.k*(3-2.*iaparams->p.harmonic.r/dist);
-#endif
-
   return 0;
 }
 
@@ -97,7 +88,7 @@ inline int harmonic_pair_energy(Particle *p1, Particle *p2, Bonded_ia_parameters
       (dist > iaparams->p.harmonic.r_cut)) 
     return 1;
 
-  *_energy = 0.5*iaparams->p.harmonic.k*SQR(dist - iaparams->p.harmonic.r);
+  *_energy = 0.5*iaparams->p.harmonic.k*Utils::sqr(dist - iaparams->p.harmonic.r);
   return 0;
 }
 

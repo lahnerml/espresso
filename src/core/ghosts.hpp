@@ -86,7 +86,7 @@ The ghost communicators are created in the init routines of the cell systems, th
 \ref nsq_topology_init for further details.
 */
 #include <mpi.h>
-#include "particle_data.hpp"
+#include "Cell.hpp"
 
 /** \name Transfer types, for \ref GhostCommunicator::type */
 /************************************************************/
@@ -157,7 +157,7 @@ typedef struct {
   /** Number of particle lists to communicate. */
   int n_part_lists;
   /** Pointer array to particle lists to communicate. */
-  ParticleList **part_lists;
+  Cell **part_lists;
 
   /** Tag used to send and receive in ASYNCHRONOUS case.
    * When using asynchronous communication it is possible to send more than one
@@ -212,13 +212,6 @@ void ghost_communicator(GhostCommunicator *gc);
 /** Go through \ref ghost_cells and remove the ghost entries from \ref
     local_particles. Part of \ref dd_exchange_and_sort_particles.*/
 void invalidate_ghosts();
-
-/* TODO: This function is not used anywhere. To be removed?  */
-#ifdef GHOST_FLAG
-inline int ifParticleIsGhost(Particle *p){
-   return p->l.ghost;
-}
-#endif
 
 /*@}*/
 

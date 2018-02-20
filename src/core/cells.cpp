@@ -436,3 +436,24 @@ void cells_update_ghosts() {
     /* Communication step: ghost information */
     ghost_communicator(&cell_structure.update_ghost_pos_comm);
 }
+
+/*************************************************/
+int cells_full_shell_neigh(int c, int n)
+{
+  switch (cell_structure.type) {
+  case CELL_STRUCTURE_DOMDEC:
+    return dd_full_shell_neigh(c, n);
+    break;
+#ifdef P4EST_DD
+  case CELL_STRUCTURE_P4EST:
+    return dd_p4est_full_shell_neigh(c, n);
+    break;
+#endif
+  default:
+    fprintf(stderr, "Cannot call full_shell_neigh on non-domain-decomposition.\n");
+    errexit();
+  }
+  // Not reached.
+  return 0;
+}
+

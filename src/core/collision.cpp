@@ -513,7 +513,7 @@ static void three_particle_binding_dd_do_search(
     Cell *basecell, Particle &p1, Particle &p2) {
   int basecellno = std::distance(&cells[0], basecell);
   for (int n = 0; n < 27; ++n) {
-    Cell &cell = cells[dd_full_shell_neigh(basecellno, n)];
+    Cell &cell = cells[cells_full_shell_neigh(basecellno, n)];
     for (int pno = 0; pno < cell.n; ++pno) {
       Particle &P = cell.part[pno];
       // Skip collided particles themselves

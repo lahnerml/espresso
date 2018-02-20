@@ -313,6 +313,9 @@ void check_resort_particles();
 /* Do a strict particle sorting, including order in the cells. */
 void local_sort_particles();
 
+/* On a domain decomposition, return a full shell neighbor cell index. */
+int cells_full_shell_neigh(int, int);
+
 /*@}*/
 
 #endif

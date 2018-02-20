@@ -61,12 +61,13 @@
 #include "thermostat.hpp"
 #include "utils.hpp"
 
-/** Structure containing the information about the cell grid used for domain decomposition. */
+/** Structure containing the information about the cell grid used for domain
+ * decomposition. */
 struct DomainDecomposition {
   DomainDecomposition()
       : cell_grid{0, 0, 0}, ghost_cell_grid{0, 0, 0}, cell_size{
                                                                         0, 0,
-                                                                            0} {}
+                                                                        0} {}
   /** linked cell grid in nodes spatial domain. */
   int cell_grid[3];
   /** linked cell grid with ghost frame. */
@@ -154,9 +155,6 @@ void dd_topology_release();
 */
 void dd_exchange_and_sort_particles(int global_flag);
 
-/** Get three cell indices (coordinates in cell gird) from particle position */
-void dd_position_to_cell_indices(double pos[3], int *idx);
-
 /** calculate physical (processor) minimal number of cells */
 int calc_processor_min_num_cells();
 
@@ -175,8 +173,8 @@ int dd_fill_comm_cell_lists(Cell **part_lists, int lc[3], int hc[3]);
  * poststore */
 void dd_assign_prefetches(GhostCommunicator *comm);
 
-/** Full shell neighbor indices.
- * Used in collision.cpp.
+/** Return a full shell neighbor index.
+ * Required for collision.cpp.
  * @param cellidx Index of a local cell
  * @param neigh Number of full shell neighbor to get (0 <= neigh < 27)
  * @return Index to cells (local or ghost cell) of the requested neighbor.

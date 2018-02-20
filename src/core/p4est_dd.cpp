@@ -17,6 +17,8 @@
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
 #include "repart.hpp"
+#include "utils/serialization/ParticleList.hpp"
+
 
 // For intrinsics version of cell_morton_idx
 #ifdef __BMI2__
@@ -173,67 +175,9 @@ typedef struct {
 // Empty as long as tclcommand_repart has not been called.
 static std::vector<p4est_locidx_t> part_nquads;
 //--------------------------------------------------------------------------------------------------
-struct CommunicationStatus {
-  enum class ReceiveStatus {
-    RECV_NOTSTARTED,
-    RECV_COUNT,
-    RECV_PARTICLES,
-    RECV_DYNDATA,
-    RECV_DONE
-  };
-
-  CommunicationStatus(int ncomm)
-      : nextstatus(ncomm, ReceiveStatus::RECV_COUNT),
-        donestatus(ncomm, ReceiveStatus::RECV_NOTSTARTED)
-  {
-  }
-
-  ReceiveStatus expected(int idx)
-  {
-    if (nextstatus[idx] <= donestatus[idx]) {
-      std::cerr << "[" << this_node << "] "
-                << "Error in communication sequence: "
-                << "Expecting status " << static_cast<int>(nextstatus[idx])
-                << " to happen but is already done ("
-                << static_cast<int>(donestatus[idx]) << ")" << std::endl;
-      errexit();
-    }
-
-    incr_recvstatus(donestatus[idx]);
-    return nextstatus[idx];
-  }
-
-  void next(int idx) { incr_recvstatus(nextstatus[idx]); }
-
-  static void incr_recvstatus(ReceiveStatus &r)
-  {
-    if (r == ReceiveStatus::RECV_DONE) {
-      std::cerr << "[" << this_node << "] "
-                << "Trying to increment bad communication status: "
-                << static_cast<int>(r) << std::endl;
-    }
-    r = static_cast<ReceiveStatus>(static_cast<int>(r) + 1);
-  }
-
- private:
-  std::vector<ReceiveStatus> nextstatus;
-  std::vector<ReceiveStatus> donestatus;
-};
-
-static inline void DIE_IF_TAG_MISMATCH(int act, int desired, const char *str) {
-  if (act != desired) {
-    std::cerr << "[" << this_node << "] TAG MISMATCH!"
-              << "Desired: " << desired << " Got: " << act << std::endl;
-    errexit();
-  }
-}
-
-static const int LOC_EX_CNT_TAG  = 11011;
 static const int LOC_EX_PART_TAG = 11022;
-static const int LOC_EX_DYN_TAG  = 11033;
-static const int GLO_EX_CNT_TAG  = 22011;
 static const int GLO_EX_PART_TAG = 22022;
-static const int GLO_EX_DYN_TAG  = 22033;
+
 static const int REP_EX_CNT_TAG  = 33011;
 static const int REP_EX_PART_TAG = 33022;
 static const int REP_EX_DYN_TAG  = 33033;
@@ -1021,7 +965,7 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
 // Note: Particle that stay local and are moved to a cell with higher index are touched twice.
 // This is not the most efficient way! It would be better to first remember the cell-particle
 // index pair of those particles in a vector and move them at the end.
-void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn) {
+void dd_p4est_fill_sendbuf (ParticleList *sendbuf) {
   double cell_lc[3], cell_hc[3];
   // Loop over all cells and particles
   for (int i=0;i<num_local_cells;++i) {
@@ -1076,10 +1020,6 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
             if (ds::p4est_shell[nidx].rank != this_node) { // It is a remote process
               // copy data to sendbuf according to rank
               int li = comm_proc[ds::p4est_shell[nidx].rank];
-              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
-#ifdef EXCLUSIONS
-              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
-#endif
               int pid = part->p.identity;
               //fold_position(part->r.p, part->l.i);
               move_indexed_particle(&sendbuf[li], cell, p);
@@ -1108,10 +1048,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
   }
 }
 //--------------------------------------------------------------------------------------------------
-static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_flag, int from) {
-  // add all particle in a recvbuf to the local storage
-  int dynsiz = 0;
-
+static void dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_flag, int from) {
   update_local_particles(recvbuf);
 
   for (int p = 0; p < recvbuf->n; ++p) {
@@ -1121,14 +1058,6 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
     //if (!global_flag)
       fold_position(recvbuf->part[p].r.p, recvbuf->part[p].l.i);
 
-    dynsiz += recvbuf->part[p].bl.n;
-#ifdef EXCLUSIONS
-    dynsiz += recvbuf->part[p].el.n;
-#endif
-  //}
-  // Fold direction of dd_append_particles unused.
-
-  //for (int p=0;p<recvbuf->n;++p) {
     Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p);
     if (target) {
       append_indexed_particle(target, std::move(recvbuf->part[p]));
@@ -1141,137 +1070,51 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
       errexit();
     }
   }
-
-  return dynsiz;
-}
-//--------------------------------------------------------------------------------------------------
-static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<int> &dynrecv) {
-  int read = 0;
-
-  for (int pc = 0; pc < recvbuf->n; pc++) {
-    // Use local_particles to find the correct particle address since the
-    // particles from recvbuf have already been copied by dd_append_particles
-    // in dd_async_exchange_insert_particles.
-    Particle *p = local_particles[recvbuf->part[pc].p.identity];
-    if (p->bl.n > 0) {
-      if (!(p->bl.e = (int *) malloc(p->bl.n * sizeof(int)))) {
-        fprintf(stderr, "Tod.\n");
-        errexit();
-      }
-      memcpy(p->bl.e, &dynrecv[read], p->bl.n * sizeof(int));
-      read += p->bl.n;
-    } else {
-      p->bl.e = NULL;
-    }
-#ifdef EXCLUSIONS
-    if (p->el.n > 0) {
-      alloc_intlist(&p->el, p->el.n);
-      // used to be memmove, but why?
-      memcpy(p->el.e, &dynrecv[read], p->el.n*sizeof(int));
-      read += p->el.n;
-    }
-    else {
-      p->el.e = NULL;
-    }
-#endif
-  }
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_local_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
   std::vector<ParticleList> sendbuf(num_comm_proc), recvbuf(num_comm_proc);
-  std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc),
-      recvbuf_dyn(num_comm_proc);
-  std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
-  std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
-  std::vector<int> nrecvpart(num_comm_proc, 0);
+  std::vector<boost::mpi::request> sreq, rreq;
+  using request_iter_type = decltype(sreq.begin());
 
+  rreq.reserve(num_comm_proc);
   for (int i = 0; i < num_comm_proc; ++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
-    // Invoke receive for the number of particles to be received from
-    // all neighbors
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
-              comm_cart, &rreq[i]);
+    rreq.push_back(comm_cart.irecv(comm_rank[i], LOC_EX_PART_TAG, recvbuf[i]));
   }
 
   // Fill the send buffers with particles that leave the local domain
-  dd_p4est_fill_sendbuf(sendbuf.data(), sendbuf_dyn.data());
+  dd_p4est_fill_sendbuf(sendbuf.data());
 
   // send number of particles, particles, and particle data
+  sreq.reserve(num_comm_proc);
   for (int i = 0; i < num_comm_proc; ++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
-              comm_cart, &sreq[i]);
-    if (sendbuf[i].n <= 0)
-      continue;
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE,
-              comm_rank[i], LOC_EX_PART_TAG, comm_cart,
-              &sreq[i + num_comm_proc]);
-    if (sendbuf_dyn[i].size() <= 0)
-      continue;
-    MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT,
-              comm_rank[i], LOC_EX_DYN_TAG, comm_cart,
-              &sreq[i + 2 * num_comm_proc]);
+    sreq.push_back(comm_cart.isend(comm_rank[i], LOC_EX_PART_TAG, sendbuf[i]));
   }
 
+  boost::mpi::status status;
+  request_iter_type completed;
   // Receive all data
-  MPI_Status status;
-  CommunicationStatus commstat(num_comm_proc);
-
-  while (true) {
-    int recvidx;
-    MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
-    if (recvidx == MPI_UNDEFINED)
-      break;
-    int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
-
-    switch (commstat.expected(recvidx)) {
-    case CommunicationStatus::ReceiveStatus::RECV_COUNT:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_CNT_TAG, "Local exchange count");
-      if (nrecvpart[recvidx] > 0) {
-        realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-        MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
-                  MPI_BYTE, source, LOC_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_PART_TAG, "Local exchange particles");
-      recvbuf[recvidx].n = nrecvpart[recvidx];
-      dyndatasiz =
-          dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
-      if (dyndatasiz > 0) {
-        recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source,
-                  LOC_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_DYN_TAG, "Local exchange dyndata");
-      dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
-      commstat.next(recvidx);
-      break;
-    default:
-      std::cerr << "[" << this_node << "]"
-                << "Unknown comm status for receive index " << recvidx
-                << std::endl;
-      break;
-    }
-  }
-  MPI_Waitall(3 * num_comm_proc, sreq.data(), MPI_STATUS_IGNORE);
-
-  // clear all buffers and free memory
   for (int i = 0; i < num_comm_proc; ++i) {
-    // Remove particles from this nodes local list and free data
-    for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = NULL;
-      free_particle(&sendbuf[i].part[p]);
+    std::tie(status, completed) = boost::mpi::wait_any(rreq.begin(), rreq.end());
+    int recvidx = std::distance(rreq.begin(), completed);
+    // Process and clear recv data
+    dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, status.source());
+    realloc_particlelist(&recvbuf[recvidx], 0);
+  }
+
+  // Clear sent data
+  for (int i = 0; i < num_comm_proc; ++i) {
+    std::tie(status, completed) = boost::mpi::wait_any(sreq.begin(), sreq.end());
+    int sendidx = std::distance(sreq.begin(), completed);
+    
+    for (int p = 0; p < sendbuf[sendidx].n; p++) {
+      local_particles[sendbuf[sendidx].part[p].p.identity] = NULL;
+      free_particle(&sendbuf[sendidx].part[p]);
     }
-    realloc_particlelist(&sendbuf[i], 0);
-    realloc_particlelist(&recvbuf[i], 0);
-    sendbuf_dyn[i].clear();
-    recvbuf_dyn[i].clear();
+    realloc_particlelist(&sendbuf[sendidx], 0);
   }
 
 #ifdef ADDITIONAL_CHECKS
@@ -1283,17 +1126,15 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
 {
   // Prepare send/recv buffers to ALL processes
   std::vector<ParticleList> sendbuf(n_nodes), recvbuf(n_nodes);
-  std::vector<std::vector<int>> sendbuf_dyn(n_nodes), recvbuf_dyn(n_nodes);
-  std::vector<MPI_Request> sreq(3 * n_nodes, MPI_REQUEST_NULL);
-  std::vector<MPI_Request> rreq(n_nodes, MPI_REQUEST_NULL);
-  std::vector<int> nrecvpart(n_nodes, 0);
+  std::vector<boost::mpi::request> sreq, rreq;
+  using request_iter_type = decltype(sreq.begin());
 
+  rreq.reserve(n_nodes);
   for (int i = 0; i < n_nodes; ++i) {
     init_particlelist(&sendbuf[i]);
     init_particlelist(&recvbuf[i]);
 
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart,
-              &rreq[i]);
+    rreq.push_back(comm_cart.irecv(i, GLO_EX_PART_TAG, recvbuf[i]));
   }
 
   // If pl == NULL do nothing, since there are no particles and cells on this
@@ -1310,12 +1151,6 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
           fprintf(stderr, "process %i invalid\n", rank);
           errexit();
         }
-        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->bl.e,
-                                 part->bl.e + part->bl.n);
-#ifdef EXCLUSIONS
-        sendbuf_dyn[rank].insert(sendbuf_dyn[rank].end(), part->el.e,
-                                 part->el.e + part->el.n);
-#endif
         int pid = part->p.identity;
         move_indexed_particle(&sendbuf[rank], pl, p);
         local_particles[pid] = NULL;
@@ -1325,76 +1160,33 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
     }
   }
 
-  // send number of particles, particles, and particle data
+  // Send data
+  sreq.reserve(n_nodes);
   for (int i = 0; i < n_nodes; ++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, i, GLO_EX_CNT_TAG, comm_cart, &sreq[i]);
-    if (sendbuf[i].n <= 0)
-      continue;
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE, i,
-              GLO_EX_PART_TAG, comm_cart, &sreq[i + n_nodes]);
-    if (sendbuf_dyn[i].size() <= 0)
-      continue;
-    MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT, i,
-              GLO_EX_DYN_TAG, comm_cart, &sreq[i + 2 * n_nodes]);
+    sreq.push_back(comm_cart.isend(i, GLO_EX_PART_TAG, sendbuf[i]));
   }
 
-  // Receive all data. The async communication scheme is the same as in
-  // exchange_and_sort_particles
-  MPI_Status status;
-  CommunicationStatus commstat(n_nodes);
-  while (true) {
-    int recvidx;
-    MPI_Waitany(n_nodes, rreq.data(), &recvidx, &status);
-    if (recvidx == MPI_UNDEFINED)
-      break;
-
-    int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
-
-    switch (commstat.expected(recvidx)) {
-    case CommunicationStatus::ReceiveStatus::RECV_COUNT:
-      DIE_IF_TAG_MISMATCH(tag, GLO_EX_CNT_TAG, "Global exchange count");
-      if (nrecvpart[recvidx] > 0) {
-        realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-        MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
-                  MPI_BYTE, source, GLO_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
-      DIE_IF_TAG_MISMATCH(tag, GLO_EX_PART_TAG, "Global exchange particles");
-      recvbuf[recvidx].n = nrecvpart[recvidx];
-      dyndatasiz =
-          dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
-      if (dyndatasiz > 0) {
-        recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source,
-                  GLO_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
-      DIE_IF_TAG_MISMATCH(tag, GLO_EX_DYN_TAG, "Global exchange dyndata");
-      dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
-      commstat.next(recvidx);
-      break;
-    default:
-      std::cerr << "[" << this_node << "]"
-                << "Unknown comm status for receive index " << recvidx
-                << std::endl;
-      break;
-    }
+  boost::mpi::status status;
+  request_iter_type completed;
+  // Receive all data
+  for (int i = 0; i < n_nodes; ++i) {
+    std::tie(status, completed) = boost::mpi::wait_any(rreq.begin(), rreq.end());
+    int recvidx = std::distance(rreq.begin(), completed);
+    // Process and clear recv data
+    dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, status.source());
+    realloc_particlelist(&recvbuf[recvidx], 0);
   }
 
-  MPI_Waitall(3 * n_nodes, sreq.data(), MPI_STATUS_IGNORE);
-
+  // Clear sent data
   for (int i = 0; i < n_nodes; ++i) {
-    // Remove particles from this nodes local list and free data
-    for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = NULL;
-      free_particle(&sendbuf[i].part[p]);
+    std::tie(status, completed) = boost::mpi::wait_any(sreq.begin(), sreq.end());
+    int sendidx = std::distance(sreq.begin(), completed);
+    
+    for (int p = 0; p < sendbuf[sendidx].n; p++) {
+      local_particles[sendbuf[sendidx].part[p].p.identity] = NULL;
+      free_particle(&sendbuf[sendidx].part[p]);
     }
-    realloc_particlelist(&sendbuf[i], 0);
-    realloc_particlelist(&recvbuf[i], 0);
+    realloc_particlelist(&sendbuf[sendidx], 0);
   }
 }
 //--------------------------------------------------------------------------------------------------
@@ -1923,17 +1715,17 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
 void
 p4est_dd_repartition(const std::string& desc, bool debug)
 {
-  if (desc == "statistics") {
-    repart::print_cell_info("!>>> Statistics", "none");
-    return;
-  }
+  //if (desc == "statistics") {
+  //  repart::print_cell_info("!>>> Statistics", "none");
+  //  return;
+  //}
 
   std::vector<double> weights = repart::metric{desc}();
   p4est_dd_repart_calc_nquads(weights, debug);
 
-  repart::print_cell_info("!>>> Before Repart", desc);
+  //repart::print_cell_info("!>>> Before Repart", desc);
   cells_re_init(CELL_STRUCTURE_CURRENT, true);
-  repart::print_cell_info("!>>> After Repart", desc);
+  //repart::print_cell_info("!>>> After Repart", desc);
 }
 
 double

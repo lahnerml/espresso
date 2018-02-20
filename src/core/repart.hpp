@@ -18,7 +18,7 @@ namespace repart {
 
 
 // Print general information about cell process mapping
-void print_cell_info(const std::string& prefix, const std::string& method);
+//void print_cell_info(const std::string& prefix, const std::string& method);
 
 /** Represents a linear combination of single metric functions.
  */

@@ -36,6 +36,7 @@
 #include "layered.hpp"
 #include "lees_edwards_domain_decomposition.hpp"
 #include "nsquare.hpp"
+#include "p4est_dd.hpp"
 #include "particle_data.hpp"
 #include "utils.hpp"
 #include "utils/NoOp.hpp"
@@ -44,11 +45,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-
-
-#ifdef DD_P4EST
-#include "p4est_dd.hpp"
-#endif
 
 /* Variables */
 
@@ -213,7 +209,7 @@ void topology_init(int cs, CellPList *local, bool isRepart) {
     layered_topology_init(local);
     break;
   case CELL_STRUCTURE_P4EST:
-    dd_p4est_topology_init(local, isRepart);
+    P4EST_DD_GUARD(dd_p4est_topology_init(local, isRepart));
     break;
   default:
     fprintf(stderr, "INTERNAL ERROR: attempting to sort the particles in an "
@@ -228,7 +224,6 @@ void topology_init(int cs, CellPList *local, bool isRepart) {
 // and therefore getting a global exchange from on_observables_calc
 static void cells_adapt_after_repart() {
   invalidate_ghosts();
-  particle_invalidate_part_node();
   n_verlet_updates++;
 
   ghost_communicator(&cell_structure.ghost_cells_comm);
@@ -356,7 +351,7 @@ void cells_resort_particles(int global_flag) {
     dd_exchange_and_sort_particles(global_flag);
     break;
   case CELL_STRUCTURE_P4EST:
-    dd_p4est_exchange_and_sort_particles(global_flag);
+    P4EST_DD_GUARD(dd_p4est_exchange_and_sort_particles(global_flag));
     break;
   }
 
@@ -406,7 +401,7 @@ void cells_on_geometry_change(int flags) {
     on_boxl_change();
     break;
   case CELL_STRUCTURE_P4EST:
-    dd_p4est_on_geometry_change(flags);
+    P4EST_DD_GUARD(dd_p4est_on_geometry_change(flags));
     break;
   }
 }

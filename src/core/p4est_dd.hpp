@@ -7,9 +7,15 @@
 #ifdef DD_P4EST
 #include <p4est_to_p8est.h>
 #include <p8est_mesh.h>
+
+#define P4EST_DD_GUARD(call) call
+#else
+#define P4EST_DD_GUARD(call) do { \
+  fprintf(stderr, "Error: P4est cellsystem is not compiled into this ESPResSo.\n"); \
+  errexit(); \
+} while(0)
 #endif
 
-//#define P4EST_NOCHANGE
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Check all particles if they have left their cell and move the to the right neighboring cell

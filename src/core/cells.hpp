@@ -216,7 +216,7 @@ extern int rebuild_verletlist;
 
 /** Switch for choosing the topology init function of a certain
     cell system. */
-void topology_init(int cs, CellPList *local);
+void topology_init(int cs, CellPList *local, bool isRepart = false);
 
 /** Reinitialize the cell structures.
     @param new_cs gives the new topology to use afterwards. May be set to

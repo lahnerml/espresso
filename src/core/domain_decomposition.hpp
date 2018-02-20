@@ -61,51 +61,12 @@
 #include "thermostat.hpp"
 #include "utils.hpp"
 
-/** Structure containing information about non bonded interactions
-    with particles in a neighbor cell. */
-typedef struct {
-  /** Just for transparency the index of the neighbor cell. */
-  int cell_ind;
-  /** Pointer to particle list of neighbor cell. */
-  ParticleList *pList;
-  /** Verlet list for non bonded interactions of a cell with a neighbor cell. */
-  PairList vList;
-
-#ifdef CELL_DEBUG
-  double my_pos[3];  /* position of the cell corner, only here for debug */
-#endif
-
-} IA_Neighbor;
-
-
-typedef struct {
-  /** number of interacting neighbor cells . 
-
-      A word about the interacting neighbor cells:
-
-      In a 3D lattice each cell has 27 neighbors (including
-      itself!). Since we deal with pair forces, it is sufficient to
-      calculate only half of the interactions (Newtons law: actio =
-      reactio). For each cell 13+1=14 neighbors. This has only to be
-      done for the inner cells. 
-
-      Caution: This implementation needs double sided ghost
-      communication! For single sided ghost communication one would
-      need some ghost-ghost cell interaction as well, which we do not
-      need! 
-
-      It follows: inner cells: n_neighbors = 14
-      ghost cells:             n_neighbors = 0
-  */
-  int n_neighbors;
-  /** Interacting neighbor cell list  */
-  IA_Neighbor *nList;
-} IA_Neighbor_List;
-
 /** Structure containing the information about the cell grid used for domain decomposition. */
-typedef struct {
-  /** flag for using Verlet List */
-  int use_vList;
+struct DomainDecomposition {
+  DomainDecomposition()
+      : cell_grid{0, 0, 0}, ghost_cell_grid{0, 0, 0}, cell_size{
+                                                                        0, 0,
+                                                                            0} {}
   /** linked cell grid in nodes spatial domain. */
   int cell_grid[3];
   /** linked cell grid with ghost frame. */

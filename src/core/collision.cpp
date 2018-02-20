@@ -738,12 +738,12 @@ void handle_collisions() {
     // If we don't have domain decomposition, we need to do a full sweep over
     // all
     // particles in the system. (slow)
-    if (cell_structure.type != CELL_STRUCTURE_DOMDEC) {
-      three_particle_binding_full_search(gathered_queue);
-    } // if cell structure != domain decomposition
-    else {
+    if (cell_structure.type == CELL_STRUCTURE_DOMDEC
+        || cell_structure.type == CELL_STRUCTURE_P4EST) {
       three_particle_binding_domain_decomposition(gathered_queue);
-    } // If we have doamin decomposition
+    } else {
+      three_particle_binding_full_search(gathered_queue);
+    }
 
   } // if TPB
 

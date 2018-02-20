@@ -4,164 +4,74 @@
 #include <cctype>
 #include <chrono>
 #include <stdexcept>
-#include <boost/iterator/iterator_facade.hpp>
 #include "cells.hpp"
 #include "domain_decomposition.hpp"
-#include "mol_cut.hpp"
 #include "interaction_data.hpp"
-
-double repart::force_calc_runtime = 1.0;
-
-// Iterator for iterating over integers (enumerating things while using
-// std::transform)
-struct IotaIter
-  : public boost::iterator_facade<IotaIter,
-                                  const int,
-                                  boost::forward_traversal_tag>
-{
-  IotaIter(): i(0) {}
-  IotaIter(int i): i(i) {}
-  IotaIter(const IotaIter& other): i(other.i) {}
-
-private:
-  int i;
-  friend class boost::iterator_core_access;
-
-  void increment() { i++; }
-  bool equal(const IotaIter& other) const { return i == other.i; }
-  const int& dereference() const { return i; }
-};
-
-template <typename T>
-struct Averager {
-    void operator()(T val) { sum += val; count++; }
-    T operator*() { return sum / count; }
-
-private:
-    T sum = T{0};
-    int count = 0;
-};
-
-template <typename T, typename It>
-T average(It first, It last)
-{
-    return *std::for_each(first, last, Averager<T>());
-}
-
-template <typename It>
-typename It::value_type average(It first, It last)
-{
-    return average<typename It::value_type>(first, last);
-}
-
-
-void
-repart::print_cell_info(const std::string& prefix, const std::string& method)
-{
-  int nc = local_cells.n;
-  int npart = std::accumulate(local_cells.cell,
-                              local_cells.cell + nc,
-                              0,
-                              [](int acc, Cell* c) { return acc + c->n; });
-
-  int pmax, pmin, cmax, cmin;
-  MPI_Reduce(&npart, &pmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
-  MPI_Reduce(&npart, &pmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
-  MPI_Reduce(&nc, &cmax, 1, MPI_INT, MPI_MAX, 0, comm_cart);
-  MPI_Reduce(&nc, &cmin, 1, MPI_INT, MPI_MIN, 0, comm_cart);
-
-  if (this_node == 0)
-    printf("%s (%s): #Particle (#Cells) max: %i (%i), min: %i (%i)\n",
-           prefix.c_str(), method.c_str(), pmax, cmax, pmin, cmin);
-}
-
+#include "short_range_loop.hpp"
 
 // Fills weights with a constant.
-static void
-metric_ncells(std::vector<double>& weights)
-{
+static void metric_ncells(std::vector<double> &weights) {
   std::fill(weights.begin(), weights.end(), 1.0);
 }
 
 // Fills weights with the number of particles per cell.
-static void
-metric_npart(std::vector<double>& weights)
-{
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 weights.begin(),
-                 [](const Cell *c) { return c->n; });
+static void metric_npart(std::vector<double> &weights) {
+  std::transform(local_cells.cell, local_cells.cell + local_cells.n,
+                 weights.begin(), [](const Cell *c) { return c->n; });
 }
 
-int cell_ndistpairs(Cell *c, int i)
-{
-  int nnp = std::accumulate(dd.cell_inter[i].nList,
-                            dd.cell_inter[i].nList
-                              + dd.cell_inter[i].n_neighbors,
-                            0,
-                            [](int acc, const IA_Neighbor& neigh){
-                              return acc + neigh.pList->n;
-                            });
+int cell_ndistpairs(Cell *c) {
+  int nnp =
+      std::accumulate(std::begin(c->m_neighbors), std::end(c->m_neighbors), 0,
+                      [](int acc, const Cell &neigh) { return acc + neigh.n; });
   return c->n * nnp;
 }
 
 // Fills weights with the number of distance pairs per cell.
-static void
-metric_ndistpairs(std::vector<double>& weights)
-{
-  // Cell number can't be easily deduced from a copied Cell*/**
-  // Therefore, we use std::transform with two input iterators
-  // and one is an IotaIter.
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 weights.begin(),
+static void metric_ndistpairs(std::vector<double> &weights) {
+  std::transform(local_cells.begin(), local_cells.end(), weights.begin(),
                  cell_ndistpairs);
 }
 
-int cell_nforcepairs(Cell *cell, int c)
-{
-  int npairs = 0;
-  for (int n = 0; n < dd.cell_inter[c].n_neighbors; n++) {
-    IA_Neighbor *neigh = &dd.cell_inter[c].nList[n];
-    for (Particle *p1 = cell->part; p1 < cell->part + cell->n; p1++) {
-      for (Particle *p2 = neigh->pList->part + (n == 0? p1 - cell->part + 1: 0); /* Half shell within a cell itself. */
-          p2 < neigh->pList->part + neigh->pList->n; p2++) {
-#ifdef EXCLUSIONS
-        if(do_nonbonded(p1, p2))
-#endif
-        {
-          double vec21[3];
-          double dist = sqrt(distance2vec(p1->r.p, p2->r.p, vec21));
-          IA_parameters *ia_params = get_ia_param(p1->p.type, p2->p.type);
-          if (CUTOFF_CHECK(dist < ia_params->LJ_cut+ia_params->LJ_offset) &&
-              CUTOFF_CHECK(dist > ia_params->LJ_min+ia_params->LJ_offset))
-            npairs++;
-        }
-      }
+static void metric_nforcepairs(std::vector<double> &weights) {
+  // Ugly hack: Use pairkernel to advance the current cell number
+  int cellno = 0;
+  for(;cellno < (local_cells.n - 1) && local_cells.cell[cellno]->n == 0; cellno++);
+
+  auto particlekernel = [&cellno](Particle &p) {
+    const Cell *c = local_cells.cell[cellno];
+    if (p.p.identity == c->part[c->n - 1].p.identity) {
+        if (cellno < (local_cells.n - 1))
+            cellno++;
+        while (cellno < (local_cells.n - 1) && local_cells.cell[cellno]->n == 0)
+            cellno++;
     }
-  }
-  return npairs;
+  };
+
+  auto pairkernel = [&weights, &cellno](Particle &p1, Particle &p2,
+                                       Distance &d) {
+#ifdef EXCLUSIONS
+    if (do_nonbonded(&p1, &p2))
+#endif
+    {
+      IA_parameters *ia_params = get_ia_param(p1.p.type, p2.p.type);
+      double dist = std::sqrt(d.dist2);
+      if (dist < ia_params->LJ_cut + ia_params->LJ_offset &&
+          dist > ia_params->LJ_min + ia_params->LJ_offset)
+        weights[cellno]++;
+    }
+  };
+
+  short_range_loop(particlekernel, pairkernel);
 }
 
-static void
-metric_nforcepairs(std::vector<double>& weights)
-{
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 weights.begin(),
-                 cell_nforcepairs);
-}
-
-int cell_nbondedia(Cell *cell, int c)
-{
+int cell_nbondedia(Cell *cell) {
   int nbondedia = 0;
   for (Particle *p = cell->part; p < cell->part + cell->n; p++) {
-    for (int i = 0; i < p->bl.n; ) {
+    for (int i = 0; i < p->bl.n;) {
       int type_num = p->bl.e[i++];
       Bonded_ia_parameters *iaparams = &bonded_ia_params[type_num];
-      //int type = iaparams->type;
+      // int type = iaparams->type;
 
       // This could be incremented conditionally if "type" has a specific value
       // to only count bonded_ia of a certain type.
@@ -172,78 +82,48 @@ int cell_nbondedia(Cell *cell, int c)
   return nbondedia;
 }
 
-static void
-metric_nbondedia(std::vector<double>& weights)
-{
-  std::transform(local_cells.cell,
-                 local_cells.cell + local_cells.n,
-                 IotaIter(),
-                 weights.begin(),
+static void metric_nbondedia(std::vector<double> &weights) {
+  std::transform(local_cells.begin(), local_cells.end(), weights.begin(),
                  cell_nbondedia);
 }
 
-static void
-metric_nghostcells(std::vector<double>& weights)
-{
-    // Reminder: Weights is a vector over local cells.
-    // We simply count the number of ghost cells and
-    // add this cost in equal parts to all local cells
-    double nghostfrac = static_cast<double>(ghost_cells.n) / local_cells.n;
-    std::fill(weights.begin(), weights.end(), nghostfrac);
+static void metric_nghostcells(std::vector<double> &weights) {
+  // Reminder: Weights is a vector over local cells.
+  // We simply count the number of ghost cells and
+  // add this cost in equal parts to all local cells
+  double nghostfrac = static_cast<double>(ghost_cells.n) / local_cells.n;
+  std::fill(weights.begin(), weights.end(), nghostfrac);
 }
 
-static void
-metric_nghostpart(std::vector<double>& weights)
-{
-    // Reminder: Weights is a vector over local cells.
-    // We simply count the number of ghost particles and
-    // add this cost in equal parts to all local cells
-    int nghostpart = std::accumulate(ghost_cells.cell,
-                                     ghost_cells.cell + ghost_cells.n,
-                                     0,
-                                     [](int acc, const Cell *c) {
-                                       return acc + c->n;
-                                     });
-    double nghostfrac = static_cast<double>(nghostpart) / local_cells.n;
-    std::fill(weights.begin(), weights.end(), nghostfrac);
-}
-
-static void
-metric_lc_runtime(std::vector<double>& weights)
-{
-    std::vector<double> ts(local_cells.n, 0.0);
-    calc_link_cell_runtime(10, ts);
-    // Factor to make entries larger than 1.
-    double f = 10.0 / average(ts.begin(), ts.end());
-    std::transform(ts.begin(), ts.end(),
-                   weights.begin(),
-                   [f](double d){ return f * d;});
-}
-
-static void
-metric_fc_runtime(std::vector<double>& weights)
-{
-    // Fill all cells with the same(!) prerecorded runtime for force_calc
-    std::fill(std::begin(weights), std::end(weights), repart::force_calc_runtime);
+static void metric_nghostpart(std::vector<double> &weights) {
+  // Reminder: Weights is a vector over local cells.
+  // We simply count the number of ghost particles and
+  // add this cost in equal parts to all local cells
+  int nghostpart =
+      std::accumulate(ghost_cells.begin(), ghost_cells.end(), 0,
+                      [](int acc, const Cell *c) { return acc + c->n; });
+  double nghostfrac = static_cast<double>(nghostpart) / local_cells.n;
+  std::fill(weights.begin(), weights.end(), nghostfrac);
 }
 
 // Generator for random integers
 struct Randintgen {
-  Randintgen():
-    mt(std::chrono::high_resolution_clock::now().time_since_epoch().count()),
-    d(1, 1000) {}
-  Randintgen(Randintgen&& other): mt(std::move(other.mt)),
-                                  d(std::move(other.d)) {}
+  Randintgen()
+      : mt(std::chrono::high_resolution_clock::now()
+               .time_since_epoch()
+               .count()),
+        d(1, 1000) {}
+  Randintgen(Randintgen &&other)
+      : mt(std::move(other.mt)), d(std::move(other.d)) {}
   int operator()() { return d(mt); }
+
 private:
   std::mt19937 mt;
   std::uniform_int_distribution<int> d;
 };
 
 // Fills weights with random integers
-static void
-metric_rand(std::vector<double>& weights)
-{
+static void metric_rand(std::vector<double> &weights) {
   std::generate(weights.begin(), weights.end(), Randintgen());
 }
 
@@ -262,8 +142,6 @@ get_single_metric_func(const std::string& desc)
     { "nbondedia"  , metric_nbondedia },
     { "nghostcells", metric_nghostcells },
     { "nghostpart" , metric_nghostpart },
-    { "lc_runtime" , metric_lc_runtime },
-    { "fc_runtime" , metric_fc_runtime },
     { "rand"       , metric_rand }
   };
 

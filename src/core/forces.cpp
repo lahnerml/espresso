@@ -93,7 +93,6 @@ void check_forces() {
 }
 
 void force_calc() {
-  repart::RuntimeRecorder rr(repart::force_calc_runtime);
   // Communication step: distribute ghost positions
   cells_update_ghosts();
 

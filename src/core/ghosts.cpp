@@ -544,7 +544,7 @@ static int is_recv_op(int comm_type, int node)
  */
 static void ghost_communicator_async(GhostCommunicator *gc)
 {
-  const int data_parts = gc->data_parts;
+  int data_parts = gc->data_parts;
   /* if ghosts should have uptodate velocities, they have to be updated like
      positions (except for shifting...) */
   if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))

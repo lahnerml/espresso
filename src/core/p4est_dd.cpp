@@ -891,17 +891,14 @@ void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
 void dd_p4est_mark_cells () {
   // Take the memory map as they are. First local cells (along Morton curve).
   // This also means cells has the same ordering as p4est_shell
-#ifndef P4EST_NOCHANGE
   for (int c=0;c<num_local_cells;++c)
     local_cells.cell[c] = &cells[c];
   // Ghost cells come after local cells
   for (int c=0;c<num_ghost_cells;++c)
     ghost_cells.cell[c] = &cells[num_local_cells + c];
-#endif
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_cell_interactions() {
-#ifndef P4EST_NOCHANGE
   dd.cell_inter = (IA_Neighbor_List*)Utils::realloc(dd.cell_inter,local_cells.n*sizeof(IA_Neighbor_List));
   for (int i=0;i<local_cells.n; i++) {
     dd.cell_inter[i].nList = NULL;
@@ -935,7 +932,6 @@ void dd_p4est_init_cell_interactions() {
 
     dd.cell_inter[i].n_neighbors = CELLS_MAX_NEIGHBORS;
   }
-#endif
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
@@ -1020,18 +1016,18 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
   for (int i=0;i<num_local_cells;++i) {
     Cell* cell = local_cells.cell[i];
     local_shell_t* shell = &ds::p4est_shell[i];
-    
+
     for (int d=0;d<3;++d) {
       cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
       if ((shell->boundary & (1<<(2*d)))) cell_lc[d] -= 0.5*ROUND_ERROR_PREC*box_l[d];
       if ((shell->boundary & (2<<(2*d)))) cell_hc[d] += 0.5*ROUND_ERROR_PREC*box_l[d];
     }
-    
+
     for (int p=0;p<cell->n;++p) {
       Particle* part = &cell->part[p];
       int x,y,z;
-      
+
       // Check if particle has left the cell. (The local domain is extenden by half round error)
       if (part->r.p[0] < cell_lc[0]) x = 0;
       else if (part->r.p[0] >= cell_hc[0]) x = 2;
@@ -1042,7 +1038,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
       if (part->r.p[2] < cell_lc[2]) z = 0;
       else if (part->r.p[2] >= cell_hc[2]) z = 2;
       else z = 1;
-      
+
       int nidx = neighbor_lut[z][y][x];
       if (nidx != -1) { // Particle p outside of cell i
         // recalculate neighboring cell to prevent rounding errors
@@ -1120,15 +1116,15 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
 #endif
   //}
   // Fold direction of dd_append_particles unused.
-  
+
   //for (int p=0;p<recvbuf->n;++p) {
     Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p);
     if (target) {
       append_indexed_particle(target, &recvbuf->part[p]);
     } else {
-      fprintf(stderr, "proc %i received remote particle p%i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n", 
+      fprintf(stderr, "proc %i received remote particle p%i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n",
         this_node, recvbuf->part[p].p.identity, global_flag, from,
-        recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2], 
+        recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2],
         dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p),
         op[0], op[1], op[2]);
       errexit();
@@ -1432,10 +1428,10 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
   std::vector<int> send_prefix(n_nodes + 1);
   std::vector<int> recv_quads(n_nodes);
   std::vector<int> recv_prefix(n_nodes + 1);
-  
+
   std::vector<std::vector<int>> send_num_part(n_nodes);
   std::vector<std::vector<int>> recv_num_part(n_nodes);
-  
+
   int lb_old_local = old_global_first_quadrant[this_node];
   int ub_old_local = old_global_first_quadrant[this_node + 1];
   int lb_new_local = ds::p4est->global_first_quadrant[this_node];
@@ -1447,10 +1443,10 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
   std::vector<MPI_Request> sreq(3 * n_nodes, MPI_REQUEST_NULL);
   std::vector<MPI_Request> rreq(n_nodes, MPI_REQUEST_NULL);
-  
+
   std::vector<ParticleList> sendbuf(n_nodes), recvbuf(n_nodes);
   std::vector<std::vector<int>> sendbuf_dyn(n_nodes), recvbuf_dyn(n_nodes);
-  
+
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish
    * 1. no quadrants of neighbor need to be received; neighbor rank < rank
@@ -1489,7 +1485,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
                            std::min(ub_old_local, ub_new_remote) -
                                std::max(lb_old_local, lb_new_remote));
     send_prefix[p+1] = send_prefix[p] + send_quads[p];
-    
+
     // Fill send list for number of particles per cell
     send_num_part[p].resize(send_quads[p]);
     init_particlelist(&sendbuf[p]);
@@ -1552,7 +1548,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       }
     }
   }
-  
+
   // Receive all data. The async communication scheme is the same as in
   // exchange_and_sort_particles
   MPI_Status status;
@@ -1565,9 +1561,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       break;
 
     int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
-      
-    //fprintf(stderr, "[%i] %i(%i)\n", this_node, source, tag);
-      
+
     switch (commstat.expected(recvidx)) {
     case CommunicationStatus::ReceiveStatus::RECV_COUNT:
       DIE_IF_TAG_MISMATCH(tag, REP_EX_CNT_TAG, "Repart exchange count");
@@ -1667,7 +1661,7 @@ int64_t dd_p4est_pos_morton_idx(double pos[3]) {
     // In the other two cases ("pos[d] <= -errmar" and
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
-  return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0], 
+  return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
     pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);
 }
 //--------------------------------------------------------------------------------------------------
@@ -1729,10 +1723,10 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   dd_p4est_assign_prefetches(&cell_structure.collect_ghost_force_comm);
 
 #ifdef LB
-  dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING) ;
-  dd_p4est_assign_prefetches(&cell_structure.ghost_lbcoupling_comm) ;
+  dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING);
+  dd_p4est_assign_prefetches(&cell_structure.ghost_lbcoupling_comm);
 #endif
-  
+
 #ifdef IMMERSED_BOUNDARY
   // Immersed boundary needs to communicate the forces from but also to the ghosts
   // This is different than usual collect_ghost_force_comm (not in reverse order)
@@ -1742,8 +1736,8 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 #endif
 
 #ifdef ENGINE
-  dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING) ;
-  dd_p4est_assign_prefetches(&cell_structure.ghost_swimming_comm) ;
+  dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING);
+  dd_p4est_assign_prefetches(&cell_structure.ghost_swimming_comm);
 #endif
 
   /* initialize cell neighbor structures */

@@ -446,6 +446,18 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
     coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
     ++data;
   }
+  if (coarsen) {
+    std::string filename = "coarsened_quads_size_" +
+                           std::to_string(p8est->mpisize) +
+                           "_step_" +
+                           std::to_string(n_lbsteps) +
+                           ".txt";
+    std::ofstream myfile;
+    myfile.open(filename, std::ofstream::out | std::ofstream::app);
+    myfile << qid + p8est->global_first_quadrant[p8est->mpirank] << std::endl;
+    myfile.flush();
+    myfile.close();
+  }
   return coarsen;
 }
 

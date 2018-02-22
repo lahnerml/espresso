@@ -722,9 +722,10 @@ int p4est_utils_adapt_grid() {
     adapt_mesh.reset();
     adapt_p4est.reset();
 
-  // 3rd step: partition grid and transfer data to respective new owner ranks
+    // 3rd step: partition grid and transfer data to respective new owner ranks
     // FIXME: Interface to Steffen's partitioning logic
-  // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
+    // FIXME: Synchronize partitioning between short-range MD and adaptive
+    //        p4ests
     p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
     p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
     std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
@@ -1102,7 +1103,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
                                     double a1, p4est_t *t2,
                                     const std::vector<double> &w2, double a2) {
   P4EST_ASSERT(p4est_utils_check_alignment(t1, t2));
-                                      
+
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
@@ -1146,7 +1147,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
       ++w_idx;
     }
   }
-  
+
   // complain if counters haven't reached the end
   P4EST_ASSERT(w_idx == (size_t) fct->local_num_quadrants);
   P4EST_ASSERT(w_id1 == (size_t) t1->local_num_quadrants);

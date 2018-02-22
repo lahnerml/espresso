@@ -2803,8 +2803,8 @@ void mpi_lbadapt_grid_init(int node, int level) {
         lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2], periodic & 1,
         periodic & 2, periodic & 4));
     // substitute and delete old p4est
-    adapt_p4est.reset(
-        p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL, NULL));
+    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0,
+                                    NULL, NULL));
   }
 
   p4est_utils_rebuild_p4est_structs(btype);

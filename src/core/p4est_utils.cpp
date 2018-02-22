@@ -503,23 +503,27 @@ void dump_decisions_synced(sc_array_t * vel, sc_array_t * vort,
         (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
       // get quadrant for level information
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      lbadapt_payload_t *data =
+          &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
       std::ofstream myfile;
       myfile.open(filename, std::ofstream::out | std::ofstream::app);
-      myfile << "id: " << qid << " level: " << (int)q->level << std::endl;
+      myfile << "id: " << qid << " level: " << (int)q->level
+             << " boundary: " << data->lbfields.boundary
+             << " local: " << nqid << std::endl;
 
-      double v = sqrt(SQR(*(double*) sc_array_index(vel, 3 * qid)) +
-                      SQR(*(double*) sc_array_index(vel, 3 * qid + 1)) +
-                      SQR(*(double*) sc_array_index(vel, 3 * qid + 2)));
+      double v = sqrt(SQR(*(double*) sc_array_index(vel, 3 * nqid)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * nqid + 1)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * nqid + 2)));
       myfile << "v: coarse: " << vel_thresh_coarse << " refine: "
              << vel_thresh_refine << " actual: " << v << std::endl;
       myfile << "vort: coarse: " << vort_thresh_coarse << " refine: "
              << vort_thresh_refine << " actual: ";
       for (int d = 0; d < P4EST_DIM; ++d) {
-        myfile << abs(*(double*) sc_array_index(vort, 3 * qid + d));
+        myfile << abs(*(double*) sc_array_index(vort, 3 * nqid + d));
         if (d < 2) myfile << ", ";
         else myfile << std::endl;
       }
-      myfile << "decision: " << (*flags)[qid] << std::endl;
+      myfile << "decision: " << (*flags)[nqid] << std::endl;
       myfile << std::endl;
 
       myfile.flush();

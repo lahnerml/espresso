@@ -386,5 +386,7 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 
+void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data);
+
 #endif // LB_ADAPTIVE
 #endif // LB_ADAPTIVE_H

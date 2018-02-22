@@ -2730,6 +2730,11 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 #endif // LB_ADAPTIVE_GPU
 }
 
+void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
+  p8est_quadrant_t *q = info->quad;
+  q->p.user_long = info->quadid;
+}
+
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   int x, y, z;
   double xyz[3];

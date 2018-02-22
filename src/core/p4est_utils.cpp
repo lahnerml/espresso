@@ -30,7 +30,6 @@ int steps_until_grid_change = -1;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
-int quad_ctr;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -435,17 +434,17 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
   // get quad id
-  p4est_tree_t *tree = p4est_tree_array_index(p8est->trees, which_tree);
-  p4est_quadrant_t *first = p4est_quadrant_array_index(&tree->quadrants, 0);
-  int qid = std::distance(first, quads[0]);
+  int qid = quads[0]->p.user_long;
+  if (qid == -1) return 0;
 
+  lbadapt_payload_t *data =
+    &lbadapt_local_data[quads[0]->level][adapt_virtual->quad_qreal_offset[qid]];
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     // avoid coarser cells than base_level
     if (quads[i]->level == lbpar.base_level) return 0;
-
-    coarsen &= !(refine_geometric(p8est, which_tree, quads[i]))
-        && ((*flags)[qid + i] == 2);
+    coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
+    ++data;
   }
   return coarsen;
 }
@@ -454,7 +453,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
   // get quad id
-  int qid = quad_ctr;
+  int qid = q->p.user_long;
 
   // perform geometric refinement
   int refine = refine_geometric(p8est, which_tree, q);
@@ -463,12 +462,12 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // vector
   if ((q->level < lbpar.max_refinement_level) &&
       ((1 == (*flags)[qid] || refine))) {
+#if 0
     int fill[] = { 0, 0, 0, 0, 0, 0, 0 };
     flags->insert(flags->begin() + qid, fill, fill + 7);
-    quad_ctr += P4EST_CHILDREN;
+#endif // 0
     return 1;
   }
-  ++quad_ctr;
   return 0;
 }
 
@@ -479,9 +478,8 @@ void dump_decisions_synced(sc_array_t * vel, sc_array_t * vort,
 #ifndef LB_ADAPTIVE_GPU
   int nqid = 0;
   p4est_quadrant_t *q;
-  std::string filename = "refinement_decision_size_" +
-                         std::to_string(adapt_p4est->mpisize) +
-                         ".txt";
+  std::string filename = "refinement_decision_step_" +
+                         std::to_string(n_lbsteps) + ".txt";
 
   for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
     // Synchronization point
@@ -666,6 +664,10 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   return 0;
 }
 
+void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
+                            p8est_quadrant_t *q) {
+  q->p.user_long = -1;
+}
 int p4est_utils_adapt_grid() {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
@@ -674,13 +676,15 @@ int p4est_utils_adapt_grid() {
   // collect refinement and coarsening flags.
   flags = new std::vector<int>();
   flags->reserve(P4EST_CHILDREN * adapt_p4est->local_num_quadrants);
-  quad_ctr = 0;
+
   p4est_utils_collect_flags(flags);
+  p4est_iterate(adapt_p4est, adapt_ghost, 0, lbadapt_init_qid_payload, 0, 0, 0);
+
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
   P4EST_ASSERT(p4est_is_equal(p4est_adapted, adapt_p4est, 0));
   p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
-                   refinement_criteria, 0, 0);
+                   refinement_criteria, p4est_utils_qid_dummy, 0);
   // perform coarsening step
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
   delete flags;

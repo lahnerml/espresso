@@ -22,6 +22,7 @@
 
 #define USE_VEL_CRIT
 #define USE_VORT_CRIT
+// #define DUMP_DECISIONS
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
@@ -446,6 +447,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
     coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
     ++data;
   }
+#ifdef DUMP_DECISIONS
   if (coarsen) {
     std::string filename = "coarsened_quads_size_" +
                            std::to_string(p8est->mpisize) +
@@ -458,6 +460,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
     myfile.flush();
     myfile.close();
   }
+#endif // DUMP_DECISIONS
   return coarsen;
 }
 
@@ -672,11 +675,13 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VORT_CRIT
   }
 #endif //0
+#ifdef DUMP_DECISIONS
   dump_decisions_synced(vel_values, vort_values,
                         v_thresh_coarse * (v_max - v_min),
                         v_thresh_refine * (v_max - v_min),
                         vort_thresh_coarse * (vort_max - vort_min),
                         vort_thresh_refine * (vort_max - vort_min));
+#endif // DUMP_DECISIONS
   return 0;
 }
 

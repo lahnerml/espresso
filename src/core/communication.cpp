@@ -2658,7 +2658,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                               data->lbfields.boundary, data->lbfields.has_force,
-                              1.0 / double(lvl), rho, j, pi);
+                              (box_l[0] / lb_conn_brick[0]) / double(lvl), rho, j, pi);
 #endif // !LB_ADAPTIVE
   } else {
     double data[10];

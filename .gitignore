@@ -13,6 +13,9 @@ autom4te.cache
 myconfig.h
 myconfig.hpp
 build/
+build*/
+bld/
+bld*/
 CMakeFiles
 
 *.*~

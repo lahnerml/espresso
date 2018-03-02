@@ -12,6 +12,7 @@
 #include <array>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <iterator>
 #include <mpi.h>
 #include <p8est_algorithms.h>
@@ -21,6 +22,7 @@
 
 #define USE_VEL_CRIT
 #define USE_VORT_CRIT
+// #define DUMP_DECISIONS
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
@@ -29,7 +31,6 @@ int steps_until_grid_change = -1;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
-int quad_ctr;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -166,6 +167,33 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 
   std::transform(std::begin(p4ests), std::end(p4ests),
                  std::back_inserter(forest_info), p4est_to_forest_info);
+}
+
+void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
+  std::vector<p4est_t *> forests;
+#ifdef DD_P4EST
+  forests.push_back(dd.p4est);
+#endif // DD_P4EST
+  forests.push_back(adapt_p4est);
+  p4est_utils_prepare(forests);
+#ifdef DD_P4EST
+  p4est_utils_partition_multiple_forests(forest_order::short_range,
+                                         forest_order::adaptive_LB);
+#else
+  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
+#endif // DD_P4EST
+#ifdef LB_ADAPTIVE_GPU
+  local_num_quadrants = adapt_p4est->local_num_quadrants;
+#endif // LB_ADAPTIVE_GPU
+
+  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
+                                      btype));
+  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
+                                            adapt_mesh, btype, 1));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
+                                                    adapt_mesh, adapt_virtual,
+                                                    btype));
 }
 
 int p4est_utils_pos_to_proc(forest_order forest, const double pos[3]) {
@@ -407,19 +435,32 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
   // get quad id
-  p4est_tree_t *tree = p4est_tree_array_index(p8est->trees, which_tree);
-  p4est_quadrant_t *first = p4est_quadrant_array_index(&tree->quadrants, 0);
-  int qid = std::distance(first, quads[0]);
-  //P4EST_ASSERT(0 <= qid && qid < p8est->local_num_quadrants);
+  int qid = quads[0]->p.user_long;
+  if (qid == -1) return 0;
 
+  lbadapt_payload_t *data =
+    &lbadapt_local_data[quads[0]->level][adapt_virtual->quad_qreal_offset[qid]];
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     // avoid coarser cells than base_level
     if (quads[i]->level == lbpar.base_level) return 0;
-
-    coarsen &= !(refine_geometric(p8est, which_tree, quads[i]))
-        && ((*flags)[qid + i] == 2);
+    coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
+    ++data;
   }
+#ifdef DUMP_DECISIONS
+  if (coarsen) {
+    std::string filename = "coarsened_quads_size_" +
+                           std::to_string(p8est->mpisize) +
+                           "_step_" +
+                           std::to_string(n_lbsteps) +
+                           ".txt";
+    std::ofstream myfile;
+    myfile.open(filename, std::ofstream::out | std::ofstream::app);
+    myfile << qid + p8est->global_first_quadrant[p8est->mpirank] << std::endl;
+    myfile.flush();
+    myfile.close();
+  }
+#endif // DUMP_DECISIONS
   return coarsen;
 }
 
@@ -427,10 +468,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
   // get quad id
-  p4est_tree_t *tree = p4est_tree_array_index(p8est->trees, which_tree);
-  p4est_quadrant_t *first = p4est_quadrant_array_index(&tree->quadrants, 0);
-  int qid = quad_ctr;
-  //P4EST_ASSERT(0 <= qid && qid < p8est->local_num_quadrants);
+  int qid = q->p.user_long;
 
   // perform geometric refinement
   int refine = refine_geometric(p8est, which_tree, q);
@@ -439,18 +477,97 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // vector
   if ((q->level < lbpar.max_refinement_level) &&
       ((1 == (*flags)[qid] || refine))) {
+#if 0
     int fill[] = { 0, 0, 0, 0, 0, 0, 0 };
     flags->insert(flags->begin() + qid, fill, fill + 7);
-    quad_ctr += P4EST_CHILDREN;
+#endif // 0
     return 1;
   }
-  ++quad_ctr;
   return 0;
+}
+
+void dump_decisions_synced(sc_array_t * vel, sc_array_t * vort,
+                           double vel_thresh_coarse, double vel_thresh_refine,
+                           double vort_thresh_coarse, double vort_thresh_refine)
+{
+#ifndef LB_ADAPTIVE_GPU
+  int nqid = 0;
+  p4est_quadrant_t *q;
+  std::string filename = "refinement_decision_step_" +
+                         std::to_string(n_lbsteps) + ".txt";
+
+  for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
+    // Synchronization point
+    MPI_Barrier(adapt_p4est->mpicomm);
+
+    // MPI rank holding current quadrant will open the file, append its
+    // information, flush it, and close the file afterwards.
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= qid) &&
+        (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      // get quadrant for level information
+      q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      lbadapt_payload_t *data =
+          &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
+      std::ofstream myfile;
+      myfile.open(filename, std::ofstream::out | std::ofstream::app);
+      myfile << "id: " << qid << " level: " << (int)q->level
+             << " boundary: " << data->lbfields.boundary
+             << " local: " << nqid << std::endl;
+
+      double v = sqrt(SQR(*(double*) sc_array_index(vel, 3 * nqid)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * nqid + 1)) +
+                      SQR(*(double*) sc_array_index(vel, 3 * nqid + 2)));
+      myfile << "v: coarse: " << vel_thresh_coarse << " refine: "
+             << vel_thresh_refine << " actual: " << v << std::endl;
+      myfile << "vort: coarse: " << vort_thresh_coarse << " refine: "
+             << vort_thresh_refine << " actual: ";
+      for (int d = 0; d < P4EST_DIM; ++d) {
+        myfile << abs(*(double*) sc_array_index(vort, 3 * nqid + d));
+        if (d < 2) myfile << ", ";
+        else myfile << std::endl;
+      }
+      myfile << "decision: " << (*flags)[nqid] << std::endl;
+      myfile << std::endl;
+
+      myfile.flush();
+      myfile.close();
+      // increment local quadrant index
+      ++nqid;
+    }
+  }
+  // make sure that we have inspected all local quadrants.
+  P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
+#endif // !defined (LB_ADAPTIVE_GPU)
 }
 
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
-  // get criteria
+  // get refinement string for first grid change operation
+#if 0
+  std::fstream fs;
+  fs.open("refinement.txt", std::fstream::in);
+  int flag;
+  char comma;
+  int ctr = 0;
+  int ctr_ones = 0;
+  int ctr_twos = 0;
+  while (fs >> flag) {
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= ctr) &&
+        (ctr < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      if (flag == 1)
+        ++ctr_ones;
+      if (flag == 2)
+        ++ctr_twos;
+      flags->push_back(flag);
+    }
+    ++ctr;
+    // fetch comma to prevent early loop exit
+    fs >> comma;
+  }
+  std::cout << "[p4est " << adapt_p4est->mpirank << "] ones: " << ctr_ones
+            << " twos: " << ctr_twos << " total: " << ctr << std::endl;
+  fs.close();
+#else // 0
   // velocity
   // Euclidean norm
   castable_unique_ptr<sc_array_t> vel_values =
@@ -503,12 +620,14 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   MPI_Allreduce(&vort_temp, &vort_max, 1, MPI_DOUBLE, MPI_MAX,
                 adapt_p4est->mpicomm);
 
+  double v_thresh_coarse = 0.05;
+  double v_thresh_refine = 0.15;
+  double vort_thresh_coarse = 0.02;
+  double vort_thresh_refine = 0.05;
   // traverse forest and decide if the current quadrant is to be refined or
   // coarsened
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
 #ifdef USE_VEL_CRIT
-    double v_thresh_coarse = 0.05;
-    double v_thresh_refine = 0.15;
     // velocity
     double v = sqrt(SQR(*(double*) sc_array_index(vel_values, 3 * qid)) +
                     SQR(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
@@ -527,8 +646,6 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VEL_CRIT
 #ifdef USE_VORT_CRIT
     // vorticity
-    double vort_thresh_coarse = 0.02;
-    double vort_thresh_refine = 0.05;
     double vort = std::numeric_limits<double>::min();
     for (int d = 0; d < P4EST_DIM; ++d) {
       vort_temp = abs(*(double*) sc_array_index(vort_values, 3 * qid + d));
@@ -557,10 +674,21 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VEL_CRIT
 #endif // USE_VORT_CRIT
   }
-
+#endif //0
+#ifdef DUMP_DECISIONS
+  dump_decisions_synced(vel_values, vort_values,
+                        v_thresh_coarse * (v_max - v_min),
+                        v_thresh_refine * (v_max - v_min),
+                        vort_thresh_coarse * (vort_max - vort_min),
+                        vort_thresh_refine * (vort_max - vort_min));
+#endif // DUMP_DECISIONS
   return 0;
 }
 
+void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
+                            p8est_quadrant_t *q) {
+  q->p.user_long = -1;
+}
 int p4est_utils_adapt_grid() {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
@@ -569,13 +697,15 @@ int p4est_utils_adapt_grid() {
   // collect refinement and coarsening flags.
   flags = new std::vector<int>();
   flags->reserve(P4EST_CHILDREN * adapt_p4est->local_num_quadrants);
-  quad_ctr = 0;
+
   p4est_utils_collect_flags(flags);
+  p4est_iterate(adapt_p4est, adapt_ghost, 0, lbadapt_init_qid_payload, 0, 0, 0);
+
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
   P4EST_ASSERT(p4est_is_equal(p4est_adapted, adapt_p4est, 0));
   p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
-                   refinement_criteria, 0, 0);
+                   refinement_criteria, p4est_utils_qid_dummy, 0);
   // perform coarsening step
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
   delete flags;
@@ -597,9 +727,10 @@ int p4est_utils_adapt_grid() {
     adapt_mesh.reset();
     adapt_p4est.reset();
 
-  // 3rd step: partition grid and transfer data to respective new owner ranks
+    // 3rd step: partition grid and transfer data to respective new owner ranks
     // FIXME: Interface to Steffen's partitioning logic
-  // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
+    // FIXME: Synchronize partitioning between short-range MD and adaptive
+    //        p4ests
     p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
     p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
     std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
@@ -977,7 +1108,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
                                     double a1, p4est_t *t2,
                                     const std::vector<double> &w2, double a2) {
   P4EST_ASSERT(p4est_utils_check_alignment(t1, t2));
-                                      
+
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
@@ -1021,7 +1152,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
       ++w_idx;
     }
   }
-  
+
   // complain if counters haven't reached the end
   P4EST_ASSERT(w_idx == (size_t) fct->local_num_quadrants);
   P4EST_ASSERT(w_id1 == (size_t) t1->local_num_quadrants);

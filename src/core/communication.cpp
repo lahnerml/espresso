@@ -2803,35 +2803,11 @@ void mpi_lbadapt_grid_init(int node, int level) {
         lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2], periodic & 1,
         periodic & 2, periodic & 4));
     // substitute and delete old p4est
-    adapt_p4est.reset(
-        p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0, NULL, NULL));
+    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0,
+                                    NULL, NULL));
   }
 
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-
-  // build initial versions of ghost, mesh, virtual, and virtual_ghost
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
-
-#ifdef LB_ADAPTIVE_GPU
-  // regular grid
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
+  p4est_utils_rebuild_p4est_structs(btype);
 #endif // LB_ADAPTIVE
 }
 
@@ -3137,29 +3113,7 @@ void mpi_unif_refinement(int node, int ref_iterations) {
     // clang-format on
     // neither re-balancing nor re-partitioning needed here
   }
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
+  p4est_utils_rebuild_p4est_structs(btype);
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3193,33 +3147,8 @@ void mpi_rand_refinement(int node, int ref_iterations) {
                       P8EST_CONNECT_CORNER,// connection type
                       NULL,                // init data
                       NULL);               // replace data
-    // clang-format on
-    p8est_partition(adapt_p4est, 0, lbadapt_partition_weight);
   }
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
+  p4est_utils_rebuild_p4est_structs(btype);
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3249,29 +3178,7 @@ void mpi_reg_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
+  p4est_utils_rebuild_p4est_structs(btype);
 
   // FIXME: Implement mapping between two trees
   lb_release_fluid();
@@ -3297,30 +3204,7 @@ void mpi_reg_coarsening(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
+  p4est_utils_rebuild_p4est_structs(btype);
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3344,30 +3228,7 @@ void mpi_geometric_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIVE_GPU
+  p4est_utils_rebuild_p4est_structs(btype);
 
   lb_release_fluid();
   lb_reinit_fluid();
@@ -3391,30 +3252,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
                     NULL,                // init data
                     NULL);               // replace data
   // clang-format on
-
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd.p4est);
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-#ifdef DD_P4EST
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
-#endif // DD_P4EST
-
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
-
-#ifdef LB_ADAPTIVE_GPU
-  local_num_quadrants = adapt_p4est->local_num_quadrants;
-#endif // LB_ADAPTIGVE_GPU
+  p4est_utils_rebuild_p4est_structs(btype);
 
   lb_release_fluid();
   lb_reinit_fluid();

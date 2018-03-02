@@ -44,8 +44,10 @@
 #include <limits>
 #include <stdlib.h>
 
-#define USE_BGK
 #ifdef LB_ADAPTIVE
+
+#define USE_BGK
+#define DUMP_VIRTUALS
 
 /* Code duplication from lb.cpp */
 /* For the D3Q19 model most functions have a separate implementation
@@ -1444,6 +1446,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     // stream if we found a neighbor.
     // however, do not stream between two real quadrants that both hold virtual
     // children
+  #if 0
     if (mesh_iter->neighbor_qid != -1
         && ((-1 != mesh_iter->current_vid)
             || (-1 != mesh_iter->neighbor_vid)
@@ -1453,7 +1456,11 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
                    adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
             || (mesh_iter->neighbor_is_ghost
                 && -1 ==
-                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
+                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
+#else // 0
+    if (mesh_iter->neighbor_qid != -1)
+#endif // 0
+    {
       int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
       assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
       assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
@@ -1691,6 +1698,7 @@ void lbadapt_bounce_back(int level) {
         // bounce back if we found a neighbor.
         // however, do not bounce back between two quadrants that hold virtual
         // children
+#if 0
         if (mesh_iter->neighbor_qid != -1
             && ((-1 != mesh_iter->current_vid)
                 || (-1 != mesh_iter->neighbor_vid)
@@ -1700,7 +1708,11 @@ void lbadapt_bounce_back(int level) {
                        adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
                 || (mesh_iter->neighbor_is_ghost
                     && -1 ==
-                       adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid]))) {
+                       adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
+#else // 0
+        if (mesh_iter->neighbor_qid != -1)
+#endif // 0
+        {
           /** read c_i in neighbors orientation and p4est's direction system.
            * Convert it to ESPResSo's directions.
            * The inverse direction of that result is the correct value to bounce
@@ -1806,9 +1818,9 @@ void lbadapt_update_populations_from_virtuals(int level) {
   while (status != P8EST_MESHITER_DONE) {
     status = p8est_meshiter_next(mesh_iter);
     if (status != P8EST_MESHITER_DONE) {
-      assert (mesh_iter->current_index % P4EST_CHILDREN ==
-              mesh_iter->current_vid);
-      // virtual quads are local if their parent is local, ghost analogous
+      P4EST_ASSERT(mesh_iter->current_index % P4EST_CHILDREN ==
+                   mesh_iter->current_vid);
+      // virtual quads are local iff their parent is local
       if (!mesh_iter->current_is_ghost) {
         parent_sid =
             mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];
@@ -1837,7 +1849,6 @@ void lbadapt_update_populations_from_virtuals(int level) {
       }
     }
   }
-
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -2615,24 +2626,100 @@ void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
 #endif // LB_ADAPTIVE_GPU
 }
 
+void lbadapt_dump2file_synced(std::string &filename) {
+#ifndef LB_ADAPTIVE_GPU
+  int nqid = 0;
+  p4est_quadrant_t *q;
+
+  for (int qid = 0; qid < adapt_p4est->global_num_quadrants; ++qid) {
+    // Synchronization point
+    MPI_Barrier(adapt_p4est->mpicomm);
+
+    // MPI rank holding current quadrant will open the file, append its
+    // information, flush it, and close the file afterwards.
+    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= qid) &&
+        (qid < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
+      // get quadrant for level information
+      q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nqid);
+      // fetch payload
+      lbadapt_payload_t *data =
+          &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[nqid]];
+      // we are not interested in boundary quadrants
+      if (!data->lbfields.boundary) {
+        std::ofstream myfile;
+        myfile.open(filename, std::ofstream::out | std::ofstream::app);
+        myfile << "id: " << qid << " level: " << (int)q->level << std::endl
+#if 0
+               << " is parallel boundary: "
+               << (-1 != adapt_mesh->parallel_boundary[nqid])
+#endif // 0
+               << "; has virtuals: "
+               << (-1 != adapt_virtual->virtual_qflags[nqid]) << std::endl
+               << " - distributions: " << std::endl
+               << "0: ";
+        for (int i = 0; i < 19; ++i) {
+          myfile << data->lbfluid[0][i] << " - ";
+        }
+        myfile << std::endl << "1: ";
+        for (int i = 0; i < 19; ++i) {
+          myfile << data->lbfluid[1][i] << " - ";
+        }
+        myfile << std::endl;
+#ifdef DUMP_VIRTUALS
+        if (-1 != adapt_virtual->virtual_qflags[nqid]) {
+          for (int v = 0; v < P4EST_CHILDREN; ++v) {
+            data =
+                &lbadapt_local_data[q->level + 1]
+                                   [adapt_virtual->quad_qvirtual_offset[nqid] +
+                                    v];
+            myfile << "virtual distributions: v" << v << std::endl << "0: ";
+            for (int i = 0; i < 19; ++i) {
+              myfile << data->lbfluid[0][i] << " - ";
+            }
+            myfile << std::endl << "1: ";
+            for (int i = 0; i < 19; ++i) {
+              myfile << data->lbfluid[1][i] << " - ";
+            }
+            myfile << std::endl;
+          }
+        }
+#endif // DUMP_VIRTUALS
+        myfile << std::endl;
+
+        myfile.flush();
+        myfile.close();
+      }
+      // increment local quadrant index
+      ++nqid;
+    }
+  }
+  // make sure that we have inspected all local quadrants.
+  P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
+#endif // LB_ADAPTIVE_GPU
+}
+
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  lbadapt_payload_t *data = (lbadapt_payload_t *)info->quad->p.user_data;
   p8est_quadrant_t *q = info->quad;
+  lbadapt_payload_t *data =
+      &lbadapt_local_data[q->level]
+                         [adapt_virtual->quad_qreal_offset[info->quadid]];
 
   std::string *filename = (std::string *)user_data;
   std::ofstream myfile;
   myfile.open(*filename, std::ofstream::out | std::ofstream::app);
-  myfile << "id: " << info->quadid
+  myfile << "id: "
+         << info->quadid +
+                adapt_p4est->global_first_quadrant[adapt_p4est->mpirank]
          << "; coords: " << (q->x / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->y / (1 << (P8EST_MAXLEVEL - q->level))) << ", "
          << (q->z / (1 << (P8EST_MAXLEVEL - q->level)))
          << "; boundary: " << data->lbfields.boundary << std::endl
-         << " - distributions: pre streaming: ";
+         << " - distributions: " << std::endl;
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[0][i] << " - ";
   }
-  myfile << std::endl << "post streaming: ";
+  myfile << std::endl;
   for (int i = 0; i < 19; ++i) {
     myfile << data->lbfluid[1][i] << " - ";
   }
@@ -2641,6 +2728,11 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
   myfile.flush();
   myfile.close();
 #endif // LB_ADAPTIVE_GPU
+}
+
+void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
+  p8est_quadrant_t *q = info->quad;
+  q->p.user_long = info->quadid;
 }
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {

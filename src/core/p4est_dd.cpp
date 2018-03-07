@@ -1401,15 +1401,18 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
     return;
   }
 
-  part_nquads.resize(n_nodes);
-  std::fill(part_nquads.begin(), part_nquads.end(),
-            static_cast<p4est_locidx_t>(0));
   // Determine prefix and target load
   double localsum = std::accumulate(metric.begin(), metric.end(), 0.0);
   double sum, prefix = 0; // Initialization is necessary on rank 0!
   MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / n_nodes;
+
+  if (target == 0.0 && this_node == 0) {
+    std::cerr << "p4est_dd_repart: Metric all-zero. Aborting repart." << std::endl;
+    // Leave part_nquads as it was and exit.
+    return;
+  }
 
   if (debug) {
     printf("[%i] NCells: %zu\n", this_node, num_local_cells);
@@ -1418,6 +1421,10 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
     printf("[%i] Target: %lf\n", this_node, target);
     printf("[%i] Prefix: %lf\n", this_node, prefix);
   }
+
+  part_nquads.resize(n_nodes);
+  std::fill(part_nquads.begin(), part_nquads.end(),
+            static_cast<p4est_locidx_t>(0));
 
   // Determine new process boundaries in local subdomain
   // Evaluated for its side effect of setting part_nquads.

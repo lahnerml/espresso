@@ -158,7 +158,8 @@ get_single_metric_func(const std::string& desc)
   throw std::invalid_argument(std::string("No such metric available: ") + desc);
 }
 
-repart::metric::metric(const std::string& desc) {
+void repart::metric::set_metric(const std::string& desc) {
+  mdesc.clear();
   parse_metric_desc(desc);
 }
 

@@ -31,6 +31,7 @@
 #include "lbboundaries/initialize.hpp"
 #include "collision_detection/initialize.hpp"
 #include "mpiio/initialize.hpp"
+#include "repart/initialize.hpp"
 
 #include "ComFixed.hpp"
 
@@ -56,6 +57,7 @@ void initialize() {
   LBBoundaries::initialize();
   VirtualSites::initialize();
   MPIIO::initialize();
+  Repart::initialize();
   CollisionDetection::initialize();
  
 

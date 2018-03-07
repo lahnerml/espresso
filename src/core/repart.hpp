@@ -25,7 +25,12 @@ namespace repart {
 struct metric {
   using metric_func = std::function<void(std::vector<double>&)>;
 
-  /** Constructor. Might throw a std::invalid_argument exception if desc is not understood.
+  metric() {}
+  metric(const std::string& desc) {
+    set_metric(desc);
+  }
+
+  /** Metric setter. Might throw a std::invalid_argument exception if desc is not understood.
    * Metric description strings are linear combinations of single metrics.
    * E.g. "2.0*ncells +1.7*nghostpart"
    * The space after the metric name ("ncell") is mandatory.
@@ -37,7 +42,7 @@ struct metric {
    * nghostcells, nghostpart, runtime and rand.
    * \param desc string to describe the metric
    */
-  metric(const std::string& desc);
+  void set_metric(const std::string& desc);
 
   /** Calculates the metric and returns the weights.
    * \return vector of weights. Length: local_cells.n

@@ -23,6 +23,52 @@ from globals cimport *
 import numpy as np
 from espressomd.utils cimport handle_errors
 from espressomd.utils import is_valid_type
+from espressomd import script_interface
+
+class PyMetric:
+    def __init__(self, desc):
+        """
+        Constructor.
+
+        Parameters
+        ----------
+
+        'desc' : string, description of the metric
+        """
+        self.__instance = script_interface.PScriptInterface("ScriptInterface::Repart::Metric")
+        self.__instance.set_params(metric=desc)
+
+    def get_metric(self):
+        return self.__instance.get_parameter("metric")
+
+    def average(self):
+        return self.__instance.call_method("average")
+    def maximum(self):
+        return self.__instance.call_method("maximum")
+    def imbalance(self):
+        return self.__instance.call_method("imbalance")
+
+    def _get_instance(self):
+        return self.__instance
+
+class P4estDD:
+    def __init__(self):
+        self.__instance = script_interface.PScriptInterface("ScriptInterface::Repart::P4estDD")
+
+    def create_metric(self, desc):
+        """
+        Constructs a metric.
+
+        Parameters
+        ----------
+
+        'desc' : string, description of the metric
+        """
+        return PyMetric(desc)
+
+    def repart(self, m):
+        self.__instance.call_method("repart", metric=m.get_metric())
+
 
 cdef class CellSystem(object):
     def set_domain_decomposition(self, use_verlet_lists=True):
@@ -63,7 +109,7 @@ cdef class CellSystem(object):
 
         # @TODO: gathering should be interface independent
         # return mpi_gather_runtime_errors(interp, TCL_OK)
-        return True
+        return P4estDD()
 
     def set_n_square(self, use_verlet_lists=True):
         """

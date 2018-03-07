@@ -592,6 +592,10 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   }
 
   // Wait for requests and postprocess them if they are receives
+#ifndef ASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY
+  MPI_Waitall(gc->num, reqs.data(), MPI_STATUSES_IGNORE);
+  for (int gcnr = 0; gcnr < gc->num; ++gcnr) {
+#else
   while (true) {
     int gcnr;
     // Wait only for the first half. The second half does not hold receive
@@ -599,6 +603,7 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     MPI_Waitany(gc->num, reqs.data(), &gcnr, MPI_STATUS_IGNORE);
     if (gcnr == MPI_UNDEFINED)
       break;
+#endif
     
     GhostCommunication *gcn = &gc->comm[gcnr];
     int comm_type = gcn->type & GHOST_JOBMASK;

@@ -73,6 +73,7 @@ option(WITH_CUDA   "Build with GPU support"  ON)
 option(WITH_HDF5   "Build with HDF5 support" ON)
 option(WITH_P4EST  "Enable adaptive grid"    ON)
 option(WITH_MINIMAL_GHOST  "Enable minimal ghost in p4est_dd"    ON)
+option(ASYNC_COMM_BIN_REP  "Enable binary reproducability of results with asynchronous communication. Will cost a little performance during communications."    ON)
 option(WITH_TESTS  "Enable tests"            ON)
 option(WITH_SCAFACOS "Build with Scafacos support" ON)
 option(WITH_VALGRIND_INSTRUMENTATION "Build with valgrind instrumentation markers" OFF)
@@ -248,6 +249,10 @@ endif(WITH_P4EST)
 if(WITH_MINIMAL_GHOST)
   add_definitions(-DMINIMAL_GHOST)
 endif(WITH_MINIMAL_GHOST)
+
+if(NOT ASYNC_COMM_BIN_REP)
+  add_definitions(-DASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY)
+endif(NOT ASYNC_COMM_BIN_REP)
 
 # Check for the h5xx submodule
 # and try to check it out if not found or update it if found.

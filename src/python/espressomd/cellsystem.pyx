@@ -66,8 +66,8 @@ class P4estDD:
         """
         return PyMetric(desc)
 
-    def repart(self, m):
-        self.__instance.call_method("repart", metric=m.get_metric())
+    def repart(self, m, verbose=False):
+        self.__instance.call_method("repart", metric=m.get_metric(), verbose=verbose)
 
 
 cdef class CellSystem(object):

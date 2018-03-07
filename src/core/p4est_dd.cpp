@@ -1470,19 +1470,18 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
 // Evaluate metric and set part_nquads global vector to be used by a
 // reinit of the cellsystem. Afterwards, directly reinits the cellsystem.
 void
-p4est_dd_repartition(const std::string& desc, bool debug)
+p4est_dd_repartition(const std::string& desc, bool verbose)
 {
-  //if (desc == "statistics") {
-  //  repart::print_cell_info("!>>> Statistics", "none");
-  //  return;
-  //}
-
   std::vector<double> weights = repart::metric{desc}();
-  p4est_dd_repart_calc_nquads(weights, debug);
+  p4est_dd_repart_calc_nquads(weights, false && verbose);
+  
+  if (verbose && this_node == 0) {
+    std::cout << " New ncells per proc: ";
+    std::copy(std::begin(part_nquads), std::end(part_nquads), std::ostream_iterator<int>(std::cout, " "));
+    std::cout << std::endl;
+  }
 
-  //repart::print_cell_info("!>>> Before Repart", desc);
   cells_re_init(CELL_STRUCTURE_CURRENT, true);
-  //repart::print_cell_info("!>>> After Repart", desc);
 }
 
 #endif

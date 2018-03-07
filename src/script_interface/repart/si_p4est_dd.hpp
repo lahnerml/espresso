@@ -53,15 +53,16 @@ public:
                       const VariantMap &parameters) override {
     if (name == "repart") {
       std::string m = boost::get<std::string>(parameters.at("metric"));
+      bool verbose = boost::get<bool>(parameters.at("verbose"));
 
-      if (this_node == 0)
+      if (verbose && this_node == 0)
         std::cout << "SIP4estDD::call_method(repart) with metric: " << m << std::endl;
 
       if (cell_structure.type != CELL_STRUCTURE_P4EST && this_node == 0) {
         std::cerr << "Trying to repartition non-p4est cell system." << std::endl
                   << "Continuing without repart." << std::endl;
       }
-      p4est_dd_repartition(m, false);
+      p4est_dd_repartition(m, verbose);
     }
     return {};
   }

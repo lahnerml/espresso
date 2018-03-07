@@ -599,7 +599,7 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     MPI_Waitany(gc->num, reqs.data(), &gcnr, MPI_STATUS_IGNORE);
     if (gcnr == MPI_UNDEFINED)
       break;
-
+    
     GhostCommunication *gcn = &gc->comm[gcnr];
     int comm_type = gcn->type & GHOST_JOBMASK;
     if (comm_type != GHOST_RECV)

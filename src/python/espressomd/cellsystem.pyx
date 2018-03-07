@@ -45,6 +45,26 @@ cdef class CellSystem(object):
         # return mpi_gather_runtime_errors(interp, TCL_OK)
         return True
 
+    def set_p4est_dd(self, use_verlet_lists=True):
+        """
+        Activates p4est domain decomposition cell system.
+
+        Parameters
+        ----------
+        'use_verlet_lists' : :obj:`bool`, optional
+                             Activates or deactivates the usage of Verlet lists
+                             in the algorithm.
+
+        """
+
+        cell_structure.use_verlet_list =  use_verlet_lists
+        # grid.h::node_grid
+        mpi_bcast_cell_structure(CELL_STRUCTURE_P4EST)
+
+        # @TODO: gathering should be interface independent
+        # return mpi_gather_runtime_errors(interp, TCL_OK)
+        return True
+
     def set_n_square(self, use_verlet_lists=True):
         """
         Activates the nsquare force calculation.

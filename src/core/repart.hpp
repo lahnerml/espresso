@@ -44,6 +44,12 @@ struct metric {
    */
   std::vector<double> operator()() const;
 
+  double curload() const;
+  double paverage() const;
+  double pmax() const;
+  double pimbalance() const;
+
+
 private:
   void parse_metric_desc(const std::string& desc);
 

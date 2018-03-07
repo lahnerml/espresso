@@ -5,6 +5,7 @@
 #include <chrono>
 #include <stdexcept>
 #include "cells.hpp"
+#include <regex>
 #include "domain_decomposition.hpp"
 #include "interaction_data.hpp"
 #include "short_range_loop.hpp"
@@ -40,11 +41,14 @@ static void metric_nforcepairs(std::vector<double> &weights) {
 
   auto particlekernel = [&cellno](Particle &p) {
     const Cell *c = local_cells.cell[cellno];
+    // At the end of a cell? -> Increment cellno consistently to
+    // short_range_loop. I.e. next non-empty cell
     if (p.p.identity == c->part[c->n - 1].p.identity) {
-        if (cellno < (local_cells.n - 1))
-            cellno++;
-        while (cellno < (local_cells.n - 1) && local_cells.cell[cellno]->n == 0)
-            cellno++;
+      if (cellno < (local_cells.n - 1))
+        cellno++;
+      // Cell "cellno" might be empty, skip ahead if so
+      while (cellno < (local_cells.n - 1) && local_cells.cell[cellno]->n == 0)
+        cellno++;
     }
   };
 
@@ -158,48 +162,43 @@ repart::metric::metric(const std::string& desc) {
   parse_metric_desc(desc);
 }
 
+static std::string remove_whitespace(const std::string &s) {
+  static const std::regex ws("\\s");
+  return std::regex_replace(s, ws, "");
+}
+
+// Parses a string representing a linear combination
+template <typename MetricVec, typename StringParseFunc>
+static void parse_linear_combination(const std::string &desc,
+                                     MetricVec& mvec,
+                                     StringParseFunc parse_metric) {
+  static const std::regex term_re(
+      "\\s*([\\+-]?\\s*\\d*(\\.\\d*)?)?\\s*\\*?\\s*(\\w+)");
+  static const auto match_to_term = [parse_metric](const std::smatch &match) {
+    // There is whitespace in the numbers (first group in term_re), so we have
+    // to remove it before calling atof.
+    std::string num = remove_whitespace(match.str(1));
+    // Number might be omitted, i.e. "foo+bar". In this case 'num' only holds a
+    // sign or nothing at all (for the very first term).
+    if (num == "+" || num == "-" || num == "")
+      num += "1.0";
+    try {
+      return std::make_pair(stod(num), parse_metric(match.str(3)));
+    } catch (...) {
+      std::cout << "Error in metric parsing at: " << match.str(0) << std::endl;
+      throw;
+    }
+  };
+
+  auto t_begin =
+      std::sregex_iterator(std::begin(desc), std::end(desc), term_re);
+  auto t_end = decltype(t_begin){};
+
+  std::transform(t_begin, t_end, std::back_inserter(mvec), match_to_term);
+}
+
 void repart::metric::parse_metric_desc(const std::string& desc) {
-  std::istringstream is(desc);
-  bool parseadd = desc[0] == '+' || desc[0] == '-';
-
-  // Single metric case
-  if (std::all_of(desc.begin(), desc.end(), [](char c){ return ::isalpha(c) || c == '_';})) {
-    mdesc.emplace_back(1.0, get_single_metric_func(desc));
-    return;
-  }
-
-  while (is.good()) {
-    double factor;
-    char add = '+';
-    char mult;
-    std::string method;
-
-    if (parseadd)
-      is >> add; // Skip this conditionally during the first iteration since
-                 // positive factor does not need to have '+' in fist addend.
-    else
-      parseadd = true;
-    if (!is || (add != '+' && add != '-'))
-      throw std::invalid_argument("Could not parse metric string: Expected +/-.");
-
-    is >> factor;
-    if (!is)
-      throw std::invalid_argument("Could not parse metric string: Expected factor.");
-
-    if (add == '-')
-      factor *= -1;
-
-    is >> mult; // '*'
-    if (!is || mult != '*')
-      throw std::invalid_argument("Could not parse metric string: Expected '*'.");
-
-    // FIXME: Needs space after method name.
-    is >> method;
-    if (!is)
-      throw std::invalid_argument("Could not parse metric string: Expected method name. Space after name is mandatory.");
-
-    mdesc.emplace_back(factor, get_single_metric_func(method));
-  }
+  parse_linear_combination(desc, mdesc, get_single_metric_func);
 }
 
 std::vector<double> repart::metric::operator()() const {
@@ -217,3 +216,35 @@ std::vector<double> repart::metric::operator()() const {
   return w;
 }
 
+double repart::metric::curload() const {
+  auto ws = (*this)();
+  return std::accumulate(std::begin(ws), std::end(ws), 0.0);
+}
+
+double repart::metric::paverage() const {
+  double l = curload();
+  double tot;
+  MPI_Allreduce(&l, &tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  return tot / n_nodes;
+}
+
+double repart::metric::pmax() const {
+  double l = curload();
+  double max;
+  MPI_Allreduce(&l, &max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+  return max;
+}
+
+double repart::metric::pimbalance() const {
+  double l = curload();
+
+  MPI_Request req[2];
+  double tot, max;
+
+  MPI_Iallreduce(&l, &tot, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &req[0]);
+  MPI_Iallreduce(&l, &max, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD, &req[1]);
+  MPI_Waitall(2, req, MPI_STATUS_IGNORE);
+
+  double avg = tot / n_nodes;
+  return max / avg;
+}

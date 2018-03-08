@@ -444,7 +444,7 @@ int cells_full_shell_neigh(int c, int n)
   case CELL_STRUCTURE_DOMDEC:
     return dd_full_shell_neigh(c, n);
     break;
-#ifdef P4EST_DD
+#ifdef DD_P4EST
   case CELL_STRUCTURE_P4EST:
     return dd_p4est_full_shell_neigh(c, n);
     break;

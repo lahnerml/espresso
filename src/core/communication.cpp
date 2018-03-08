@@ -2676,6 +2676,10 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
     pi[4] = data[8];
     pi[5] = data[9];
   }
+  lb_float h_max = h[lbpar.max_refinement_level];
+  j[0] = j[0] / *rho * h_max / lbpar.tau;
+  j[1] = j[1] / *rho * h_max / lbpar.tau;
+  j[2] = j[2] / *rho * h_max / lbpar.tau;
 #endif // !LB_ADAPTIVE_GPU
 #endif // LB
 }

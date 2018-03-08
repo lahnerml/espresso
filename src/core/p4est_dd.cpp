@@ -1408,9 +1408,10 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
   MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / n_nodes;
 
-  if (target == 0.0 && this_node == 0) {
-    std::cerr << "p4est_dd_repart: Metric all-zero. Aborting repart." << std::endl;
-    // Leave part_nquads as it was and exit.
+  if (target == 0.0) {
+    if (this_node == 0)
+      std::cerr << "p4est_dd_repart: Metric all-zero. Aborting repart." << std::endl;
+    // Leave part_nquads as it is and exit.
     return;
   }
 

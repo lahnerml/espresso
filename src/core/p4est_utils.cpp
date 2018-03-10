@@ -39,7 +39,11 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
 
 static inline void tree_to_boxlcoords(double x[3]) {
   for (int i = 0; i < 3; ++i)
+#ifdef DD_P4EST
     x[i] *= box_l[i] / dd_p4est_num_trees_in_dir(i);
+#else  // defined(DD_P4EST)
+    x[i] *= box_l[i] / lb_conn_brick[i];
+#endif // defined(DD_P4EST)
 }
 
 static inline void maybe_tree_to_boxlcoords(double x[3]) {
@@ -52,7 +56,11 @@ static inline void maybe_tree_to_boxlcoords(double x[3]) {
 
 static inline void boxl_to_treecoords(double x[3]) {
   for (int i = 0; i < 3; ++i)
+#ifdef DD_P4EST
     x[i] /= (box_l[i] / dd_p4est_num_trees_in_dir(i));
+#else  // defined(DD_P4EST)
+    x[i] /= (box_l[i] / lb_conn_brick[i]);
+#endif // defined(DD_P4EST)
 }
 
 static inline void maybe_boxl_to_treecoords(double x[3]) {

@@ -21,7 +21,6 @@
 
 #define USE_VEL_CRIT
 #define USE_VORT_CRIT
-// #define DUMP_DECISIONS
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
@@ -497,20 +496,6 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
     coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
     ++data;
   }
-#ifdef DUMP_DECISIONS
-  if (coarsen) {
-    std::string filename = "coarsened_quads_size_" +
-                           std::to_string(p8est->mpisize) +
-                           "_step_" +
-                           std::to_string(n_lbsteps) +
-                           ".txt";
-    std::ofstream myfile;
-    myfile.open(filename, std::ofstream::out | std::ofstream::app);
-    myfile << qid + p8est->global_first_quadrant[p8est->mpirank] << std::endl;
-    myfile.flush();
-    myfile.close();
-  }
-#endif // DUMP_DECISIONS
   return coarsen;
 }
 
@@ -527,10 +512,6 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // vector
   if ((q->level < lbpar.max_refinement_level) &&
       ((1 == (*flags)[qid] || refine))) {
-#if 0
-    int fill[] = { 0, 0, 0, 0, 0, 0, 0 };
-    flags->insert(flags->begin() + qid, fill, fill + 7);
-#endif // 0
     return 1;
   }
   return 0;
@@ -593,31 +574,6 @@ void dump_decisions_synced(sc_array_t * vel, sc_array_t * vort,
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
   // get refinement string for first grid change operation
-#if 0
-  std::fstream fs;
-  fs.open("refinement.txt", std::fstream::in);
-  int flag;
-  char comma;
-  int ctr = 0;
-  int ctr_ones = 0;
-  int ctr_twos = 0;
-  while (fs >> flag) {
-    if ((adapt_p4est->global_first_quadrant[adapt_p4est->mpirank] <= ctr) &&
-        (ctr < adapt_p4est->global_first_quadrant[adapt_p4est->mpirank + 1])) {
-      if (flag == 1)
-        ++ctr_ones;
-      if (flag == 2)
-        ++ctr_twos;
-      flags->push_back(flag);
-    }
-    ++ctr;
-    // fetch comma to prevent early loop exit
-    fs >> comma;
-  }
-  std::cout << "[p4est " << adapt_p4est->mpirank << "] ones: " << ctr_ones
-            << " twos: " << ctr_twos << " total: " << ctr << std::endl;
-  fs.close();
-#else // 0
   // velocity
   // Euclidean norm
   castable_unique_ptr<sc_array_t> vel_values =
@@ -724,14 +680,6 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #endif // USE_VEL_CRIT
 #endif // USE_VORT_CRIT
   }
-#endif //0
-#ifdef DUMP_DECISIONS
-  dump_decisions_synced(vel_values, vort_values,
-                        v_thresh_coarse * (v_max - v_min),
-                        v_thresh_refine * (v_max - v_min),
-                        vort_thresh_coarse * (vort_max - vort_min),
-                        vort_thresh_refine * (vort_max - vort_min));
-#endif // DUMP_DECISIONS
   return 0;
 }
 

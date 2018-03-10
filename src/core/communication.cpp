@@ -194,7 +194,6 @@ static int terminated = 0;
   CB(mpi_lbadapt_grid_init)                                                    \
   CB(mpi_lbadapt_set_min_level)                                                \
   CB(mpi_lbadapt_set_max_level)                                                \
-  CB(mpi_lbadapt_set_steps_before_grid_change)                                 \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
   CB(mpi_lbadapt_vtk_print_density)                                            \
   CB(mpi_lbadapt_vtk_print_velocity)                                           \

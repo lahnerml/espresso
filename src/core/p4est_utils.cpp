@@ -246,7 +246,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
  * CAUTION: If LB_ADAPTIVE is not set, all p4ests will be scaled by the side
  *          length of the p4est instance used for short-ranged MD.
  */
-static int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
+int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
   int tid = -1;
   for (int t = 0; t < p4est->connectivity->num_trees; ++t) {
     // collect corners of tree
@@ -364,10 +364,9 @@ int64_t p4est_utils_pos_quad_ext(forest_order forest, const double pos[3]) {
   return -1;
 }
 
-static int p4est_utils_find_qid_prepare(forest_order forest,
-                                        const double pos[3],
-                                        p8est_tree_t **tree,
-                                        p8est_quadrant_t *pquad) {
+int p4est_utils_find_qid_prepare(forest_order forest, const double pos[3],
+                                 p8est_tree_t **tree,
+                                 p8est_quadrant_t *pquad) {
   const p4est_utils_forest_info_t &current_p4est =
       forest_info.at(static_cast<int>(forest));
   p8est_t *p4est = current_p4est.p4est;

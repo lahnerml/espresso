@@ -2833,12 +2833,6 @@ void mpi_lbadapt_set_max_level(int node, int l_max) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_set_steps_before_grid_change(int node, int steps) {
-#ifdef LB_ADAPTIVE
-  steps_until_grid_change = steps;
-#endif // LB_ADAPTIVE
-}
-
 void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 #ifdef LB_ADAPTIVE
   char filename[len];

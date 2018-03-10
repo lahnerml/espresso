@@ -85,7 +85,6 @@ enum class forest_order {
 #endif // LB_ADAPTIVE
 };
 
-extern int steps_until_grid_change;
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;

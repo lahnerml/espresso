@@ -35,9 +35,6 @@ int tclcommand_set_min_level(ClientData data, Tcl_Interp *interp, int argc,
 int tclcommand_set_max_level(ClientData data, Tcl_Interp *interp, int argc,
                              char **argv);
 
-int tclcommand_set_steps_until_grid_change(ClientData data, Tcl_Interp *interp,
-                                           int argc, char **argv);
-
 int tclcommand_set_unif_ref(ClientData data, Tcl_Interp *interp, int argc,
                             char **argv);
 

@@ -6,7 +6,6 @@
 #include "domain_decomposition.hpp"
 #include "lb-adaptive.hpp"
 #include "p4est_dd.hpp"
-#include "p4est_gridchange_criteria.hpp"
 
 #include <algorithm>
 #include <array>
@@ -25,9 +24,6 @@
 // #define DUMP_DECISIONS
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
-
-// number of (MD) intergration steps before grid changes
-int steps_until_grid_change = -1;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;

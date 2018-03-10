@@ -531,6 +531,16 @@ void mpi_bcast_constraint(int del_num);
 /** Callback to adapt p4est grid
  */
 void mpi_adapt_grid (int node, int param);
+
+/** Callback to broadcast velocity threshold values for coarsening and
+ * refinement.
+ */
+void mpi_bcast_thresh_vel(int node, int param);
+
+/** Callback to broadcast vorticity threshold values for coarsening and
+ * refinement.
+ */
+void mpi_bcast_thresh_vort(int node, int param);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 
 #ifdef LB_ADAPTIVE

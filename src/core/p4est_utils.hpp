@@ -85,6 +85,9 @@ enum class forest_order {
 #endif // LB_ADAPTIVE
 };
 
+// relative threshold values for refinement and coarsening.
+extern double vel_thresh[2];
+extern double vort_thresh[2];
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;

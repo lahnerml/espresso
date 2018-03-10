@@ -25,4 +25,7 @@
 
 int tclcommand_adapt_grid(ClientData data, Tcl_Interp *interp, int argc,
                           char **argv);
+
+int tclcommand_set_adapt_thresh(ClientData data, Tcl_Interp *interp, int argc,
+                                char **argv);
 #endif // P4EST_UTILS_TCL_HPP

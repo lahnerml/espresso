@@ -209,6 +209,7 @@ static void tcl_register_commands(Tcl_Interp* interp) {
   /* in p4est_utils.cpp */
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
   REGISTER_COMMAND("adapt-grid", tclcommand_adapt_grid);
+  REGISTER_COMMAND("set-adapt-thresh", tclcommand_set_adapt_thresh);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 
   /* in p4est_dd.cpp */

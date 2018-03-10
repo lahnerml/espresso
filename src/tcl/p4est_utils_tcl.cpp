@@ -19,9 +19,10 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "communication.hpp"
 #include "p4est_utils_tcl.hpp"
 
+#include "communication.hpp"
+#include "p4est_utils.hpp"
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 int tclcommand_adapt_grid(ClientData data, Tcl_Interp *interp, int argc,
@@ -35,5 +36,46 @@ int tclcommand_adapt_grid(ClientData data, Tcl_Interp *interp, int argc,
   mpi_adapt_grid(0, -1);
 
   return 0;
+}
+
+void print_usage_set_thresh(ClientData data, Tcl_Interp *interp) {
+  Tcl_AppendResult(interp, "Setting refinement criteria requires 3 "
+                           "parameters:\n[criterion] [thresh_coarsening] "
+                           "[thresh_refine]\n");
+}
+
+int tclcommand_set_adapt_thresh(ClientData data, Tcl_Interp *interp, int argc,
+                                char **argv) {
+  if(argc != 4) {
+    print_usage_set_thresh(data, interp);
+    return TCL_ERROR;
+  }
+
+  argc--; argv++;
+
+  if(ARG0_IS_S_EXACT("velocity")) {
+    --argc; ++argv;
+    if(!ARG0_IS_D(vel_thresh[0]) || !ARG1_IS_D(vel_thresh[1])) {
+      print_usage_set_thresh(data, interp);
+      return TCL_ERROR;
+    }
+    mpi_call(mpi_bcast_thresh_vel, -1, 0);
+    mpi_bcast_thresh_vel(0, 0);
+  }
+  else if (ARG0_IS_S_EXACT("vorticity")) {
+    --argc; ++argv;
+    if(!ARG0_IS_D(vort_thresh[0]) || !ARG1_IS_D(vort_thresh[1])) {
+      print_usage_set_thresh(data, interp);
+      return TCL_ERROR;
+    }
+    mpi_call(mpi_bcast_thresh_vort, -1, 0);
+    mpi_bcast_thresh_vort(0, 0);
+  }
+  else {
+    print_usage_set_thresh(data, interp);
+    return TCL_ERROR;
+  }
+
+  return TCL_OK;
 }
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)

@@ -19,13 +19,15 @@
 #include <p8est_search.h>
 #include <vector>
 
-#define USE_VEL_CRIT
-#define USE_VORT_CRIT
-
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
+// relative threshold values for refinement and coarsening.  Initially they are
+// set such that they have no effect.  Order is coarsening - refinement.
+double vel_thresh[2] = {0., 1.};
+double vort_thresh[2] = {0., 1.};
+
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -626,31 +628,23 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   MPI_Allreduce(&vort_temp, &vort_max, 1, MPI_DOUBLE, MPI_MAX,
                 adapt_p4est->mpicomm);
 
-  double v_thresh_coarse = 0.05;
-  double v_thresh_refine = 0.15;
-  double vort_thresh_coarse = 0.02;
-  double vort_thresh_refine = 0.05;
   // traverse forest and decide if the current quadrant is to be refined or
   // coarsened
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-#ifdef USE_VEL_CRIT
     // velocity
     double v = sqrt(SQR(*(double*) sc_array_index(vel_values, 3 * qid)) +
                     SQR(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
                     SQR(*(double*) sc_array_index(vel_values, 3 * qid + 2)));
     // Note, that this formulation stems from the fact that velocity is 0 at
     // boundaries
-    if (v_thresh_refine * (v_max - v_min) <= (v - v_min)) {
-      flags->push_back(1);
+    if (vel_thresh[1] * (v_max - v_min) < (v - v_min)) {
+      (*flags)[qid] = 1;
     }
-    else if (v - v_min <= v_thresh_coarse * (v_max - v_min)) {
-      flags->push_back(2);
+    else if ((1 != (*flags)[qid]) &&
+             (v - v_min < vel_thresh[0] * (v_max - v_min))) {
+      (*flags)[qid] = 2;
     }
-    else {
-      flags->push_back(0);
-    }
-#endif // USE_VEL_CRIT
-#ifdef USE_VORT_CRIT
+
     // vorticity
     double vort = std::numeric_limits<double>::min();
     for (int d = 0; d < P4EST_DIM; ++d) {
@@ -659,44 +653,33 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         vort = vort_temp;
       }
     }
-#ifndef USE_VEL_CRIT
-    if (vort_thresh_refine * (vort_max - vort_min) <= (vort - vort_min)) {
-      flags->push_back(1);
-    }
-    else if (vort - vort_min < vort_thresh_coarse * (vort_max - vort_min)) {
-      flags->push_back(2);
-    }
-    else {
-      flags->push_back(0);
-    }
-#else // USE_VEL_CRIT
-    if (vort_thresh_refine * (vort_max - vort_min) <= (vort - vort_min)) {
+    if (vort_thresh[1] * (vort_max - vort_min) < (vort - vort_min)) {
       (*flags)[qid] = 1;
     }
     else if ((1 != (*flags)[qid]) &&
-             (vort - vort_min < vort_thresh_coarse * (vort_max - vort_min))) {
+             (vort - vort_min < vort_thresh[0] * (vort_max - vort_min))) {
       (*flags)[qid] = 2;
     }
-#endif // USE_VEL_CRIT
-#endif // USE_VORT_CRIT
   }
   return 0;
 }
 
+/** Dummy initialization function for quadrants created in refinement step
+ */
 void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
                             p8est_quadrant_t *q) {
   q->p.user_long = -1;
 }
+
 int p4est_utils_adapt_grid() {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
 
   // 1st step: alter copied grid and map data between grids.
   // collect refinement and coarsening flags.
-  flags = new std::vector<int>();
-  flags->reserve(P4EST_CHILDREN * adapt_p4est->local_num_quadrants);
-
+  flags = new std::vector<int>(adapt_p4est->local_num_quadrants, 0);
   p4est_utils_collect_flags(flags);
+
   p4est_iterate(adapt_p4est, adapt_ghost, 0, lbadapt_init_qid_payload, 0, 0, 0);
 
   // copy forest and perform refinement step.

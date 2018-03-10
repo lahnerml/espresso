@@ -207,46 +207,16 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
 /** \name Geometric helper functions                                         */
 /*****************************************************************************/
 /*@{*/
-/** Get the coordinates of the midpoint of a quadrant.
+/** Get the coordinates of the front lower left corner of a quadrant.
  *
  * \param [in]  p8est    the forest
  * \param [in]  which_tree the tree in the forest containing \a q
  * \param [in]  q      the quadrant
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
-inline void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                                     p8est_quadrant_t *q, double xyz[3]) {
-  int base = P8EST_QUADRANT_LEN(q->level);
-  int root = P8EST_ROOT_LEN;
-  double half_length = ((double)base / (double)root) * 0.5;
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
-  }
-}
-
-/** Get the coordinates of the midpoint of a quadrant
- *
- * \param [in]  mesh_iter  A mesh-based iterator.
- * \param [out] xyz        The coordinates of the the midpoint of the current
- *                         quadrant that mesh_iter is pointing to.
- */
-inline void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
-  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
-  int root = P8EST_ROOT_LEN;
-  double half_length = ((double)base / (double)root) * 0.5;
-
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
-
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    xyz[i] += half_length;
-  }
-}
+void p4est_utils_get_front_lower_left(p8est_t *p8est,
+                                             p4est_topidx_t which_tree,
+                                             p8est_quadrant_t *q, double *xyz);
 
 /** Get the coordinates of the front lower left corner of a quadrant
  *
@@ -255,28 +225,26 @@ inline void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
  *                         of the current quadrant that mesh_iter is pointing
  *                         to.
  */
-inline void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
-                                             double *xyz) {
-  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
-      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
-  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
-                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
-                         q->x, q->y, q->z, xyz);
-}
 
-/** Get the coordinates of the front lower left corner of a quadrant.
+void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
+                                             double *xyz);
+/** Get the coordinates of the midpoint of a quadrant.
  *
  * \param [in]  p8est    the forest
  * \param [in]  which_tree the tree in the forest containing \a q
  * \param [in]  q      the quadrant
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
-inline void p4est_utils_get_front_lower_left(p8est_t *p8est,
-                                             p4est_topidx_t which_tree,
-                                             p8est_quadrant_t *q, double *xyz) {
-  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
-                         xyz);
-}
+void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
+                                     p8est_quadrant_t *q, double xyz[3]);
+
+/** Get the coordinates of the midpoint of a quadrant
+ *
+ * \param [in]  mesh_iter  A mesh-based iterator.
+ * \param [out] xyz        The coordinates of the the midpoint of the current
+ *                         quadrant that mesh_iter is pointing to.
+ */
+void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 /*@}*/
 
 /*****************************************************************************/

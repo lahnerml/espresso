@@ -153,10 +153,6 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     double xyz[3];
     p4est_utils_get_front_lower_left(p4est, q->p.which_tree, q, xyz);
 
-    // Scale xyz because p4est_utils_pos_morton_idx_global will assume it is
-    // and undo this.
-    maybe_tree_to_boxlcoords(xyz);
-
     insert_elem.first_quad_morton_idx[i] = p4est_utils_pos_morton_idx_global(
         p4est, insert_elem.finest_level_global,
         insert_elem.tree_quadrant_offset_synced, xyz);
@@ -247,6 +243,10 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
  *          length of the p4est instance used for short-ranged MD.
  */
 int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
+  double t_pos[3];
+  std::copy(&pos[0], &pos[2], &t_pos[0]);
+  boxl_to_treecoords(t_pos);
+
   int tid = -1;
   for (int t = 0; t < p4est->connectivity->num_trees; ++t) {
     // collect corners of tree
@@ -256,10 +256,6 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
       c[ci][0] = p4est->connectivity->vertices[P4EST_DIM * v + 0];
       c[ci][1] = p4est->connectivity->vertices[P4EST_DIM * v + 1];
       c[ci][2] = p4est->connectivity->vertices[P4EST_DIM * v + 2];
-
-      // As pure MD allows for box_l != 1.0, "pos" will be in [0,box_l) and
-      // not in [0,1). So manually scale the trees to fill [0,box_l).
-      maybe_tree_to_boxlcoords(c[ci].data());
     }
 
     // find lower left and upper right corner of tree
@@ -284,9 +280,9 @@ int p4est_utils_map_pos_to_tree(p4est_t *p4est, const double pos[3]) {
 
     // if position is between lower left and upper right corner of forest this
     // is the right tree
-    if ((c[idx_min][0] <= pos[0]) && (c[idx_min][1] <= pos[1]) &&
-        (c[idx_min][2] <= pos[2]) && (pos[0] < c[idx_max][0]) &&
-        (pos[1] < c[idx_max][1]) && (pos[2] < c[idx_max][2])) {
+    if ((c[idx_min][0] <= t_pos[0]) && (c[idx_min][1] <= t_pos[1]) &&
+        (c[idx_min][2] <= t_pos[2]) && (t_pos[0] < c[idx_max][0]) &&
+        (t_pos[1] < c[idx_max][1]) && (t_pos[2] < c[idx_max][2])) {
       // ensure trees do not overlap
       P4EST_ASSERT(-1 == tid);
       tid = t;
@@ -438,6 +434,57 @@ p4est_locidx_t p4est_utils_pos_qid_ghost(forest_order forest,
   return index;
 }
 
+void p4est_utils_get_front_lower_left(p8est_t *p8est,
+                                             p4est_topidx_t which_tree,
+                                             p8est_quadrant_t *q, double *xyz) {
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] *= (box_l[0] / lb_conn_brick[0]);
+  }
+}
+
+void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
+                                             double *xyz) {
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] *= (box_l[0] / lb_conn_brick[0]);
+  }
+}
+
+void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
+                                     p8est_quadrant_t *q, double xyz[3]) {
+  int base = P8EST_QUADRANT_LEN(q->level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+  p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+    xyz[i] *= (box_l[0] / lb_conn_brick[0]);
+  }
+}
+
+void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
+  int base = P8EST_QUADRANT_LEN(mesh_iter->current_level);
+  int root = P8EST_ROOT_LEN;
+  double half_length = ((double)base / (double)root) * 0.5;
+
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(
+      mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
+  p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
+                         mesh_iter->mesh->quad_to_tree[mesh_iter->current_qid],
+                         q->x, q->y, q->z, xyz);
+
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    xyz[i] += half_length;
+    xyz[i] *= (box_l[0] / lb_conn_brick[0]);
+  }
+}
 // CAUTION: Currently LB only
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {

@@ -800,10 +800,8 @@ int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q) {
-  int base = P8EST_QUADRANT_LEN(q->level);
-  int root = P8EST_ROOT_LEN;
   // 0.6 instead of 0.5 for stability reasons
-  lb_float half_length = 0.6 * sqrt(3) * ((lb_float)base / (lb_float)root);
+  lb_float half_length = 0.6 * sqrt(3) * h[q->level];
 
   lb_float midpoint[3];
   p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);

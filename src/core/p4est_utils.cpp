@@ -43,14 +43,6 @@ static inline void tree_to_boxlcoords(double x[3]) {
 #endif // defined(DD_P4EST)
 }
 
-static inline void maybe_tree_to_boxlcoords(double x[3]) {
-#ifndef LB_ADAPTIVE
-  tree_to_boxlcoords(x);
-#else
-  // Id mapping
-#endif
-}
-
 static inline void boxl_to_treecoords(double x[3]) {
   for (int i = 0; i < 3; ++i)
 #ifdef DD_P4EST
@@ -60,18 +52,10 @@ static inline void boxl_to_treecoords(double x[3]) {
 #endif // defined(DD_P4EST)
 }
 
-static inline void maybe_boxl_to_treecoords(double x[3]) {
-#ifndef LB_ADAPTIVE
-  boxl_to_treecoords(x);
-#else
-   // Id mapping
-#endif
-}
-
 static inline std::array<double, 3>
-maybe_boxl_to_treecoords_copy(const double x[3]) {
+boxl_to_treecoords_copy(const double x[3]) {
   std::array<double, 3> res{{x[0], x[1], x[2]}};
-  maybe_boxl_to_treecoords(res.data());
+  boxl_to_treecoords(res.data());
   return res;
 }
 
@@ -302,7 +286,7 @@ p4est_utils_pos_morton_idx_global(p8est_t *p4est, int level,
 
   // In case of pure MD arbitrary numbers are allowed for box_l.
   // Scale "spos" such that it corresponds to a box_l of 1.0
-  auto spos = maybe_boxl_to_treecoords_copy(pos);
+  auto spos = boxl_to_treecoords_copy(pos);
 
   int nq = 1 << level;
   for (int i = 0; i < P8EST_DIM; ++i) {
@@ -373,7 +357,7 @@ int p4est_utils_find_qid_prepare(forest_order forest, const double pos[3],
   p4est_qcoord_to_vertex(p4est->connectivity, tid, 0, 0, 0, first_pos);
 
   // Trees might not have a base length of 1
-  auto spos = maybe_boxl_to_treecoords_copy(pos);
+  auto spos = boxl_to_treecoords_copy(pos);
 
   int qcoord[3];
   for (int i = 0; i < P8EST_DIM; ++i) {

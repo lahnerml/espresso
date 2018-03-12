@@ -471,16 +471,16 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t **quads) {
   // get quad id
   int qid = quads[0]->p.user_long;
+  // don not coarsen newly generated quadrants
   if (qid == -1) return 0;
+  // avoid coarser cells than base_level
+  if (quads[0]->level == lbpar.base_level) return 0;
 
-  lbadapt_payload_t *data =
-    &lbadapt_local_data[quads[0]->level][adapt_virtual->quad_qreal_offset[qid]];
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    // avoid coarser cells than base_level
-    if (quads[i]->level == lbpar.base_level) return 0;
-    coarsen &= !(data->lbfields.boundary) && ((*flags)[qid + i] == 2);
-    ++data;
+    // do not coarsen quadrants at the boundary
+    coarsen &= !refine_geometric(p8est, which_tree, quads[i]) &&
+               ((*flags)[qid + i] == 2);
   }
   return coarsen;
 }

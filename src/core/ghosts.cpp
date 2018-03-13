@@ -592,7 +592,8 @@ static void ghost_communicator_async(GhostCommunicator *gc)
   }
 
   // Wait for requests and postprocess them if they are receives
-// Removed. Does not work with bonds as requests get replaced by new ones in this case.
+// Removed. Does not work with bonds as requests get replaced by new ones in this case
+// and put_recv_buffer is never executed.
 //#ifndef ASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY
 //  MPI_Waitall(gc->num, reqs.data(), MPI_STATUSES_IGNORE);
 //  for (int gcnr = 0; gcnr < gc->num; ++gcnr) {

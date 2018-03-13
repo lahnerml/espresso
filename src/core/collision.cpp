@@ -542,6 +542,72 @@ static void three_particle_binding_dd_do_search(
   }
 }
 
+Cell* project_to_boundary(const double pos[3])
+{
+  // In pronciple we could directly map a particle to the subdomain for the domain_decomposition cell system.
+  // However with non-rectangular subdomains this is not so easy anymore.
+  // Also, we could try to find out to which boundary in its cell it is nearest and mirror the particle
+  // over to the other cell (possible over edge, corner?). However, we stick to the most simple approach for now.
+
+  // Test with increasing distance:
+  //  - First face neighbors
+  //  - Then edge neighbors
+  //  - Then corner neighbors
+  static const std::vector<std::array<int, 3>> directions = {
+    // Faces
+    { 0,  0, -1},
+    { 0,  0,  1},
+    { 0, -1,  0},
+    { 0,  1,  0},
+    {-1,  0,  0},
+    { 1,  0,  0},
+    // Edges
+    { 0, -1, -1},
+    { 0, -1,  1},
+    { 0,  1, -1},
+    { 0,  1,  1},
+    
+    {-1,  0, -1},
+    {-1,  0,  1},
+    { 1,  0, -1},
+    { 1,  0,  1},
+    
+    {-1, -1,  0},
+    {-1,  1,  0},
+    { 1, -1,  0},
+    { 1,  1,  0},
+    // Corners
+    {-1, -1, -1},
+    {-1, -1,  1},
+    {-1,  1, -1},
+    {-1,  1,  1},
+
+    { 1, -1, -1},
+    { 1, -1,  1},
+    { 1,  1, -1},
+    { 1,  1,  1}};
+
+  Cell *c;
+
+  for (const auto& displ: directions) {  
+    double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
+                     , pos[1] + displ[1] * dd.cell_size[1]
+                     , pos[2] + displ[2] * dd.cell_size[2] };
+    if ((c = cell_structure.position_to_cell(spos)))
+      return c;
+  }
+
+  return nullptr;
+}
+
+Cell* responsible_collision_cell(Particle& p)
+{
+  if (p.l.ghost)
+    return project_to_boundary(p.r.p);
+  else
+    return cell_structure.position_to_cell(p.r.p);
+}
+
 // Goes through the collision queue and for each pair in it
 // looks for a third particle by using the domain decomposition
 // cell system. If found, it performs three particle binding
@@ -556,8 +622,16 @@ void three_particle_binding_domain_decomposition(
 
       Particle &p1 = *local_particles[c.pp1];
       Particle &p2 = *local_particles[c.pp2];
-      auto cell1 = cell_structure.position_to_cell(p1.r.p);
-      auto cell2 = cell_structure.position_to_cell(p2.r.p);
+      auto cell1 = responsible_collision_cell(p1);
+      auto cell2 = responsible_collision_cell(p2);
+
+      if (!cell1 || !cell2) {
+        fprintf(stderr, "Error: Particles during collision handling nowhere near domain.\n"
+                        "P1: %lf %lf %lf (cell %p; is ghost? %i), P2: %lf %lf %lf (cell %p; is ghost? %i)\n",
+                        p1.r.p[0], p1.r.p[1], p1.r.p[2], static_cast<void*>(cell1), p1.l.ghost,
+                        p2.r.p[0], p2.r.p[1], p2.r.p[2], static_cast<void*>(cell2), p2.l.ghost);
+        errexit();
+      }
 
       three_particle_binding_dd_do_search(cell1, p1, p2);
       if (cell1 != cell2)

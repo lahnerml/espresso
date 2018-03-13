@@ -547,6 +547,13 @@ void dd_update_communicators_w_boxl() {
 void dd_init_cell_interactions() {
   int m, n, o, p, q, r, ind1, ind2;
 
+  dd_fs_neigh.clear();
+  for (p = -1; p <= 1; p++)
+    for (q = -1; q <= 1; q++)
+      for (r = -1; r <= 1; r++)
+        dd_fs_neigh.push_back(get_linear_index(r, q, p, dd.ghost_cell_grid));
+
+
   /* loop all local cells */
   DD_LOCAL_CELLS_LOOP(m, n, o) {
 

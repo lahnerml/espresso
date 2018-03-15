@@ -1137,7 +1137,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
     // in dd_async_exchange_insert_particles.
     Particle *p = local_particles[recvbuf->part[pc].p.identity];
     if (p->bl.n > 0) {
-      if (!(p->bl.e = (int *) malloc(p->bl.n * sizeof(int)))) {
+      if (!(p->bl.e = (int *) malloc(p->bl.max * sizeof(int)))) {
         fprintf(stderr, "Tod.\n");
         errexit();
       }
@@ -1145,6 +1145,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
       read += p->bl.n;
     } else {
       p->bl.e = NULL;
+      p->bl.max = 0;
     }
 #ifdef EXCLUSIONS
     if (p->el.n > 0) {

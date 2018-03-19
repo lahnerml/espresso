@@ -1750,12 +1750,6 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   /* initialize cell neighbor structures */
   dd_p4est_init_cell_interactions();
 
-  // TODO: Repart-Komm ist geflogen.
-  //       Ggf. später wieder einführen und einfach
-  //       die Zellen tracken, damit man sich
-  //       dd_p4est_save_position_to_cell sparen kann
-  //       sowohl auf Sender- als auch auf Empfängerseite.
-
   if (isRepart) {
     dd_p4est_repart_exchange_part(old);
     for(c=0; c<local_cells.n; c++)

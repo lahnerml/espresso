@@ -96,6 +96,7 @@ double nptiso_pref4;
 
 #ifdef USE_FLOWFIELD
 std::vector<double> velu, velv, velw;
+std::string ff_name_u, ff_name_v, ff_name_w;
 
 struct CFile {
   CFile(const char *filename, const char *mode) {
@@ -110,20 +111,31 @@ private:
   FILE *fp;
 };
 
-static void fluid_init()
+void fluid_init()
 {
-  CFile fp("u.dat", "rb"), fq("v.dat", "rb"), fr("w.dat", "rb");
-  size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);
-  size_t nelem = ffs * ffs * ffs;
+  if (ff_name_u == "") {
+    fprintf(stderr, "Error in fluid_init: Set flow field file name first.\n");
+    errexit();
+  }
+  CFile fp(ff_name_u.c_str(), "rb"), fq(ff_name_v.c_str(), "rb"), fr(ff_name_w.c_str(), "rb");
+  const size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);
+  const size_t nelem = ffs * ffs * ffs;
+  size_t relem;
 
   velu.resize(nelem);
   velv.resize(nelem);
   velw.resize(nelem);
 
-  if (fread(velu.data(), sizeof(double), nelem, fp) != nelem
-      || fread(velv.data(), sizeof(double), nelem, fq) != nelem
-      || fread(velw.data(), sizeof(double), nelem, fr) != nelem) {
-    fprintf(stderr, "[%i] Error read flowfield has too few elements.\n", this_node);
+  if ((relem = fread(velu.data(), sizeof(double), nelem, fp)) != nelem) {
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_u.c_str(), nelem, relem);
+    errexit();
+  }
+  if ((relem = fread(velv.data(), sizeof(double), nelem, fq)) != nelem) {
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_v.c_str(), nelem, relem);
+    errexit();
+  }
+  if ((relem = fread(velw.data(), sizeof(double), nelem, fr)) != nelem) {
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_w.c_str(), nelem, relem);
     errexit();
   }
 }

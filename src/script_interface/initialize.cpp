@@ -34,6 +34,7 @@
 #include "collision_detection/initialize.hpp"
 #include "mpiio/initialize.hpp"
 #include "repart/initialize.hpp"
+#include "flowfield/initialize.hpp"
 
 #include "ComFixed.hpp"
 
@@ -63,6 +64,7 @@ void initialize() {
   MPIIO::initialize();
   Repart::initialize();
   CollisionDetection::initialize();
+  Flowfield::initialize();
  
 
   ScriptInterface::register_new<Testing::VariantTester>("Testing::VariantTester");

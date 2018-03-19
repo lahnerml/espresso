@@ -103,13 +103,21 @@ extern int ghmc_nmd;
 extern double ghmc_phi;
 
 #ifdef USE_FLOWFIELD
+void fluid_init();
+
 /** Flow field langevin parameter */
 extern double langevin_pref3;
 
 /** Flow field itself */
 extern std::vector<double> velu, velv, velw;
 
-#define FLOWFIELD_SIZE 65
+/** File names */
+extern std::string ff_name_u, ff_name_v, ff_name_w;
+
+// Flowfield size in one dimension
+#ifndef FLOWFIELD_SIZE
+#define FLOWFIELD_SIZE 64
+#endif
 // Overflow is unlikely (who has that much memory). But prevent silent
 // execution or segmentation faults because of accidentally wrongly set
 // flowfield sizes.
@@ -118,9 +126,15 @@ extern std::vector<double> velu, velv, velw;
 #  error Flowfield size too great for size_t
 #endif
 
-#define veluu(i, j, k) (velu[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
-#define velvv(i, j, k) (velv[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
-#define velww(i, j, k) (velw[FLOWFIELD_SIZE * FLOWFIELD_SIZE * i + FLOWFIELD_SIZE * j + k])
+#define veluu(xi, yj, zk) (velu[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
+#define velvv(xi, yj, zk) (velv[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
+#define velww(xi, yj, zk) (velw[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
+
+#define PY_USE_FLOWFIELD 1
+#define PY_FLOWFIELD_SIZE FLOWFIELD_SIZE
+#else // USE_FLOWFIELD
+#define PY_USE_FLOWFIELD 0
+#define PY_FLOWFIELD_SIZE -1
 #endif // USE_FLOWFIELD
 
 
@@ -252,15 +266,18 @@ inline double friction_thermV_nptiso(double p_diff) {
 #ifdef USE_FLOWFIELD
 inline void fluid_velocity(double pos[3], double vfxyz[3])
 {
+  // Exit if flowfield has not already been set
+  if (velu.size() != FLOWFIELD_SIZE)
+    return;
+
   // Velocities at the corners of the grid cell particle p is in.
   double u000, u100, u010, u001, u101, u011, u110, u111;
   double v000, v100, v010, v001, v101, v011, v110, v111;
   double w000, w100, w010, w001, w101, w011, w110, w111;
 
-  // Flowfield is defined on vertices, i.e. has FLOWFIELD_SIZE - 1 cells.
-  std::array<double, 3> ff_cellsize = {{ box_l[0] / (FLOWFIELD_SIZE - 1),
-                                         box_l[1] / (FLOWFIELD_SIZE - 1),
-                                         box_l[2] / (FLOWFIELD_SIZE - 1)}};
+  std::array<double, 3> ff_cellsize = {{ box_l[0] / FLOWFIELD_SIZE,
+                                         box_l[1] / FLOWFIELD_SIZE,
+                                         box_l[2] / FLOWFIELD_SIZE}};
   // Cell index and upper cell index
   // In combination 000, 001, 010, ... all 8 neighboring grid points of p
   int x0 = pos[0] / ff_cellsize[0];
@@ -304,37 +321,43 @@ inline void fluid_velocity(double pos[3], double vfxyz[3])
     z1 = FLOWFIELD_SIZE - 1;
   }
 
+  // Account for particles in the last cell (periodic boundary conditions)
+  if (x1 == FLOWFIELD_SIZE)
+    x1 = 0;
+  if (y1 == FLOWFIELD_SIZE)
+    y1 = 0;
+  if (z1 == FLOWFIELD_SIZE)
+    z1 = 0;
+
+
   // Look up the values of the 8 points of the grid
 
-  // HERE I,J,K VALUES ARE IN REVERSE ORDER TO MAINTAIN THE CORRECT
-  // CONFIGURATION !!!
-  // DOUBLE CHECK WHEN THE DNS DATASET CHANGED
-  u000 = veluu(z0, x0, y0);
-  u100 = veluu(z1, x0, y0);
-  u010 = veluu(z0, x1, y0);
-  u001 = veluu(z0, x0, y1);
-  u101 = veluu(z1, x0, y1);
-  u011 = veluu(z0, x1, y1);
-  u110 = veluu(z1, x1, y0);
-  u111 = veluu(z1, x1, y1);
+  u000 = veluu(x0, y0, z0);
+  u100 = veluu(x0, y0, z1);
+  u010 = veluu(x1, y0, z0);
+  u001 = veluu(x0, y1, z0);
+  u101 = veluu(x0, y1, z1);
+  u011 = veluu(x1, y1, z0);
+  u110 = veluu(x1, y0, z1);
+  u111 = veluu(x1, y1, z1);
 
-  v000 = velvv(z0, x0, y0);
-  v100 = velvv(z1, x0, y0);
-  v010 = velvv(z0, x1, y0);
-  v001 = velvv(z0, x0, y1);
-  v101 = velvv(z1, x0, y1);
-  v011 = velvv(z0, x1, y1);
-  v110 = velvv(z1, x1, y0);
-  v111 = velvv(z1, x1, y1);
+  v000 = velvv(x0, y0, z0);
+  v100 = velvv(x0, y0, z1);
+  v010 = velvv(x1, y0, z0);
+  v001 = velvv(x0, y1, z0);
+  v101 = velvv(x0, y1, z1);
+  v011 = velvv(x1, y1, z0);
+  v110 = velvv(x1, y0, z1);
+  v111 = velvv(x1, y1, z1);
 
-  w000 = velww(z0, x0, y0);
-  w100 = velww(z1, x0, y0);
-  w010 = velww(z0, x1, y0);
-  w001 = velww(z0, x0, y1);
-  w101 = velww(z1, x0, y1);
-  w011 = velww(z0, x1, y1);
-  w110 = velww(z1, x1, y0);
-  w111 = velww(z1, x1, y1);
+  w000 = velww(x0, y0, z0);
+  w100 = velww(x0, y0, z1);
+  w010 = velww(x1, y0, z0);
+  w001 = velww(x0, y1, z0);
+  w101 = velww(x0, y1, z1);
+  w011 = velww(x1, y1, z0);
+  w110 = velww(x1, y0, z1);
+  w111 = velww(x1, y1, z1);
 
   // Compute the velocity components u, v, w at point
   vfxyz[0] = u000 * (1 - wx) * (1 - wy) * (1 - wz) +

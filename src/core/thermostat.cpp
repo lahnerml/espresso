@@ -114,7 +114,8 @@ private:
 void fluid_init()
 {
   if (ff_name_u == "") {
-    fprintf(stderr, "Warning: fluid_init(): Flow field file names not set. Omitting loading flow fields.\n");
+    if (this_node == 0)
+      fprintf(stderr, "Warning: fluid_init(): Flow field file names not set. Omitting loading flow fields.\n");
     //errexit();
   }
   CFile fp(ff_name_u.c_str(), "rb"), fq(ff_name_v.c_str(), "rb"), fr(ff_name_w.c_str(), "rb");

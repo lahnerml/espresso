@@ -114,8 +114,8 @@ private:
 void fluid_init()
 {
   if (ff_name_u == "") {
-    fprintf(stderr, "Error in fluid_init: Set flow field file name first.\n");
-    errexit();
+    fprintf(stderr, "Warning: fluid_init(): Flow field file names not set. Omitting loading flow fields.\n");
+    //errexit();
   }
   CFile fp(ff_name_u.c_str(), "rb"), fq(ff_name_v.c_str(), "rb"), fr(ff_name_w.c_str(), "rb");
   const size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);

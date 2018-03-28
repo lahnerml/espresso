@@ -101,7 +101,7 @@ std::string ff_name_u, ff_name_v, ff_name_w;
 struct CFile {
   CFile(const char *filename, const char *mode) {
     if (!(fp = fopen(filename, mode))) {
-      fprintf(stderr, "[%i] Cannot open file: %s.\n", this_node, filename);
+      fprintf(stderr, "[%i] Cannot open file: `%s'.\n", this_node, filename);
       errexit();
     }
   }
@@ -116,6 +116,7 @@ void fluid_init()
   if (ff_name_u == "") {
     if (this_node == 0)
       fprintf(stderr, "Warning: fluid_init(): Flow field file names not set. Omitting loading flow fields.\n");
+    return;
     //errexit();
   }
   CFile fp(ff_name_u.c_str(), "rb"), fq(ff_name_v.c_str(), "rb"), fr(ff_name_w.c_str(), "rb");

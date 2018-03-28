@@ -127,15 +127,15 @@ void fluid_init()
   velw.resize(nelem);
 
   if ((relem = fread(velu.data(), sizeof(double), nelem, fp)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_u.c_str(), nelem, relem);
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_u.c_str(), nelem, relem);
     errexit();
   }
   if ((relem = fread(velv.data(), sizeof(double), nelem, fq)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_v.c_str(), nelem, relem);
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_v.c_str(), nelem, relem);
     errexit();
   }
   if ((relem = fread(velw.data(), sizeof(double), nelem, fr)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %i. Read: %zu\n", this_node, ff_name_w.c_str(), nelem, relem);
+    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_w.c_str(), nelem, relem);
     errexit();
   }
 }

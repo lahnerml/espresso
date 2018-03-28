@@ -9,12 +9,17 @@
 
 namespace repart {
 
-//struct RuntimeRecorder {
-//  RuntimeRecorder(double& t): t(t) { t = MPI_Wtime(); }
-//  ~RuntimeRecorder() { t = MPI_Wtime() - t; }
-//private:
-//  double& t;
-//};
+struct RuntimeRecorder {
+  RuntimeRecorder(double& t): t(t) { t = MPI_Wtime(); }
+  ~RuntimeRecorder() { t = MPI_Wtime() - t; }
+private:
+  double& t;
+};
+
+extern double ivv_runtime;
+extern double fc_runtime;
+extern double lc_runtime;
+extern std::vector<double> lc_cell_runtime;
 
 
 // Print general information about cell process mapping

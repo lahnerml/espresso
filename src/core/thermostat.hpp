@@ -267,8 +267,10 @@ inline double friction_thermV_nptiso(double p_diff) {
 inline void fluid_velocity(double pos[3], double vfxyz[3])
 {
   // Exit if flowfield has not already been set
-  if (velu.size() != FLOWFIELD_SIZE)
+  if (velu.size() == static_cast<size_t>(0)) {
+    vfxyz[0] = vfxyz[1] = vfxyz[2] = 0.0;
     return;
+  }
 
   // Velocities at the corners of the grid cell particle p is in.
   double u000, u100, u010, u001, u101, u011, u110, u111;

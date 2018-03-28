@@ -21,6 +21,7 @@
 #include "ParallelScriptInterface.hpp"
 #include "si_metric.hpp"
 #include "si_p4est_dd.hpp"
+#include "si_analysis.hpp"
 
 namespace ScriptInterface {
 namespace Repart {
@@ -29,6 +30,8 @@ void initialize() {
       "ScriptInterface::Repart::Metric");
   ScriptInterface::register_new<ScriptInterface::Repart::SIP4estDD>(
       "ScriptInterface::Repart::P4estDD");
+  ScriptInterface::register_new<ScriptInterface::Repart::SIAnalysis>(
+      "ScriptInterface::Repart::Analysis");
 }
 }
 }

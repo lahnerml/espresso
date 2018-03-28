@@ -54,6 +54,7 @@ class PyMetric:
 class P4estDD:
     def __init__(self):
         self.__instance = script_interface.PScriptInterface("ScriptInterface::Repart::P4estDD")
+        self.__ana_instance = script_interface.PScriptInterface("ScriptInterface::Repart::Analysis")
 
     def create_metric(self, desc):
         """
@@ -68,6 +69,16 @@ class P4estDD:
 
     def repart(self, m, verbose=False):
         self.__instance.call_method("repart", metric=m.get_metric(), verbose=verbose)
+    
+    def runtime(self, m):
+        ret = self.__ana_instance.call_method("runtime", funct=m)
+        if ret is None:
+            raise ValueError("Unkown parameter `" + m + "'")
+        else:
+            return ret
+    
+    def reset_runtime(self, m):
+        self.__ana_instance.call_method("reset", funct=m)
 
 
 cdef class CellSystem(object):

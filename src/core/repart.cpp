@@ -10,6 +10,20 @@
 #include "interaction_data.hpp"
 #include "short_range_loop.hpp"
 
+namespace repart {
+double ivv_runtime = 0.0;
+double fc_runtime = 0.0;
+double lc_runtime = 0.0;
+std::vector<double> lc_cell_runtime;
+}
+
+static void metric_runtime(std::vector<double> &weights) {
+  using namespace repart;
+  auto avg = std::accumulate(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), 0.0) / lc_cell_runtime.size();
+  // Rescale the timinigs reasonably.
+  std::transform(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), std::begin(weights), [avg](double d){ return d * 1000.0 / avg; });
+}
+
 // Fills weights with a constant.
 static void metric_ncells(std::vector<double> &weights) {
   std::fill(weights.begin(), weights.end(), 1.0);
@@ -146,7 +160,8 @@ get_single_metric_func(const std::string& desc)
     { "nbondedia"  , metric_nbondedia },
     { "nghostcells", metric_nghostcells },
     { "nghostpart" , metric_nghostpart },
-    { "rand"       , metric_rand }
+    { "rand"       , metric_rand },
+    { "runtime"    , metric_runtime }
   };
 
   for (const auto& t: mets) {

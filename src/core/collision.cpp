@@ -33,6 +33,8 @@
 #include "rotation.hpp"
 #include "virtual_sites/VirtualSitesRelative.hpp"
 
+Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+
 #ifdef COLLISION_DETECTION_DEBUG
 #define TRACE(a) a
 #else
@@ -596,7 +598,7 @@ Cell* project_to_boundary(const double pos[3])
     double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
                      , pos[1] + displ[1] * dd.cell_size[1]
                      , pos[2] + displ[2] * dd.cell_size[2] };
-    if ((c = cell_structure.position_to_cell(spos)))
+    if ((c = dd_p4est_position_to_cell_strict(spos)))
       return c;
   }
 
@@ -605,6 +607,10 @@ Cell* project_to_boundary(const double pos[3])
 
 Cell* responsible_collision_cell(Particle& p)
 {
+  if (cell_structure.type != CELL_STRUCTURE_P4EST) {
+    fprintf(stderr, "Coldet currently works only with p4est cell system.");
+    errexit();
+  }
   if (p.l.ghost)
     return project_to_boundary(p.r.p);
   else

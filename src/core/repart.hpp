@@ -10,8 +10,8 @@
 namespace repart {
 
 struct RuntimeRecorder {
-  RuntimeRecorder(double& t): t(t) { t = MPI_Wtime(); }
-  ~RuntimeRecorder() { t = MPI_Wtime() - t; }
+  RuntimeRecorder(double& t): t(t) { t -= MPI_Wtime(); }
+  ~RuntimeRecorder() { t += MPI_Wtime() - t; }
 private:
   double& t;
 };

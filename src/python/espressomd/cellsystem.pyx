@@ -80,7 +80,7 @@ class P4estDD:
     def reset_runtime(self, m):
         self.__ana_instance.call_method("reset", funct=m)
     
-    def reset_cellruntime(self, m):
+    def reset_cellruntime(self):
         self.__ana_instance.call_method("resetcells")
 
 

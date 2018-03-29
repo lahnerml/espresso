@@ -113,7 +113,7 @@ static Cell* dd_p4est_save_position_to_cell(double pos[3]);
 // Map a position to a cell, returns NULL if not in local domain
 static Cell* dd_p4est_position_to_cell(double pos[3]);
 //void dd_p4est_position_to_cell(double pos[3], int* idx);
-static Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+Cell* dd_p4est_position_to_cell_strict(double pos[3]);
 
 // Map a position to a global processor index
 static int dd_p4est_pos_to_proc(double pos[3]);

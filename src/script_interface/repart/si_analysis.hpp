@@ -48,6 +48,8 @@ public:
         fc_runtime = lc_runtime = ivv_runtime = 0;
       else
         *variable(m) = 0.0;
+    } else if (name == "resetcells") {
+      std::fill(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), 0.0);
     }
 
     return {};

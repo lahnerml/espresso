@@ -595,14 +595,12 @@ Cell* project_to_boundary(const double pos[3])
 
   Cell *c;
 
-  for (int radius = 1; radius < box_l[0]; radius++) {
-    for (const auto& displ: directions) {  
-      double spos[3] = { pos[0] + radius * displ[0] * dd.cell_size[0]
-                       , pos[1] + radius * displ[1] * dd.cell_size[1]
-                       , pos[2] + radius * displ[2] * dd.cell_size[2] };
-      if ((c = dd_p4est_position_to_cell_strict(spos)))
-        return c;
-    }
+  for (const auto& displ: directions) {  
+    double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
+                     , pos[1] + displ[1] * dd.cell_size[1]
+                     , pos[2] + displ[2] * dd.cell_size[2] };
+    if ((c = dd_p4est_position_to_cell_strict(spos)))
+      return c;
   }
 
   return nullptr;
@@ -638,11 +636,12 @@ void three_particle_binding_domain_decomposition(
       auto cell2 = responsible_collision_cell(p2);
 
       if (!cell1 || !cell2) {
-        fprintf(stderr, "Error: Particles during collision handling nowhere near domain.\n"
-                        "P1: %lf %lf %lf (cell %p; is ghost? %i), P2: %lf %lf %lf (cell %p; is ghost? %i)\n",
-                        p1.r.p[0], p1.r.p[1], p1.r.p[2], static_cast<void*>(cell1), p1.l.ghost,
-                        p2.r.p[0], p2.r.p[1], p2.r.p[2], static_cast<void*>(cell2), p2.l.ghost);
-        errexit();
+        //fprintf(stderr, "Error: Particles during collision handling nowhere near domain.\n"
+        //                "P1: %lf %lf %lf (cell %p; is ghost? %i), P2: %lf %lf %lf (cell %p; is ghost? %i)\n",
+        //                p1.r.p[0], p1.r.p[1], p1.r.p[2], static_cast<void*>(cell1), p1.l.ghost,
+        //                p2.r.p[0], p2.r.p[1], p2.r.p[2], static_cast<void*>(cell2), p2.l.ghost);
+        //errexit();
+        continue;
       }
 
       three_particle_binding_dd_do_search(cell1, p1, p2);

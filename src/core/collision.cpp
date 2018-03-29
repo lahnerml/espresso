@@ -559,6 +559,7 @@ Cell* project_to_boundary(const double pos[3])
   //  - Then edge neighbors
   //  - Then corner neighbors
   static const std::vector<std::array<int, 3>> directions = {
+    { 0,  0,  0},
     // Faces
     { 0,  0, -1},
     { 0,  0,  1},

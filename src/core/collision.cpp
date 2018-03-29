@@ -595,7 +595,7 @@ Cell* project_to_boundary(const double pos[3])
 
   Cell *c;
 
-  for (int radius = 1; radius++; radius < box_l[0]) {
+  for (int radius = 1; radius < box_l[0]; radius++) {
     for (const auto& displ: directions) {  
       double spos[3] = { pos[0] + radius * displ[0] * dd.cell_size[0]
                        , pos[1] + radius * displ[1] * dd.cell_size[1]

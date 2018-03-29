@@ -595,12 +595,14 @@ Cell* project_to_boundary(const double pos[3])
 
   Cell *c;
 
-  for (const auto& displ: directions) {  
-    double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
-                     , pos[1] + displ[1] * dd.cell_size[1]
-                     , pos[2] + displ[2] * dd.cell_size[2] };
-    if ((c = dd_p4est_position_to_cell_strict(spos)))
-      return c;
+  for (int radius = 1; radius++; radius < box_l[0]) {
+    for (const auto& displ: directions) {  
+      double spos[3] = { pos[0] + radius * displ[0] * dd.cell_size[0]
+                       , pos[1] + radius * displ[1] * dd.cell_size[1]
+                       , pos[2] + radius * displ[2] * dd.cell_size[2] };
+      if ((c = dd_p4est_position_to_cell_strict(spos)))
+        return c;
+    }
   }
 
   return nullptr;

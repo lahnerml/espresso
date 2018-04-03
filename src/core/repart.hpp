@@ -57,7 +57,10 @@ struct metric {
   double curload() const;
   double paverage() const;
   double pmax() const;
+  double pmin() const;
   double pimbalance() const;
+
+  std::array<double, 4> pmax_avg_min_imb() const;
 
 
 private:

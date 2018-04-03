@@ -45,8 +45,12 @@ class PyMetric:
         return self.__instance.call_method("average")
     def maximum(self):
         return self.__instance.call_method("maximum")
+    def minimum(self):
+        return self.__instance.call_method("minimum")
     def imbalance(self):
         return self.__instance.call_method("imbalance")
+    def max_avg_min_imb(self):
+        return self.__instance.call_method("max_avg_min_imb")
 
     def _get_instance(self):
         return self.__instance

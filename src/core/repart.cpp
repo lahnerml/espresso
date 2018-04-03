@@ -253,6 +253,13 @@ double repart::metric::pmax() const {
   return max;
 }
 
+double repart::metric::pmin() const {
+  double l = curload();
+  double min;
+  MPI_Allreduce(&l, &min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+  return min;
+}
+
 double repart::metric::pimbalance() const {
   double l = curload();
 
@@ -265,4 +272,18 @@ double repart::metric::pimbalance() const {
 
   double avg = tot / n_nodes;
   return max / avg;
+}
+
+std::array<double, 4> repart::metric::pmax_avg_min_imb() const {
+  double l = curload();
+
+  MPI_Request req[3];
+  double tot, max, min;
+  MPI_Ireduce(&l, &tot, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD, &req[0]);
+  MPI_Ireduce(&l, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD, &req[1]);
+  MPI_Ireduce(&l, &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD, &req[2]);
+  MPI_Waitall(3, req, MPI_STATUS_IGNORE);
+
+  double avg = tot / n_nodes;
+  return {{max, avg, min, max / avg}};
 }

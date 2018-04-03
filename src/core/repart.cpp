@@ -22,7 +22,10 @@ static void metric_runtime(std::vector<double> &weights) {
   auto avg = std::accumulate(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), 0.0) / lc_cell_runtime.size();
   // Rescale the timinigs reasonably.
   std::transform(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), std::begin(weights), [avg](double d){ return d * 1000.0 / avg; });
-  fprintf(stderr, "Runtime metric currently disabled.");
+
+  if (this_node == 0)
+    fprintf(stderr, "Runtime metric currently disabled.");
+  comm_cart.barrier();
   errexit();
 }
 

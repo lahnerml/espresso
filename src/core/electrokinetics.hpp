@@ -21,7 +21,7 @@
 #define _ELECTROKINETICS_HPP
 
 #include "config.hpp"
-#include "lb-boundaries.hpp"
+#include "lbboundaries.hpp"
 
 //note that we need to declare the ek_parameters struct and instantiate it for LB_GPU
 //to compile when electrokinetics is not compiled in. This seemed more elegant than
@@ -50,6 +50,7 @@ typedef struct {
   float time_step; //MD time step
   float lb_density;
   unsigned int dim_x;
+  unsigned int dim_x_padded;
   unsigned int dim_y;
   unsigned int dim_z;
   unsigned int number_of_nodes;
@@ -59,7 +60,7 @@ typedef struct {
   float gamma_even;
   float friction;
   float T;
-  float bjerrumlength;
+  float prefactor;
   float lb_force[3];
   unsigned int number_of_species;
   int reaction_species[3];
@@ -92,9 +93,6 @@ typedef struct {
   float valency[MAX_NUMBER_OF_SPECIES];
   float ext_force[3][MAX_NUMBER_OF_SPECIES];
   char* node_is_catalyst;
-#ifdef EK_REACTION
-  float* pressure;
-#endif
 } EK_parameters;
 
 #endif
@@ -166,7 +164,7 @@ int ek_set_lb_density(double lb_density);
 int ek_set_viscosity(double viscosity);
 int ek_set_friction(double friction);
 int ek_set_T(double T);
-int ek_set_bjerrumlength(double bjerrumlength);
+int ek_set_prefactor(double prefactor);
 #ifdef EK_ELECTROSTATIC_COUPLING
 int ek_set_electrostatics_coupling( bool electrostatics_coupling );
 void ek_calculate_electrostatic_coupling();
@@ -185,6 +183,7 @@ int ek_set_fluidcoupling(bool ideal_contribution);
 int ek_node_print_velocity(int x, int y, int z, double* velocity);
 int ek_node_print_density(int species, int x, int y, int z, double* density);
 int ek_node_print_flux(int species, int x, int y, int z, double* flux);
+int ek_node_print_potential(int x, int y, int z, double* potential);
 int ek_node_set_density(int species, int x, int y, int z, double density);
 ekfloat ek_calculate_net_charge(); 
 int ek_neutralize_system(int species); 
@@ -195,15 +194,6 @@ int ek_load_checkpoint(char* filename);
 void ek_init_species_density_wallcharge(ekfloat* wallcharge_species_density, int wallcharge_species);
 #endif
 
-#ifdef EK_REACTION
-int ek_print_vtk_reaction_tags(char* filename);
-int ek_set_reaction( int reactant, int product0, int product1, 
-                     float rho_reactant_reservoir, float rho_product0_reservoir, float rho_product1_reservoir, 
-                     float reaction_ct_rate, float reaction_fraction_0, float reaction_fraction_1, 
-                     float mass_reactant, float mass_product0, float mass_product1 );
-int ek_print_vtk_pressure(char* filename);
-int ek_tag_reaction_nodes( LB_Boundary* lbboundary, char reaction_type );
-#endif
 
 #endif /* CUDA */
 

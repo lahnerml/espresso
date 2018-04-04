@@ -23,22 +23,21 @@
  *  For more information on ghosts,
  *  see \ref ghosts.hpp "ghosts.hpp" 
 */
-#include <mpi.h>
+#include "ghosts.hpp"
+#include "cells.hpp"
+#include "communication.hpp"
+#include "domain_decomposition.hpp"
+#include "forces_inline.hpp"
+#include "global.hpp"
+#include "grid.hpp"
+#include "particle_data.hpp"
+#include "utils.hpp"
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <mpi.h>
 #include <vector>
-#include <algorithm>
-#include "utils.hpp"
-#include "ghosts.hpp"
-#include "global.hpp"
-#include "cells.hpp"
-#include "communication.hpp"
-#include "grid.hpp"
-#include "particle_data.hpp"
-#include "forces_inline.hpp"
-
-#include "call_trace.hpp"
 
 /** Tag for communication in ghost_comm. */
 #define REQ_GHOST_SEND 100
@@ -48,40 +47,22 @@
  * buffer but to be able to remove the old global variables.
  */
 class CommBuf {
-  int nbytes;
-  int maxbytes;
-  char *buf;
+  std::vector<char> buf;
   std::vector<int> bondbuffer;
 
 public:
-  CommBuf(): nbytes(0), maxbytes(0), buf(nullptr) {}
-
-  ~CommBuf() { Utils::realloc(buf, 0); }
-  
-  CommBuf(const CommBuf& other): nbytes(other.nbytes), maxbytes(other.maxbytes), buf((char*)Utils::malloc(maxbytes))
-  {
-    memcpy(buf, other.buf, nbytes);
-  }
-
   /** Returns the size in bytes set by the last call to ensure_and_set_size.
    */
-  int size() { return nbytes; }
+  int size() { return buf.size(); }
 
   /** Ensures that this buffer can hold at least nb bytes of data.
    * Also sets the internal state so that subsequent calls to size() return nb.
    */
-  void ensure_and_set_size(int nb)
-  {
-    if (nb > maxbytes) {
-       maxbytes = nb;
-       buf = (char *) Utils::realloc(buf, nb);
-     }
-     nbytes = nb;
-   }
+  void ensure_and_set_size(int nb) { buf.resize(nb); }
 
   /** Returns a char pointer to the underlying data buffer.
    */
-   operator char *() { return buf; }
+   operator char *() { return buf.data(); }
 
    /** Access the associated bond buffer.
     */
@@ -97,32 +78,37 @@ static MPI_Op MPI_FORCES_SUM;
 */
 int ghosts_have_v = 0;
 
+/** add force to another. This is used when collecting ghost forces. */
+inline void add_force(ParticleForce *F_to, ParticleForce *F_add) {
+  for (int i = 0; i < 3; i++)
+    F_to->f[i] += F_add->f[i];
+#ifdef ROTATION
+  for (int i = 0; i < 3; i++)
+    F_to->torque[i] += F_add->torque[i];
+#endif
+}
+
 void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
 {
-  CALL_TRACE();
-  
-  int i;
+  assert(comm);
   comm->data_parts = data_parts;
   comm->async = async;
-
-  /* if ghosts should have uptodate velocities, they have to be updated like positions
-     (except for shifting...) */
-  if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
-    comm->data_parts |= GHOSTTRANS_MOMENTUM;
 
   GHOST_TRACE(fprintf(stderr, "%d: prepare_comm, data_parts = %d\n", this_node, comm->data_parts));
 
   comm->num = num;
   comm->comm = (GhostCommunication*)Utils::malloc(num*sizeof(GhostCommunication));
-  for(i=0; i<num; i++) {
+  for(int i=0; i<num; i++) {
     comm->comm[i].shift[0]=comm->comm[i].shift[1]=comm->comm[i].shift[2]=0.0;
+    comm->comm[i].n_part_lists = 0;
+    comm->comm[i].part_lists = nullptr;
   }
 }
 
 void free_comm(GhostCommunicator *comm)
 {
   int n;
-  GHOST_TRACE(fprintf(stderr,"%d: free_comm: %p has %d ghost communications\n",this_node,comm,comm->num));
+  GHOST_TRACE(fprintf(stderr,"%d: free_comm: %p has %d ghost communications\n",this_node,(void*) comm,comm->num));
   for (n = 0; n < comm->num; n++) free(comm->comm[n].part_lists);
   free(comm->comm);
 }
@@ -173,8 +159,6 @@ int calc_transmit_size(GhostCommunication *gc, int data_parts)
 
 void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_parts)
 {
-  CALL_TRACE();
-  
   GHOST_TRACE(fprintf(stderr, "%d: prepare sending to/bcast from %d\n", this_node, gc->node));
 
   /* reallocate send buffer */
@@ -271,8 +255,6 @@ void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_par
 
 static void prepare_ghost_cell(Cell *cell, int size)
 {
-  CALL_TRACE();
-  
 #ifdef GHOSTS_HAVE_BONDS
   // free all allocated information, will be resent
   {
@@ -283,34 +265,22 @@ static void prepare_ghost_cell(Cell *cell, int size)
     }
   }          
 #endif
-  realloc_particlelist(cell, cell->n = size);
+  cell->resize(size);
   // invalidate pointers etc
   {
     int np   = cell->n;
     Particle *part = cell->part;
     for (int p = 0; p < np; p++) {
-      Particle *pt = &part[p];
-      // no bonds or exclusions
-      pt->bl.e = 0;
-      pt->bl.n = 0;
-      pt->bl.max = 0;
-#ifdef EXCLUSIONS
-      pt->el.e = 0;
-      pt->el.n = 0;
-      pt->el.max = 0;
-#endif
-#ifdef GHOST_FLAG
+      Particle *pt = new(&part[p]) Particle();
+
       //init ghost variable
       pt->l.ghost=1;
-#endif
     }
   }
 }
 
 void prepare_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
 {
-  CALL_TRACE();
-  
   GHOST_TRACE(fprintf(stderr, "%d: prepare receiving from %d\n", this_node, gc->node));
   /* reallocate recv buffer */
   r_buffer.ensure_and_set_size(calc_transmit_size(gc, data_parts));
@@ -325,10 +295,10 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
   std::vector<int>::const_iterator bond_retrieve = r_buffer.bondbuf().begin();
 
   for (int pl = 0; pl < gc->n_part_lists; pl++) {
-    ParticleList *cur_list = gc->part_lists[pl];
+    auto cur_list = gc->part_lists[pl];
     if (data_parts & GHOSTTRANS_PARTNUM) {
       GHOST_TRACE(fprintf(stderr, "%d: reallocating cell %p to size %d, assigned to node %d\n",
-			  this_node, cur_list, *(int *)retrieve, gc->node));
+			  this_node, (void*) cur_list, *(int *)retrieve, gc->node));
       prepare_ghost_cell(cur_list, *(int *)retrieve);
       retrieve += sizeof(int);
     }
@@ -345,21 +315,22 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
 	  memmove(&n_bonds, retrieve, sizeof(int));
 	  retrieve +=  sizeof(int);
           if (n_bonds) {
-            realloc_intlist(&pt->bl, pt->bl.n = n_bonds);
-            std::copy(bond_retrieve, bond_retrieve + n_bonds, pt->bl.e);
+	    pt->bl.resize(n_bonds);
+            std::copy_n(bond_retrieve, n_bonds, pt->bl.begin());
             bond_retrieve += n_bonds;
           }
 #ifdef EXCLUSIONS
-	  memmove(&n_bonds, retrieve, sizeof(int));
+          int n_exclusions;
+	  memmove(&n_exclusions, retrieve, sizeof(int));
 	  retrieve +=  sizeof(int);
-          if (n_bonds) {
-            realloc_intlist(&pt->el, pt->el.n = n_bonds);
-            std::copy(bond_retrieve, bond_retrieve + n_bonds, pt->el.e);
-            bond_retrieve += n_bonds;
+          if (n_exclusions) {
+	    pt->el.resize(n_exclusions);
+            std::copy_n(bond_retrieve, n_exclusions, pt->el.begin());
+            bond_retrieve += n_exclusions;
           }
 #endif
 #endif
-	  if (local_particles[pt->p.identity] == NULL) {
+	  if (local_particles[pt->p.identity] == nullptr) {
 	    local_particles[pt->p.identity] = pt;
 	  }
 	}
@@ -484,11 +455,9 @@ void cell_cell_transfer(GhostCommunication *gc, int data_parts)
 	if (data_parts & GHOSTTRANS_PROPRTS) {
 	  memmove(&pt2->p, &pt1->p, sizeof(ParticleProperties));
 #ifdef GHOSTS_HAVE_BONDS
-          realloc_intlist(&(pt2->bl), pt2->bl.n = pt1->bl.n);
-	  memmove(pt2->bl.e, pt1->bl.e, pt1->bl.n*sizeof(int));
+	  pt2->bl = pt1->bl;
 #ifdef EXCLUSIONS
-          realloc_intlist(&(pt2->el), pt2->el.n = pt1->el.n);
-	  memmove(pt2->el.e, pt1->el.e, pt1->el.n*sizeof(int));
+	  pt2->el = pt1->el;
 #endif
 #endif
         }
@@ -575,30 +544,18 @@ static int is_recv_op(int comm_type, int node)
  */
 static void ghost_communicator_async(GhostCommunicator *gc)
 {
-  const int data_parts = gc->data_parts;
-  // Use static buffers for performance reasons
-  static std::vector<CommBuf> commbufs;
+  int data_parts = gc->data_parts;
+  /* if ghosts should have uptodate velocities, they have to be updated like
+     positions (except for shifting...) */
+  if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
+    data_parts |= GHOSTTRANS_MOMENTUM;
+
+  std::vector<CommBuf> commbufs(gc->num);
   // Reqs has size 2 * gc->num. In the first gc->num elements the requests of
   // particle data Isend and Irecv are stored. In the second half requests of
   // bond Isends are stored. After reception of the particle data, the finished
   // Irecv requests are replaced by new bond Irecv requests.
-  static std::vector<MPI_Request> reqs;
-
-  // Zero the size of *all* bondbufs since we rely of zero size receive
-  // bondbufs and we cannot guarantee that all comm_types are ordered the same
-  // way for each GhostCommunicator.
-  for (unsigned int i = 0; i < commbufs.size(); ++i)
-    commbufs[i].bondbuf().resize(0);
-
-
-  // Ensure minimum size of buffers
-  if (commbufs.size() < (size_t) gc->num) {
-    commbufs.resize(gc->num);
-    reqs.resize(2 * gc->num);
-    // Since the second half of reqs stores only request for sends, we need to
-    // initialize the elements (Note: could also be done in the receive loop)
-    std::fill(reqs.begin() + gc->num, reqs.end(), MPI_REQUEST_NULL);
-  }
+  std::vector<MPI_Request> reqs(2 * gc->num, MPI_REQUEST_NULL);
 
   // Prepare receive buffers and post receives
   for (int i = 0; i < gc->num; i++) {
@@ -606,6 +563,8 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     const int comm_type = gcn->type & GHOST_JOBMASK;
     if (comm_type == GHOST_RECV) {
       prepare_recv_buffer(commbufs[i], gcn, data_parts);
+      if (commbufs[i].size() <= 0)
+        continue;
       MPI_Irecv(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
     } else if (comm_type != GHOST_SEND) {
       // Check for invalid operations
@@ -620,53 +579,56 @@ static void ghost_communicator_async(GhostCommunicator *gc)
     const int comm_type = gcn->type & GHOST_JOBMASK;
     if (comm_type == GHOST_SEND) {
       prepare_send_buffer(commbufs[i], gcn, data_parts);
+      if (commbufs[i].size() <= 0)
+        continue;
       MPI_Isend(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
 
       // MPI guarantees ordered communication for the same pair of (receiver, tag)
       std::vector<int>& bbuf = commbufs[i].bondbuf();
-      if (bbuf.size() > 0)
-        MPI_Isend(bbuf.data(), bbuf.size(), MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gc->num + i]);
+      if (bbuf.size() <= 0)
+        continue;
+      MPI_Isend(bbuf.data(), bbuf.size(), MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gc->num + i]);
     }
   }
 
   // Wait for requests and postprocess them if they are receives
-  int outcount;
-  static std::vector<int> idxs;
-  if (idxs.size() < (size_t) gc->num)
-    idxs.resize(gc->num);
-
+// Removed. Does not work with bonds as requests get replaced by new ones in this case
+// and put_recv_buffer is never executed.
+//#ifndef ASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY
+//  MPI_Waitall(gc->num, reqs.data(), MPI_STATUSES_IGNORE);
+//  for (int gcnr = 0; gcnr < gc->num; ++gcnr) {
+//#else
   while (true) {
+    int gcnr;
     // Wait only for the first half. The second half does not hold receive
     // requests
-    MPI_Waitsome(gc->num, reqs.data(), &outcount, idxs.data(), MPI_STATUS_IGNORE);
-    if (outcount == MPI_UNDEFINED)
+    MPI_Waitany(gc->num, reqs.data(), &gcnr, MPI_STATUS_IGNORE);
+    if (gcnr == MPI_UNDEFINED)
       break;
+//#endif
+    
+    GhostCommunication *gcn = &gc->comm[gcnr];
+    int comm_type = gcn->type & GHOST_JOBMASK;
+    if (comm_type != GHOST_RECV)
+      continue;
 
-    for (int i = 0; i < outcount; ++i) {
-      int gcnr = idxs[i];
-
-      GhostCommunication *gcn = &gc->comm[gcnr];
-      CommBuf& buf = commbufs[gcnr];
-      int comm_type = gcn->type & GHOST_JOBMASK;
-      // Postprocess receives
-      if (comm_type == GHOST_RECV) {
-        if (data_parts == GHOSTTRANS_FORCE /*&& comm_type != GHOST_RDCE*/) {
-          add_forces_from_recv_buffer(buf, gcn);
-        } else if (data_parts & GHOSTTRANS_PROPRTS) {
-          int n_bonds = *(int *)((char *) buf + buf.size() - sizeof(int));
-          // If no bonds have been received yet the bondbuffer has zero
-          // size since it is reset in put_recv_buffer
-          if (buf.bondbuf().size() != n_bonds && n_bonds > 0) {
-            buf.bondbuf().resize(n_bonds);
-            // Post the Irecv for the bonds replacing(!) the MPI_Request of the particles
-            MPI_Irecv(buf.bondbuf().data(), n_bonds, MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gcnr]);
-          } else {
-            put_recv_buffer(buf, gcn, gc->data_parts);
-          }
-        } else {
-          put_recv_buffer(buf, gcn, gc->data_parts);
-        }
+    // Postprocess receives
+    CommBuf& buf = commbufs[gcnr];
+    if (data_parts == GHOSTTRANS_FORCE /*&& comm_type != GHOST_RDCE*/) {
+      add_forces_from_recv_buffer(buf, gcn);
+    } else if (data_parts & GHOSTTRANS_PROPRTS) {
+      int n_bonds = *(int *)((char *) buf + buf.size() - sizeof(int));
+      // If no bonds have been received yet the bondbuffer has zero
+      // size since it is reset in put_recv_buffer
+      if (n_bonds > 0 && buf.bondbuf().size() != static_cast<size_t>(n_bonds)) {
+        buf.bondbuf().resize(n_bonds);
+        // Post the Irecv for the bonds replacing(!) the MPI_Request of the particles
+        MPI_Irecv(buf.bondbuf().data(), n_bonds, MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gcnr]);
+      } else {
+        put_recv_buffer(buf, gcn, gc->data_parts);
       }
+    } else {
+      put_recv_buffer(buf, gcn, gc->data_parts);
     }
   }
 
@@ -684,7 +646,8 @@ static void ghost_communicator_sync(GhostCommunicator *gc)
   int n, n2;
   int data_parts = gc->data_parts;
 
-  GHOST_TRACE(fprintf(stderr, "%d: ghost_comm %p, data_parts %d\n", this_node, gc, data_parts));
+
+  GHOST_TRACE(fprintf(stderr, "%d: ghost_comm %p, data_parts %d\n", this_node, (void*) gc, data_parts));
 
   for (n = 0; n < gc->num; n++) {
     GhostCommunication *gcn = &gc->comm[n];
@@ -794,7 +757,7 @@ static void ghost_communicator_sync(GhostCommunicator *gc)
 	if (node == this_node)
 	  MPI_Reduce(s_buffer, r_buffer, s_buffer.size(), MPI_BYTE, MPI_FORCES_SUM, node, comm_cart);
 	else
-	  MPI_Reduce(s_buffer, NULL, s_buffer.size(), MPI_BYTE, MPI_FORCES_SUM, node, comm_cart);
+	  MPI_Reduce(s_buffer, nullptr, s_buffer.size(), MPI_BYTE, MPI_FORCES_SUM, node, comm_cart);
 	break;
       }
       //GHOST_TRACE(MPI_Barrier(comm_cart));
@@ -872,8 +835,8 @@ void invalidate_ghosts()
       /* Particle is stored as ghost in the local_particles array,
 	 if the pointer stored there belongs to a ghost celll
 	 particle array. */
-      if( &(part[p]) == local_particles[part[p].p.identity] ) 
-	local_particles[part[p].p.identity] = NULL;
+      if( &(part[p]) == local_particles[part[p].p.identity] )
+	local_particles[part[p].p.identity] = nullptr;
       free_particle(part+p);
     }
     ghost_cells.cell[c]->n = 0;

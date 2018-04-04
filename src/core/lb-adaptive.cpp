@@ -25,10 +25,9 @@
  * Implementation file for \ref lb-adaptive.hpp.
  */
 #include "communication.hpp"
-#include "constraint.hpp"
 #include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
-#include "lb-boundaries.hpp"
+#include "lbboundaries.hpp"
 #include "lb-d3q19.hpp"
 #include "lb.hpp"
 #include "p4est_dd.hpp"

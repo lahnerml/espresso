@@ -19,15 +19,19 @@
 from __future__ import print_function, absolute_import
 include "myconfig.pxi"
 from libcpp cimport bool
+from libcpp.vector cimport vector
+from .actors cimport Actor
+
+cdef class HydrodynamicInteraction(Actor):
+    pass
 
 IF LB_GPU or LB:
 
-
-##############################################
-#
-# extern functions and structs
-#
-##############################################
+    ##############################################
+    #
+    # extern functions and structs
+    #
+    ##############################################
 
     cdef extern from "lb.hpp":
 
@@ -80,6 +84,7 @@ IF LB_GPU or LB:
         int lb_lbfluid_set_bulk_visc(double * c_bulk_visc)
         int lb_lbfluid_get_bulk_visc(double * c_bulk_visc)
         int lb_lbfluid_print_vtk_velocity(char * filename)
+        int lb_lbfluid_print_vtk_velocity(char* filename, vector[int] bb1, vector[int] bb2)
         int lb_lbfluid_print_vtk_boundary(char * filename)
         int lb_lbfluid_print_velocity(char * filename)
         int lb_lbfluid_print_boundary(char * filename)
@@ -88,6 +93,20 @@ IF LB_GPU or LB:
         int lb_set_lattice_switch(int py_switch)
         int lb_get_lattice_switch(int * py_switch)
         int lb_lbnode_get_u(int * coord, double * double_return)
+        int lb_lbnode_set_u(int *ind, double *u);
+        int lb_lbnode_get_rho(int * coord, double * double_return)
+        int lb_lbnode_get_pi(int * coord, double * double_return)
+        int lb_lbnode_get_pi_neq(int * coord, double * double_return)
+        int lb_lbnode_get_pop(int * coord, double * double_return)
+        int lb_lbnode_set_pop(int * coord, double * double_return)
+        int lb_lbnode_get_boundary(int * coord, int * int_return)
+        int lb_lbfluid_set_couple_flag(int c_couple_flag)
+        int lb_lbfluid_get_couple_flag(int * c_couple_flag)
+        int lb_lbfluid_get_interpolated_velocity_global(double *p, double *v)
+
+    cdef extern from "lbgpu.hpp":
+        int lb_lbfluid_remove_total_momentum()
+        void lb_lbfluid_get_interpolated_velocity_at_positions(double *positions, double *velocities, int length);
 
     ###############################################
     #
@@ -206,10 +225,51 @@ IF LB_GPU or LB:
         # call c-function
         IF SHANCHEN:
             if(lb_lbfluid_set_ext_force(1, c_ext_force[0], c_ext_force[1], c_ext_force[2])):
-                raise Exception("lb_fluid_set_ext_force error at C-level interface")
+                raise Exception(
+                    "lb_fluid_set_ext_force error at C-level interface")
         ELSE:
             if(lb_lbfluid_set_ext_force(0, c_ext_force[0], c_ext_force[1], c_ext_force[2])):
-                raise Exception("lb_fluid_set_ext_force error at C-level interface")
+                raise Exception(
+                    "lb_fluid_set_ext_force error at C-level interface")
+
+        return 0
+
+###############################################
+
+    cdef inline python_lbfluid_set_couple_flag(p_couple_flag):
+
+        if p_couple_flag == "2pt":
+            p_couple_flag = 2
+        elif p_couple_flag == "3pt":
+            p_couple_flag = 4
+        else:
+            raise Exception(
+                "Parameter couple accepts only \"2pt\" and \"3pt\"")
+
+        cdef int c_couple_flag;
+        c_couple_flag = p_couple_flag
+        if(lb_lbfluid_set_couple_flag(c_couple_flag)):
+            raise Exception(
+                "lb_lbfluid_set_couple_flag error at C-level interface")
+        return 0
+
+###############################################
+
+    cdef inline python_lbfluid_get_couple_flag(p_couple_flag):
+
+        cdef int c_couple_flag;
+        if(lb_lbfluid_get_couple_flag(&c_couple_flag)):
+            raise Exception(
+                "lb_lbfluid_get_couple_flag error at C-level interface")
+        p_couple_flag = c_couple_flag
+
+        if p_couple_flag == 2:
+            p_couple_flag = "2pt"
+        elif p_couple_flag == 4:
+            p_couple_flag = "3pt"
+        else:
+            raise Exception(
+                "lb_lbfluid_get_couple_flag error at C-level interface")
 
         return 0
 
@@ -324,4 +384,3 @@ IF LB_GPU or LB:
         p_ext_force = c_ext_force
 
         return 0
-

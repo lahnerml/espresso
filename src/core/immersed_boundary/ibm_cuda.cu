@@ -9,12 +9,16 @@
 #ifdef IMMERSED_BOUNDARY
 
 #include "lbgpu.hpp"
-#include "lb-boundaries.hpp"
+#include "lbboundaries.hpp"
 #include "particle_data.hpp"
 #include "cuda_utils.hpp"
 #include "cuda_interface.hpp"
 #include "immersed_boundary/ibm_main.hpp"
 #include "immersed_boundary/ibm_cuda_interface.hpp"
+
+#if defined(OMPI_MPI_H) || defined(_MPI_H)
+#error CU-file includes mpi.h! This should not happen!
+#endif
 
 // ****** Kernel functions for internal use ********
 __global__ void ResetLBForces_Kernel(LB_node_force_gpu node_f, const LB_parameters_gpu *const paraP);
@@ -26,8 +30,8 @@ __device__ inline void atomicadd( float* address,float value);
 void InitCUDA_IBM(const int numParticles);
 
 // ***** Our own global variables ********
-IBM_CUDA_ParticleDataInput *IBM_ParticleDataInput_device = NULL;
-IBM_CUDA_ParticleDataOutput *IBM_ParticleDataOutput_device = NULL;
+IBM_CUDA_ParticleDataInput *IBM_ParticleDataInput_device = nullptr;
+IBM_CUDA_ParticleDataOutput *IBM_ParticleDataOutput_device = nullptr;
 
 // ****** These variables are defined in lbgpu_cuda.cu, but we also want them here ****
 extern LB_node_force_gpu node_f;
@@ -36,8 +40,8 @@ extern LB_nodes_gpu *current_nodes;
 // ** These variables are static in lbgpu_cuda.cu, so we need to duplicate them here
 // They are initialized in ForcesIntoFluid
 // The pointers are on the host, but point into device memory
-LB_parameters_gpu *paraIBM = NULL;
-float* lb_boundary_velocity_IBM = NULL;
+LB_parameters_gpu *paraIBM = nullptr;
+float* lb_boundary_velocity_IBM = nullptr;
 
 /****************
    IBM_ResetLBForces_GPU
@@ -64,7 +68,7 @@ Called from integrate_vv to put the forces into the fluid
 This must be the first CUDA-IBM function to be called because it also does some initialization
 *******************/
 
-void IBM_ForcesIntoFluid_GPU()
+void IBM_ForcesIntoFluid_GPU(ParticleRange particles)
 {
   // This function does
   // (1) Gather forces from all particles via MPI
@@ -74,11 +78,11 @@ void IBM_ForcesIntoFluid_GPU()
   const int numParticles = gpu_get_global_particle_vars_pointer_host()->number_of_particles;
 
   // Storage only needed on master and allocated only once at the first time step
-  if ( IBM_ParticleDataInput_host == NULL && this_node == 0 )
+  if ( IBM_ParticleDataInput_host == nullptr && this_node == 0 )
     InitCUDA_IBM(numParticles);
 
   // We gather particle positions and forces from all nodes
-  IBM_cuda_mpi_get_particles();
+  IBM_cuda_mpi_get_particles(particles);
 
 
   // ***** GPU stuff only on master *****
@@ -194,7 +198,7 @@ Calls a kernel function to interpolate the velocity at each IBM particle's posit
 Store velocity in the particle data structure
 **************/
 
-void ParticleVelocitiesFromLB_GPU()
+void ParticleVelocitiesFromLB_GPU(ParticleRange particles)
 {
   // This function performs three steps:
   // (1) interpolate velocities on GPU
@@ -222,7 +226,7 @@ void ParticleVelocitiesFromLB_GPU()
 
   // ***** Back to all nodes ****
   // Spread using MPI
-  IBM_cuda_mpi_send_velocities();
+  IBM_cuda_mpi_send_velocities(particles);
 
 }
 

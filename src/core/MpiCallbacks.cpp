@@ -19,30 +19,32 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <exception>
-
-#include <boost/mpi.hpp>
-
 #include "MpiCallbacks.hpp"
 
 #include "utils/make_unique.hpp"
 #include "utils/serialization/array.hpp"
 
+#include <boost/mpi.hpp>
+
+#include <stdexcept>
+
 namespace Communication {
 
 void MpiCallbacks::call(int id, int par1, int par2) const {
   /** Can only be call from master */
-  assert(m_comm.rank() == 0);
+  if (m_comm.rank() != 0) {
+    throw std::logic_error("Callbacks can only be invoked on rank 0.");
+  }
 
   /** Check if callback exists */
   if (m_callbacks.find(id) == m_callbacks.end()) {
     throw std::out_of_range("Callback does not exists.");
   }
 
-  std::array<int, 3> request{id, par1, par2};
+  std::array<int, 3> request{{id, par1, par2}};
 
   /** Send request to slaves */
-  boost::mpi::broadcast(m_comm, request, 0);
+  boost::mpi::broadcast(m_comm, request.data(), request.size(), 0);
 }
 
 void MpiCallbacks::call(func_ptr_type fp, int par1, int par2) const {
@@ -74,36 +76,20 @@ int MpiCallbacks::add(func_ptr_type fp) {
 
 void MpiCallbacks::remove(const int id) { m_callbacks.remove(id); }
 
-void MpiCallbacks::slave(int id, int par1, int par2) const {
-  m_callbacks[id](par1, par2);
-}
-
 void MpiCallbacks::abort_loop() const { call(LOOP_ABORT, 0, 0); }
 
 void MpiCallbacks::loop() const {
   for (;;) {
     std::array<int, 3> request;
     /** Communicate callback id and parameters */
-    boost::mpi::broadcast(m_comm, request, 0);
+    boost::mpi::broadcast(m_comm, request.data(), request.size(), 0);
     /** id == 0 is loop_abort. */
     if (request[0] == LOOP_ABORT) {
       break;
     } else {
       /** Call the callback */
-      slave(request[0], request[1], request[2]);
+      m_callbacks[request[0]](request[1], request[2]);
     }
   }
 }
-
-namespace {
-std::unique_ptr<MpiCallbacks> m_global_callback;
-} /* namespace */
-
-void initialize_callbacks(boost::mpi::communicator const &comm) {
-  m_global_callback = Utils::make_unique<MpiCallbacks>(comm);
-}
-
-/* We use a singelton callback class for now. */
-MpiCallbacks &mpiCallbacks() { return *m_global_callback; }
-
 } /* namespace Communication */

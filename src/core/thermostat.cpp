@@ -1,22 +1,22 @@
 /*
   Copyright (C) 2010,2012,2013,2014,2015,2016 The ESPResSo project
-  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010 
+  Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
-  
+
   This file is part of ESPResSo.
-  
+
   ESPResSo is free software: you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation, either version 3 of the License, or
   (at your option) any later version.
-  
+
   ESPResSo is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
-  
+
   You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses/>. 
+  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 /** \file thermostat.cpp
     Implementation of \ref thermostat.hpp "thermostat.h"
@@ -26,29 +26,38 @@
 #include "lattice.hpp"
 #include "npt.hpp"
 #include "ghmc.hpp"
+#include "lb.hpp"
+#include "thermalized_bond.hpp"
+
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
-
-#if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
-#define FLATNOISE
-#endif
-
 
 /* thermostat switch */
 int thermo_switch = THERMO_OFF;
 /** Temperature */
 double temperature = 0.0;
 
+using Thermostat::GammaType;
+
+namespace {
+  /* These functions return the sentinel value for the
+     langevin params, indicating that they have not been
+     set yet. */
+constexpr double sentinel(double) { return -1.0; }
+Vector3d sentinel(Vector3d) { return {-1.0, -1.0, -1.0}; }
+}
+
 /* LANGEVIN THERMOSTAT */
-/* Langevin friction coefficient gamma. */
-double langevin_gamma = 0.0;
-/* Friction coefficient gamma for rotation */
-#ifndef ROTATIONAL_INERTIA
-double langevin_gamma_rotation = -1.0;
-#else
-double langevin_gamma_rotation[3] = {-1.0,-1.0,-1.0};
-#endif
+
+/* Langevin friction coefficient gamma for translation. */
+GammaType langevin_gamma = sentinel(GammaType{});
+/* Friction coefficient gamma for rotation. */
+GammaType langevin_gamma_rotation = sentinel(GammaType{});
+GammaType langevin_pref1;
+GammaType langevin_pref2;
+GammaType langevin_pref2_rotation;
+
 /* Langevin for translations */
 bool langevin_trans = true;
 /* Langevin for rotations */
@@ -66,25 +75,17 @@ int ghmc_nmd = 1;
 // phi parameter for partial momentum update step in GHMC
 double ghmc_phi = 0;
 
-double langevin_pref1, langevin_pref2;
-#ifndef ROTATIONAL_INERTIA
-double langevin_pref2_rotation;
-#else
-double langevin_pref2_rotation[3];
-#endif
 #ifdef MULTI_TIMESTEP
-  double langevin_pref1_small, langevin_pref2_small;
-  static double langevin_pref2_small_buffer;
+GammaType langevin_pref1_small, langevin_pref2_small;
+static GammaType langevin_pref2_small_buffer;
 #endif
 
-/** buffers for the work around for the correlated random values which cool the system,
+/** buffers for the work around for the correlated random values which cool the
+   system,
     and require a magical heat up whenever reentering the integrator. */
-static double langevin_pref2_buffer;
-#ifndef ROTATIONAL_INERTIA
-static double langevin_pref2_rotation_buffer;
-#else
-static double langevin_pref2_rotation_buffer[3];
-#endif
+static GammaType langevin_pref2_buffer;
+static GammaType langevin_pref2_rotation_buffer;
+double langevin_pref3;
 
 #ifdef NPT
 double nptiso_pref1;
@@ -93,201 +94,200 @@ double nptiso_pref3;
 double nptiso_pref4;
 #endif
 
+#ifdef USE_FLOWFIELD
+std::vector<double> velu, velv, velw;
 
-void thermo_init_langevin() 
+struct CFile {
+  CFile(const char *filename, const char *mode) {
+    if (!(fp = fopen(filename, mode))) {
+      fprintf(stderr, "[%i] Cannot open file: %s.\n", this_node, filename);
+      errexit();
+    }
+  }
+  ~CFile() { fclose(fp); }
+  operator FILE *() { return fp; }
+private:
+  FILE *fp;
+};
+
+static void fluid_init()
 {
-  int j;
-  langevin_pref1 = -langevin_gamma/time_step;
-#if defined (FLATNOISE)
-  langevin_pref2 = sqrt(24.0*temperature*langevin_gamma/time_step);
-#elif defined (GAUSSRANDOMCUT) || defined (GAUSSRANDOM)
-  langevin_pref2 = sqrt(2.0*temperature*langevin_gamma/time_step);
-#else
-#error No Noise defined
-#endif
+  CFile fp("u.dat", "rb"), fq("v.dat", "rb"), fr("w.dat", "rb");
+  size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);
+  size_t nelem = ffs * ffs * ffs;
+
+  velu.resize(nelem);
+  velv.resize(nelem);
+  velw.resize(nelem);
+
+  if (fread(velu.data(), sizeof(double), nelem, fp) != nelem
+      || fread(velv.data(), sizeof(double), nelem, fq) != nelem
+      || fread(velw.data(), sizeof(double), nelem, fr) != nelem) {
+    fprintf(stderr, "[%i] Error read flowfield has too few elements.\n", this_node);
+    errexit();
+  }
+}
+#endif // USE_FLOWFIELD
+
+void thermo_init_langevin() {
+  langevin_pref1 = -langevin_gamma / time_step;
+  langevin_pref2 = sqrt(24.0 * temperature / time_step * langevin_gamma);
+  langevin_pref3 = time_step;
+  ;
+
 #ifdef MULTI_TIMESTEP
   if (smaller_time_step > 0.) {
-    langevin_pref1_small = -langevin_gamma/smaller_time_step;
- #ifndef LANGEVIN_PER_PARTICLE
-    langevin_pref2_small = sqrt(24.0*temperature*langevin_gamma/smaller_time_step);
- #endif
+    langevin_pref1_small = -langevin_gamma / smaller_time_step;
+#ifndef LANGEVIN_PER_PARTICLE
+    langevin_pref2_small =
+        sqrt(24.0 * temperature * langevin_gamma / smaller_time_step);
+#endif
   } else {
-    langevin_pref1_small = -langevin_gamma/time_step;
- #ifndef LANGEVIN_PER_PARTICLE
-    langevin_pref2_small = sqrt(24.0*temperature*langevin_gamma/time_step);
- #endif
+    langevin_pref1_small = -langevin_gamma / time_step;
+#ifndef LANGEVIN_PER_PARTICLE
+    langevin_pref2_small =
+        sqrt(24.0 * temperature * langevin_gamma / time_step);
+#endif
   }
 #endif
-  
-#ifdef ROTATION 
-#ifndef ROTATIONAL_INERTIA
-  if ( langevin_gamma_rotation < 0.0 )
-  {
+
+  /* If gamma_rotation is not set explicitly,
+     use the linear one. */
+  if (langevin_gamma_rotation < GammaType{}) {
     langevin_gamma_rotation = langevin_gamma;
   }
-#else
-  if (( langevin_gamma_rotation[0] < 0.0 ) || (langevin_gamma_rotation[1] < 0.0) || (langevin_gamma_rotation[2] < 0.0))
-  for ( j = 0 ; j < 3 ; j++)
-  {
-    langevin_gamma_rotation[j] = langevin_gamma;
-  }
+
+  langevin_pref2_rotation =
+      sqrt(24.0 * temperature * langevin_gamma_rotation / time_step);
+
+#ifdef PARTICLE_ANISOTROPY
+#ifdef ROTATION
+  THERMO_TRACE(
+      fprintf(stderr, "%d: thermo_init_langevin: langevin_gamma_rotation=(%f,%f,%f), "
+                      "langevin_pref2_rotation=(%f,%f,%f)",
+              this_node, langevin_gamma_rotation[0], langevin_gamma_rotation[1],
+              langevin_gamma_rotation[2], langevin_pref2_rotation[0],
+              langevin_pref2_rotation[1], langevin_pref2_rotation[2]));
 #endif
-#ifndef ROTATIONAL_INERTIA
-#if defined (FLATNOISE)
-  langevin_pref2_rotation = sqrt(24.0*temperature*langevin_gamma_rotation/time_step);
-#elif defined (GAUSSRANDOMCUT) || defined (GAUSSRANDOM)
-  langevin_pref2_rotation = sqrt(2.0*temperature*langevin_gamma_rotation/time_step);
+  THERMO_TRACE(fprintf(
+      stderr, "%d: thermo_init_langevin: langevin_pref1=(%f,%f,%f), langevin_pref2=(%f,%f,%f)",
+      this_node, langevin_pref1[0], langevin_pref1[1], langevin_pref1[2],
+      langevin_pref2[0], langevin_pref2[1], langevin_pref2[2]));
 #else
-#error No Noise defined
+#ifdef ROTATION
+  THERMO_TRACE(
+      fprintf(stderr, "%d: thermo_init_langevin: langevin_gamma_rotation=%f, "
+                      "langevin_pref2_rotation=%f",
+              this_node, langevin_gamma_rotation, langevin_pref2_rotation));
 #endif
-#else
-#if defined (FLATNOISE)
-  for ( j = 0 ; j < 3 ; j++) langevin_pref2_rotation[j] = sqrt(24.0*temperature*langevin_gamma_rotation[j]/time_step);
-#elif defined (GAUSSRANDOMCUT) || defined (GAUSSRANDOM)
-  for ( j = 0 ; j < 3 ; j++) langevin_pref2_rotation[j] = sqrt(2.0*temperature*langevin_gamma_rotation[j]/time_step);
-#else
-#error No Noise defined
+  THERMO_TRACE(fprintf(
+      stderr, "%d: thermo_init_langevin: langevin_pref1=%f, langevin_pref2=%f",
+      this_node, langevin_pref1, langevin_pref2));
 #endif
-#endif // ROTATIONAL_INERTIA
-  THERMO_TRACE(fprintf(stderr,"%d: thermo_init_langevin: langevin_gamma_rotation=%f, langevin_pref2_rotation=%f",this_node, langevin_gamma_rotation,langevin_pref2_rotation));
-#endif
-  THERMO_TRACE(fprintf(stderr,"%d: thermo_init_langevin: langevin_pref1=%f, langevin_pref2=%f",this_node,langevin_pref1,langevin_pref2));  
+
+#ifdef USE_FLOWFIELD
+  fluid_init();
+#endif // USE_FLOWFIELD
 }
 
 #ifdef NPT
-void thermo_init_npt_isotropic()
-{
+void thermo_init_npt_isotropic() {
   if (nptiso.piston != 0.0) {
-#if defined (FLATNOISE)
-    nptiso_pref1 = -nptiso_gamma0*0.5 * time_step;
+    nptiso_pref1 = -nptiso_gamma0 * 0.5 * time_step;
 #ifdef MULTI_TIMESTEP
-    if (smaller_time_step > 0.) 
-      nptiso_pref2 = sqrt(12.0*temperature*nptiso_gamma0*time_step) * smaller_time_step;
+    if (smaller_time_step > 0.)
+      nptiso_pref2 = sqrt(12.0 * temperature * nptiso_gamma0 * time_step) *
+                     smaller_time_step;
     else
 #endif
-      nptiso_pref2 = sqrt(12.0*temperature*nptiso_gamma0*time_step) * time_step;
-    nptiso_pref3 = -nptiso_gammav*(1.0/nptiso.piston)*0.5*time_step;
-    nptiso_pref4 = sqrt(12.0*temperature*nptiso_gammav*time_step);
-#elif defined (GAUSSRANDOMCUT) || defined (GAUSSRANDOM)
-    nptiso_pref1 = -nptiso_gamma0*0.5 * time_step;
-    nptiso_pref2 = sqrt(1.0*temperature*nptiso_gamma0*time_step) * time_step;
-    nptiso_pref3 = -nptiso_gammav*(1.0/nptiso.piston)*0.5*time_step;
-    nptiso_pref4 = sqrt(1.0*temperature*nptiso_gammav*time_step);
-#else
-#error No Noise defined
-#endif
-    THERMO_TRACE(fprintf(stderr,"%d: thermo_init_npt_isotropic: nptiso_pref1=%f, nptiso_pref2=%f, nptiso_pref3=%f, nptiso_pref4=%f \n",this_node,nptiso_pref1,nptiso_pref2,nptiso_pref3,nptiso_pref4));
-  }
-  else {
-    thermo_switch = ( thermo_switch ^ THERMO_NPT_ISO );
-    THERMO_TRACE(fprintf(stderr,"%d: thermo_init_npt_isotropic: switched off nptiso (piston=%f; thermo_switch=%d) \n",this_node,nptiso.piston,thermo_switch));
+      nptiso_pref2 =
+          sqrt(12.0 * temperature * nptiso_gamma0 * time_step) * time_step;
+    nptiso_pref3 = -nptiso_gammav * (1.0 / nptiso.piston) * 0.5 * time_step;
+    nptiso_pref4 = sqrt(12.0 * temperature * nptiso_gammav * time_step);
+    THERMO_TRACE(fprintf(
+        stderr, "%d: thermo_init_npt_isotropic: nptiso_pref1=%f, "
+                "nptiso_pref2=%f, nptiso_pref3=%f, nptiso_pref4=%f \n",
+        this_node, nptiso_pref1, nptiso_pref2, nptiso_pref3, nptiso_pref4));
+  } else {
+    thermo_switch = (thermo_switch ^ THERMO_NPT_ISO);
+    THERMO_TRACE(fprintf(stderr, "%d: thermo_init_npt_isotropic: switched off "
+                                 "nptiso (piston=%f; thermo_switch=%d) \n",
+                         this_node, nptiso.piston, thermo_switch));
   }
 }
 #endif
 
-void thermo_init()
-{
-  if(thermo_switch == THERMO_OFF){
+void thermo_init() {
+
+  // Init thermalized bond despite of thermostat 
+  if (n_thermalized_bonds) {
+    thermalized_bond_init();
+  }
+
+  if (thermo_switch == THERMO_OFF) {
     return;
   }
-#ifdef INTER_DPD
-  if(thermo_switch & THERMO_INTER_DPD)  inter_dpd_init();
-#endif
   if(thermo_switch & THERMO_LANGEVIN ) thermo_init_langevin();
 #ifdef DPD
-  if(thermo_switch & THERMO_DPD) thermo_init_dpd();
+  if(thermo_switch & THERMO_DPD) dpd_init();
 #endif
 #ifdef NPT
-  if(thermo_switch & THERMO_NPT_ISO)   thermo_init_npt_isotropic();
+  if (thermo_switch & THERMO_NPT_ISO)
+    thermo_init_npt_isotropic();
 #endif
 #ifdef GHMC
-  if(thermo_switch & THERMO_GHMC) thermo_init_ghmc();
+  if (thermo_switch & THERMO_GHMC)
+    thermo_init_ghmc();
 #endif
 }
 
-void thermo_heat_up()
-{
-  int j;
-  if(thermo_switch & THERMO_LANGEVIN) {
-    langevin_pref2_buffer          = langevin_pref2;
-    langevin_pref2 *= sqrt(3);
-#ifndef ROTATIONAL_INERTIA
-    langevin_pref2_rotation_buffer = langevin_pref2_rotation;
-    langevin_pref2_rotation *= sqrt(3);
-#else
-    for ( j = 0 ; j < 3 ; j++)
-    {
-    	langevin_pref2_rotation_buffer[j] = langevin_pref2_rotation[j];
-    	langevin_pref2_rotation[j] *= sqrt(3);
-    }
-#endif
+void langevin_heat_up() {
+  langevin_pref2_buffer = langevin_pref2;
+  langevin_pref2 *= sqrt(3);
+
+  langevin_pref2_rotation_buffer = langevin_pref2_rotation;
+  langevin_pref2_rotation *= sqrt(3);
+
 #ifdef MULTI_TIMESTEP
-    langevin_pref2_small_buffer    = langevin_pref2_small;
-    langevin_pref2_small          *= sqrt(3);
+  langevin_pref2_small_buffer = langevin_pref2_small;
+  langevin_pref2_small *= sqrt(3);
 #endif
+}
+
+void thermo_heat_up() {
+  if (thermo_switch & THERMO_LANGEVIN) {
+    langevin_heat_up();
   }
 #ifdef DPD
-  else if (thermo_switch & THERMO_DPD){dpd_heat_up();}
+  if (thermo_switch & THERMO_DPD) {
+    dpd_heat_up();
+  }
 #endif
-#ifdef INTER_DPD
-  else if (thermo_switch & THERMO_INTER_DPD) {inter_dpd_heat_up();}
+  if (n_thermalized_bonds) {
+    thermalized_bond_heat_up();
+  }
+
+}
+
+void langevin_cool_down() {
+  langevin_pref2 = langevin_pref2_buffer;
+  langevin_pref2_rotation = langevin_pref2_rotation_buffer;
+
+#ifdef MULTI_TIMESTEP
+  langevin_pref2_small = langevin_pref2_small_buffer;
 #endif
 }
 
-void thermo_cool_down()
-{
-  int j;
-  if(thermo_switch & THERMO_LANGEVIN) {
-	langevin_pref2          = langevin_pref2_buffer;
-#ifndef ROTATIONAL_INERTIA
-    langevin_pref2_rotation = langevin_pref2_rotation_buffer;
-#else
-    for ( j = 0 ; j < 3 ; j++)
-    {
-    	langevin_pref2_rotation[j] = langevin_pref2_rotation_buffer[j];
-    }
-#endif
-#ifdef MULTI_TIMESTEP
-    langevin_pref2_small    = langevin_pref2_small_buffer;
-#endif
+void thermo_cool_down() {
+  if (thermo_switch & THERMO_LANGEVIN) {
+    langevin_cool_down();
   }
 #ifdef DPD
-  else if (thermo_switch & THERMO_DPD){dpd_cool_down();}
+  if (thermo_switch & THERMO_DPD) {
+    dpd_cool_down();
+  }
 #endif
-#ifdef INTER_DPD
-  else if (thermo_switch & THERMO_INTER_DPD) inter_dpd_cool_down();
-#endif
-}
-
-int get_cpu_temp()
-{
-  std::ifstream f("/sys/class/thermal/thermal_zone0/temp");
-  int temp;
-  f >> temp;
-  f.close();
-  return (temp + 273150)/1000;
-}
-
-static int volatile cpu_temp_count = 0;
-void set_cpu_temp(int temp)
-{
-  while (temp != get_cpu_temp())
-  {
-    if (temp < get_cpu_temp())
-    {
-      //printf("Cooling down CPU from %dK to %dK\n", get_cpu_temp(), temp);
-      // pause for 1 second to give the CPU time to cool down
-      usleep(1e6);
-    }
-    else
-    {
-      //printf("Heating up CPU from %dK to %dK\n", get_cpu_temp(), temp);
-      // crunch some numbers to heat up the CPU
-      cpu_temp_count = 0;
-      for (int i = 0; i < 1e9; ++i)
-      {
-        cpu_temp_count += i;
-      }
-    }
+  if (n_thermalized_bonds) {
+    thermalized_bond_cool_down();
   }
 }

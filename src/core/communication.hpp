@@ -61,6 +61,8 @@
 #include "cuda_init.hpp"
 #include "particle_data.hpp"
 
+#include "utils/serialization/array.hpp"
+
 /**************************************************
  * exported variables
  **************************************************/
@@ -82,6 +84,14 @@ extern boost::mpi::communicator comm_cart;
 #define SOME_TAG 42
 #endif
 
+namespace Communication {
+/**
+ * @brief Returns a reference to the global callback class instance.
+ *
+ */
+MpiCallbacks &mpiCallbacks();
+}
+
 /**************************************************
  * for every procedure requesting a MPI negotiation
  * a slave exists which processes this request on
@@ -96,16 +106,13 @@ typedef void(SlaveCallback)(int node, int param);
 /** \name Exported Functions */
 /*@{*/
 /** Initialize MPI and determine \ref n_nodes and \ref this_node. */
-void mpi_init(int *argc = NULL, char ***argv = NULL);
+void mpi_init();
 
 /* Call a slave function. */
 void mpi_call(SlaveCallback cb, int node, int param);
 
 /** Process requests from master node. Slave nodes main loop. */
 void mpi_loop();
-
-/** Stop Espresso, all slave nodes exit. */
-void mpi_stop();
 
 /** Abort Espresso using MPI_Abort. */
 void mpi_abort();
@@ -118,18 +125,8 @@ void mpi_finalize();
  * and node grid.
  */
 void mpi_reshape_communicator(std::array<int, 3> const &node_grid,
-                              std::array<int, 3> const &periodicity = {1, 1,
-                                                                       1});
-
-/** Issue REQ_BCAST_PAR: broadcast a parameter from datafield.
-    @param i the number from \ref global.hpp "global.hpp" referencing the
-   datafield.
-    @return nonzero on error
-*/
-int mpi_bcast_parameter(int i);
-
-/** Issue REQ_WHO_HAS: ask nodes for their attached particles. */
-void mpi_who_has();
+                              std::array<int, 3> const &periodicity = {{1, 1,
+                                                                       1}});
 
 /** Issue REQ_EVENT: tells all clients of some system change.
     The events are:
@@ -262,7 +259,7 @@ void mpi_send_quat(int node, int part, double quat[4]);
     \param pnode the node it is attached to.
     \param rot the rotation flag
 */
-void mpi_send_rotation(int pnode, int part, int rot);
+void mpi_send_rotation(int pnode, int part, short int rot);
 
 /* Issue REQ_SET_LAMBDA: send particle angular velocity.
     Also calls \ref on_particle_change.
@@ -324,16 +321,6 @@ void mpi_send_smaller_timestep_flag(int node, int part,
                                     int smaller_timestep_flag);
 #endif
 
-#ifdef CONFIGTEMP
-/** Issue REQ_SET_CONFIGTEMP: send configurational temperature flag.
-    Also calls \ref on_particle_change.
-    \param part the particle.
-    \param node the node it is attached to.
-    \param configtemp the configurational temperature flag.
-*/
-void mpi_send_configtemp_flag(int node, int part, int configtemp_flag);
-#endif
-
 /** Issue REQ_SET_TYPE: send particle type.
     Also calls \ref on_particle_change.
     \param part the particle.
@@ -386,7 +373,7 @@ void mpi_remove_particle(int node, int id);
     \note Gets a copy of the particle data not a pointer to the actual particle
     used in integration
 */
-void mpi_recv_part(int node, int part, Particle *part_data);
+Particle mpi_recv_part(int node, int part);
 
 /** Issue REQ_INTEGRATE: start integrator.
     @param n_steps how many steps to do.
@@ -470,19 +457,6 @@ void mpi_local_stress_tensor(DoubleList *TensorInBin, int bins[3],
                              int periodic[3], double range_start[3],
                              double range[3]);
 
-/** Issue REQ_GETPARTS: gather all particle informations (except bonds).
-    This is slow and may use huge amounts of memory. If il is non-NULL, also
-    the bonding information is also fetched and stored in a single intlist
-    pointed to by il. The particles bonding information references this array,
-    which is the only data you have to free later (besides the result array
-    you allocated). YOU MUST NOT CALL \ref free_particle on any of these
-  particles!
-
-  \param result where to store the gathered particles
-  \param il if non-NULL, the integerlist where to store the bonding info
-*/
-void mpi_get_particles(Particle *result, IntList *il);
-
 /** Issue REQ_SET_TIME_STEP: send new \ref time_step and rescale the
     velocities accordingly.
 */
@@ -514,18 +488,25 @@ void mpi_set_particle_temperature(int pnode, int part, double _T);
 
 /** Issue REQ_SEND_PARTICLE_T: send particle type specific frictional
  * coefficient. */
+#ifndef PARTICLE_ANISOTROPY
 void mpi_set_particle_gamma(int pnode, int part, double gamma);
+#else
+void mpi_set_particle_gamma(int pnode, int part, Vector3d gamma);
+#endif
+
 #ifdef ROTATION
-#ifndef ROTATIONAL_INERTIA
+#ifndef PARTICLE_ANISOTROPY
 void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot);
 #else
-void mpi_set_particle_gamma_rot(int pnode, int part, double gamma_rot[3]);
-#endif // ROTATIONAL_INERTIA
+void mpi_set_particle_gamma_rot(int pnode, int part, Vector3d gamma_rot);
+#endif // PARTICLE_ANISOTROPY
 #endif
 #endif // LANGEVIN_PER_PARTICLE
 
-/** Issue REQ_BCAST_COULOMB: send new coulomb parameters. */
-void mpi_bcast_constraint(int del_num);
+#if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
+/** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
+void mpi_bcast_lbboundary(int del_num);
+#endif
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 /** Callback to adapt p4est grid
@@ -646,22 +627,6 @@ void mpi_recv_interpolated_velocity (int node, double *p, double *v);
 void mpi_dd_p4est_write_particle_vtk(int node, int len);
 #endif
 
-#if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
-/** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
-void mpi_bcast_lbboundary(int del_num);
-#endif
-
-/** Issue REQ_BCAST_LJFORCECAP: initialize force capping. */
-void mpi_cap_forces(double force_cap);
-
-/** Issue REQ_GET_CONSFOR: get force acting on constraint */
-void mpi_get_constraint_force(int constraint, double force[3]);
-
-#ifdef CONFIGTEMP
-/** Issue REQ_GET_CONFIGTEMP: get configurational temperature */
-void mpi_get_configtemp(double cfgtmp[2]);
-#endif
-
 /** Issue REQ_RESCALE_PART: rescales all particle positions in direction 'dir'
  * by a factor 'scale'. */
 void mpi_rescale_particles(int dir, double scale);
@@ -672,9 +637,6 @@ void mpi_bcast_cell_structure(int cs);
 /** Issue REQ_BCAST_NPTISO_GEOM: broadcast nptiso geometry parameter to all
  * nodes. */
 void mpi_bcast_nptiso_geom(void);
-
-/** Issue REQ_BCAST_LJANGLEFORCECAP: initialize LJANGLE force capping. */
-// void mpi_ljangle_cap_forces(double force_cap);
 
 /** Issue REQ_UPDATE_MOL_IDS: Update the molecule ids so that they are
     in sync with the topology.  Note that this only makes sense if you
@@ -690,7 +652,7 @@ int mpi_sync_topo_part_info(void);
  * @param field References the parameter field to be broadcasted. The references
  * are defined in \ref lb.hpp "lb.hpp"
  */
-void mpi_bcast_lb_params(int field);
+void mpi_bcast_lb_params(int field, int value = -1);
 
 /** Issue REQ_BCAST_cuda_global_part_vars: Broadcast a parameter for CUDA
  */
@@ -780,16 +742,18 @@ void mpi_external_potential_sum_energies_slave();
 std::vector<EspressoGpuDevice> mpi_gather_cuda_devices();
 #endif
 
-/** CPU Thermostat */
-void mpi_thermalize_cpu(int temp);
-
-/** MPI-IO output function.
- *  \param filename Filename prefix for the created files. Must be
- * null-terminated.
- *  \param fields Fields to dump (see mpiio_tcl.hpp).
- *  \param write 1 to write, 0 to read
+/**
+ * @brief Resort the particles.
+ *
+ * This function resorts the particles on the nodes.
+ *
+ * @param global_flag If true a global resort is done,
+ *        if false particles are only exchanges between
+ *        neighbors.
+ * @return The number of particles on the nodes after
+ *         the resort.
  */
-void mpi_mpiio(const char *filename, unsigned fields, int write);
+std::vector<int> mpi_resort_particles(int global_flag);
 
 /*@}*/
 
@@ -799,7 +763,6 @@ void mpi_mpiio(const char *filename, unsigned fields, int write);
 */
 /*@{*/
 #define P3M_COUNT_CHARGES 0
-#define SORT_PARTICLES 1
 #define CHECK_PARTICLES 2
 #define MAGGS_COUNT_CHARGES 3
 #define P3M_COUNT_DIPOLES 5

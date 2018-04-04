@@ -146,23 +146,23 @@ typedef struct {
   /** flag indicating whether this site belongs to a boundary */
   int boundary;
 
-/** normal vector of the boundary surface */
-// double *nvec; //doesn't work like that any more, I think (georg, 17.08.10)
+  /** normal vector of the boundary surface */
+  double *nvec; // doesn't work like that any more, I think (georg, 17.08.10)
+#endif          // LB_BOUNDARIES
 
-#endif // LB_BOUNDARIES
 } LB_FluidNode;
 
 /** Data structure holding the parameters for the Lattice Boltzmann system. */
 typedef struct {
 
   /** number density (LJ units) */
-  double rho[LB_COMPONENTS];
+  double rho;
 
   /** kinematic viscosity (LJ units) */
-  double viscosity[LB_COMPONENTS];
+  double viscosity;
 
   /** bulk viscosity (LJ units) */
-  double bulk_viscosity[LB_COMPONENTS];
+  double bulk_viscosity;
 
   /** lattice spacing (LJ units) */
   double agrid;
@@ -182,22 +182,35 @@ typedef struct {
   /** friction coefficient for viscous coupling (LJ units)
    * Note that the friction coefficient is quite high and may
    * lead to numerical artifacts with low order integrators */
-  double friction[LB_COMPONENTS];
+  double friction;
 
   /** external force applied to the fluid at each lattice site (MD units) */
   double ext_force[3]; /* Open question: Do we want a local force or global
                           force? */
-  double rho_lb_units[LB_COMPONENTS];
-  double gamma_odd[LB_COMPONENTS];
-  double gamma_even[LB_COMPONENTS];
+  double rho_lb_units;
+  /** relaxation of the odd kinetic modes */
+  double gamma_odd;
+  /** relaxation of the even kinetic modes */
+  double gamma_even;
+  /** relaxation rate of shear modes */
+  double gamma_shear;
+  /** relaxation rate of bulk modes */
+  double gamma_bulk;
 
-  /** Flag determining whether gamma_shear, gamma_odd, and gamma_even are
+  /** Flag determining whether lbpar.gamma_shear, gamma_odd, and gamma_even are
    * calculated
-   *  from gamma_shear in such a way to yield a TRT LB with minimized slip at
+   *  from lbpar.gamma_shear in such a way to yield a TRT LB with minimized slip
+   * at
    *  bounce-back boundaries */
   bool is_TRT;
 
   int resend_halo;
+
+  /** \name Derived parameters */
+  /** Flag indicating whether fluctuations are present. */
+  int fluct;
+  /** amplitudes of the fluctuations of the modes */
+  double phi[19];
 } LB_Parameters;
 #else // LB_ADAPTIVE
 // define the very same structs, only use typedef for floating point numbers and
@@ -227,9 +240,9 @@ typedef struct {
 } LB_FluidNode;
 
 typedef struct {
-  lb_float rho[LB_COMPONENTS];
-  lb_float viscosity[LB_COMPONENTS];
-  lb_float bulk_viscosity[LB_COMPONENTS];
+  lb_float rho;
+  lb_float viscosity;
+  lb_float bulk_viscosity;
   lb_float agrid;
   lb_float tau;
 
@@ -238,12 +251,14 @@ typedef struct {
   /** the maximum refinement level */
   int max_refinement_level;
 
-  lb_float friction[LB_COMPONENTS];
+  lb_float friction;
   lb_float ext_force[3]; /* Open question: Do we want a local force or global
                             force? */
-  lb_float rho_lb_units[LB_COMPONENTS];
-  lb_float gamma_odd[LB_COMPONENTS];
-  lb_float gamma_even[LB_COMPONENTS];
+  lb_float rho_lb_units;
+  lb_float gamma_odd;
+  lb_float gamma_even;
+  lb_float gamma_shear;
+  lbfloat gamma_bulk;
   bool is_TRT;
   int resend_halo;
 } LB_Parameters;
@@ -280,34 +295,16 @@ extern int fluct;
 /** Switch indicating momentum exchange between particles and fluid */
 extern int transfer_momentum;
 
-/** Eigenvalue of collision operator corresponding to shear viscosity. */
-extern double lblambda;
-
-/** Eigenvalue of collision operator corresponding to bulk viscosity. */
-extern double lblambda_bulk;
-
+#ifdef LB_ADAPTIVE
+// count number of LB steps to control subcycling
 extern int n_lbsteps;
 
-#ifdef LB_ADAPTIVE
+// save meshwidth for all available levels
 extern lb_float h[P8EST_MAXLEVEL];
 
+// calculate prefactors based on lbpar.max_refinement_level
 extern lb_float prefactors[P8EST_MAXLEVEL];
-
-extern lb_float gamma_shear[P8EST_MAXLEVEL];
-
-extern lb_float gamma_bulk[P8EST_MAXLEVEL];
-#else  // LB_ADAPTIVE
-extern int resend_halo;
-
-extern double gamma_shear;
-extern double gamma_bulk;
 #endif // LB_ADAPTIVE
-extern double gamma_odd;
-extern double gamma_even;
-extern double lb_phi[19];
-extern double lb_coupl_pref;
-extern double lb_coupl_pref2;
-#endif // !LB_ADAPTIVE_GPU
 
 /************************************************************/
 /** \name Exported Functions */
@@ -336,13 +333,6 @@ void lb_reinit_parameters();
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_fluid();
-
-#ifdef LB_ADAPTIVE
-void lb_release_fluid();
-#endif // LB_ADAPTIVE
-
-/** deallocate lb fluid */
-void lb_release();
 
 /** Resets the forces on the fluid nodes */
 void lb_reinit_forces();
@@ -376,7 +366,7 @@ void lb_get_local_fields(LB_FluidNode *node, double *rho, double *j,
     @param j local fluid speed
     @param pi local fluid pressure
 */
-void lb_calc_n_from_rho_j_pi(const index_t index, const double rho,
+void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
                              const double *j, double *pi);
 
 /** Propagates the Lattice Boltzmann system for one time step.
@@ -401,7 +391,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *p, double *v);
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v);
 int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost);
 
-inline void lb_calc_local_fields(index_t index, double *rho, double *j,
+inline void lb_calc_local_fields(Lattice::index_t index, double *rho, double *j,
                                  double *pi);
 
 /** Calculation of hydrodynamic modes.
@@ -409,18 +399,18 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
  *  @param index number of the node to calculate the modes for
  *  @param mode output pointer to a double[19]
  */
-void lb_calc_modes(index_t index, double *mode);
+void lb_calc_modes(Lattice::index_t index, double *mode);
 
 /** Calculate the local fluid density.
  * The calculation is implemented explicitly for the special case of D3Q19.
  * @param index the local lattice site (Input).
  * @param rho   local fluid density
  */
-inline void lb_calc_local_rho(index_t index, double *rho) {
+inline void lb_calc_local_rho(Lattice::index_t index, double *rho) {
 #ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
-#endif // !LB_ADAPTIVE
+#endif
 
   // unit conversion: mass density
   if (!(lattice_switch & LATTICE_LB)) {
@@ -430,7 +420,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
     return;
   }
 
-  double avg_rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
+  double avg_rho = lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
 
   *rho = avg_rho + lbfluid[0][0][index] + lbfluid[0][1][index] +
          lbfluid[0][2][index] + lbfluid[0][3][index] + lbfluid[0][4][index] +
@@ -447,7 +437,7 @@ inline void lb_calc_local_rho(index_t index, double *rho) {
  * @param index The local lattice site (Input).
  * @param j local fluid speed
  */
-inline void lb_calc_local_j(index_t index, double *j) {
+inline void lb_calc_local_j(Lattice::index_t index, double *j) {
 #ifndef LB_ADAPTIVE
 #ifndef D3Q19
 #error Only D3Q19 is implemened!
@@ -479,7 +469,7 @@ inline void lb_calc_local_j(index_t index, double *j) {
  * @param index The local lattice site (Input).
  * @param pi local fluid pressure
  */
-inline void lb_calc_local_pi(index_t index, double *pi) {
+inline void lb_calc_local_pi(Lattice::index_t index, double *pi) {
 
   double rho;
   double j[3];
@@ -502,7 +492,7 @@ inline void lb_calc_local_pi(index_t index, double *pi) {
  * @param j       local fluid speed
  * @param pi      local fluid pressure
  */
-inline void lb_calc_local_fields(index_t index, double *rho, double *j,
+inline void lb_calc_local_fields(Lattice::index_t index, double *rho, double *j,
                                  double *pi) {
 #ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
@@ -527,7 +517,7 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
 
 #ifdef LB_BOUNDARIES
   if (lbfields[index].boundary) {
-    *rho = lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
+    *rho = lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
     j[0] = 0.;
     j[1] = 0.;
     j[2] = 0.;
@@ -546,7 +536,7 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
   double modes_from_pi_eq[6];
   lb_calc_modes(index, mode);
 
-  *rho = mode[0] + lbpar.rho[0] * lbpar.agrid * lbpar.agrid * lbpar.agrid;
+  *rho = mode[0] + lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
 
   j[0] = mode[1];
   j[1] = mode[2];
@@ -565,8 +555,8 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
 
   /* equilibrium part of the stress modes */
   modes_from_pi_eq[0] = scalar(j, j) / *rho;
-  modes_from_pi_eq[1] = (SQR(j[0]) - SQR(j[1])) / *rho;
-  modes_from_pi_eq[2] = (scalar(j, j) - 3.0 * SQR(j[2])) / *rho;
+  modes_from_pi_eq[1] = (Utils::sqr(j[0]) - Utils::sqr(j[1])) / *rho;
+  modes_from_pi_eq[2] = (scalar(j, j) - 3.0 * Utils::sqr(j[2])) / *rho;
   modes_from_pi_eq[3] = j[0] * j[1] / *rho;
   modes_from_pi_eq[4] = j[0] * j[2] / *rho;
   modes_from_pi_eq[5] = j[1] * j[2] / *rho;
@@ -574,17 +564,17 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
   mode[4] = modes_from_pi_eq[0] +
-            (0.5 + 0.5 * gamma_bulk) * (mode[4] - modes_from_pi_eq[0]);
+            (0.5 + 0.5 * lbpar.gamma_bulk) * (mode[4] - modes_from_pi_eq[0]);
   mode[5] = modes_from_pi_eq[1] +
-            (0.5 + 0.5 * gamma_shear) * (mode[5] - modes_from_pi_eq[1]);
+            (0.5 + 0.5 * lbpar.gamma_shear) * (mode[5] - modes_from_pi_eq[1]);
   mode[6] = modes_from_pi_eq[2] +
-            (0.5 + 0.5 * gamma_shear) * (mode[6] - modes_from_pi_eq[2]);
+            (0.5 + 0.5 * lbpar.gamma_shear) * (mode[6] - modes_from_pi_eq[2]);
   mode[7] = modes_from_pi_eq[3] +
-            (0.5 + 0.5 * gamma_shear) * (mode[7] - modes_from_pi_eq[3]);
+            (0.5 + 0.5 * lbpar.gamma_shear) * (mode[7] - modes_from_pi_eq[3]);
   mode[8] = modes_from_pi_eq[4] +
-            (0.5 + 0.5 * gamma_shear) * (mode[8] - modes_from_pi_eq[4]);
+            (0.5 + 0.5 * lbpar.gamma_shear) * (mode[8] - modes_from_pi_eq[4]);
   mode[9] = modes_from_pi_eq[5] +
-            (0.5 + 0.5 * gamma_shear) * (mode[9] - modes_from_pi_eq[5]);
+            (0.5 + 0.5 * lbpar.gamma_shear) * (mode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -603,7 +593,7 @@ inline void lb_calc_local_fields(index_t index, double *rho, double *j,
 }
 
 #ifdef LB_BOUNDARIES
-inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
+inline void lb_local_fields_get_boundary_flag(Lattice::index_t index, int *boundary) {
 #ifndef LB_ADAPTIVE
   if (!(lattice_switch & LATTICE_LB)) {
     runtimeErrorMsg() << "Error in lb_local_fields_get_boundary_flag in "
@@ -622,26 +612,26 @@ inline void lb_local_fields_get_boundary_flag(index_t index, int *boundary) {
  * @param index The local lattice site (Input).
  * @param pop fluid population
  */
-inline void lb_get_populations(index_t index, double *pop) {
+inline void lb_get_populations(Lattice::index_t index, double *pop) {
 #ifndef LB_ADAPTIVE
   int i = 0;
-  for (i = 0; i < 19 * LB_COMPONENTS; i++) {
+  for (i = 0; i < 19; i++) {
     pop[i] =
-        lbfluid[0][i][index] + lbmodel.coeff[i % 19][0] * lbpar.rho[i / 19];
+        lbfluid[0][i][index] + lbmodel.coeff[i % 19][0] * lbpar.rho;
   }
 #endif // LB_ADAPTIVE
 }
 
-inline void lb_set_populations(index_t index, double *pop) {
+inline void lb_set_populations(Lattice::index_t index, double *pop) {
 #ifndef LB_ADAPTIVE
   int i = 0;
-  for (i = 0; i < 19 * LB_COMPONENTS; i++) {
+  for (i = 0; i < 19; i++) {
     lbfluid[0][i][index] =
-        pop[i] - lbmodel.coeff[i % 19][0] * lbpar.rho[i / 19];
+        pop[i] - lbmodel.coeff[i % 19][0] * lbpar.rho;
   }
 #endif // LB_ADAPTIVE
 }
-#endif // LB
+#endif
 
 #include "lbgpu.hpp"
 
@@ -665,11 +655,12 @@ int lb_lbfluid_get_tau(double *p_tau);
 int lb_lbfluid_get_visc(double *p_visc);
 int lb_lbfluid_get_bulk_visc(double *p_bulk_visc);
 int lb_lbfluid_get_friction(double *p_friction);
+int lb_lbfluid_get_couple_flag(int *couple_flag);
 int lb_lbfluid_get_ext_force(double *p_f);
 #ifdef SHANCHEN
 int lb_lbfluid_set_shanchen_coupling(double *p_coupling);
 int lb_lbfluid_set_mobility(double *p_mobility);
-#endif // SHANCHEN
+#endif
 int lb_set_lattice_switch(int py_switch);
 int lb_get_lattice_switch(int *py_switch);
 
@@ -707,10 +698,10 @@ int lb_lbnode_set_pop(int *ind, double *pop);
  * position is not within the local lattice. This version of the function
  * can be called without the position needing to be on the local processor */
 int lb_lbfluid_get_interpolated_velocity_global(double *p, double *v);
+#endif // defined (LB) || defined(LB_GPU)
 
 #endif // !LB_ADAPTIVE_GPU
 #endif // LB
 
 #endif /* _LB_H */
-
 /*@}*/

@@ -20,9 +20,10 @@
 
 from __future__ import print_function, absolute_import
 include "myconfig.pxi"
-from espressomd._system cimport *
+from espressomd.system cimport *
 cimport numpy as np
 from espressomd.utils cimport *
+from espressomd.utils import is_valid_type
 
 cdef extern from "SystemInterface.hpp":
     cdef cppclass SystemInterface:
@@ -54,14 +55,13 @@ IF ELECTROSTATICS:
                 COULOMB_INTER_RF, \
                 COULOMB_P3M_GPU, \
                 COULOMB_MMM1D_GPU, \
-                COULOMB_EWALD_GPU, \
                 COULOMB_EK, \
                 COULOMB_SCAFACOS
 
-        int coulomb_set_bjerrum(double bjerrum)
+        int coulomb_set_prefactor(double prefactor)
+        void deactivate_coulomb_method()
 
         ctypedef struct Coulomb_parameters:
-            double bjerrum
             double prefactor
             CoulombMethod method
 
@@ -103,13 +103,12 @@ IF ELECTROSTATICS:
 
         IF CUDA:
             cdef extern from "p3m_gpu.hpp":
-                void p3m_gpu_init(int cao, int * mesh, double alpha, double * box)
+                void p3m_gpu_init(int cao, int * mesh, double alpha)
 
             cdef inline python_p3m_gpu_init(params):
                 cdef int cao
                 cdef int mesh[3]
                 cdef double alpha
-                cdef double box[3]
                 cao = params["cao"]
                 # Mesh can be specified as single int, but here, an array is needed
                 if not hasattr(params["mesh"],"__getitem__"):
@@ -118,8 +117,7 @@ IF ELECTROSTATICS:
                 else:
                     mesh = params["mesh"]
                 alpha = params["alpha"]
-                box = params["box"]
-                p3m_gpu_init(cao, mesh, alpha, box)
+                p3m_gpu_init(cao, mesh, alpha)
 
         # Convert C arguments into numpy array
         cdef inline python_p3m_set_mesh_offset(mesh_off):
@@ -133,7 +131,8 @@ IF ELECTROSTATICS:
             cdef char * log = NULL
             cdef int response
             response = p3m_adaptive_tune(& log)
-            print(log)
+            handle_errors("Error in p3m_adaptive_tune")
+            if log.strip(): print(log)
             return response
 
         cdef inline python_p3m_set_params(p_r_cut, p_mesh, p_cao, p_alpha, p_accuracy):
@@ -146,7 +145,7 @@ IF ELECTROSTATICS:
             cao = p_cao
             alpha = p_alpha
             accuracy = p_accuracy
-            if isinstance(p_mesh, int):
+            if is_valid_type(p_mesh, int):
                 mesh[0] = p_mesh
                 mesh[1] = p_mesh
                 mesh[2] = p_mesh
@@ -168,7 +167,7 @@ IF ELECTROSTATICS:
             alpha = p_alpha
             accuracy = p_accuracy
             n_interpol = p_n_interpol
-            if isinstance(p_mesh, int):
+            if is_valid_type(p_mesh, int):
                 mesh[0] = p_mesh
                 mesh[1] = p_mesh
                 mesh[2] = p_mesh
@@ -195,36 +194,6 @@ IF ELECTROSTATICS:
         int dh_set_params(double kappa, double r_cut)
         int dh_set_params_cdh(double kappa, double r_cut, double eps_int, double eps_ext, double r0, double r1, double alpha)
 
-IF ELECTROSTATICS and CUDA and EWALD_GPU:
-    cdef extern from "actor/EwaldGPU.hpp":
-        cdef cppclass EwaldgpuForce:
-            EwaldgpuForce(EspressoSystemInterface & s, double r_cut, int num_kx, int num_ky, int num_kz, double alpha)
-            int set_params(double rcut, int num_kx, int num_ky, int num_kz, double alpha)
-            int set_params_tune(double accuracy, double precision, int K_max, int time_calc_steps)
-            int adaptive_tune(char ** log, EspressoSystemInterface & s)
-            double tune_alpha(double accuracy, double precision, int K, double V, double q_sqr, int N)
-            double tune_rcut(double accuracy, double precision, double alpha, double V, double q_sqr, int N)
-            int determine_calc_time_steps()
-
-        ctypedef struct Ewaldgpu_params:
-            double rcut
-            int num_kx
-            int num_ky
-            int num_kz
-            double alpha
-            double accuracy
-            double precision
-            bint isTuned  # Tuning is over
-            bint isTunedFlag  # Flag tuning is over
-            int K_max  # Maximal reciprocal K-vector in tuning
-            int time_calc_steps  # Steps in time_force_calc function
-
-        cdef extern Ewaldgpu_params ewaldgpu_params
-
-        # ctypedef extern class EwaldgpuForce ewaldgpuForce
-#    cdef extern from "EspressoSystemInterface.cpp":
-#        cdef cppclass extern EspressoSystemInterface *EspressoSystemInterface;
-
 IF ELECTROSTATICS:
     cdef extern from "mmm1d.hpp":
         ctypedef struct MMM1D_struct:
@@ -240,7 +209,7 @@ IF ELECTROSTATICS:
         int mmm1d_tune(char **log);
 
     cdef extern from "interaction_data.hpp":
-        int coulomb_set_bjerrum(double bjerrum)
+        int coulomb_set_prefactor(double prefactor)
 
         ctypedef enum CoulombMethod :
             COULOMB_NONE, 
@@ -254,11 +223,9 @@ IF ELECTROSTATICS:
             COULOMB_INTER_RF, 
             COULOMB_P3M_GPU,
             COULOMB_MMM1D_GPU,
-            COULOMB_EWALD_GPU,
             COULOMB_EK 
 
         ctypedef struct Coulomb_parameters:
-            double bjerrum
             double prefactor
             CoulombMethod method
 
@@ -269,7 +236,7 @@ IF ELECTROSTATICS:
         cdef int resp
         MMM1D_init();
         if MMM1D_sanity_checks()==1:
-            raise ValueError("MMM1D Sanity check failed: wrong periodicity or wrong cellsystem, PRTFM")
+            handle_errors("MMM1D Sanity check failed: wrong periodicity or wrong cellsystem, PRTFM")
         resp=mmm1d_tune(&log)
         if resp:
             print(log)
@@ -307,7 +274,8 @@ IF ELECTROSTATICS and MMM1D_GPU:
             Mmm1dgpuForce(SystemInterface &s, mmm1dgpu_real coulomb_prefactor, mmm1dgpu_real maxPWerror);
             void setup(SystemInterface &s);
             void tune(SystemInterface &s, mmm1dgpu_real _maxPWerror, mmm1dgpu_real _far_switch_radius, int _bessel_cutoff);
-            void set_params(mmm1dgpu_real _boxz, mmm1dgpu_real _coulomb_prefactor, mmm1dgpu_real _maxPWerror, mmm1dgpu_real _far_switch_radius, int _bessel_cutoff, bool manual = False);
+            void set_params(mmm1dgpu_real _boxz, mmm1dgpu_real _coulomb_prefactor, mmm1dgpu_real _maxPWerror, mmm1dgpu_real _far_switch_radius, int _bessel_cutoff, bool manual);
+            void set_params(mmm1dgpu_real _boxz, mmm1dgpu_real _coulomb_prefactor, mmm1dgpu_real _maxPWerror, mmm1dgpu_real _far_switch_radius, int _bessel_cutoff);
 
             unsigned int numThreads;
             unsigned int numBlocks(SystemInterface &s);

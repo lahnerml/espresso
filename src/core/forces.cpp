@@ -93,7 +93,8 @@ void check_forces() {
 }
 
 void force_calc() {
-  repart::RuntimeRecorder(repart::fc_runtime);
+  // TODO: Fix compilation error
+  //repart::RuntimeRecorder(repart::fc_runtime);
 
   // Communication step: distribute ghost positions
   cells_update_ghosts();

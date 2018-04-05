@@ -213,7 +213,8 @@ void integrate_ensemble_init() {
 /************************************************************/
 
 void integrate_vv(int n_steps, int reuse_forces) {
-  repart::RuntimeRecorder(repart::ivv_runtime);
+  // TODO: Fix compilation error
+  //repart::RuntimeRecorder(repart::ivv_runtime);
 
   /* Prepare the Integrator */
   on_integration_start();

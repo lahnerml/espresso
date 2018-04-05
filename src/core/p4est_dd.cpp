@@ -207,6 +207,15 @@ static const int REP_EX_DYN_TAG  = 33033;
 
 static const int COMM_RANK_NONE  = 999999;
 //--------------------------------------------------------------------------------------------------
+
+p4est_t* dd_p4est_get_p4est() {
+  return ds::p4est;
+}
+
+int dd_p4est_get_n_trees(int dir = 0) {
+  return brick_size[dir];
+}
+
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
 int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {

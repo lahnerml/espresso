@@ -16,6 +16,18 @@
 } while(0)
 #endif
 
+/** Get pointer to short-range MD p4est */
+p4est_t* dd_p4est_get_p4est();
+
+/** Get number of trees in current p4est_connectivity structure for given
+ * direction.
+ *
+ * @param dir   Direction index, ordered as x, y, z.
+ *              Defaults to x if not specified.
+ * @return      Number of trees in specified direction
+ */
+int dd_p4est_get_n_trees(int dir);
+
 int dd_p4est_full_shell_neigh(int cell, int neighidx);
 
 // Check all particles if they have left their cell and move the to the right neighboring cell

@@ -1152,13 +1152,16 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
     }
 #ifdef EXCLUSIONS
     if (p->el.n > 0) {
-      alloc_intlist(&p->el, p->el.n);
-      // used to be memmove, but why?
+      if (!(p->el.e = (int *) malloc(p->el.max * sizeof(int)))) {
+        fprintf(stderr, "Tod.\n");
+        errexit();
+      }
       memcpy(p->el.e, &dynrecv[read], p->el.n*sizeof(int));
       read += p->el.n;
     }
     else {
       p->el.e = NULL;
+      p->el.max = 0;
     }
 #endif
   }
@@ -1623,11 +1626,15 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           }
 #ifdef EXCLUSIONS
           if (p->el.n > 0) {
-            alloc_intlist(&p->el, p->el.n);
+            if (!(p->el.e = (int *) malloc(p->el.max * sizeof(int)))) {
+              fprintf(stderr, "Tod.\n");
+              errexit();
+            }
             memcpy(p->el.e, &recvbuf_dyn[source][read], p->el.n*sizeof(int));
             read += p->el.n;
           } else {
             p->el.e = NULL;
+            p->el.max = 0;
           }
 #endif
         }

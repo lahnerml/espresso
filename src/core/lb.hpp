@@ -33,9 +33,6 @@
 #include "lattice_inline.hpp"
 #include "utils.hpp"
 
-extern int
-    lb_components; // global variable holding the number of fluid components
-
 #ifdef LB
 
 /* For the D3Q19 model most functions have a separate implementation
@@ -113,23 +110,7 @@ typedef struct {
 } LB_Model;
 
 /** Data structure for fluid on a local lattice site */
-typedef struct {
-
-  /** flag indicating whether fields have to be recomputed */
-  int recalc_fields;
-
-  /** local density */
-  double rho[1];
-
-  /** local momentum */
-  double j[3];
-
-  /** local stress tensor */
-  double pi[6];
-
-  /* local populations of the velocity directions
-   *  are stored seperately to achieve higher performance */
-
+struct LB_FluidNode {
   /** flag indicating whether a force is acting on the node */
   int has_force;
 
@@ -145,12 +126,9 @@ typedef struct {
 #ifdef LB_BOUNDARIES
   /** flag indicating whether this site belongs to a boundary */
   int boundary;
-
-  /** normal vector of the boundary surface */
-  double *nvec; // doesn't work like that any more, I think (georg, 17.08.10)
 #endif          // LB_BOUNDARIES
 
-} LB_FluidNode;
+};
 
 /** Data structure holding the parameters for the Lattice Boltzmann system. */
 typedef struct {
@@ -170,14 +148,6 @@ typedef struct {
   /** time step for fluid propagation (LJ units)
    *  Note: Has to be larger than MD time step! */
   double tau;
-
-#ifdef LB_ADAPTIVE
-  /** the initial level */
-  int base_level;
-
-  /** the maximum level up to which the forest may be refined */
-  int max_refinement_level;
-#endif // LB_ADAPTIVE
 
   /** friction coefficient for viscous coupling (LJ units)
    * Note that the friction coefficient is quite high and may
@@ -289,9 +259,6 @@ typedef struct lbadapt_payload {
 } lbadapt_payload_t;
 #endif // LB_ADAPTIVE
 
-/* int to indicate fluctuations */
-extern int fluct;
-
 /** Switch indicating momentum exchange between particles and fluid */
 extern int transfer_momentum;
 
@@ -341,25 +308,6 @@ void lb_reinit_forces();
 int lb_sanity_checks();
 
 #ifndef LB_ADAPTIVE_GPU
-/** Sets the density and momentum on a local lattice site.
- * @param node  Pointer to the Node of the lattice site within the local domain
- * (Input)
- * @param rho   Local density of the fluid (Input)
- * @param v     Local momentum of the fluid (Input)
- * @param pi    Local pressure of the fluid (Input)
- */
-void lb_set_local_fields(LB_FluidNode *node, const double rho, const double *v,
-                         const double *pi);
-
-/** Returns the mass, momentum and stress of a local lattice site.
- * @param node  The index of the lattice site within the local domain (Input)
- * @param rho   Local density of the fluid (Output)
- * @param j     Local momentum of the fluid (Output)
- * @param pi    Local stress tensor of the fluid (Output)
- */
-void lb_get_local_fields(LB_FluidNode *node, double *rho, double *j,
-                         double *pi);
-
 /** Calculates the equilibrium distributions.
     @param index Index of the local site
     @param rho local fluid density

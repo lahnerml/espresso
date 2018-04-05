@@ -25,10 +25,15 @@
 #include "domain_decomposition.hpp"
 #include "errorhandling.hpp"
 #include "grid.hpp"
+#include "domain_decomposition.hpp"
+#include "particle_data.hpp"
+#include "collision.hpp"
 #include "initialize.hpp"
 #include "interaction_data.hpp"
 #include "rotation.hpp"
 #include "virtual_sites/VirtualSitesRelative.hpp"
+
+Cell* dd_p4est_position_to_cell_strict(double pos[3]);
 
 #ifdef COLLISION_DETECTION_DEBUG
 #define TRACE(a) a
@@ -554,6 +559,7 @@ Cell* project_to_boundary(const double pos[3])
   //  - Then edge neighbors
   //  - Then corner neighbors
   static const std::vector<std::array<int, 3>> directions = {
+    { 0,  0,  0},
     // Faces
     { 0,  0, -1},
     { 0,  0,  1},
@@ -593,7 +599,7 @@ Cell* project_to_boundary(const double pos[3])
     double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
                      , pos[1] + displ[1] * dd.cell_size[1]
                      , pos[2] + displ[2] * dd.cell_size[2] };
-    if ((c = cell_structure.position_to_cell(spos)))
+    if ((c = dd_p4est_position_to_cell_strict(spos)))
       return c;
   }
 
@@ -602,6 +608,10 @@ Cell* project_to_boundary(const double pos[3])
 
 Cell* responsible_collision_cell(Particle& p)
 {
+  if (cell_structure.type != CELL_STRUCTURE_P4EST) {
+    fprintf(stderr, "Coldet currently works only with p4est cell system.");
+    errexit();
+  }
   if (p.l.ghost)
     return project_to_boundary(p.r.p);
   else
@@ -626,11 +636,12 @@ void three_particle_binding_domain_decomposition(
       auto cell2 = responsible_collision_cell(p2);
 
       if (!cell1 || !cell2) {
-        fprintf(stderr, "Error: Particles during collision handling nowhere near domain.\n"
-                        "P1: %lf %lf %lf (cell %p; is ghost? %i), P2: %lf %lf %lf (cell %p; is ghost? %i)\n",
-                        p1.r.p[0], p1.r.p[1], p1.r.p[2], static_cast<void*>(cell1), p1.l.ghost,
-                        p2.r.p[0], p2.r.p[1], p2.r.p[2], static_cast<void*>(cell2), p2.l.ghost);
-        errexit();
+        //fprintf(stderr, "Error: Particles during collision handling nowhere near domain.\n"
+        //                "P1: %lf %lf %lf (cell %p; is ghost? %i), P2: %lf %lf %lf (cell %p; is ghost? %i)\n",
+        //                p1.r.p[0], p1.r.p[1], p1.r.p[2], static_cast<void*>(cell1), p1.l.ghost,
+        //                p2.r.p[0], p2.r.p[1], p2.r.p[2], static_cast<void*>(cell2), p2.l.ghost);
+        //errexit();
+        continue;
       }
 
       three_particle_binding_dd_do_search(cell1, p1, p2);

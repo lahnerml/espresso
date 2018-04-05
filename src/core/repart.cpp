@@ -10,6 +10,25 @@
 #include "interaction_data.hpp"
 #include "short_range_loop.hpp"
 
+namespace repart {
+double ivv_runtime = 0.0;
+double fc_runtime = 0.0;
+double lc_runtime = 0.0;
+std::vector<double> lc_cell_runtime;
+}
+
+static void metric_runtime(std::vector<double> &weights) {
+  using namespace repart;
+  auto avg = std::accumulate(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), 0.0) / lc_cell_runtime.size();
+  // Rescale the timinigs reasonably.
+  std::transform(std::begin(lc_cell_runtime), std::end(lc_cell_runtime), std::begin(weights), [avg](double d){ return d * 1000.0 / avg; });
+
+  if (this_node == 0)
+    fprintf(stderr, "Runtime metric currently disabled.");
+  comm_cart.barrier();
+  errexit();
+}
+
 // Fills weights with a constant.
 static void metric_ncells(std::vector<double> &weights) {
   std::fill(weights.begin(), weights.end(), 1.0);
@@ -146,7 +165,8 @@ get_single_metric_func(const std::string& desc)
     { "nbondedia"  , metric_nbondedia },
     { "nghostcells", metric_nghostcells },
     { "nghostpart" , metric_nghostpart },
-    { "rand"       , metric_rand }
+    { "rand"       , metric_rand },
+    { "runtime"    , metric_runtime }
   };
 
   for (const auto& t: mets) {
@@ -236,6 +256,13 @@ double repart::metric::pmax() const {
   return max;
 }
 
+double repart::metric::pmin() const {
+  double l = curload();
+  double min;
+  MPI_Allreduce(&l, &min, 1, MPI_DOUBLE, MPI_MIN, MPI_COMM_WORLD);
+  return min;
+}
+
 double repart::metric::pimbalance() const {
   double l = curload();
 
@@ -248,4 +275,18 @@ double repart::metric::pimbalance() const {
 
   double avg = tot / n_nodes;
   return max / avg;
+}
+
+std::array<double, 4> repart::metric::pmax_avg_min_imb() const {
+  double l = curload();
+
+  MPI_Request req[3];
+  double tot, max, min;
+  MPI_Ireduce(&l, &tot, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD, &req[0]);
+  MPI_Ireduce(&l, &max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD, &req[1]);
+  MPI_Ireduce(&l, &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD, &req[2]);
+  MPI_Waitall(3, req, MPI_STATUS_IGNORE);
+
+  double avg = tot / n_nodes;
+  return {{max, avg, min, max / avg}};
 }

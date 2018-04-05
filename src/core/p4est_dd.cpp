@@ -18,7 +18,6 @@
 #include "ghosts.hpp"
 #include "p4est_utils.hpp"
 #include "repart.hpp"
-#include "utils/List.hpp"
 #include "utils/serialization/ParticleList.hpp"
 
 //#include <boost/mpi/nonblocking.hpp>
@@ -79,7 +78,7 @@ static Cell* dd_p4est_save_position_to_cell(double pos[3]);
 // Map a position to a cell, returns NULL if not in local domain
 static Cell* dd_p4est_position_to_cell(double pos[3]);
 //void dd_p4est_position_to_cell(double pos[3], int* idx);
-static Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+Cell* dd_p4est_position_to_cell_strict(double pos[3]);
 
 // Map a position to a global processor index
 static int dd_p4est_pos_to_proc(double pos[3]);
@@ -1127,14 +1126,16 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
     }
 #ifdef EXCLUSIONS
     if (p->el.n > 0) {
-      // TODO: Fix
-      // alloc_intlist(&p->el, p->el.n);
-      // used to be memmove, but why?
+      if (!(p->el.e = (int *) malloc(p->el.max * sizeof(int)))) {
+        fprintf(stderr, "Tod.\n");
+        errexit();
+      }
       memcpy(p->el.e, &dynrecv[read], p->el.n*sizeof(int));
       read += p->el.n;
     }
     else {
       p->el.e = NULL;
+      p->el.max = 0;
     }
 #endif
   }
@@ -1599,12 +1600,15 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           }
 #ifdef EXCLUSIONS
           if (p->el.n > 0) {
-            // TODO: Fix this
-            // alloc_intlist(&p->el, p->el.n);
+            if (!(p->el.e = (int *) malloc(p->el.max * sizeof(int)))) {
+              fprintf(stderr, "Tod.\n");
+              errexit();
+            }
             memcpy(p->el.e, &recvbuf_dyn[source][read], p->el.n*sizeof(int));
             read += p->el.n;
           } else {
             p->el.e = NULL;
+            p->el.max = 0;
           }
 #endif
         }
@@ -1726,12 +1730,6 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 
   /* initialize cell neighbor structures */
   dd_p4est_init_cell_interactions();
-
-  // TODO: Repart-Komm ist geflogen.
-  //       Ggf. später wieder einführen und einfach
-  //       die Zellen tracken, damit man sich
-  //       dd_p4est_save_position_to_cell sparen kann
-  //       sowohl auf Sender- als auch auf Empfängerseite.
 
   if (isRepart) {
     dd_p4est_repart_exchange_part(old);
@@ -1979,10 +1977,10 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
   MPI_Allreduce(MPI_IN_PLACE, part_nquads.data(), n_nodes,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
-  // TODO: Could try to steal quads from neighbors.
-  //       Global reshifting (i.e. stealing from someone else than the direct
-  //       neighbors) is not a good idea since it globally changes the metric.
-  //       Anyways, this is most likely due to a bad quad/proc quotient.
+  // Could try to steal quads from neighbors.
+  // Global reshifting (i.e. stealing from someone else than the direct
+  // neighbors) is not a good idea since it globally changes the metric.
+  // Anyways, this is most likely due to a bad quad/proc quotient.
   if (part_nquads[this_node] == 0) {
     fprintf(stderr, "[%i] No quads assigned to me. Cannot guarantee to work. Exiting\n", this_node);
     fprintf(stderr, "[%i] Try changing the metric or reducing the number of processes\n", this_node);

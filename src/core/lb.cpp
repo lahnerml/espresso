@@ -28,10 +28,7 @@
  */
 
 #include "lb.hpp"
-
 #include "communication.hpp"
-// #include "cuda_interface.hpp" TODO Is this needed?
-// #include "domain_decomposition.hpp" TODO Is this needed?
 #include "grid.hpp"
 #include "halo.hpp"
 #include "immersed_boundary/ibm_main.hpp"
@@ -55,9 +52,6 @@
 #endif // LB_ADAPTIVE
 
 // #define DUMP_GRID
-
-// global variable holding the number of fluid components (see global.cpp)
-int lb_components = LB_COMPONENTS;
 
 #ifdef LB
 #ifndef LB_ADAPTIVE_GPU
@@ -186,8 +180,11 @@ int n_lbsteps = 0;
  * set lattice switch on C-level
  */
 int lb_set_lattice_switch(int py_switch) {
-
-  switch (py_switch) {
+  switch(py_switch) {
+  case 0:
+    lattice_switch = LATTICE_OFF;
+    mpi_bcast_parameter(FIELD_LATTICE_SWITCH);
+    return 0;
   case 1:
     lattice_switch = LATTICE_LB;
     mpi_bcast_parameter(FIELD_LATTICE_SWITCH);
@@ -2332,7 +2329,7 @@ static void lb_realloc_fluid() {
     lbfluid[1][i] = lbfluid[1][0] + i * lblattice.halo_grid_volume;
   }
 
-  lbfields = (LB_FluidNode *)Utils::realloc(
+  lbfields = Utils::realloc(
       lbfields, lblattice.halo_grid_volume * sizeof(*lbfields));
 #else // !LB_ADAPTIVE
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
@@ -2545,7 +2542,6 @@ void lb_reinit_fluid() {
     // calculate equilibrium distribution
     lb_calc_n_from_rho_j_pi(index, rho, j, pi);
 
-    lbfields[index].recalc_fields = 1;
 #ifdef LB_BOUNDARIES
     lbfields[index].boundary = 0;
 #endif // LB_BOUNDARIES
@@ -2796,7 +2792,6 @@ void lb_calc_modes(Lattice::index_t index, double *mode) {
   mode[8] = n6p - n7p;
   mode[9] = n8p - n9p;
 
-#ifndef OLD_FLUCT
   /* kinetic modes */
   mode[10] = -2. * n1m + n4m + n5m + n6m + n7m;
   mode[11] = -2. * n2m + n4m - n5m + n8m + n9m;
@@ -2807,10 +2802,10 @@ void lb_calc_modes(Lattice::index_t index, double *mode) {
   mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2. * (n1p + n2p + n3p);
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
-#endif // !OLD_FLUCT
 #else // !LB_ADAPTIVE
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // !LB_ADAPTIVE
+
 #else  // D3Q19
   int i, j;
   for (i = 0; i < lbmodel.n_veloc; i++) {
@@ -2949,7 +2944,6 @@ inline void lb_relax_modes(Lattice::index_t index, double *mode) {
   mode[8] = pi_eq[4] + lbpar.gamma_shear * (mode[8] - pi_eq[4]);
   mode[9] = pi_eq[5] + lbpar.gamma_shear * (mode[9] - pi_eq[5]);
 
-#ifndef OLD_FLUCT
   /* relax the ghost modes (project them out) */
   /* ghost modes have no equilibrium part due to orthogonality */
   mode[10] = lbpar.gamma_odd * mode[10];
@@ -2961,7 +2955,6 @@ inline void lb_relax_modes(Lattice::index_t index, double *mode) {
   mode[16] = lbpar.gamma_even * mode[16];
   mode[17] = lbpar.gamma_even * mode[17];
   mode[18] = lbpar.gamma_even * mode[18];
-#endif // !OLD_FLUCT
 #else
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
@@ -2981,7 +2974,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[8] += (fluct[4] = rootrho_gauss * lbpar.phi[8] * gaussian_random());
   mode[9] += (fluct[5] = rootrho_gauss * lbpar.phi[9] * gaussian_random());
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho_gauss * lbpar.phi[10] * gaussian_random();
   mode[11] += rootrho_gauss * lbpar.phi[11] * gaussian_random();
@@ -2992,7 +2984,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[16] += rootrho_gauss * lbpar.phi[16] * gaussian_random();
   mode[17] += rootrho_gauss * lbpar.phi[17] * gaussian_random();
   mode[18] += rootrho_gauss * lbpar.phi[18] * gaussian_random();
-#endif // !OLD_FLUCT
 
 #elif defined(GAUSSRANDOMCUT)
   double rootrho_gauss =
@@ -3006,7 +2997,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[8] += (fluct[4] = rootrho_gauss * lbpar.phi[8] * gaussian_random_cut());
   mode[9] += (fluct[5] = rootrho_gauss * lbpar.phi[9] * gaussian_random_cut());
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho_gauss * lbpar.phi[10] * gaussian_random_cut();
   mode[11] += rootrho_gauss * lbpar.phi[11] * gaussian_random_cut();
@@ -3017,7 +3007,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[16] += rootrho_gauss * lbpar.phi[16] * gaussian_random_cut();
   mode[17] += rootrho_gauss * lbpar.phi[17] * gaussian_random_cut();
   mode[18] += rootrho_gauss * lbpar.phi[18] * gaussian_random_cut();
-#endif // OLD_FLUCT
 
 #elif defined(FLATNOISE)
   double rootrho = sqrt(fabs(
@@ -3031,7 +3020,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[8] += (fluct[4] = rootrho * lbpar.phi[8] * (d_random() - 0.5));
   mode[9] += (fluct[5] = rootrho * lbpar.phi[9] * (d_random() - 0.5));
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho * lbpar.phi[10] * (d_random() - 0.5);
   mode[11] += rootrho * lbpar.phi[11] * (d_random() - 0.5);
@@ -3042,7 +3030,6 @@ inline void lb_thermalize_modes(Lattice::index_t index, double *mode) {
   mode[16] += rootrho * lbpar.phi[16] * (d_random() - 0.5);
   mode[17] += rootrho * lbpar.phi[17] * (d_random() - 0.5);
   mode[18] += rootrho * lbpar.phi[18] * (d_random() - 0.5);
-#endif // !OLD_FLUCT
 #else  // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM
@@ -3205,7 +3192,6 @@ inline void lb_calc_n_from_modes_push(Lattice::index_t index, double *m) {
   for (int i = 0; i < lbmodel.n_veloc; i++)
     m[i] = (1. / d3q19_modebase[19][i]) * m[i];
 
-#ifndef OLD_FLUCT
   lbfluid[1][0][next[0]] = m[0] - m[4] + m[16];
   lbfluid[1][1][next[1]] =
       m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2. * (m[10] + m[16]);
@@ -3249,27 +3235,6 @@ inline void lb_calc_n_from_modes_push(Lattice::index_t index, double *m) {
   lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] -
                              m[11] + m[12] + m[14] - m[15] + m[16] - m[17] -
                              m[18];
-#else  // !OLD_FLUCT
-  lbfluid[1][0][next[0]] = m[0] - m[4];
-  lbfluid[1][1][next[1]] = m[0] + m[1] + m[5] + m[6];
-  lbfluid[1][2][next[2]] = m[0] - m[1] + m[5] + m[6];
-  lbfluid[1][3][next[3]] = m[0] + m[2] - m[5] + m[6];
-  lbfluid[1][4][next[4]] = m[0] - m[2] - m[5] + m[6];
-  lbfluid[1][5][next[5]] = m[0] + m[3] - 2. * m[6];
-  lbfluid[1][6][next[6]] = m[0] - m[3] - 2. * m[6];
-  lbfluid[1][7][next[7]] = m[0] + m[1] + m[2] + m[4] + 2. * m[6] + m[7];
-  lbfluid[1][8][next[8]] = m[0] - m[1] - m[2] + m[4] + 2. * m[6] + m[7];
-  lbfluid[1][9][next[9]] = m[0] + m[1] - m[2] + m[4] + 2. * m[6] - m[7];
-  lbfluid[1][10][next[10]] = m[0] - m[1] + m[2] + m[4] + 2. * m[6] - m[7];
-  lbfluid[1][11][next[11]] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8];
-  lbfluid[1][12][next[12]] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8];
-  lbfluid[1][13][next[13]] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8];
-  lbfluid[1][14][next[14]] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8];
-  lbfluid[1][15][next[15]] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9];
-  lbfluid[1][16][next[16]] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9];
-  lbfluid[1][17][next[17]] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9];
-  lbfluid[1][18][next[18]] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9];
-#endif // !OLD_FLUCT
 
   /* weights enter in the back transformation */
   for (int i = 0; i < lbmodel.n_veloc; i++)
@@ -3494,6 +3459,7 @@ inline void lb_collide_stream() {
         if (!lbfields[index].boundary)
 #endif // LB_BOUNDARIES
         {
+
           /* calculate modes locally */
           lb_calc_modes(index, modes);
 
@@ -4201,10 +4167,6 @@ void calc_particle_lattice_ia() {
 
       /* halo is valid now */
       lbpar.resend_halo = 0;
-
-      /* all fields have to be recalculated */
-      for (int i = 0; i < lblattice.halo_grid_volume; ++i)
-        lbfields[i].recalc_fields = 1;
     }
 #endif // LB ADAPTIVE
 
@@ -4246,7 +4208,6 @@ void calc_particle_lattice_ia() {
 #endif
       {
         lb_viscous_coupling(&p, force);
-
 
         /* add force to the particle */
         p.f.f[0] += force[0];

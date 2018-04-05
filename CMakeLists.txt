@@ -66,13 +66,14 @@ set(CMAKE_FIND_FRAMEWORK LAST)
 # User input options
 ######################################################################
 
-#option(WITH_PYTHON "Build python interface"  ON)
 set(WITH_PYTHON yes)
 
+option(WITH_GSL "Build with GSL support" ON)
 option(WITH_CUDA   "Build with GPU support"  ON)
 option(WITH_HDF5   "Build with HDF5 support" ON)
 option(WITH_P4EST  "Enable adaptive grid"    ON)
 option(WITH_MINIMAL_GHOST  "Enable minimal ghost in p4est_dd"    ON)
+option(WITH_FLOWFIELD  "Enable static background flowfield support"    OFF)
 #option(ASYNC_COMM_BIN_REP  "Enable binary reproducability of results with asynchronous communication. Will cost a little performance during communications."    ON)
 option(WITH_TESTS  "Enable tests"            ON)
 option(WITH_SCAFACOS "Build with Scafacos support" ON)
@@ -254,6 +255,12 @@ if(NOT ASYNC_COMM_BIN_REP)
   add_definitions(-DASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY)
 endif(NOT ASYNC_COMM_BIN_REP)
 
+if(WITH_FLOWFIELD)
+  set(FLOWFIELD_SIZE 64 CACHE STRING "Size of the cubic flowfield in one direction")
+  add_definitions(-DUSE_FLOWFIELD)
+  add_definitions(-DFLOWFIELD_SIZE=${FLOWFIELD_SIZE})
+endif(WITH_FLOWFIELD)
+
 # Check for the h5xx submodule
 # and try to check it out if not found or update it if found.
 if(WITH_HDF5 AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
@@ -277,6 +284,13 @@ if(WITH_SCAFACOS)
     set(SCAFACOS 1)
   endif(SCAFACOS_FOUND)
 endif(WITH_SCAFACOS)
+
+if(WITH_GSL)
+  find_package(GSL)
+  if (GSL_FOUND)
+    set(GSL 1)
+  endif(GSL_FOUND)
+endif(WITH_GSL)
 
 if(WITH_VALGRIND_INSTRUMENTATION)
   find_package(PkgConfig)

@@ -1,6 +1,8 @@
 #ifndef ALGORITHM_LINK_CELL_HPP
 #define ALGORITHM_LINK_CELL_HPP
 
+#include "repart.hpp"
+
 namespace Algorithm {
 
 /**
@@ -13,7 +15,9 @@ template <typename CellIterator, typename ParticleKernel, typename PairKernel,
 void link_cell(CellIterator first, CellIterator last,
              ParticleKernel &&particle_kernel, PairKernel &&pair_kernel,
              DistanceFunction &&distance_function) {
+//const CellIterator f = first;
 for (; first != last; ++first) {
+  //repart::RuntimeRecorder(repart::lc_cell_runtime[std::distance(f, first)]);
   for (int i = 0; i != first->n; i++) {
     auto &p1 = first->part[i];
 

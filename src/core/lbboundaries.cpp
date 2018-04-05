@@ -128,7 +128,7 @@ void lb_init_boundaries() {
             << "no charged species available to create wall charge\n";
       }
     }
-#endif // EK_BOUNDARIES
+#endif
 
     for (z = 0; z < int(lbpar_gpu.dim_z); z++) {
       for (y = 0; y < int(lbpar_gpu.dim_y); y++) {
@@ -147,7 +147,7 @@ void lb_init_boundaries() {
             node_charged = 0;
             node_wallcharge = 0.0f;
           }
-#endif // EK_BOUNDARIES
+#endif
 
           int n = 0;
           for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end(); ++lbb, n++) {
@@ -169,7 +169,7 @@ void lb_init_boundaries() {
                     ek_parameters.agrid * ek_parameters.agrid);
               }
             }
-#endif // EK_BOUNDARIES
+#endif
           }
 
 #ifdef EK_BOUNDARIES
@@ -182,7 +182,7 @@ void lb_init_boundaries() {
                                                    // boundary_number is not used by
                                                    // a constraint
           }
-#endif // EK_BOUNDARIES
+#endif
           if (dist <= 0 && boundary_number >= 0 &&
               (lbboundaries.size() > 0 || pdb_boundary_lattice)) {
             size_of_index = (number_of_boundnodes + 1) * sizeof(int);
@@ -233,7 +233,7 @@ void lb_init_boundaries() {
                     ek_parameters.agrid;
             }
           }
-#endif // EK_BOUNDARIES
+#endif
         }
       }
     }
@@ -267,7 +267,7 @@ void lb_init_boundaries() {
                                          wallcharge_species);
       free(host_wallcharge_species_density);
     }
-#endif // EK_BOUNDARIES
+#endif
 
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   } else { 
@@ -316,33 +316,6 @@ void lb_init_boundaries() {
         }
       }
     }
-    // SET VOXEL BOUNDARIES DIRECTLY
-    
-    /* TODO implement as shape
-    int xxx, yyy, zzz = 0;
-    char line[80];
-    for (n = 0; n < n_lb_boundaries; n++) {
-      switch (lb_boundaries[n].type) {
-      case LB_BOUNDARY_VOXEL:
-        FILE *fp;
-        fp = fopen(lb_boundaries[n].c.voxel.filename, "r");
-
-        while (fgets(line, 80, fp) != nullptr) {
-          // get a line, up to 80 chars from fp,  done if nullptr 
-          sscanf(line, "%d %d %d", &xxx, &yyy, &zzz);
-
-          lbfields[get_linear_index(xxx, yyy, zzz, lblattice.halo_grid)]
-              .boundary = n + 1;
-        }
-        fclose(fp);
-
-        break;
-
-      default:
-        break;
-      }
-    }
-    */
 #elif defined (LB_ADAPTIVE)
     lbadapt_get_boundary_status();
 #endif
@@ -371,9 +344,9 @@ int lbboundary_get_force(void* lbb, double *f) {
     f[0] = -forces[3 * no + 0];
     f[1] = -forces[3 * no + 1];
     f[2] = -forces[3 * no + 2];
-#else // defined(LB_BOUNDARIES_GPU) && defined(LB_GPU)
+#else
     return ES_ERROR;
-#endif // defined(LB_BOUNDARIES_GPU) && defined(LB_GPU)
+#endif
   } else {
 #if defined(LB_BOUNDARIES) && defined(LB)
     mpi_gather_stats(8, forces, nullptr, nullptr, nullptr);
@@ -383,17 +356,18 @@ int lbboundary_get_force(void* lbb, double *f) {
     f[2] = forces[3 * no + 2] * lbpar.agrid / lbpar.tau; // lbpar.tau; on a Saturday at the ICP. Someone fix.
 #else
     return ES_ERROR;
-#endif // defined(LB_BOUNDARIES) && defined(LB)
+#endif
   }
 
   free(forces);
-#endif // defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
+#endif
   return 0;
 }
 
 #endif /* LB_BOUNDARIES or LB_BOUNDARIES_GPU */
 
 #ifdef LB_BOUNDARIES
+
 void lb_bounce_back() {
 #ifndef LB_ADAPTIVE
 #ifdef D3Q19
@@ -428,7 +402,7 @@ void lb_bounce_back() {
                    9, 12, 11, 14, 13, 16, 15, 18, 17};
 
   /* bottom-up sweep */
-  //  for (k=lblattice.halo_offset;k<lblattice.halo_grid_volume;k++) 
+  //  for (k=lblattice.halo_offset;k<lblattice.halo_grid_volume;k++)
   for (z = 0; z < lblattice.grid[2] + 2; z++) {
     for (y = 0; y < lblattice.grid[1] + 2; y++) {
       for (x = 0; x < lblattice.grid[0] + 2; x++) {
@@ -441,10 +415,10 @@ void lb_bounce_back() {
             population_shift = 0;
             for (l = 0; l < 3; l++) {
               population_shift -=
-                  lbpar.agrid * lbpar.agrid * lbpar.agrid *
-                  lbpar.rho * 2 * lbmodel.c[i][l] *
-                  lbmodel.w[i] *
-		(*LBBoundaries::lbboundaries[lbfields[k].boundary - 1]).velocity()[l] / //TODO
+                  lbpar.agrid * lbpar.agrid * lbpar.agrid * lbpar.rho * 2 *
+                  lbmodel.c[i][l] * lbmodel.w[i] *
+                  (*LBBoundaries::lbboundaries[lbfields[k].boundary - 1])
+                .velocity()[l] * (lbpar.tau / lbpar.agrid) / // TODO
                   lbmodel.c_sound_sq;
             }
 
@@ -456,7 +430,8 @@ void lb_bounce_back() {
                 z - lbmodel.c[i][2] < lblattice.grid[2] + 1) {
               if (!lbfields[k - next[i]].boundary) {
                 for (l = 0; l < 3; l++) {
-		  (*LBBoundaries::lbboundaries[lbfields[k].boundary - 1]).force()[l] +=   //TODO
+                  (*LBBoundaries::lbboundaries[lbfields[k].boundary - 1])
+                      .force()[l] += // TODO
                       (2 * lbfluid[1][i][k] + population_shift) *
                       lbmodel.c[i][l];
                 }
@@ -471,12 +446,12 @@ void lb_bounce_back() {
       }
     }
   }
-#else // !PULL
+#else
 #error Bounce back boundary conditions are only implemented for PUSH scheme!
-#endif // !PULL
-#else // D3Q19
+#endif
+#else
 #error Bounce back boundary conditions are only implemented for D3Q19!
-#endif // D3Q19
+#endif
 #endif // LB_ADAPTIVE
 }
 

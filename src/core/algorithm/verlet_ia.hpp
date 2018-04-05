@@ -2,6 +2,7 @@
 #define CORE_ALGORITHM_VERLET_IA_HPP
 
 #include <utility>
+#include "repart.hpp"
 
 namespace Algorithm {
 namespace detail {
@@ -13,7 +14,9 @@ void update_and_kernel(CellIterator first, CellIterator last,
                        PairKernel &&pair_kernel,
                        DistanceFunction &&distance_function,
                        VerletCriterion &&verlet_criterion) {
+  //const CellIterator f = first;
   for (; first != last; ++first) {
+    //repart::RuntimeRecorder(repart::lc_cell_runtime[std::distance(f, first)]);
     /* Clear the VL */
     first->m_verlet_list.clear();
 
@@ -51,7 +54,10 @@ template <typename CellIterator, typename ParticleKernel, typename PairKernel,
 void kernel(CellIterator first, CellIterator last,
             ParticleKernel &&particle_kernel, PairKernel &&pair_kernel,
             DistanceFunction &&distance_function) {
+  //const CellIterator f = first;
   for (; first != last; ++first) {
+    //repart::RuntimeRecorder(repart::lc_cell_runtime[std::distance(f, first)]);
+
     for (int i = 0; i != first->n; i++) {
       particle_kernel(first->part[i]);
     }

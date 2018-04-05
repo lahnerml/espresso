@@ -56,7 +56,12 @@ public:
       return m_metric.pmax();
     else if (name == "imbalance")
       return m_metric.pimbalance();
-    else
+    else if (name == "minimum")
+      return m_metric.pmin();
+    else if (name == "max_avg_min_imb") {
+      auto a = m_metric.pmax_avg_min_imb();
+      return std::vector<double>(a.begin(), a.end());
+    } else
       return {};
   }
 

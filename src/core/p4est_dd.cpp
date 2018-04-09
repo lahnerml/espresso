@@ -494,6 +494,7 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
   // geather cell neighbors
   std::vector<uint64_t> quads;
   std::vector<local_shell_t> shell;
+  castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
   
   // Loop all local cells to geather information for those
   for (int i=0;i<ds::p4est->local_num_quadrants;++i) {
@@ -519,8 +520,6 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
     // Geather all inforamtion about neighboring cells
     for (int n=0;n<26;++n) {
       ls.neighbor[n] = -1;
-      sc_array_t *ni;
-      ni = sc_array_new(sizeof(int));
       p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n, NULL, NULL, ni);
       if (ni->elem_count > 1)
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
@@ -533,7 +532,7 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
           data->rshell[n] = p4est_mesh->ghost_to_proc[neighrank];
         }
       }
-      sc_array_destroy(ni);
+      sc_array_truncate(ni);
     }
     shell.push_back(ls);
   }

@@ -1953,13 +1953,6 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         adapt_ghost->btype, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
         P8EST_TRAVERSE_PARBOUNDINNER));
 
-#ifdef LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) /
-               ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN);
-#else  // LB_ADAPTIVE_GPU
-    double h = (double)P8EST_QUADRANT_LEN(level) / (double)P8EST_ROOT_LEN;
-#endif // LB_ADAPTIVE_GPU
-
     while (status != P8EST_MESHITER_DONE) {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
@@ -1973,7 +1966,8 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                                   data->lbfields.boundary,
-                                  data->lbfields.has_force, h, &rho, j, NULL);
+                                  data->lbfields.has_force, h[level], &rho, j,
+                                  nullptr);
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;

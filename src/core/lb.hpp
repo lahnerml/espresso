@@ -227,10 +227,12 @@ typedef struct {
   lb_float rho_lb_units;
   lb_float gamma_odd;
   lb_float gamma_even;
-  lb_float gamma_shear;
-  lbfloat gamma_bulk;
+  lb_float gamma_shear[P8EST_QMAXLEVEL];
+  lb_float gamma_bulk[P8EST_QMAXLEVEL];
   bool is_TRT;
   int resend_halo;
+  int fluct;
+  lb_float phi[19];
 } LB_Parameters;
 #endif // LB_ADAPTIVE
 

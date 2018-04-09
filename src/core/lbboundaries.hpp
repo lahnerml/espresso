@@ -44,6 +44,10 @@
 
 namespace LBBoundaries {
 extern std::vector<std::shared_ptr<LBBoundary>> lbboundaries;
+#ifdef LB_ADAPTIVE
+extern std::vector<int> exclude_in_geom_ref;
+#endif // LB_ADAPTIVE
+
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /*@}*/
 

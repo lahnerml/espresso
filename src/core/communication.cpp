@@ -2023,7 +2023,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, rho, j, pi);
 #else  // !LB_ADAPTIVE
-    int quad;
+    int quad = 0;
     int lvl = 0;
     for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
       p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
@@ -2075,7 +2075,7 @@ void mpi_recv_fluid_slave(int node, int index) {
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, &data[0], &data[1], &data[4]);
 #else  // !LB_ADAPTIVE
-    int quad;
+    int quad = 0;
     int lvl = 0;
     for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
       p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
@@ -2193,9 +2193,9 @@ void mpi_lbadapt_grid_init(int node, int level) {
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   /* create connectivity and octree */
 #ifdef DD_P4EST
-  if (dd.p4est != NULL) {
+  if (dd_p4est_get_p4est() != NULL) {
     for (int i = 0; i < P4EST_DIM; ++i) {
-      lb_conn_brick[i] = dd_p4est_num_trees_in_dir(i);
+      lb_conn_brick[i] = dd_p4est_get_n_trees(i);
     }
   } else
 #endif // DD_P4EST
@@ -2523,7 +2523,6 @@ void mpi_unif_refinement(int node, int ref_iterations) {
   }
   p4est_utils_rebuild_p4est_structs(btype);
 
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2558,7 +2557,6 @@ void mpi_rand_refinement(int node, int ref_iterations) {
   }
   p4est_utils_rebuild_p4est_structs(btype);
 
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2589,7 +2587,6 @@ void mpi_reg_refinement(int node, int param) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   // FIXME: Implement mapping between two trees
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2614,7 +2611,6 @@ void mpi_reg_coarsening(int node, int param) {
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2638,7 +2634,6 @@ void mpi_geometric_refinement(int node, int param) {
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2662,7 +2657,6 @@ void mpi_inv_geometric_refinement(int node, int param) {
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
-  lb_release_fluid();
   lb_reinit_fluid();
   lb_reinit_forces();
 #endif // LB_ADAPTIVE
@@ -2670,17 +2664,16 @@ void mpi_inv_geometric_refinement(int node, int param) {
 
 void mpi_exclude_boundary(int node, int param) {
 #ifdef LB_ADAPTIVE
-  if (exclude_in_geom_ref == NULL) {
-    exclude_in_geom_ref = new std::vector<int>();
-    exclude_in_geom_ref->reserve(n_lb_boundaries);
+  if (LBBoundaries::exclude_in_geom_ref.size() == 0) {
+    LBBoundaries::exclude_in_geom_ref.reserve(LBBoundaries::lbboundaries.size());
   }
 
   // ensure to only push each boundary index once
   std::vector<int>::iterator it;
-  it = std::find(exclude_in_geom_ref->begin(), exclude_in_geom_ref->end(),
-                 param);
-  if (it == exclude_in_geom_ref->end()) {
-    exclude_in_geom_ref->push_back(param);
+  it = std::find(LBBoundaries::exclude_in_geom_ref.begin(),
+                 LBBoundaries::exclude_in_geom_ref.end(), param);
+  if (it == LBBoundaries::exclude_in_geom_ref.end()) {
+    LBBoundaries::exclude_in_geom_ref.push_back(param);
   }
 #endif // LB_ADAPTIVE
 }

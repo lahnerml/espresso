@@ -101,7 +101,12 @@ LB_Parameters lbpar = {
     // is_TRT
     false,
     // resend_halo
-    0};
+    0,
+    // fluct
+    0,
+    // phi
+    0.,
+};
 
 /** The DnQm model to be used. */
 LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
@@ -3874,35 +3879,35 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;
     if (bnd) {
-      local_rho = lbpar.rho[0] * h_max * h_max * h_max;
-      local_j[0] =
-          local_rho * lb_boundaries[data->lbfields.boundary - 1].velocity[0];
-      local_j[1] =
-          local_rho * lb_boundaries[data->lbfields.boundary - 1].velocity[1];
-      local_j[2] =
-          local_rho * lb_boundaries[data->lbfields.boundary - 1].velocity[2];
+      local_rho = lbpar.rho * h_max * h_max * h_max;
+      for (int i = 0; i < P8EST_DIM; ++i) {
+        local_j[i] =
+            local_rho *
+            LBBoundaries::lbboundaries[data->lbfields.boundary - 1].get()
+                ->velocity()[i];
+      }
     } else {
       lbadapt_calc_modes(data->lbfluid, modes);
-      local_rho = lbpar.rho[0] * h_max * h_max * h_max + modes[0];
-      local_j[0] = modes[1];
-      local_j[1] = modes[2];
-      local_j[2] = modes[3];
+      local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
+      for (int i = 0; i < P8EST_DIM; ++i) {
+        local_j[i] = modes[i+1];
+      }
     }
 #else  // LB_BOUNDARIES
     lbadapt_calc_modes(data->lbfluid, modes);
-    local_rho = lbpar.rho[0] * h_max * h_max * h_max + modes[0];
+    local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
     local_j[0] = modes[1];
     local_j[1] = modes[2];
     local_j[2] = modes[3];
 #endif // LB_BOUNDARIES
-    v[0] += delta[x] * local_j[0] / (local_rho);
-    v[1] += delta[x] * local_j[1] / (local_rho);
-    v[2] += delta[x] * local_j[2] / (local_rho);
+    for (int i = 0; i < P8EST_DIM; ++i) {
+      v[i] += delta[x] * local_j[i] / (local_rho);
+    }
   }
 
-  v[0] *= h_max / lbpar.tau;
-  v[1] *= h_max / lbpar.tau;
-  v[2] *= h_max / lbpar.tau;
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    v[i] *= h_max / lbpar.tau;
+  }
 #endif // LB_ADAPTIVE
 #endif // !LB_ADAPTIVE_GPU
   return 0;

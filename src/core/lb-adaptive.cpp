@@ -1414,7 +1414,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
   lbadapt_payload_t *data;
   bool has_virtuals;
 
-  lb_float modes[lbmodel.n_veloc];
+  lb_float modes[19];
   castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
       P8EST_CONNECT_EDGE, quads_to_collide, P8EST_TRAVERSE_REAL,
@@ -2782,7 +2782,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
     if (ncnt > 0) return ncnt;
     fprintf(stderr, "Particle not in local LB domain ");
-    fprintf(stderr, "%i : %lli [%lf %lf %lf], ", this_node, qidx,
+    fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx,
             pos[0], pos[1], pos[2]);
 #ifdef DD_P4EST
     fprintf(stderr, "belongs to MD process %i\n",

@@ -3768,7 +3768,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     }
   }
 #else  // !LB_ADAPTIVE
-  for (x = 0; x < dcnt; ++x) {
+  for (int x = 0; x < dcnt; ++x) {
     if (n_lbsteps % (1 << (lbpar.max_refinement_level - level[x])) == 0) {
       local_f = node_index[x]->lbfields.force;
       double level_fact = prefactors[level[x]] * prefactors[level[x]];
@@ -4046,18 +4046,21 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   for (x = 0; x < dcnt; x++) {
     data = node_index[x];
 #ifdef LB_BOUNDARIES
-    int bnd = data->boundary;
+    int bnd = data->lbfields.boundary;
     if (bnd) {
-      local_rho = lbpar.rho[0] * h_max * h_max * h_max;
-      local_j[0] = local_rho *
-                   lb_boundaries[data->boundary - 1].velocity[0];
-      local_j[1] = local_rho *
-                   lb_boundaries[data->boundary - 1].velocity[1];
-      local_j[2] = local_rho *
-                   lb_boundaries[data->boundary - 1].velocity[2];
+      local_rho = lbpar.rho * h_max * h_max * h_max;
+      local_j[0] =
+          lbpar.rho * h_max * h_max * h_max *
+          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[0]; // TODO
+      local_j[1] =
+          lbpar.rho * h_max * h_max * h_max *
+          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[1]; // TODO This might not work properly
+      local_j[2] =
+          lbpar.rho * h_max * h_max * h_max *
+          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[2]; // TODO
     } else {
       lbadapt_calc_modes(data->lbfluid, modes);
-      local_rho = lbpar.rho[0] * h_max * h_max * h_max + modes[0];
+      local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
       local_j[0] = modes[1];
       local_j[1] = modes[2];
       local_j[2] = modes[3];
@@ -4226,6 +4229,7 @@ void calc_particle_lattice_ia() {
       }
     }
 
+#ifndef LB_ADAPTIVE
     /* ghost cells */
     for (auto &p : ghost_cells.particles()) {
 
@@ -4256,6 +4260,27 @@ void calc_particle_lattice_ia() {
         });
       }
     }
+#else // !LB_ADAPTIVE
+#ifdef DD_P4EST
+    /* ghost cells */
+    for (auto &p : ghost_cells.particles()) {
+
+#ifdef IMMERSED_BOUNDARY
+      // Virtual particles for IBM must not be coupled
+        if (!p.p.isVirtual)
+#endif // IMMERSED_BOUNDARY
+      {
+        lb_viscous_coupling(&p, force, true);
+      }
+
+      /* ghosts must not have the force added! */
+      ONEPART_TRACE(if (p->p.identity == check_id) {
+        fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
+                p->f.f[0], p->f.f[1], p->f.f[2]);
+      });
+    }
+#endif // DD_P4EST
+#endif // LB_ADAPTIVE
   }
 }
 

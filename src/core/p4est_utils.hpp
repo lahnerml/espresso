@@ -180,7 +180,7 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
  * @return         The MPI rank which holds a quadrant at the given position for
  *                 the current p4est.
  */
-int p4est_utils_pos_to_proc(p4est_t *p4est, double* xyz);
+int p4est_utils_pos_to_proc(forest_order forest, double* xyz);
 /*@}*/
 
 /*****************************************************************************/

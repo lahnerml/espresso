@@ -35,73 +35,78 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
 }
 
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
-  // fill element to insert
-  p4est_utils_forest_info_t insert_elem(p4est);
+  if (p4est) {
+    // fill element to insert
+    p4est_utils_forest_info_t insert_elem(p4est);
 
-  // allocate a local send buffer to insert local quadrant offsets
-  std::vector<p4est_locidx_t> local_tree_offsets(p4est->trees->elem_count);
+    // allocate a local send buffer to insert local quadrant offsets
+    std::vector<p4est_locidx_t> local_tree_offsets(p4est->trees->elem_count);
 
-  // only inspect local trees if current process hosts quadrants
-  if (p4est->local_num_quadrants != 0) {
-    for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
-      p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
-      // local max level
-      if (insert_elem.finest_level_local < tree->maxlevel) {
-        insert_elem.finest_level_local = insert_elem.coarsest_level_local =
-            tree->maxlevel;
-      }
-      // local min level
-      for (int l = insert_elem.coarsest_level_local; l >= 0; --l) {
-        if (l < insert_elem.coarsest_level_local &&
-            tree->quadrants_per_level[l]) {
-          insert_elem.coarsest_level_local = l;
+    // only inspect local trees if current process hosts quadrants
+    if (p4est->local_num_quadrants != 0) {
+      for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
+        p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
+        // local max level
+        if (insert_elem.finest_level_local < tree->maxlevel) {
+          insert_elem.finest_level_local = insert_elem.coarsest_level_local =
+              tree->maxlevel;
+        }
+        // local min level
+        for (int l = insert_elem.coarsest_level_local; l >= 0; --l) {
+          if (l < insert_elem.coarsest_level_local &&
+              tree->quadrants_per_level[l]) {
+            insert_elem.coarsest_level_local = l;
+          }
         }
       }
     }
-  }
-  // synchronize level and insert into forest_info vector
-  MPI_Allreduce(&insert_elem.finest_level_local,
-                &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
-                p4est->mpicomm);
-  MPI_Allreduce(&insert_elem.coarsest_level_local,
-                &insert_elem.coarsest_level_global, 1, P4EST_MPI_LOCIDX,
-                MPI_MIN, p4est->mpicomm);
-  insert_elem.finest_level_ghost = insert_elem.finest_level_global;
-  insert_elem.coarsest_level_ghost = insert_elem.coarsest_level_global;
+    // synchronize level and insert into forest_info vector
+    MPI_Allreduce(&insert_elem.finest_level_local,
+                  &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
+                  p4est->mpicomm);
+    MPI_Allreduce(&insert_elem.coarsest_level_local,
+                  &insert_elem.coarsest_level_global, 1, P4EST_MPI_LOCIDX,
+                  MPI_MIN, p4est->mpicomm);
+    insert_elem.finest_level_ghost = insert_elem.finest_level_global;
+    insert_elem.coarsest_level_ghost = insert_elem.coarsest_level_global;
 
-  // get Morton-IDs analog to p4est_utils_cell_morton_idx
-  insert_elem.p4est_space_idx.resize(n_nodes + 1);
-  for (int i=0;i<=n_nodes;++i) {
-    p4est_quadrant_t *q = &p4est->global_first_position[i];
-    if (i < n_nodes) {
-      double xyz[3];
-      p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree,
-                             q->x, q->y, q->z, xyz);
-      insert_elem.p4est_space_idx[i] =
-          p4est_utils_cell_morton_idx(
-              xyz[0] * (1 << insert_elem.finest_level_global),
-              xyz[1] * (1 << insert_elem.finest_level_global),
-              xyz[2] * (1 << insert_elem.finest_level_global));
-    } else {
-      double n_trees[3];
+    // get Morton-IDs analog to p4est_utils_cell_morton_idx
+    insert_elem.p4est_space_idx.resize(n_nodes + 1);
+    for (int i = 0; i <= n_nodes; ++i) {
+      p4est_quadrant_t *q = &p4est->global_first_position[i];
+      if (i < n_nodes) {
+        double xyz[3];
+        p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree,
+                               q->x, q->y, q->z, xyz);
+        insert_elem.p4est_space_idx[i] =
+            p4est_utils_cell_morton_idx(
+                xyz[0] * (1 << insert_elem.finest_level_global),
+                xyz[1] * (1 << insert_elem.finest_level_global),
+                xyz[2] * (1 << insert_elem.finest_level_global));
+      } else {
+        double n_trees[3];
 #if defined(LB_ADAPTIVE)
-      for (int i = 0; i < P8EST_DIM; ++i)
-        n_trees[i] = lb_conn_brick[i];
+        for (int i = 0; i < P8EST_DIM; ++i)
+          n_trees[i] = lb_conn_brick[i];
 #elif defined(DD_P4EST)
-      for (int i = 0; i < P8EST_DIM; ++i)
-        n_trees[i] = brick_size[i];
+        for (int i = 0; i < P8EST_DIM; ++i)
+          n_trees[i] = brick_size[i];
 #endif
-      int64_t tmp = 1 << insert_elem.finest_level_global;
-      while (tmp < ((box_l[0] / n_trees[0]) * (1 << insert_elem.finest_level_global)))
-        tmp <<= 1;
-      while (tmp < ((box_l[1] / n_trees[1]) * (1 << insert_elem.finest_level_global)))
-        tmp <<= 1;
-      while (tmp < ((box_l[2] / n_trees[2]) * (1 << insert_elem.finest_level_global)))
-        tmp <<= 1;
-      insert_elem.p4est_space_idx[i] = tmp*tmp*tmp;
+        int64_t tmp = 1 << insert_elem.finest_level_global;
+        while (tmp < ((box_l[0] / n_trees[0]) * (1 << insert_elem.finest_level_global)))
+          tmp <<= 1;
+        while (tmp < ((box_l[1] / n_trees[1]) * (1 << insert_elem.finest_level_global)))
+          tmp <<= 1;
+        while (tmp < ((box_l[2] / n_trees[2]) * (1 << insert_elem.finest_level_global)))
+          tmp <<= 1;
+        insert_elem.p4est_space_idx[i] = tmp * tmp * tmp;
+      }
     }
+    return insert_elem;
   }
-  return insert_elem;
+  else {
+    return nullptr;
+  }
 }
 
 void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
@@ -706,67 +711,73 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 #if defined(DD_P4EST) && defined (LB_ADAPTIVE)
   p8est_t *p4est_ref = forest_info.at(static_cast<int>(reference)).p4est;
   p8est_t *p4est_mod = forest_info.at(static_cast<int>(modify)).p4est;
-  P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
-  P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
-  P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,
-                                                p4est_mod->connectivity));
+  if (p4est_ref && p4est_mod) {
+    P4EST_ASSERT(p4est_ref->mpisize == p4est_mod->mpisize);
+    P4EST_ASSERT(p4est_ref->mpirank == p4est_mod->mpirank);
+    P4EST_ASSERT(p8est_connectivity_is_equivalent(p4est_ref->connectivity,
+                                                  p4est_mod->connectivity));
 
-  std::vector<p4est_locidx_t> num_quad_per_proc(p4est_ref->mpisize, 0);
-  std::vector<p4est_locidx_t> num_quad_per_proc_global(p4est_ref->mpisize, 0);
+    std::vector<p4est_locidx_t> num_quad_per_proc(p4est_ref->mpisize, 0);
+    std::vector<p4est_locidx_t> num_quad_per_proc_global(p4est_ref->mpisize, 0);
 
-  unsigned int tid = p4est_mod->first_local_tree;
-  unsigned int tqid = 0;
-  // trees
-  p8est_tree_t *curr_tree;
-  // quadrants
-  p8est_quadrant_t *curr_quad;
+    unsigned int tid = p4est_mod->first_local_tree;
+    unsigned int tqid = 0;
+    // trees
+    p8est_tree_t *curr_tree;
+    // quadrants
+    p8est_quadrant_t *curr_quad;
 
-  if (0 < p4est_mod->local_num_quadrants) {
-    curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
-  }
-
-  // Check for each of the quadrants of the given p4est, to which MD cell it
-  // maps
-  for (int qid = 0; qid < p4est_mod->local_num_quadrants; ++qid) {
-    // wrap multiple trees
-    if (tqid == curr_tree->quadrants.elem_count) {
-      ++tid;
-      P4EST_ASSERT(tid < p4est_mod->trees->elem_count);
+    if (0 < p4est_mod->local_num_quadrants) {
       curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
-      tqid = 0;
     }
-    if (0 < curr_tree->quadrants.elem_count) {
-      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
-      double xyz[3];
-      p4est_utils_get_front_lower_left(p4est_mod, tid, curr_quad, xyz);
-      int proc = p4est_utils_pos_to_proc(reference, xyz);
-      ++num_quad_per_proc[proc];
+
+    // Check for each of the quadrants of the given p4est, to which MD cell it
+    // maps
+    for (int qid = 0; qid < p4est_mod->local_num_quadrants; ++qid) {
+      // wrap multiple trees
+      if (tqid == curr_tree->quadrants.elem_count) {
+        ++tid;
+        P4EST_ASSERT(tid < p4est_mod->trees->elem_count);
+        curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
+        tqid = 0;
+      }
+      if (0 < curr_tree->quadrants.elem_count) {
+        curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
+        double xyz[3];
+        p4est_utils_get_front_lower_left(p4est_mod, tid, curr_quad, xyz);
+        int proc = p4est_utils_pos_to_proc(reference, xyz);
+        ++num_quad_per_proc[proc];
+      }
+      ++tqid;
     }
-    ++tqid;
+
+    // Gather this information over all processes
+    MPI_Allreduce(num_quad_per_proc.data(), num_quad_per_proc_global.data(),
+                  p4est_mod->mpisize, P4EST_MPI_LOCIDX, MPI_SUM,
+                  p4est_mod->mpicomm);
+
+    p4est_locidx_t sum = std::accumulate(std::begin(num_quad_per_proc_global),
+                                         std::end(num_quad_per_proc_global), 0);
+
+    if (sum < p4est_mod->global_num_quadrants) {
+      printf("%i : quadrants lost while partitioning\n", this_node);
+      errexit();
+    }
+
+    CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,
+                      num_quad_per_proc_global[this_node]));
+
+    // Repartition with the computed distribution
+    int shipped =
+        p8est_partition_given(p4est_mod, num_quad_per_proc_global.data());
+    P4EST_GLOBAL_PRODUCTIONF(
+        "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
+        (long long) shipped, shipped * 100. / p4est_mod->global_num_quadrants);
   }
-
-  // Gather this information over all processes
-  MPI_Allreduce(num_quad_per_proc.data(), num_quad_per_proc_global.data(),
-                p4est_mod->mpisize, P4EST_MPI_LOCIDX, MPI_SUM,
-                p4est_mod->mpicomm);
-
-  p4est_locidx_t sum = std::accumulate(std::begin(num_quad_per_proc_global),
-                                       std::end(num_quad_per_proc_global), 0);
-
-  if (sum < p4est_mod->global_num_quadrants) {
-    printf("%i : quadrants lost while partitioning\n", this_node);
-    errexit();
+  else {
+    std::cerr << "Not all p4ests have been created yet. This may happen during"
+              << " initialization." << std::endl;
   }
-
-  CELL_TRACE(printf("%i : repartitioned LB %i\n", this_node,
-                    num_quad_per_proc_global[this_node]));
-
-  // Repartition with the computed distribution
-  int shipped =
-      p8est_partition_given(p4est_mod, num_quad_per_proc_global.data());
-  P4EST_GLOBAL_PRODUCTIONF(
-      "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
-      (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
 #endif // defined(DD_P4EST) && defined(LB_ADAPTIVE)
 }
 

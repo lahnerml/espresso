@@ -329,16 +329,8 @@ void dd_p4est_create_grid (bool isRepart) {
   p4est_space_idx.clear();
   ds::p4est_shell.clear();
 
-#ifdef LB_ADAPTIVE
-  // the adaptive LB has a strange grid, thus we have to do something similar here
-  if (max_range < 1.0)
-    grid_level = dd_p4est_cellsize_even();
-  else
-    grid_level = dd_p4est_cellsize_optimal();
-#else
   grid_level = dd_p4est_cellsize_optimal();
-#endif
-  
+
   // set global variables
   dd.cell_size[0] = box_l[0]/(double)grid_size[0];
   dd.cell_size[1] = box_l[1]/(double)grid_size[1];

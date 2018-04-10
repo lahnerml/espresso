@@ -90,7 +90,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
           n_trees[i] = lb_conn_brick[i];
 #elif defined(DD_P4EST)
         for (int i = 0; i < P8EST_DIM; ++i)
-          n_trees[i] = brick_size[i];
+          n_trees[i] = dd_p4est_get_n_trees(i);
 #endif
         int64_t tmp = 1 << insert_elem.finest_level_global;
         while (tmp < ((box_l[0] / n_trees[0]) * (1 << insert_elem.finest_level_global)))

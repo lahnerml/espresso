@@ -1035,7 +1035,6 @@ int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
   mode[8] = n6p - n7p;
   mode[9] = n8p - n9p;
 
-#ifndef OLD_FLUCT
   /* kinetic modes */
   mode[10] = -2. * n1m + n4m + n5m + n6m + n7m;
   mode[11] = -2. * n2m + n4m - n5m + n8m + n9m;
@@ -1046,7 +1045,6 @@ int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
   mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2. * (n1p + n2p + n3p);
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
-#endif // !OLD_FLUCT
 
 #else  // D3Q19
   int i, j;
@@ -1140,7 +1138,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random());
   mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random());
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random();
   mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random();
@@ -1151,7 +1148,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random();
   mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random();
   mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random();
-#endif // !OLD_FLUCT
 
 #elif defined(GAUSSRANDOMCUT)
   lb_float rootrho_gauss =
@@ -1165,7 +1161,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random_cut());
   mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random_cut());
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random_cut();
   mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random_cut();
@@ -1176,7 +1171,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random_cut();
   mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random_cut();
   mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random_cut();
-#endif // OLD_FLUCT
 
 #elif defined(FLATNOISE)
   lb_float rootrho =
@@ -1190,7 +1184,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[8] += (fluct[4] = rootrho * lbpar.phi[8] * (d_random() - 0.5));
   mode[9] += (fluct[5] = rootrho * lbpar.phi[9] * (d_random() - 0.5));
 
-#ifndef OLD_FLUCT
   /* ghost modes */
   mode[10] += rootrho * lbpar.phi[10] * (d_random() - 0.5);
   mode[11] += rootrho * lbpar.phi[11] * (d_random() - 0.5);
@@ -1201,7 +1194,6 @@ int lbadapt_thermalize_modes(lb_float *mode) {
   mode[16] += rootrho * lbpar.phi[16] * (d_random() - 0.5);
   mode[17] += rootrho * lbpar.phi[17] * (d_random() - 0.5);
   mode[18] += rootrho * lbpar.phi[18] * (d_random() - 0.5);
-#endif // !OLD_FLUCT
 #else  // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM

@@ -27,11 +27,12 @@
 #ifndef LB_H
 #define LB_H
 
+#include "lattice_inline.hpp"
+#include "utils.hpp"
+
 #ifdef LB_ADAPTIVE
 #include <p8est.h>
 #endif // LB_ADAPTIVE
-#include "lattice_inline.hpp"
-#include "utils.hpp"
 
 #ifdef LB
 

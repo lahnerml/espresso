@@ -204,8 +204,13 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
+  // set levels to a regular grid if nothing else is specified
   if (lbpar.base_level <= 0) {
     lbpar.base_level =
+        Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
+  }
+  if (lbpar.max_refinement_level <= 0) {
+    lbpar.max_refinement_level =
         Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
   }
 

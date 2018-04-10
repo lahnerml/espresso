@@ -69,6 +69,38 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   insert_elem.finest_level_ghost = insert_elem.finest_level_global;
   insert_elem.coarsest_level_ghost = insert_elem.coarsest_level_global;
 
+  // get Morton-IDs analog to p4est_utils_cell_morton_idx
+  insert_elem.p4est_space_idx.resize(n_nodes + 1);
+  for (int i=0;i<=n_nodes;++i) {
+    p4est_quadrant_t *q = &p4est->global_first_position[i];
+    if (i < n_nodes) {
+      double xyz[3];
+      p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree,
+                             q->x, q->y, q->z, xyz);
+      insert_elem.p4est_space_idx[i] =
+          p4est_utils_cell_morton_idx(
+              xyz[0] * (1 << insert_elem.finest_level_global),
+              xyz[1] * (1 << insert_elem.finest_level_global),
+              xyz[2] * (1 << insert_elem.finest_level_global));
+    } else {
+      double n_trees[3];
+#if defined(LB_ADAPTIVE)
+      for (int i = 0; i < P8EST_DIM; ++i)
+        n_trees[i] = lb_conn_brick[i];
+#elif defined(DD_P4EST)
+      for (int i = 0; i < P8EST_DIM; ++i)
+        n_trees[i] = brick_size[i];
+#endif
+      int64_t tmp = 1 << insert_elem.finest_level_global;
+      while (tmp < ((box_l[0] / n_trees[0]) * (1 << insert_elem.finest_level_global)))
+        tmp <<= 1;
+      while (tmp < ((box_l[1] / n_trees[1]) * (1 << insert_elem.finest_level_global)))
+        tmp <<= 1;
+      while (tmp < ((box_l[2] / n_trees[2]) * (1 << insert_elem.finest_level_global)))
+        tmp <<= 1;
+      insert_elem.p4est_space_idx[i] = tmp*tmp*tmp;
+    }
+  }
   return insert_elem;
 }
 
@@ -168,11 +200,49 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
-int p4est_utils_pos_to_proc(p4est_t* p4est, double *xyz) {
-  // TODO: Implement
-  return 0;
+// Returns the morton index for given cartesian coordinates.
+// Note: This is not the index of the p4est quadrants. But the ordering is the same.
+int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
+#ifdef __BMI2__
+  //#warning "Using BMI2 for cell_morton_idx"
+  static const unsigned mask_x = 0x49249249;
+  static const unsigned mask_y = 0x92492492;
+  static const unsigned mask_z = 0x24924924;
+
+  return _pdep_u32(x, mask_x)
+           | _pdep_u32(y, mask_y)
+           | _pdep_u32(z, mask_z);
+#else
+//#warning "BMI2 not detected: Using slow loop version for cell_morton_idx"
+  int64_t idx = 0;
+  int64_t pos = 1;
+
+  for (int i = 0; i < 21; ++i) {
+    if ((x&1)) idx += pos;
+    x >>= 1; pos <<= 1;
+    if ((y&1)) idx += pos;
+    y >>= 1; pos <<= 1;
+    if ((z&1)) idx += pos;
+    z >>= 1; pos <<= 1;
+  }
+
+  return idx;
+#endif
 }
 
+// Find the process that handles the position
+int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
+  const auto &fi = forest_info.at(static_cast<int>(forest));
+  int xyz_mod[3];
+  for (int i = 0; i < P8EST_DIM; ++i)
+    xyz_mod[i] = xyz[i] * (1 << fi.finest_level_global);
+  auto it = std::upper_bound(
+      std::begin(fi.p4est_space_idx), std::end(fi.p4est_space_idx) - 1,
+      p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]),
+      [](int i, int64_t idx) { return i < idx; });
+
+  return std::distance(std::begin(fi.p4est_space_idx), it) - 1;
+}
 
 // CAUTION: Currently LB only
 int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,

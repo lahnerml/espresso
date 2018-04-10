@@ -91,6 +91,7 @@ extern double vort_thresh[2];
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
+  std::vector<int> p4est_space_idx;
   int coarsest_level_local;
   int coarsest_level_ghost;
   int coarsest_level_global;
@@ -99,7 +100,8 @@ struct p4est_utils_forest_info_t {
   int finest_level_ghost;
 
   p4est_utils_forest_info_t(p4est_t *p4est)
-      : p4est(p4est), coarsest_level_local(P8EST_QMAXLEVEL),
+      : p4est(p4est), p4est_space_idx(),
+        coarsest_level_local(P8EST_QMAXLEVEL),
         coarsest_level_ghost(P8EST_QMAXLEVEL),
         coarsest_level_global(P8EST_QMAXLEVEL), finest_level_local(-1),
         finest_level_global(-1), finest_level_ghost(-1) {}
@@ -172,6 +174,13 @@ void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  *                         quadrant that mesh_iter is pointing to.
  */
 void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
+
+/** Obtain a Morton-index by interleaving 3 integer coordinates.
+ *
+ * @param x, y, z  The coordinates
+ * @return         Morton-index of given position.
+ */
+int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Map a geometric position to the respective processor.
  *

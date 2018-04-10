@@ -144,8 +144,8 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 void p4est_utils_get_front_lower_left(p8est_t *p8est,
-                                             p4est_topidx_t which_tree,
-                                             p8est_quadrant_t *q, double *xyz);
+                                      p4est_topidx_t which_tree,
+                                      p8est_quadrant_t *q, double *xyz);
 
 /** Get the coordinates of the front lower left corner of a quadrant
  *
@@ -156,7 +156,7 @@ void p4est_utils_get_front_lower_left(p8est_t *p8est,
  */
 
 void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
-                                             double *xyz);
+                                      double *xyz);
 /** Get the coordinates of the midpoint of a quadrant.
  *
  * \param [in]  p8est    the forest
@@ -165,7 +165,7 @@ void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
 void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                                     p8est_quadrant_t *q, double xyz[3]);
+                              p8est_quadrant_t *q, double xyz[3]);
 
 /** Get the coordinates of the midpoint of a quadrant
  *

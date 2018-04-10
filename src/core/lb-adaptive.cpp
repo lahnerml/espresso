@@ -2712,21 +2712,18 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  xid = (pos[0]) * (1 << lbpar.max_refinement_level);
-  yid = (pos[1]) * (1 << lbpar.max_refinement_level);
-  zid = (pos[2]) * (1 << lbpar.max_refinement_level);
+  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]);
+  yid = (pos[1]) * ((double) lb_conn_brick[0] / box_l[0]);
+  zid = (pos[2]) * ((double) lb_conn_brick[0] / box_l[0]);
   int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;
   for (int z = -1; z <= 1; z += 2) {
     for (int y = -1; y <= 1; y += 2) {
       for (int x = -1; x <= 1; x += 2) {
-        xid = (pos[0] + x * box_l[0] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
-        yid = (pos[1] + y * box_l[1] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
-        zid = (pos[2] + z * box_l[2] * ROUND_ERROR_PREC) *
-              (1 << lbpar.max_refinement_level);
+        xid = (pos[0] + x * ((double) lb_conn_brick[0] / box_l[0]) * ROUND_ERROR_PREC);
+        yid = (pos[1] + y * ((double) lb_conn_brick[1] / box_l[1]) * ROUND_ERROR_PREC);
+        zid = (pos[2] + z * ((double) lb_conn_brick[2] / box_l[2]) * ROUND_ERROR_PREC);
         ret[cnt] = -1;
         sidx[cnt++] = p4est_utils_cell_morton_idx(xid, yid, zid);
       }
@@ -2743,11 +2740,11 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   }
   if (this_node + 1 >= n_nodes) {
     int64_t tmp = (1 << lbpar.max_refinement_level);
-    while (tmp < (box_l[0] * (1 << lbpar.max_refinement_level)))
+    while (tmp < ((box_l[0] / lb_conn_brick[0]) * (1 << lbpar.max_refinement_level)))
       tmp <<= 1;
-    while (tmp < (box_l[1] * (1 << lbpar.max_refinement_level)))
+    while (tmp < ((box_l[1] / lb_conn_brick[1]) * (1 << lbpar.max_refinement_level)))
       tmp <<= 1;
-    while (tmp < (box_l[2] * (1 << lbpar.max_refinement_level)))
+    while (tmp < ((box_l[2] / lb_conn_brick[2]) * (1 << lbpar.max_refinement_level)))
       tmp <<= 1;
     qidx = tmp *tmp *tmp;
   } else {

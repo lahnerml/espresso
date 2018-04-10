@@ -2450,28 +2450,14 @@ void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j) {
 }
 
 /*** ITERATOR CALLBACKS ***/
-/** should no longer be needed */
-void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info,
-                               void *user_data) {
-#ifndef LB_ADAPTIVE_GPU
-  p8est_quadrant_t *q = info->quad;
-  lbadapt_payload_t *data = (lbadapt_payload_t *)q->p.user_data;
-
-  data->lbfields.recalc_fields = 1;
-#endif // LB_ADAPTIVE_GPU
-}
-
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
   lb_float *rho = (lb_float *)user_data; /* passed lb_float to fill */
-  p8est_quadrant_t *q = info->quad;      /* get current global cell id */
+  p8est_quadrant_t *q = info->quad;
+  p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
+      &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[qid]];
   lb_float h_max = h[lbpar.max_refinement_level];
-
-#ifndef D3Q19
-#error Only D3Q19 is implemened!
-#endif // D3Q19
 
   // unit conversion: mass density
   if (!(lattice_switch & LATTICE_LB)) {
@@ -2496,32 +2482,61 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
 #endif // LB_ADAPTIVE_GPU
 }
 
-void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data) {
+void calc_local_j(lb_float populations[2][19], std::array<lb_float, 3> &res) {
+  // clang-format off
+  res[0] = populations[0][ 1] - populations[0][ 2] + populations[0][ 7] -
+           populations[0][ 8] + populations[0][ 9] - populations[0][10] +
+           populations[0][11] - populations[0][12] + populations[0][13] -
+           populations[0][14];
+  res[1] = populations[0][ 3] - populations[0][ 4] + populations[0][ 7] -
+           populations[0][ 8] - populations[0][ 9] + populations[0][10] +
+           populations[0][15] - populations[0][16] + populations[0][17] -
+           populations[0][18];
+  res[2] = populations[0][ 5] - populations[0][ 6] + populations[0][11] -
+           populations[0][12] - populations[0][13] + populations[0][14] +
+           populations[0][15] - populations[0][16] - populations[0][17] +
+           populations[0][18];
+  // clang-format on
+}
+void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  lb_float *bnd_vals = (lb_float *)user_data; /* passed array to fill */
-  p8est_quadrant_t *q = info->quad;           /* get current global cell id */
-  p4est_topidx_t which_tree = info->treeid;   /* get current tree id */
-  p4est_locidx_t local_id = info->quadid;     /* get cell id w.r.t. tree-id */
-  p8est_tree_t *tree;
-  lbadapt_payload_t *data =
-      (lbadapt_payload_t *)q->p.user_data; /* payload of cell */
+  std::array<lb_float, 3> momentum;
+  memcpy (momentum.data(), user_data, 3 * sizeof(lb_float));
 
-  lb_float bnd; /* local meshwidth */
-  p4est_locidx_t arrayoffset;
+  p8est_quadrant_t *q = info->quad;
+  p4est_locidx_t qid = info->quadid;
+  lbadapt_payload_t *data;
+  data = &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[qid]];
 
-  tree = p8est_tree_array_index(adapt_p4est->trees, which_tree);
-  local_id += tree->quadrants_offset; /* now the id is relative to the MPI
-                                         process */
-  arrayoffset =
-      local_id; /* each local quadrant has 2^d (P8EST_CHILDREN) values in
-                   u_interp */
-
-  /* just grab the u value of each cell and pass it into solution vector
-   */
-  bnd = data->lbfields.boundary;
-  bnd_vals[arrayoffset] = bnd;
+  std::array<lb_float, 3> j;
+  calc_local_j(data->lbfluid, j);
+  for (int i = 0; i < P8EST_DIM; ++i)
+    momentum[i] += j[i] + data->lbfields.force[i];
 #endif // LB_ADAPTIVE_GPU
 }
+
+void lbadapt_calc_local_temp(p8est_iter_volume_info_t *info, void *user_data) {
+#ifndef LB_ADAPTIVE_GPU
+  temp_iter_t *ti = (temp_iter_t*) user_data;
+
+  p8est_quadrant_t *q = info->quad;
+  p4est_locidx_t qid = info->quadid;
+  lbadapt_payload_t *data;
+  data = &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[qid]];
+  std::array<lb_float, 3> j;
+
+  if (data->lbfields.boundary) {
+    j = {0., 0., 0.};
+    ++ti->n_non_boundary_nodes;
+  }
+  else {
+    calc_local_j(data->lbfluid, j);
+  }
+  ti->temp += scalar(j.data(), j.data());
+
+#endif // LB_ADAPTIVE_GPU
+}
+
 
 void lbadapt_dump2file_synced(std::string &filename) {
 #ifndef LB_ADAPTIVE_GPU

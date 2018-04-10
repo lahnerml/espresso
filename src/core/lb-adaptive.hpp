@@ -63,6 +63,11 @@ extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
                                                  //        z_min, z_max
 
+typedef struct {
+  double temp = 0.;
+  int n_non_boundary_nodes = 0;
+} temp_iter_t;
+
 /*** MAPPING OF CI FROM ESPRESSO LBM TO P4EST FACE-/EDGE ENUMERATION ***/
 /**
  * | ESPResSo c_i | p4est face | p4est edge | vec          |
@@ -383,6 +388,8 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data);
 void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
+
+void lbadapt_calc_local_temp(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data);
 

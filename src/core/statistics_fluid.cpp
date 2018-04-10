@@ -29,6 +29,7 @@
 #include "utils.hpp"
 #include "communication.hpp"
 #include "lb.hpp"
+#include "lb-adaptive.hpp"
 #include "lbboundaries.hpp"
 #include "statistics_fluid.hpp"
 
@@ -40,6 +41,11 @@
 void lb_calc_fluid_mass(double *result) {
   int x, y, z, index;
   double sum_rho=0.0, rho=0.0;
+
+#ifdef LB_ADAPTIVE
+  p8est_iterate(adapt_p4est, nullptr, (void *)&rho, lbadapt_calc_local_rho,
+                nullptr, nullptr, nullptr);
+#else  // LB_ADAPTIVE
 
   for (x=1; x<=lblattice.grid[0]; x++) {
     for (y=1; y<=lblattice.grid[1]; y++) {
@@ -53,6 +59,7 @@ void lb_calc_fluid_mass(double *result) {
       }
     }
   }
+#endif // LB_ADAPTIVE
 
   MPI_Reduce(&sum_rho, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 }
@@ -62,28 +69,36 @@ void lb_calc_fluid_mass(double *result) {
  */
 void lb_calc_fluid_momentum(double *result) {
 
-    int x, y, z, index;
-    double j[3], momentum[3] = { 0.0, 0.0, 0.0 };
+  int x, y, z, index;
+  double j[3], momentum[3] = { 0.0, 0.0, 0.0 };
 
-    for (x=1; x<=lblattice.grid[0]; x++) {
-	for (y=1; y<=lblattice.grid[1]; y++) {
-	    for (z=1; z<=lblattice.grid[2]; z++) {
-		index = get_linear_index(x,y,z,lblattice.halo_grid);
+  double h_max;
+#ifdef LB_ADAPTIVE
+  h_max = h[lbpar.max_refinement_level];
+  p8est_iterate(adapt_p4est, nullptr, (void *)momentum, lbadapt_calc_local_j,
+                nullptr, nullptr, nullptr);
+#else  // LB_ADAPTIVE
+  h_max = lbpar.agrid;
+  for (x=1; x<=lblattice.grid[0]; x++) {
+    for (y=1; y<=lblattice.grid[1]; y++) {
+      for (z=1; z<=lblattice.grid[2]; z++) {
+        index = get_linear_index(x,y,z,lblattice.halo_grid);
 
-		lb_calc_local_j(index,j);
-		momentum[0] += j[0] + lbfields[index].force[0];
-		momentum[1] += j[1] + lbfields[index].force[1];
-		momentum[2] += j[2] + lbfields[index].force[2];
+        lb_calc_local_j(index,j);
+        momentum[0] += j[0] + lbfields[index].force[0];
+        momentum[1] += j[1] + lbfields[index].force[1];
+        momentum[2] += j[2] + lbfields[index].force[2];
 
-	    }
-	}
+      }
     }
+  }
+#endif // LB_ADAPTIVE
 
-    momentum[0] *= lbpar.agrid/lbpar.tau;
-    momentum[1] *= lbpar.agrid/lbpar.tau;
-    momentum[2] *= lbpar.agrid/lbpar.tau;
+  momentum[0] *= h_max/lbpar.tau;
+  momentum[1] *= h_max/lbpar.tau;
+  momentum[2] *= h_max/lbpar.tau;
 
-    MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
+  MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
     
 }
 
@@ -95,7 +110,16 @@ void lb_calc_fluid_temp(double *result) {
   double rho, j[3];
   double temp = 0.0;
   int number_of_non_boundary_nodes = 0;
+  double h_max;
 
+#ifdef LB_ADAPTIVE
+  h_max = h[lbpar.max_refinement_level];
+  temp_iter_t helper;
+  p8est_iterate(adapt_p4est, nullptr, (void *)&helper, lbadapt_calc_local_temp,
+                nullptr, nullptr, nullptr);
+
+#else  // LB_ADAPTIVE
+  h_max = lbpar.agrid;
   for (x=1; x<=lblattice.grid[0]; x++) {
     for (y=1; y<=lblattice.grid[1]; y++) {
       for (z=1; z<=lblattice.grid[2]; z++) {
@@ -113,10 +137,11 @@ void lb_calc_fluid_temp(double *result) {
       }
     }
   }
+#endif // LB_ADAPTIVE
 
   // @Todo: lblattice.agrid is 3d. What to use here?
   temp *= 1./(3.*lbpar.rho*number_of_non_boundary_nodes*
-              lbpar.tau*lbpar.tau*lbpar.agrid)/n_nodes;
+              lbpar.tau*lbpar.tau*h_max)/n_nodes;
 
   MPI_Reduce(&temp, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 }
@@ -124,10 +149,12 @@ void lb_calc_fluid_temp(double *result) {
 void lb_collect_boundary_forces(double *result) {
 #ifdef LB_BOUNDARIES
   int n_lb_boundaries = LBBoundaries::lbboundaries.size();
-  double* boundary_forces = (double*) Utils::malloc(3*n_lb_boundaries*sizeof(double));
+  double* boundary_forces =
+      (double*) Utils::malloc(3*n_lb_boundaries*sizeof(double));
 
   int i = 0;
-  for (auto it = LBBoundaries::lbboundaries.begin(); it != LBBoundaries::lbboundaries.end(); ++it, i++) 
+  for (auto it = LBBoundaries::lbboundaries.begin();
+       it != LBBoundaries::lbboundaries.end(); ++it, i++)
     for (int j = 0; j < 3; j++)
       boundary_forces[3*i+j]=(**it).force()[j];
 
@@ -140,6 +167,7 @@ void lb_collect_boundary_forces(double *result) {
 
 /** Calculate a density profile of the fluid. */
 void lb_calc_densprof(double *result, int *params) {
+#ifndef LB_ADAPTIVE
 
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
@@ -211,13 +239,14 @@ void lb_calc_densprof(double *result, int *params) {
 
   if (this_node != 0) free(params);
 
+#endif // !LB_ADAPTIVE
 }
 
 #define REQ_VELPROF 701
 
 /** Calculate a velocity profile for the LB fluid. */	
 void lb_calc_velprof(double *result, int *params) {
-
+#ifndef LB_ADAPTIVE
   int index, dir[3], grid[3];
   int newroot=0, subrank, involved=0;
   double rho, j[3], *velprof;
@@ -306,7 +335,7 @@ void lb_calc_velprof(double *result, int *params) {
   }
 
   if (this_node !=0) free(params);
-
+#endif // LB_ADAPTIVE
 }
 
 #endif /* LB */

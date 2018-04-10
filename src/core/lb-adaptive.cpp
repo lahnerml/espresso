@@ -2709,9 +2709,9 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]);
-  yid = (pos[1]) * ((double) lb_conn_brick[0] / box_l[0]);
-  zid = (pos[2]) * ((double) lb_conn_brick[0] / box_l[0]);
+  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]) * (1 << lbpar.max_refinement_level);
+  yid = (pos[1]) * ((double) lb_conn_brick[1] / box_l[1]) * (1 << lbpar.max_refinement_level);
+  zid = (pos[2]) * ((double) lb_conn_brick[2] / box_l[2]) * (1 << lbpar.max_refinement_level);
   int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;

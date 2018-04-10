@@ -229,9 +229,9 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   double v_min = std::numeric_limits<double>::max();
   double v_max = std::numeric_limits<double>::min();
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-    v = sqrt(SQR(*(double *)sc_array_index(vel_values, 3 * qid)) +
-             SQR(*(double *)sc_array_index(vel_values, 3 * qid + 1)) +
-             SQR(*(double *)sc_array_index(vel_values, 3 * qid + 2)));
+    v = sqrt(Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid)) +
+             Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 1)) +
+             Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 2)));
     if (v < v_min) {
       v_min = v;
     }
@@ -276,9 +276,9 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   // coarsened
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
     // velocity
-    double v = sqrt(SQR(*(double*) sc_array_index(vel_values, 3 * qid)) +
-                    SQR(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
-                    SQR(*(double*) sc_array_index(vel_values, 3 * qid + 2)));
+    double v = sqrt(Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid)) +
+                    Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
+                    Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid + 2)));
     // Note, that this formulation stems from the fact that velocity is 0 at
     // boundaries
     if (vel_thresh[1] * (v_max - v_min) < (v - v_min)) {
@@ -388,7 +388,7 @@ int p4est_utils_adapt_grid() {
   // 5th step: Prepare next integration step
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
-  forests.push_back(dd.p4est);
+  forests.push_back(dd_p4est_get_p4est());
 #endif // DD_P4EST
   forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);

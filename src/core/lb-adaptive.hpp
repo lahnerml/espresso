@@ -28,9 +28,14 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
-#ifdef LB_ADAPTIVE
 /* p4est includes; opted to go for pure 3D */
 #include "p4est_utils.hpp"
+
+#include "lb-adaptive-gpu.hpp"
+#include "lb.hpp"
+#include "utils.hpp"
+
+#ifdef LB_ADAPTIVE
 #include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
@@ -42,10 +47,6 @@
 #include <p8est_vtk.h>
 #include <string.h>
 #include <vector>
-
-#include "lb-adaptive-gpu.hpp"
-#include "lb.hpp"
-#include "utils.hpp"
 
 /* "global variables" */
 extern castable_unique_ptr<p4est_t> adapt_p4est;

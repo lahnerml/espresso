@@ -2619,6 +2619,7 @@ void lb_release_fluid() {
   free(lbfluid[1][0]);
   free(lbfluid[1]);
   free(lbfields);
+#endif // LB_ADAPTIVE
 }
 
 /** Release fluid and communication. */
@@ -3636,6 +3637,7 @@ void lattice_boltzmann_update() {
 inline void lb_viscous_coupling(Particle *p, double force[3],
                                 bool ghost = false) {
 #ifndef LB_ADAPTIVE_GPU
+#ifndef LB_ADAPTIVE
   // FIXME port to GPU
   int x, y, z;
   Lattice::index_t node_index[8];

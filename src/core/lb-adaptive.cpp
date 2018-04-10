@@ -220,7 +220,6 @@ void lbadapt_init() {
 #endif // LB_ADAPTIVE_GPU
   lbadapt_allocate_data();
 
-
   int status;
   lbadapt_payload_t *data;
   castable_unique_ptr<p8est_meshiter_t> mesh_iter;

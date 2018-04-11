@@ -78,12 +78,10 @@ void lbboundary_mindist_position(double pos[3], double *mindist,
 
 /** Initialize boundary conditions for all constraints in the system. */
 void lb_init_boundaries() {
-
 #ifndef LB_ADAPTIVE
   int x, y, z;
   // char *errtxt;
   double pos[3], dist, dist_tmp = 0.0, dist_vec[3];
-#endif // !LB_ADAPTIVE
 
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined(LB_GPU) && defined(LB_BOUNDARIES_GPU)
@@ -271,7 +269,7 @@ void lb_init_boundaries() {
 
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   } else { 
-#if defined(LB) && defined(LB_BOUNDARIES) && not defined(LB_ADAPTIVE)
+#if defined(LB) && defined(LB_BOUNDARIES)
     int node_domain_position[3], offset[3];
     int the_boundary = -1;
     map_node_array(this_node, node_domain_position);
@@ -316,10 +314,11 @@ void lb_init_boundaries() {
         }
       }
     }
-#elif defined (LB_ADAPTIVE)
+  }
+#endif // defined(LB) && defined(LB_BOUNDARIES)
+#else
     lbadapt_get_boundary_status();
 #endif
-  }
 }
 
 // TODO dirty hack. please someone get rid of void*

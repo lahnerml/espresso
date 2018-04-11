@@ -673,18 +673,14 @@ int lb_lbfluid_get_ext_force(double *p_f) {
 
 int lb_lbfluid_print_vtk_boundary(char *filename) {
 #ifdef LB_ADAPTIVE
-  int len;
   /* strip file ending from filename (if given) */
-  char *pos_file_ending = strpbrk(filename, ".");
-  if (pos_file_ending != 0) {
+  char *pos_file_ending;
+  pos_file_ending = strrchr(filename, '.');
+  if (pos_file_ending != nullptr) {
     *pos_file_ending = '\0';
-  } else {
-    pos_file_ending = strpbrk(filename, "\0");
   }
-
-  /* this is parallel io, i.e. we have to communicate the filename to all
-   * other processes. */
-  len = pos_file_ending - filename + 1;
+  int len = static_cast<int>(strlen(filename));
+  ++len;
 
   /* call mpi printing routine on all slaves and communicate the filename */
   mpi_call(mpi_lbadapt_vtk_print_boundary, -1, len);
@@ -818,24 +814,20 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   return 0;
 }
 
-int lb_lbfluid_print_vtk_density(char **filename) {
+int lb_lbfluid_print_vtk_density(char *filename) {
 #ifdef LB_ADAPTIVE
-  int len;
   /* strip file ending from filename (if given) */
-  char *pos_file_ending = strpbrk(*filename, ".");
-  if (pos_file_ending != 0) {
+  char *pos_file_ending;
+  pos_file_ending = strrchr(filename, '.');
+  if (pos_file_ending != nullptr) {
     *pos_file_ending = '\0';
-  } else {
-    pos_file_ending = strpbrk(*filename, "\0");
   }
-
-  /* this is parallel io, i.e. we have to communicate the filename to all
-   * other processes. */
-  len = pos_file_ending - *filename + 1;
+  int len = static_cast<int>(strlen(filename));
+  ++len;
 
   /* call mpi printing routine on all slaves and communicate the filename */
   mpi_call(mpi_lbadapt_vtk_print_density, -1, len);
-  MPI_Bcast(*filename, len, MPI_CHAR, 0, comm_cart);
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
@@ -854,8 +846,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, *filename);
-  p8est_vtk_context_set_scale(context, 1); /* quadrant at almost full scale */
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
+  p8est_vtk_context_set_scale(context, 1); /* quadrant at full scale */
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
@@ -879,7 +871,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #else  // LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(*filename);
+  lbadapt_vtk_context_t *context = lbadapt_vtk_context_new(filename);
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
@@ -952,18 +944,14 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                   std::vector<int> bb2) {
 #ifdef LB_ADAPTIVE
-  int len;
   /* strip file ending from filename (if given) */
-  char *pos_file_ending = strpbrk(filename, ".");
-  if (pos_file_ending != 0) {
+  char *pos_file_ending;
+  pos_file_ending = strrchr(filename, '.');
+  if (pos_file_ending != nullptr) {
     *pos_file_ending = '\0';
-  } else {
-    pos_file_ending = strpbrk(filename, "\0");
   }
-
-  /* this is parallel io, i.e. we have to communicate the filename to all
-   * other processes. */
-  len = pos_file_ending - filename + 1;
+  int len = static_cast<int>(strlen(filename));
+  ++len;
 
   /* call mpi printing routine on all slaves and communicate the filename */
   mpi_call(mpi_lbadapt_vtk_print_velocity, -1, len);

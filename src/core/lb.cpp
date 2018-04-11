@@ -4280,15 +4280,14 @@ void calc_particle_lattice_ia() {
  * This function has to be called after changing the density of
  * a local lattice site in order to set lbpar.rho consistently. */
 void lb_calc_average_rho() {
-  double rho, local_rho, sum_rho;
-
-  local_rho = 0.0;
+  double rho, sum_rho;
 #ifdef LB_ADAPTIVE
   rho = 0.0;
   p8est_iterate(adapt_p4est, nullptr, (void *)&rho, lbadapt_calc_local_rho, nullptr,
                 nullptr, nullptr);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
+  double local_rho = 0.0;
   Lattice::index_t index;
   int x, y, z;
 

@@ -786,8 +786,11 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
         (long long) shipped, shipped * 100. / p4est_mod->global_num_quadrants);
   }
   else {
-    std::cerr << "Not all p4ests have been created yet. This may happen during"
-              << " initialization." << std::endl;
+    if (this_node == 0) {
+      std::cerr
+          << "Not all p4ests have been created yet. This may happen during"
+          << " initialization." << std::endl;
+    }
   }
 #endif // defined(DD_P4EST) && defined(LB_ADAPTIVE)
 }

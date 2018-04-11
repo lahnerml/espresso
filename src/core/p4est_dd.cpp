@@ -1093,7 +1093,7 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
     if (target) {
       append_indexed_particle(target, std::move(recvbuf->part[p]));
     } else {
-      fprintf(stderr, "proc %i received remote particle p%i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %lli, pos2proc %i\n\told pos %lfx%lfx%lf\n",
+      fprintf(stderr, "proc %i received remote particle p%i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n",
         this_node, recvbuf->part[p].p.identity, global_flag, from,
         recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2],
         dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p),
@@ -1995,7 +1995,7 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
                                                  static_cast<p4est_gloidx_t>(0));
       if (ds::p4est->global_num_quadrants != totnquads) {
         fprintf(stderr,
-                "[%i] ERROR: totnquads = %lli but global_num_quadrants = %lli\n",
+                "[%i] ERROR: totnquads = %li but global_num_quadrants = %li\n",
                 this_node, totnquads, ds::p4est->global_num_quadrants);
         errexit();
       }

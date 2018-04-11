@@ -2245,7 +2245,7 @@ void mpi_lbadapt_set_max_level(int node, int l_max) {
 
 void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 #ifdef LB_ADAPTIVE
-  char filename[len];
+  char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 #ifndef LB_ADAPTIVE_GPU
   p4est_locidx_t num_cells = adapt_p4est->local_num_quadrants;
@@ -2316,7 +2316,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 
 void mpi_lbadapt_vtk_print_density(int node, int len) {
 #ifdef LB_ADAPTIVE
-  char filename[len];
+  char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
 #ifndef LB_ADAPTIVE_GPU
@@ -2385,7 +2385,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
 
 void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 #ifdef LB_ADAPTIVE
-  char filename[len];
+  char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
 #ifndef LB_ADAPTIVE_GPU
@@ -2465,7 +2465,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
 void mpi_lbadapt_vtk_print_gpu_utilization(int node, int len) {
 #ifdef LB_ADAPTIVE_GPU
-  char filename[len];
+  char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   std::vector<thread_block_container_t> a(adapt_p4est->local_num_quadrants);
@@ -3169,7 +3169,7 @@ void mpi_resort_particles_slave(int global_flag, int) {
 
 void mpi_dd_p4est_write_particle_vtk(int node, int len) {
 #ifdef DD_P4EST
-  char filename[len];
+  char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   dd_p4est_write_particle_vtk(filename);

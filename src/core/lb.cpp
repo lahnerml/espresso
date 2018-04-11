@@ -710,7 +710,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = p8est_vtk_write_cell_dataf(context, 1, /* write tree indices */
@@ -723,7 +723,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                        "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -733,7 +733,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   context =
       lbadapt_vtk_write_cell_dataf(context, 1,
@@ -747,7 +747,7 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                    0, /* no custom cell vector data */
                                    "boundary", boundary.get(), context);
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -859,7 +859,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
@@ -873,7 +873,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                        "density", density.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -883,7 +883,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   context = lbadapt_vtk_write_cell_dataf(context, 1, /* write tree indices */
                                          1, /* write the refinement level */
@@ -895,7 +895,7 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                          0, /* no custom cell vector data */
                                          "density", density.get(), context);
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -997,7 +997,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
 
   // clang-format off
@@ -1012,11 +1012,11 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        "vorticity", vorticity.get(),
                                        "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   context = p8est_vtk_write_point_dataf(context, 0, 1, "velocity node",
                                         vel_pts.get(), context);
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -1026,7 +1026,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
 
   context = lbadapt_vtk_write_cell_dataf(context, 1, /* write tree indices */
@@ -1039,7 +1039,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                                data */
                                          "velocity", velocity.get(), context);
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
 #endif // LB_ADAPTIVE_GPU
@@ -4297,8 +4297,8 @@ void lb_calc_average_rho() {
   local_rho = 0.0;
 #ifdef LB_ADAPTIVE
   rho = 0.0;
-  p8est_iterate(adapt_p4est, NULL, (void *)&rho, lbadapt_calc_local_rho, NULL,
-                NULL, NULL);
+  p8est_iterate(adapt_p4est, nullptr, (void *)&rho, lbadapt_calc_local_rho, nullptr,
+                nullptr, nullptr);
   MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
 #else  // LB_ADAPTIVE
   Lattice::index_t index;

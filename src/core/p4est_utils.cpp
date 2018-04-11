@@ -150,11 +150,22 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
 }
 
 inline void tree_to_boxlcoords(double x[3]) {
-  for (int i = 0; i < P8EST_DIM; ++i)
-#ifdef DD_P4EST
+  for (int i = 0; i < P8EST_DIM; ++i) {
+#if defined(DD_P4EST) && defined(LB_ADAPTIVE)
+    if (dd_p4est_get_p4est() != nullptr) {
+      x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
+    } else {
+      x[i] *= (box_l[i] / lb_conn_brick[i]);
+    }
+  }
+#elif defined(DD_P4EST)
     x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
-#else  // defined(DD_P4EST)
+#elif defined(LB_ADAPTIVE)
     x[i] *= (box_l[i] / lb_conn_brick[i]);
+#else  // defined(DD_P4EST)
+    fprintf(stderr, "Function tree_to_boxlcoords only works if DD_P4EST or "
+                    "LB_ADAPTIVE is activated.\n");
+    errexit();
 #endif // defined(DD_P4EST)
 }
 

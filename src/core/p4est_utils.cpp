@@ -166,7 +166,7 @@ void p4est_utils_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
-                                             double *xyz) {
+                                      double *xyz) {
   p8est_quadrant_t *q = p8est_mesh_get_quadrant(
       mesh_iter->p4est, mesh_iter->mesh, mesh_iter->current_qid);
   p8est_qcoord_to_vertex(mesh_iter->p4est->connectivity,
@@ -176,7 +176,7 @@ void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
 }
 
 void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
-                                     p8est_quadrant_t *q, double xyz[3]) {
+                              p8est_quadrant_t *q, double xyz[3]) {
   int base = P8EST_QUADRANT_LEN(q->level);
   int root = P8EST_ROOT_LEN;
   double half_length = ((double)base / (double)root) * 0.5;

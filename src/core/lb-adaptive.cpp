@@ -1651,7 +1651,7 @@ void lbadapt_bounce_back(int level) {
                     lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
                     LBBoundaries::lbboundaries
                         [currCellData->lbfields.boundary - 1].get()
-                            ->velocity()[l] /
+                            ->velocity()[l] * (lbpar.tau / h_max) /
                     lbmodel.c_sound_sq;
               }
 
@@ -1683,8 +1683,8 @@ void lbadapt_bounce_back(int level) {
                     h_max * h_max * h_max * lbpar.rho * 2 *
                     lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
                     LBBoundaries::lbboundaries
-                        [data->lbfields.boundary - 1].get()->velocity()[l] /
-                    lbmodel.c_sound_sq;
+                        [data->lbfields.boundary - 1].get()->velocity()[l] *
+                    (lbpar.tau / h_max) / lbmodel.c_sound_sq;
               }
 
               currCellData->lbfluid[1][dir_ESPR] =

@@ -222,7 +222,7 @@ void topology_init(int cs, CellPList *local, bool isRepart = false);
     @param new_cs gives the new topology to use afterwards. May be set to
     \ref CELL_STRUCTURE_CURRENT for not changing it.
 */
-void cells_re_init(int new_cs, bool isRepart = false);
+void cells_re_init(int new_cs, bool isRepart = false, bool omitLBinit = false);
 
 /** Reallocate the list of all cells (\ref cells::cells). */
 void realloc_cells(int size);

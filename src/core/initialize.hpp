@@ -87,7 +87,7 @@ void on_boxl_change();
 /** called every time a major change to the cell structure has
     happened, like the skin or grid have changed. This one is
     potentially slow. */
-void on_cell_structure_change();
+void on_cell_structure_change(bool omitLBinit = false);
 
 /** called every time the temperature changes. This one is
     potentially slow. */

@@ -245,7 +245,7 @@ static void cells_adapt_after_repart() {
 
 /************************************************************/
 
-void cells_re_init(int new_cs, bool isRepart) {
+void cells_re_init(int new_cs, bool isRepart, bool omitLBinit) {
   CellPList tmp_local;
 
   CELL_TRACE(fprintf(stderr, "%d: cells_re_init: convert type (%d->%d)\n",
@@ -282,7 +282,7 @@ void cells_re_init(int new_cs, bool isRepart) {
   else
     resort_particles = Cells::RESORT_GLOBAL;
 
-  on_cell_structure_change();
+  on_cell_structure_change(omitLBinit);
 
   // Linked cell runtime.
   std::fill(std::begin(repart::lc_cell_runtime), std::end(repart::lc_cell_runtime), 0.0);

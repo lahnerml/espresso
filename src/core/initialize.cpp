@@ -497,7 +497,7 @@ void on_boxl_change() {
 #endif
 }
 
-void on_cell_structure_change() {
+void on_cell_structure_change(bool omitLBinit) {
   EVENT_TRACE(fprintf(stderr, "%d: on_cell_structure_change\n", this_node));
 
 /* Now give methods a chance to react to the change in cell
@@ -550,7 +550,7 @@ void on_cell_structure_change() {
 #endif /* ifdef DIPOLES */
 
 #ifdef LB
-  if (lattice_switch & LATTICE_LB) {
+  if (!omitLBinit && (lattice_switch & LATTICE_LB)) {
     lb_init();
   }
 #endif

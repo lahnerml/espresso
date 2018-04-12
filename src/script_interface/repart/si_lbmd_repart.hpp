@@ -62,6 +62,7 @@ public:
       if (cell_structure.type != CELL_STRUCTURE_P4EST) {
         std::cerr << "Trying to repartition non-p4est cell system." << std::endl
                   << "Continuing without repart." << std::endl;
+        return {};
       }
 #endif
 

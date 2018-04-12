@@ -61,6 +61,8 @@ static p8est_t* tree_of(const repart_info& ri)
     return p4est_utils_get_forest_info(ri.fo).p4est;
 }
 
+namespace lbmd {
+
 void repart_all(const std::vector<std::string>& metrics, const std::vector<double>& alphas)
 {
     std::vector<std::vector<double>> ws;
@@ -93,6 +95,7 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
     });
 }
 
+}
 
 #endif
 

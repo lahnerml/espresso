@@ -2033,8 +2033,7 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
        {0, 3, 16, 5, 12, 9, 24},  // left, back, top
        {1, 3, 17, 5, 13, 9, 25}}; // right, back, top
 
-  lb_float h_max = (lb_float) P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
-                   (lb_float) P8EST_ROOT_LEN;
+  lb_float h_max = h[lbpar.max_refinement_level];
 
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {

@@ -2024,17 +2024,12 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, rho, j, pi);
 #else  // !LB_ADAPTIVE
-    int quad = 0;
-    int lvl = 0;
-    for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
-      p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
-      int64_t qidx = lbadapt_get_global_idx(q, adapt_mesh->quad_to_tree[i]);
-      if (qidx > index) {
-        quad = i - 1;
-        break;
-      }
-      lvl = q->level;
-    }
+    p4est_locidx_t quad =
+        p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
+    p8est_quadrant_t *q =
+        p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad);
+    int lvl = q->level;
+
     lbadapt_payload_t *data =
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
@@ -2076,17 +2071,12 @@ void mpi_recv_fluid_slave(int node, int index) {
 #ifndef LB_ADAPTIVE
     lb_calc_local_fields(index, &data[0], &data[1], &data[4]);
 #else  // !LB_ADAPTIVE
-    int quad = 0;
-    int lvl = 0;
-    for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
-      p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
-      int64_t qidx = lbadapt_get_global_idx(q, adapt_mesh->quad_to_tree[i]);
-      if (qidx > index) {
-        quad = i - 1;
-        break;
-      }
-      lvl = q->level;
-    }
+    p4est_locidx_t quad =
+        p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
+    p8est_quadrant_t *q =
+        p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad);
+    int lvl = q->level;
+
     lbadapt_payload_t *dat =
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(dat->lbfluid, dat->lbfields.force,

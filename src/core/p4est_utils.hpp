@@ -248,6 +248,17 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  */
 int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
 
+/** Map a process-local Morton-index obtained from
+ * \ref p4est_utils_cell_morton_idx to a local qid.
+ *
+ * @param forest   The position of the forest info containing the p4est for
+ *                 which to map.
+ * @param idx      The Morton index as calculated by
+ *                 \ref p4est_utils_cell_morton_idx
+ * @return         The quadrant index at the given index.
+ */
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx);
+
 /** Map a geometric position to the respective processor.
  *
  * @param forest   The forest_info containing the p4est for which to map.

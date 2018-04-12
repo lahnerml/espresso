@@ -241,6 +241,42 @@ int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   return p4est_utils_cell_morton_idx(x, y, z);
 }
 
+/** Perform a binary search for a given quadrant.
+ * CAUTION: This only makes sense for adaptive grids and therefore we implicitly
+ *          assume that we are operating on the potentially adaptive p4est of
+ *          the LBM.
+ *
+ * @param idx      The index calculated by \ref p4est_utils_cell_morton_idx
+ *                 that we are looking for.
+ * @return         The qid of this quadrant in the adaptive p4est.
+ */
+p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
+  p4est_gloidx_t cmp_idx;
+  p4est_locidx_t count, step, index, first;
+  p4est_quadrant_t *q;
+  first = 0;
+  count = adapt_p4est->local_num_quadrants;
+  while (0 < count) {
+    step = 0.5 * count;
+    index = first + step;
+    q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, index);
+    p4est_topidx_t tid = adapt_mesh->quad_to_tree[index];
+    cmp_idx = p4est_utils_global_idx(q, tid);
+    if (cmp_idx < idx) {
+      first = step + 1;
+      count -= step + 1;
+    } else {
+      count = step;
+    }
+  }
+  return first;
+}
+
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
+  P4EST_ASSERT(forest == forest_order::adaptive_LB);
+  return bin_search_loc_quads(idx);
+}
+
 // Find the process that handles the position
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
   const auto &fi = forest_info.at(static_cast<int>(forest));

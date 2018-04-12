@@ -6,7 +6,7 @@
 
 namespace lbmd {
 
-void repart_all(const std::vector<std::string>& metrics, std::vector<double>& alphas);
+void repart_all(const std::vector<std::string>& metrics, const std::vector<double>& alphas);
 
 }
 

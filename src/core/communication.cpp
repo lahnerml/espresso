@@ -74,6 +74,7 @@
 #include "p3m-dipolar.hpp"
 #include "p3m.hpp"
 #include "p4est_dd.hpp"
+#include "p4est_utils.hpp"
 #include "partCfg_global.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"

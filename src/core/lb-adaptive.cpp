@@ -72,7 +72,6 @@ castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
-int lb_conn_brick[3] = {0, 0, 0};
 double coords_for_regional_refinement[6] = {
     std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
     std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),

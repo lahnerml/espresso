@@ -1,6 +1,8 @@
 #ifndef P4EST_UTILS_HPP
 #define P4EST_UTILS_HPP
 
+#include "grid.hpp"
+#include "p4est_dd.hpp"
 #include "utils.hpp"
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
@@ -76,6 +78,13 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator void *() const { return this->get(); }
 };
 
+#ifdef LB_ADAPTIVE
+extern int lb_conn_brick[3];
+// relative threshold values for refinement and coarsening.
+extern double vel_thresh[2];
+extern double vort_thresh[2];
+#endif // LB_ADAPTIVE
+
 enum class forest_order {
 #ifdef DD_P4EST
   short_range = 0,
@@ -84,10 +93,6 @@ enum class forest_order {
   adaptive_LB
 #endif // LB_ADAPTIVE
 };
-
-// relative threshold values for refinement and coarsening.
-extern double vel_thresh[2];
-extern double vort_thresh[2];
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;

@@ -23,11 +23,15 @@ static std::vector<p4est_utils_forest_info_t> forest_info;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
+
+#ifdef LB_ADAPTIVE
+int lb_conn_brick[3] = {0, 0, 0};
+
 // relative threshold values for refinement and coarsening.  Initially they are
 // set such that they have no effect.  Order is coarsening - refinement.
 double vel_thresh[2] = {0., 1.};
 double vort_thresh[2] = {0., 1.};
-
+#endif // LB_ADAPTIVE
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.

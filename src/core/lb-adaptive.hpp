@@ -59,7 +59,6 @@ extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 
-extern int lb_conn_brick[3]; // Number of trees in each spatial direction
 extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
                                                  //        y_min, y_max,
                                                  //        z_min, z_max

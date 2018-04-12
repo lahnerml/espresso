@@ -141,6 +141,57 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
 /** \name Geometric helper functions                                         */
 /*****************************************************************************/
 /*@{*/
+/** Transform coordinates in-place from p4est-tree coordinates (a tree is a
+ * unit-cube) to simulation domain.
+ *
+ * @param x    Position that is transformed in place.
+ */
+inline void tree_to_boxlcoords(double x[3]) {
+  for (int i = 0; i < P8EST_DIM; ++i) {
+#if defined(DD_P4EST) && defined(LB_ADAPTIVE)
+    if (dd_p4est_get_p4est() != nullptr) {
+      x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
+    } else {
+      x[i] *= (box_l[i] / lb_conn_brick[i]);
+    }
+  }
+#elif defined(DD_P4EST)
+  x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
+#elif defined(LB_ADAPTIVE)
+  x[i] *= (box_l[i] / lb_conn_brick[i]);
+#else  // defined(DD_P4EST)
+  fprintf(stderr, "Function tree_to_boxlcoords only works if DD_P4EST or "
+                  "LB_ADAPTIVE is activated.\n");
+  errexit();
+#endif // defined(DD_P4EST)
+}
+
+/** Transform coordinates in-place from simulation domain to p4est
+ * tree-coordinates (a tree is a unit-cube).
+ *
+ * @param x    Position that is transformed in place.
+ */
+inline void boxl_to_treecoords(double x[3]) {
+  for (int i = 0; i < P8EST_DIM; ++i) {
+#if defined(DD_P4EST) && defined(LB_ADAPTIVE)
+    if (dd_p4est_get_p4est() != nullptr) {
+      x[i] /= (box_l[i] / dd_p4est_get_n_trees(i));
+    } else {
+      x[i] /= (box_l[i] / lb_conn_brick[i]);
+    }
+  }
+#elif defined(DD_P4EST)
+  x[i] /= (box_l[i] / dd_p4est_get_n_trees(i));
+#elif defined(LB_ADAPTIVE)
+  x[i] /= (box_l[i] / lb_conn_brick[i]);
+#else  // defined(DD_P4EST)
+  fprintf(stderr, "Function tree_to_boxlcoords only works if DD_P4EST or "
+                  "LB_ADAPTIVE is activated.\n");
+  errexit();
+#endif // defined(DD_P4EST)
+}
+
+
 /** Get the coordinates of the front lower left corner of a quadrant.
  *
  * \param [in]  p8est    the forest

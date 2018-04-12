@@ -2641,17 +2641,6 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   q->p.user_long = info->quadid;
 }
 
-int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
-  int x, y, z;
-  double xyz[3];
-  p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << lbpar.max_refinement_level);
-  y = xyz[1] * (1 << lbpar.max_refinement_level);
-  z = xyz[2] * (1 << lbpar.max_refinement_level);
-
-  return p4est_utils_cell_morton_idx(x, y, z);
-}
-
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
                                int displace[3]) {
   int x, y, z;
@@ -2690,7 +2679,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   int64_t qidx, zlvlfill;
   for (size_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
-    qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+    qidx = p4est_utils_global_idx(q, q->p.piggy3.which_tree);
     zlvlfill = 1 << (3*(lbpar.max_refinement_level - q->level));
     if (qidx <= pidx && pidx < qidx + zlvlfill)
       return i;
@@ -2726,7 +2715,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
   }
   for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
     q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
-    qidx = lbadapt_get_global_idx(q, adapt_mesh->quad_to_tree[i]);
+    qidx = p4est_utils_global_idx(q, adapt_mesh->quad_to_tree[i]);
     if (qidx > pidx)
       return i - 1;
     for (int j = 0; j < 8; ++j)
@@ -2744,7 +2733,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     qidx = tmp *tmp *tmp;
   } else {
     q = &adapt_p4est->global_first_position[this_node + 1];
-    qidx = lbadapt_get_global_idx(q, q->p.which_tree);
+    qidx = p4est_utils_global_idx(q, q->p.which_tree);
   }
   if (pidx < qidx) {
     return adapt_p4est->local_num_quadrants - 1;
@@ -2987,7 +2976,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     int64_t nidx = lbadapt_get_global_idx(quad, tree, displace);
     for (int64_t i=0; i<adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
-      qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+      qidx = p4est_utils_global_idx(q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_qreal_offset[q->p.piggy3.local_num];
         nodes[ncnt] = &lbadapt_local_data[q->level][sid];
@@ -3005,7 +2994,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     }
     for (int64_t i=0; i<adapt_ghost->ghosts.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
-      qidx = lbadapt_get_global_idx(q, q->p.piggy3.which_tree);
+      qidx = p4est_utils_global_idx(q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level][sid];

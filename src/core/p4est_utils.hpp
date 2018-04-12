@@ -240,6 +240,14 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
  */
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
+/** Obtain a Morton-index from a quadrant and its treeid.
+ *
+ * @param q        Quadrant of a given tree.
+ * @param tree     Tree-id holding given quadrant.
+ * @return         Morton-index of given quadrant.
+ */
+int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+
 /** Map a geometric position to the respective processor.
  *
  * @param forest   The forest_info containing the p4est for which to map.

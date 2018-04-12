@@ -230,6 +230,17 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
 #endif
 }
 
+int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
+  int x, y, z;
+  double xyz[3];
+  p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
+  x = xyz[0] * (1 << lbpar.max_refinement_level);
+  y = xyz[1] * (1 << lbpar.max_refinement_level);
+  z = xyz[2] * (1 << lbpar.max_refinement_level);
+
+  return p4est_utils_cell_morton_idx(x, y, z);
+}
+
 // Find the process that handles the position
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
   const auto &fi = forest_info.at(static_cast<int>(forest));

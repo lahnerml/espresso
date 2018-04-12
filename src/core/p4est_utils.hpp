@@ -240,12 +240,22 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Map a geometric position to the respective processor.
  *
- * @param p4est    The p4est for which to map.
- * @param xyz      The position to map
+ * @param forest   The forest_info containing the p4est for which to map.
+ * @param xyz      The position to map.
  * @return         The MPI rank which holds a quadrant at the given position for
  *                 the current p4est.
  */
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz);
+
+/** Map an index to the respective processor.
+ *
+ * @param forest   The forest info containing the p4est for which to map.
+ * @param idx      The Morton index as calculated by
+ *                 \ref p4est_utils_cell_morton_idx.
+ * @return         The MPI rank which holds a quadrant at the given position for
+ *                 the current p4est.
+ */
+int p4est_utils_idx_to_proc(forest_order forest, p4est_gloidx_t idx);
 /*@}*/
 
 /*****************************************************************************/

@@ -233,13 +233,19 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
 // Find the process that handles the position
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
+  boxl_to_treecoords(xyz);
   int xyz_mod[3];
   for (int i = 0; i < P8EST_DIM; ++i)
     xyz_mod[i] = xyz[i] * (1 << fi.finest_level_global);
+  int idx = p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
+  return p4est_utils_idx_to_proc(forest, idx);
+}
+
+int p4est_utils_idx_to_proc(forest_order forest, p4est_gloidx_t idx) {
+  const auto &fi = forest_info.at(static_cast<int>(forest));
   auto it = std::upper_bound(
-      std::begin(fi.p4est_space_idx), std::end(fi.p4est_space_idx) - 1,
-      p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]),
-      [](int i, int64_t idx) { return i < idx; });
+      std::begin(fi.p4est_space_idx), std::end(fi.p4est_space_idx) - 1, idx,
+      [](int i, int64_t index) { return i < index; });
 
   return std::distance(std::begin(fi.p4est_space_idx), it) - 1;
 }

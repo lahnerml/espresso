@@ -59,6 +59,7 @@ class P4estDD:
     def __init__(self):
         self.__instance = script_interface.PScriptInterface("ScriptInterface::Repart::P4estDD")
         self.__ana_instance = script_interface.PScriptInterface("ScriptInterface::Repart::Analysis")
+        self.__lbmd_instance = script_interface.PScriptInterface("ScriptInterface::Repart::LBMD_Repart")
 
     def create_metric(self, desc):
         """
@@ -73,17 +74,23 @@ class P4estDD:
 
     def repart(self, m, verbose=False):
         self.__instance.call_method("repart", metric=m.get_metric(), verbose=verbose)
-    
+
+    def repart_lbmd(self, md_alpha=1.0, md_metric="", lb_alpha=1.0, lb_metric=""):
+        if md_metric == "" or lb_metric == "":
+            raise ValueError("Supply md_metric and lb_metric parameters.")
+        # Same ordering as forest_order!
+        self.__lbmd_instance.call_method("repart", md_alpha=md_alpha, lb_alpha=lb_alpha, md_metirc=md_metric, lb_metric=lb_metric)
+
     def runtime(self, m):
         ret = self.__ana_instance.call_method("runtime", funct=m)
         if ret is None:
             raise ValueError("Unkown parameter `" + m + "'")
         else:
             return ret
-    
+
     def reset_runtime(self, m):
         self.__ana_instance.call_method("reset", funct=m)
-    
+
     def reset_cellruntime(self):
         self.__ana_instance.call_method("resetcells")
 

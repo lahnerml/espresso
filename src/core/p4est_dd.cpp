@@ -417,6 +417,7 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
   num_cells = num_local_cells + num_ghost_cells;
   
   ds::p4est_shell.resize(num_cells);
+  castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
 
   for (int i = 0; i < num_local_cells; ++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds::p4est, p4est_mesh, i);
@@ -445,9 +446,8 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
     if (ds::p4est_shell[i].boundary) ds::p4est_shell[i].shell = 1;
     
     for (int n = 0; n < 26; ++n) {
+      sc_array_truncate(ni);
       ds::p4est_shell[i].neighbor[n] = -1;
-      sc_array_t *ni;
-      ni = sc_array_new(sizeof(int));
       p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n, NULL, NULL, ni);
       if (ni->elem_count > 1) // more than 1 neighbor in this direction
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
@@ -458,8 +458,7 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
           ds::p4est_shell[i].shell = 1;
         }
       }
-      sc_array_destroy(ni);
-      
+
       if (ds::p4est_shell[i].neighbor[n] < 0 || ds::p4est_shell[i].neighbor[n] >= num_cells) {
         printf("Index OOB %i of %li (%li,%li)\n", ds::p4est_shell[i].neighbor[n], num_cells, num_local_cells, num_ghost_cells);
         //errexit();

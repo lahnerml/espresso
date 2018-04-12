@@ -154,16 +154,17 @@ inline void tree_to_boxlcoords(double x[3]) {
     } else {
       x[i] *= (box_l[i] / lb_conn_brick[i]);
     }
-  }
 #elif defined(DD_P4EST)
-  x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
+    x[i] *= (box_l[i] / dd_p4est_get_n_trees(i));
 #elif defined(LB_ADAPTIVE)
-  x[i] *= (box_l[i] / lb_conn_brick[i]);
-#else  // defined(DD_P4EST)
+    x[i] *= (box_l[i] / lb_conn_brick[i]);
+#endif
+  }
+#if !defined(DD_P4EST) && !defined(LB_ADAPTIVE)
   fprintf(stderr, "Function tree_to_boxlcoords only works if DD_P4EST or "
                   "LB_ADAPTIVE is activated.\n");
   errexit();
-#endif // defined(DD_P4EST)
+#endif
 }
 
 /** Transform coordinates in-place from simulation domain to p4est
@@ -179,16 +180,17 @@ inline void boxl_to_treecoords(double x[3]) {
     } else {
       x[i] /= (box_l[i] / lb_conn_brick[i]);
     }
-  }
 #elif defined(DD_P4EST)
   x[i] /= (box_l[i] / dd_p4est_get_n_trees(i));
 #elif defined(LB_ADAPTIVE)
   x[i] /= (box_l[i] / lb_conn_brick[i]);
-#else  // defined(DD_P4EST)
+#endif
+  }
+#if !defined(DD_P4EST) && !defined(LB_ADAPTIVE)
   fprintf(stderr, "Function tree_to_boxlcoords only works if DD_P4EST or "
                   "LB_ADAPTIVE is activated.\n");
   errexit();
-#endif // defined(DD_P4EST)
+#endif
 }
 
 

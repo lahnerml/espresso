@@ -1482,21 +1482,8 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     double j[3];
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
-    int proc = 0;
-    for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
-      double xyz[3];
-      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx = p4est_utils_cell_morton_idx(
-          xyz[0] * (1 << lbpar.max_refinement_level),
-          xyz[1] * (1 << lbpar.max_refinement_level),
-          xyz[2] * (1 << lbpar.max_refinement_level));
-      if (qidx > index) {
-        proc -= 1;
-        break;
-      }
-    }
-    auto h_max = h[lbpar.max_refinement_level];
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
+    lb_float h_max = h[lbpar.max_refinement_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     rho *= 1 / h_max / h_max / h_max;
@@ -1549,21 +1536,8 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     double j[3];
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
-    int proc = 0;
-    for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
-      double xyz[3];
-      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx = p4est_utils_cell_morton_idx(
-          xyz[0] * (1 << lbpar.max_refinement_level),
-          xyz[1] * (1 << lbpar.max_refinement_level),
-          xyz[2] * (1 << lbpar.max_refinement_level));
-      if (qidx > index) {
-        break;
-      }
-    }
-    proc -= 1;
-    double h_max = 1.0 / double(1 << lbpar.max_refinement_level);
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
+    lb_float h_max = h[lbpar.max_refinement_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     p_u[0] = j[0] / rho * h_max / lbpar.tau;

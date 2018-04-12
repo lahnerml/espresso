@@ -1496,7 +1496,7 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
         break;
       }
     }
-    double h_max = 1.0 / double(1 << lbpar.max_refinement_level);
+    auto h_max = h[lbpar.max_refinement_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     rho *= 1 / h_max / h_max / h_max;

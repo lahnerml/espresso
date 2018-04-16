@@ -19,6 +19,11 @@
 #include <p8est_search.h>
 #include <vector>
 
+// For intrinsics version of cell_morton_idx
+#ifdef __BMI2__
+#include <x86intrin.h>
+#endif
+
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid

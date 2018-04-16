@@ -19,7 +19,9 @@
 #include "p4est_utils.hpp"
 #include "repart.hpp"
 #include "utils/serialization/ParticleList.hpp"
+#ifdef LB_ADAPTIVE
 #include "lb-adaptive.hpp"
+#endif
 
 //#include <boost/mpi/nonblocking.hpp>
 
@@ -415,9 +417,9 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
   num_local_cells = (size_t) ds::p4est->local_num_quadrants;
   num_ghost_cells = (size_t) p4est_ghost->ghosts.elem_count;
   num_cells = num_local_cells + num_ghost_cells;
-  
-  ds::p4est_shell.resize(num_cells);
   castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
+
+  ds::p4est_shell.resize(num_cells);
 
   for (int i = 0; i < num_local_cells; ++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds::p4est, p4est_mesh, i);
@@ -446,7 +448,6 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
     if (ds::p4est_shell[i].boundary) ds::p4est_shell[i].shell = 1;
     
     for (int n = 0; n < 26; ++n) {
-      sc_array_truncate(ni);
       ds::p4est_shell[i].neighbor[n] = -1;
       p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n, NULL, NULL, ni);
       if (ni->elem_count > 1) // more than 1 neighbor in this direction
@@ -458,6 +459,7 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
           ds::p4est_shell[i].shell = 1;
         }
       }
+      sc_array_truncate(ni);
 
       if (ds::p4est_shell[i].neighbor[n] < 0 || ds::p4est_shell[i].neighbor[n] >= num_cells) {
         printf("Index OOB %i of %li (%li,%li)\n", ds::p4est_shell[i].neighbor[n], num_cells, num_local_cells, num_ghost_cells);

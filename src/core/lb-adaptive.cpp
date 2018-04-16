@@ -204,8 +204,8 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 
 void lbadapt_init() {
   // set levels to a regular grid if nothing else is specified
-  if (lbpar.base_level <= 0) {
-    lbpar.base_level =
+  if (lbpar.min_refinement_level <= 0) {
+    lbpar.min_refinement_level =
         Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
   }
   if (lbpar.max_refinement_level <= 0) {
@@ -214,7 +214,7 @@ void lbadapt_init() {
   }
 
   // reset p4est
-  mpi_lbadapt_grid_init(0, lbpar.base_level);
+  mpi_lbadapt_grid_init(0, lbpar.min_refinement_level);
 
   // reset data
   lbadapt_local_data.clear();
@@ -699,7 +699,7 @@ void lbadapt_patches_populate_halos(int level) {
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
                              p8est_quadrant_t *q) {
   return (
-      prefactors[lbpar.base_level + (lbpar.max_refinement_level - q->level)]);
+      prefactors[lbpar.min_refinement_level + (lbpar.max_refinement_level - q->level)]);
 }
 
 /*** REFINEMENT ***/
@@ -3018,7 +3018,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
 }
 
 int lbadapt_sanity_check_parameters() {
-  for (int level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+  for (int level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level; ++level) {
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
       fprintf(stderr, "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
               level, lbpar.gamma_shear[level]);

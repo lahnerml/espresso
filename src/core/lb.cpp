@@ -3241,7 +3241,7 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  for (level = lbpar.base_level; level <= lbpar.max_refinement_level; ++level) {
+  for (level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level; ++level) {
     // populate halos on that level
     lbadapt_patches_populate_halos(level);
 
@@ -3257,7 +3257,7 @@ inline void lb_collide_stream() {
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
-  for (level = lbpar.max_refinement_level; lbpar.base_level <= level; --level) {
+  for (level = lbpar.max_refinement_level; lbpar.min_refinement_level <= level; --level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
     lbadapt_gpu_execute_update_from_virtuals_kernel(level);
@@ -4112,7 +4112,7 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
     // update ghost layer on all levels
-    for (int level = lbpar.base_level; level <= lbpar.max_refinement_level;
+    for (int level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level;
          ++level) {
       std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);

@@ -305,8 +305,8 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   int qid = quads[0]->p.user_long;
   // don not coarsen newly generated quadrants
   if (qid == -1) return 0;
-  // avoid coarser cells than base_level
-  if (quads[0]->level == lbpar.base_level) return 0;
+  // avoid coarser cells than min_refinement_level
+  if (quads[0]->level == lbpar.min_refinement_level) return 0;
 
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {

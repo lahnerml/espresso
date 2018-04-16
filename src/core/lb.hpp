@@ -218,7 +218,7 @@ typedef struct {
   lb_float tau;
 
   /** the initial level based on which the number of LB steps is defined */
-  int base_level;
+  int min_refinement_level;
   /** the maximum refinement level */
   int max_refinement_level;
 

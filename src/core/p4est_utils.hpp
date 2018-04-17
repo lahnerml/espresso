@@ -227,6 +227,66 @@ inline int p4est_utils_get_threshold_vorticity(double *thresh) {
 #endif // LB_ADAPTIVE
   return 0;
 }
+
+/** Perform uniform grid refinement ref_step times */
+inline int p4est_utils_uniform_refinement(int ref_steps) {
+  mpi_call(mpi_unif_refinement, -1, ref_steps);
+  mpi_unif_refinement(0, ref_steps);
+  return 0;
+}
+
+/** Perform random grid refinement ref_step times */
+inline int p4est_utils_random_refinement(int ref_steps) {
+  mpi_call(mpi_rand_refinement, -1, ref_steps);
+  mpi_rand_refinement(0, ref_steps);
+  return 0;
+}
+
+/** Perform regional coarsening within given bounding box coordinates */
+inline int p4est_utils_regional_coarsening(double *bb_coords) {
+  memcpy(coords_for_regional_refinement, bb_coords, 6 * sizeof(double));
+  mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
+  mpi_bcast_parameters_for_regional_refinement(0, 0);
+  mpi_call(mpi_reg_coarsening, -1, 0);
+  mpi_reg_coarsening(0, 0);
+  return 0;
+}
+
+/** Perform regional refinement within given bounding box coordinates */
+inline int p4est_utils_regional_refinement(double *bb_coords) {
+  memcpy(coords_for_regional_refinement, bb_coords, 6 * sizeof(double));
+  mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
+  mpi_bcast_parameters_for_regional_refinement(0, 0);
+  mpi_call(mpi_reg_refinement, -1, 0);
+  mpi_reg_refinement(0, 0);
+  return 0;
+}
+
+/** Exclude a boundary index from geometric refinement or inverse geometric
+ * refinement.
+ */
+inline int p4est_utils_geometric_refinement_exclude_boundary_index(int index) {
+  mpi_call(mpi_exclude_boundary, -1, index);
+  mpi_exclude_boundary(0, index);
+  return 0;
+}
+
+/** Perform geometric refinement step, i.e. refine around boundaries. */
+inline int p4est_utils_geometric_refinement() {
+  mpi_call(mpi_geometric_refinement, -1, 0);
+  mpi_geometric_refinement(0, 0);
+  return 0;
+}
+
+/** Perform inverse geometric refinement step, i.e. refine everywhere but around
+ * boundaries.
+ */
+inline int p4est_utils_inverse_geometric_refinement() {
+  mpi_call(mpi_inv_geometric_refinement, -1, 0);
+  mpi_inv_geometric_refinement(0, 0);
+  return 0;
+}
+
 /*@}*/
 
 /*****************************************************************************/

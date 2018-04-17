@@ -114,3 +114,58 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
         def _deactivate_method(self):
             pass
+
+        # Adapt Grid
+        ####################################################
+        def uniform_refinement(self, p_ref_steps):
+            cdef int c_ref_steps = p_ref_steps
+            if (p4est_utils_uniform_refinement(c_ref_steps)):
+                raise Exception("p4est_utils_uniform_refinement error")
+
+            return 0
+
+        ####################################################
+
+        def random_refinement(self, p_ref_steps):
+            cdef int c_ref_steps = p_ref_steps
+            if (p4est_utils_random_refinement(c_ref_steps)):
+                raise Exception("p4est_utils_random_refinement error")
+
+            return 0
+
+        ####################################################
+
+        def regional_coarsening(self, p_bb_coords):
+            cdef double c_bb_coords[6]
+            c_bb_coords = p_bb_coords
+            if (p4est_utils_regional_coarsening(c_bb_coords)):
+                raise Exception("p4est_utils_regional_coarsening error")
+
+            return 0
+
+        ####################################################
+
+        def regional_refinement(self, p_bb_coords):
+            cdef double c_bb_coords[6]
+            c_bb_coords = p_bb_coords
+            if (p4est_utils_regional_refinement(c_bb_coords)):
+                raise Exception("p4est_utils_regional_refinement error")
+
+            return 0
+
+        ####################################################
+
+        def geometric_refinement(self):
+            if (p4est_utils_geometric_refinement()):
+                raise Exception("p4est_utils_geometric_refinement error")
+
+            return 0
+
+        ####################################################
+
+        def inverse_geometric_refinement(self):
+            if (p4est_utils_inverse_geometric_refinement()):
+                raise Exception("p4est_utils_inverse_geometric_refinement error")
+
+            return 0
+

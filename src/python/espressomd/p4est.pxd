@@ -69,6 +69,13 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         int p4est_utils_get_threshold_velocity(double *c_thresh)
         int p4est_utils_set_threshold_vorticity(double *c_thresh)
         int p4est_utils_get_threshold_vorticity(double *c_thresh)
+        int p4est_utils_uniform_refinement(int ref_steps)
+        int p4est_utils_random_refinement(int ref_steps)
+        int p4est_utils_regional_coarsening(double *c_bbcoords)
+        int p4est_utils_regional_refinement(double *c_bbcoords)
+        int p4est_utils_geometric_refinement_exclude_boundary_index(int index)
+        int p4est_utils_geometric_refinement()
+        int p4est_utils_inverse_geometric_refinement()
 
 
     ###############################################

@@ -169,3 +169,10 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
             return 0
 
+        ####################################################
+
+        def adapt_grid(self):
+            if (p4est_utils_adapt_grid()):
+                raise Exception("p4est_utils_adapt_grid error")
+
+            return 0

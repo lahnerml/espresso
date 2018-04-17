@@ -76,6 +76,7 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         int p4est_utils_geometric_refinement_exclude_boundary_index(int index)
         int p4est_utils_geometric_refinement()
         int p4est_utils_inverse_geometric_refinement()
+        int p4est_utils_adapt_grid()
 
 
     ###############################################

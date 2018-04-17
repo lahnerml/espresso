@@ -287,6 +287,12 @@ inline int p4est_utils_inverse_geometric_refinement() {
   return 0;
 }
 
+/** Trigger dynamic grid adaptation. */
+inline int p4est_utils_adapt_grid() {
+  mpi_call(mpi_adapt_grid, -1, 0);
+  mpi_adapt_grid(0, 0);
+  return 0;
+}
 /*@}*/
 
 /*****************************************************************************/

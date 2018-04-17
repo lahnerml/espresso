@@ -1,0 +1,99 @@
+#
+# ESPResSo is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+from __future__ import print_function, absolute_import, division
+include "myconfig.pxi"
+import os
+import cython
+import numpy as np
+cimport numpy as np
+from .actors cimport Actor
+from . cimport cuda_init
+from . import cuda_init
+from globals cimport *
+from copy import deepcopy
+from . import utils
+from espressomd.utils import array_locked, is_valid_type
+
+# Actor class
+####################################################
+cdef class GridInteraction(Actor):
+    def _p4est_init(self):
+        raise Exception(
+            "Subclasses of HydrodynamicInteraction must define the _lb_init() method.")
+
+# LBFluid main class
+####################################################
+IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
+    cdef class P4est(GridInteraction):
+        """
+        Initialize p4est grid interaction routines
+
+        """
+
+        # validate the given parameters on actor initalization
+        ####################################################
+        def validate_params(self):
+            default_params = self.default_params()
+
+        # list of valid keys for parameters
+        ####################################################
+        def valid_keys(self):
+            return "min_ref_level", "max_ref_level"
+
+        # list of esential keys required for the fluid
+        ####################################################
+        def required_keys(self):
+            return []
+
+        # list of default parameters
+        ####################################################
+        def default_params(self):
+            return {"min_ref_level": -1,
+                    "max_ref_level": -1}
+
+        # function that calls wrapper functions which set the parameters at C-Level
+        ####################################################
+        def _set_params_in_es_core(self):
+            default_params = self.default_params()
+
+            if python_p4est_set_min_level(self._params["min_ref_level"]):
+                raise Exception("p4est_utils_set_min_level error")
+
+            if python_p4est_set_max_level(self._params["max_ref_level"]):
+                raise Exception("p4est_utils_set_max_level error")
+            utils.handle_errors("LB activation")
+
+        # function that calls wrapper functions which get the parameters from C-Level
+        ####################################################
+        def _get_params_from_es_core(self):
+            default_params = self.default_params()
+
+            if not self._params["min_ref_level"] == default_params["min_ref_level"]:
+                if python_p4est_get_min_level(self._params["min_ref_level"]):
+                    raise Exception("p4est_utils_get_min_level error")
+
+            if not self._params["max_ref_level"] == default_params["max_ref_level"]:
+                if python_p4est_get_max_level(self._params["max_ref_level"]):
+                    raise Exception("p4est_utils_get_max_level error")
+
+            return self._params
+
+        # Activate Actor
+        ####################################################
+        def _activate_method(self):
+            self.validate_params()
+            self._set_params_in_es_core()
+            IF EK_ADAPTIVE or ES_ADAPTIVE or LB_ADAPTIVE:
+                return
+            ELSE:
+                raise Exception("No adaptive components are compiled in.")
+
+        def _deactivate_method(self):
+            pass

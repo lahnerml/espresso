@@ -148,6 +148,37 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
 void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
 
 /*****************************************************************************/
+/** \name Python interface                                                   */
+/*****************************************************************************/
+/*@{*/
+/** Set min level from p4est actor */
+inline int p4est_utils_set_min_level(int lvl) {
+  p4est_params.min_ref_level = lvl;
+  mpi_call(mpi_set_min_level, -1, lvl);
+  return 0;
+}
+
+/** Get min level from p4est actor */
+inline int p4est_utils_get_min_level(int *lvl) {
+  *lvl = p4est_params.min_ref_level;
+  return 0;
+}
+
+/** Set max level from p4est actor */
+inline int p4est_utils_set_max_level(int lvl) {
+  p4est_params.max_ref_level = lvl;
+  mpi_call(mpi_set_max_level, -1, lvl);
+  return 0;
+}
+
+/** Get max level from p4est actor */
+inline int p4est_utils_get_max_level(int *lvl) {
+  *lvl = p4est_params.max_ref_level;
+  return 0;
+}
+/*@}*/
+
+/*****************************************************************************/
 /** \name Geometric helper functions                                         */
 /*****************************************************************************/
 /*@{*/

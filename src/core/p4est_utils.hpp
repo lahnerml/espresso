@@ -105,6 +105,9 @@ extern p4est_parameters p4est_params;
 extern int lb_conn_brick[3];
 #endif // LB_ADAPTIVE
 
+extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
+                                                 //        y_min, y_max,
+                                                 //        z_min, z_max
 
 enum class forest_order {
 #ifdef DD_P4EST
@@ -466,7 +469,7 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /** Function that handles grid alteration. After calling this function the grid
  * has changed and everything is set to perform the next integration step.
  */
-int p4est_utils_adapt_grid();
+int p4est_utils_perform_adaptivity_step();
 
 template <typename T>
 /** Skeleton for copying data.

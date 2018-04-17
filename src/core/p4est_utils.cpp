@@ -13,6 +13,7 @@
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <mpi.h>
 #include <p8est_algorithms.h>
 #include <p8est_bits.h>
@@ -36,12 +37,18 @@ p4est_parameters p4est_params = {
   // threshold_vorticity
   {0.0, 1.0},
 };
-// CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
-std::vector<int> *flags;
 
 #ifdef LB_ADAPTIVE
 int lb_conn_brick[3] = {0, 0, 0};
 #endif // LB_ADAPTIVE
+
+double coords_for_regional_refinement[6] = {
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+    std::numeric_limits<double>::min(), std::numeric_limits<double>::max()};
+
+// CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
+std::vector<int> *flags;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -452,7 +459,7 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
-int p4est_utils_adapt_grid() {
+int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
 

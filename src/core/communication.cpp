@@ -2154,7 +2154,7 @@ void mpi_lbadapt_grid_reset(int node, int dummy) {
 void mpi_adapt_grid(int node, int level) {
 // TODO: make this work for DD_P4EST
 #if (defined(LB_ADAPTIVE)) // || defined(DD_P4EST))
-  p4est_utils_adapt_grid();
+  p4est_utils_perform_adaptivity_step();
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }
 

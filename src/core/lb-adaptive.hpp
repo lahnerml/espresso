@@ -36,6 +36,7 @@
 #include "utils.hpp"
 
 #ifdef LB_ADAPTIVE
+/* p4est includes; opted to go for pure 3D */
 #include <p8est_bits.h>
 #include <p8est_connectivity.h>
 #include <p8est_extended.h>
@@ -58,10 +59,6 @@ extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
-
-extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
-                                                 //        y_min, y_max,
-                                                 //        z_min, z_max
 
 typedef struct {
   double temp = 0.;

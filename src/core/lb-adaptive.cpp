@@ -348,9 +348,9 @@ void lbadapt_reinit_fluid_per_cell() {
   if (adapt_p4est == nullptr) {
     lbadapt_init();
   }
-  if (lbadapt_local_data.empty()) {
-    lbadapt_allocate_data();
-  }
+  lbadapt_release();
+  lbadapt_allocate_data();
+
   int status;
   lbadapt_payload_t *data;
   lb_float h_max = h[p4est_params.max_ref_level];
@@ -383,7 +383,9 @@ void lbadapt_reinit_fluid_per_cell() {
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h[level]);
 #ifdef LB_BOUNDARIES
-        data->lbfields.boundary = 0;
+        double mp[3];
+        p4est_utils_get_midpoint(mesh_iter, mp);
+        data->lbfields.boundary = lbadapt_is_boundary(mp);
 #endif // LB_BOUNDARIES
 #else  // LB_ADAPTIVE_GPU
         for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {

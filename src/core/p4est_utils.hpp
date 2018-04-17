@@ -78,6 +78,16 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator void *() const { return this->get(); }
 };
 
+/** Struct containing information to adjust p4est behavior */
+typedef struct {
+  /** minimum required grid level */
+  int min_ref_level;
+  /** maximum allowed grid level */
+  int max_ref_level;
+} p4est_parameters;
+
+extern p4est_parameters p4est_params;
+
 #ifdef LB_ADAPTIVE
 extern int lb_conn_brick[3];
 // relative threshold values for refinement and coarsening.

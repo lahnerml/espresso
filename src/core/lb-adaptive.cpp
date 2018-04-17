@@ -171,7 +171,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 {
 #ifdef EXTERNAL_FORCES
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 #ifdef LB_ADAPTIVE_GPU
 // unit conversion: force density
   data->force[0] =
@@ -204,17 +204,17 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 
 void lbadapt_init() {
   // set levels to a regular grid if nothing else is specified
-  if (lbpar.min_refinement_level <= 0) {
-    lbpar.min_refinement_level =
+  if (p4est_params.min_ref_level <= 0) {
+    p4est_params.min_ref_level =
         Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
   }
-  if (lbpar.max_refinement_level <= 0) {
-    lbpar.max_refinement_level =
+  if (p4est_params.max_ref_level <= 0) {
+    p4est_params.max_ref_level =
         Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
   }
 
   // reset p4est
-  mpi_lbadapt_grid_init(0, lbpar.min_refinement_level);
+  mpi_lbadapt_grid_init(0, p4est_params.min_ref_level);
 
   // reset data
   lbadapt_local_data.clear();
@@ -265,8 +265,8 @@ void lbadapt_init() {
 } // lbadapt_init();
 
 void lbadapt_reinit_parameters() {
-  for (int i = lbpar.max_refinement_level; 0 <= i; --i) {
-    prefactors[i] = 1 << (lbpar.max_refinement_level - i);
+  for (int i = p4est_params.max_ref_level; 0 <= i; --i) {
+    prefactors[i] = 1 << (p4est_params.max_ref_level - i);
 
 #ifdef LB_ADAPTIVE_GPU
     h[i] = ((double)P8EST_QUADRANT_LEN(i) * box_l[0]) /
@@ -357,7 +357,7 @@ void lbadapt_reinit_fluid_per_cell() {
   }
   int status;
   lbadapt_payload_t *data;
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
@@ -699,7 +699,7 @@ void lbadapt_patches_populate_halos(int level) {
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
                              p8est_quadrant_t *q) {
   return (
-      prefactors[lbpar.min_refinement_level + (lbpar.max_refinement_level - q->level)]);
+      prefactors[p4est_params.min_ref_level + (p4est_params.max_ref_level - q->level)]);
 }
 
 /*** REFINEMENT ***/
@@ -801,7 +801,7 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
                                  lb_float *j, lb_float *pi, lb_float local_h) {
   int i;
   lb_float local_rho, local_j[3], local_pi[6], trace;
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   const lb_float avg_rho = lbpar.rho * h_max * h_max * h_max;
 
@@ -905,7 +905,7 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
                               int boundary, int has_force, lb_float local_h,
                               lb_float *rho, lb_float *j, lb_float *pi) {
   int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 #ifdef LB_BOUNDARIES
   if (boundary) {
     // set all to 0 on boundary
@@ -1069,7 +1069,7 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 #ifndef LB_ADAPTIVE_GPU
   lb_float rho, j[3], pi_eq[6];
 
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
 
@@ -1127,7 +1127,7 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 }
 
 int lbadapt_thermalize_modes(lb_float *mode) {
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   lb_float fluct[6];
 #ifdef GAUSSRANDOM
@@ -1212,7 +1212,7 @@ int lbadapt_thermalize_modes(lb_float *mode) {
 int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float local_h) {
   lb_float rho, u[3], C[6];
 
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   int level = log2((lb_float)(P8EST_ROOT_LEN >> P8EST_MAXLEVEL) / local_h);
 
@@ -1533,7 +1533,7 @@ void lbadapt_bounce_back(int level) {
   int status = 0;
   lbadapt_payload_t *data, *currCellData;
 
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   // vector of inverse c_i, 0 is inverse to itself.
   // clang-format off
@@ -1842,7 +1842,7 @@ void lbadapt_get_density_values(sc_array_t *density_values) {
   int cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
 #endif // LB_ADAPTIVE_GPU
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
@@ -1937,7 +1937,7 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
   int cells_per_patch =
       LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE * LBADAPT_PATCHSIZE;
 #endif // LB_ADAPTIVE_GPU
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
@@ -2033,7 +2033,7 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
        {0, 3, 16, 5, 12, 9, 24},  // left, back, top
        {1, 3, 17, 5, 13, 9, 25}}; // right, back, top
 
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   for (level = forest.coarsest_level_local; level <= forest.finest_level_local;
        ++level) {
@@ -2202,7 +2202,7 @@ void check_vel(int qid, double local_h, lbadapt_payload_t *data,
                               data->lbfields.boundary, data->lbfields.has_force,
                               local_h, &rho, vel[qid].data(), 0);
 
-    lb_float h_max = h[lbpar.max_refinement_level];
+    lb_float h_max = h[p4est_params.max_ref_level];
     vel[qid][0] = vel[qid][0] / rho * h_max / lbpar.tau;
     vel[qid][1] = vel[qid][1] / rho * h_max / lbpar.tau;
     vel[qid][2] = vel[qid][2] / rho * h_max / lbpar.tau;
@@ -2399,7 +2399,7 @@ void lbadapt_get_boundary_status() {
 
 void lbadapt_calc_local_rho(p8est_meshiter_t *mesh_iter, lb_float *rho) {
 #ifndef LB_ADAPTIVE_GPU
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   lbadapt_payload_t *data;
   data = &lbadapt_local_data[mesh_iter->current_level]
@@ -2451,7 +2451,7 @@ void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
   p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data =
       &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[qid]];
-  lb_float h_max = h[lbpar.max_refinement_level];
+  lb_float h_max = h[p4est_params.max_ref_level];
 
   // unit conversion: mass density
   if (!(lattice_switch & LATTICE_LB)) {
@@ -2646,17 +2646,17 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << lbpar.max_refinement_level) + displace[0];
-  y = xyz[1] * (1 << lbpar.max_refinement_level) + displace[1];
-  z = xyz[2] * (1 << lbpar.max_refinement_level) + displace[2];
+  x = xyz[0] * (1 << p4est_params.max_ref_level) + displace[0];
+  y = xyz[1] * (1 << p4est_params.max_ref_level) + displace[1];
+  z = xyz[2] * (1 << p4est_params.max_ref_level) + displace[2];
 
-  int ub = lb_conn_brick[0] * (1 << lbpar.max_refinement_level);
+  int ub = lb_conn_brick[0] * (1 << p4est_params.max_ref_level);
   if (x >= ub) x -= ub;
   if (x < 0) x += ub;
-  ub = lb_conn_brick[1] * (1 << lbpar.max_refinement_level);
+  ub = lb_conn_brick[1] * (1 << p4est_params.max_ref_level);
   if (y >= ub) y -= ub;
   if (y < 0) y += ub;
-  ub = lb_conn_brick[2] * (1 << lbpar.max_refinement_level);
+  ub = lb_conn_brick[2] * (1 << p4est_params.max_ref_level);
   if (z >= ub) z -= ub;
   if (z < 0) z += ub;
 
@@ -2672,15 +2672,15 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  xid = (pos[0]) * (1 << lbpar.max_refinement_level);
-  yid = (pos[1]) * (1 << lbpar.max_refinement_level);
-  zid = (pos[2]) * (1 << lbpar.max_refinement_level);
+  xid = (pos[0]) * (1 << p4est_params.max_ref_level);
+  yid = (pos[1]) * (1 << p4est_params.max_ref_level);
+  zid = (pos[2]) * (1 << p4est_params.max_ref_level);
   int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
   int64_t qidx, zlvlfill;
   for (size_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
     qidx = p4est_utils_global_idx(q, q->p.piggy3.which_tree);
-    zlvlfill = 1 << (3*(lbpar.max_refinement_level - q->level));
+    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
     if (qidx <= pidx && pidx < qidx + zlvlfill)
       return i;
   }
@@ -2696,9 +2696,9 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]) * (1 << lbpar.max_refinement_level);
-  yid = (pos[1]) * ((double) lb_conn_brick[1] / box_l[1]) * (1 << lbpar.max_refinement_level);
-  zid = (pos[2]) * ((double) lb_conn_brick[2] / box_l[2]) * (1 << lbpar.max_refinement_level);
+  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]) * (1 << p4est_params.max_ref_level);
+  yid = (pos[1]) * ((double) lb_conn_brick[1] / box_l[1]) * (1 << p4est_params.max_ref_level);
+  zid = (pos[2]) * ((double) lb_conn_brick[2] / box_l[2]) * (1 << p4est_params.max_ref_level);
   int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
   int64_t ret[8], sidx[8], qidx;
   int cnt = 0;
@@ -2723,12 +2723,12 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
         ret[j] = i - 1;
   }
   if (this_node + 1 >= n_nodes) {
-    int64_t tmp = (1 << lbpar.max_refinement_level);
-    while (tmp < ((box_l[0] / lb_conn_brick[0]) * (1 << lbpar.max_refinement_level)))
+    int64_t tmp = (1 << p4est_params.max_ref_level);
+    while (tmp < ((box_l[0] / lb_conn_brick[0]) * (1 << p4est_params.max_ref_level)))
       tmp <<= 1;
-    while (tmp < ((box_l[1] / lb_conn_brick[1]) * (1 << lbpar.max_refinement_level)))
+    while (tmp < ((box_l[1] / lb_conn_brick[1]) * (1 << p4est_params.max_ref_level)))
       tmp <<= 1;
-    while (tmp < ((box_l[2] / lb_conn_brick[2]) * (1 << lbpar.max_refinement_level)))
+    while (tmp < ((box_l[2] / lb_conn_brick[2]) * (1 << p4est_params.max_ref_level)))
       tmp <<= 1;
     qidx = tmp *tmp *tmp;
   } else {
@@ -2952,7 +2952,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     delta_loc[d + 3] = 1.0 - dis;
   }
   delta[0] = delta_loc[didx[0][0]] * delta_loc[didx[0][1]] * delta_loc[didx[0][2]];
-  zsize = 1 << (lbpar.max_refinement_level - lvl);
+  zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize*zsize*zsize;
 
   int ncnt = 1;
@@ -3018,7 +3018,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
 }
 
 int lbadapt_sanity_check_parameters() {
-  for (int level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level; ++level) {
+  for (int level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level; ++level) {
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
       fprintf(stderr, "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
               level, lbpar.gamma_shear[level]);

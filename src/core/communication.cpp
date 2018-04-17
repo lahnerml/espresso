@@ -215,8 +215,8 @@ static int terminated = 0;
   CB(mpi_bcast_thresh_vel)                                                     \
   CB(mpi_bcast_thresh_vort)                                                    \
   CB(mpi_lbadapt_grid_init)                                                    \
-  CB(mpi_lbadapt_set_min_level)                                                \
-  CB(mpi_lbadapt_set_max_level)                                                \
+  CB(mpi_set_min_level)                                                        \
+  CB(mpi_set_max_level)                                                        \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
   CB(mpi_lbadapt_vtk_print_density)                                            \
   CB(mpi_lbadapt_vtk_print_velocity)                                           \
@@ -2209,20 +2209,16 @@ void mpi_lbadapt_grid_init(int node, int level) {
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_set_min_level(int node, int l_min) {
+void mpi_set_min_level(int node, int l_min) {
+  p4est_params.min_ref_level = l_min;
 #ifdef LB_ADAPTIVE
-  lbpar.min_refinement_level = l_min;
-  assert(lbpar.min_refinement_level <= lbpar.max_refinement_level);
-
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
 
-void mpi_lbadapt_set_max_level(int node, int l_max) {
+void mpi_set_max_level(int node, int l_max) {
+  p4est_params.max_ref_level = l_max;
 #ifdef LB_ADAPTIVE
-  lbpar.max_refinement_level = l_max;
-  assert(lbpar.min_refinement_level <= lbpar.max_refinement_level);
-
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
 }
@@ -2498,7 +2494,7 @@ void mpi_unif_refinement(int node, int ref_iterations) {
     // clang-format off
     p8est_refine_ext(adapt_p4est,             // forest
                      0,                    // no recursive refinement
-                     lbpar.max_refinement_level, // maximum refinement level
+                     p4est_params.max_ref_level, // maximum refinement level
                      refine_regional,      // return true to refine cell
                      NULL,                 // init data
                      NULL);                // replace data
@@ -2529,7 +2525,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
     // clang-format off
     p8est_refine_ext(adapt_p4est,             // forest
                      0,                    // no recursive refinement
-                     lbpar.max_refinement_level, // maximum refinement level
+                     p4est_params.max_ref_level, // maximum refinement level
                      refine_random,        // return true to refine cell
                      NULL,                 // init data
                      NULL);                // replace data
@@ -2558,7 +2554,7 @@ void mpi_reg_refinement(int node, int param) {
   // clang-format off
   p8est_refine_ext(adapt_p4est,                // forest
                    0,                    // no recursive refinement
-                   lbpar.max_refinement_level, // maximum refinement level
+                   p4est_params.max_ref_level, // maximum refinement level
                    refine_regional,      // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
@@ -2606,7 +2602,7 @@ void mpi_geometric_refinement(int node, int param) {
   // clang-format off
   p8est_refine_ext(adapt_p4est,             // forest
                    1,                    // recursive refinement
-                   lbpar.max_refinement_level, // maximum refinement level
+                   p4est_params.max_ref_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data
@@ -2629,7 +2625,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
   // clang-format off
   p8est_refine_ext(adapt_p4est,             // forest
                    1,                    // recursive refinement
-                   lbpar.max_refinement_level, // maximum refinement level
+                   p4est_params.max_ref_level, // maximum refinement level
                    refine_inv_geometric, // return true to refine cell
                    NULL,                 // init data
                    NULL);                // replace data

@@ -78,12 +78,6 @@ LB_Parameters lbpar = {
     -1.0,
     // tau
     -1.0,
-#ifdef LB_ADAPTIVE
-    // base level for calculation of tau
-    -1,
-    // max level
-    -1,
-#endif // LB_ADAPTIVE
     // friction
     0.0,
     // ext_force
@@ -1483,7 +1477,7 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
-    lb_float h_max = h[lbpar.max_refinement_level];
+    lb_float h_max = h[p4est_params.max_ref_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     rho *= 1 / h_max / h_max / h_max;
@@ -1537,7 +1531,7 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
-    lb_float h_max = h[lbpar.max_refinement_level];
+    lb_float h_max = h[p4est_params.max_ref_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     p_u[0] = j[0] / rho * h_max / lbpar.tau;
@@ -1712,15 +1706,15 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
       double xyz[3];
       p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
       int64_t qidx = p4est_utils_cell_morton_idx(
-          xyz[0] * (1 << lbpar.max_refinement_level),
-          xyz[1] * (1 << lbpar.max_refinement_level),
-          xyz[2] * (1 << lbpar.max_refinement_level));
+          xyz[0] * (1 << p4est_params.max_ref_level),
+          xyz[1] * (1 << p4est_params.max_ref_level),
+          xyz[2] * (1 << p4est_params.max_ref_level));
       if (qidx > index) {
         break;
       }
     }
     proc -= 1;
-    double h_max = 1.0 / double(1 << lbpar.max_refinement_level);
+    double h_max = 1.0 / double(1 << p4est_params.max_ref_level);
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     p_pi[0] = pi[0] / lbpar.tau / lbpar.tau / h_max;
@@ -3241,7 +3235,7 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  for (level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level; ++level) {
+  for (level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level; ++level) {
     // populate halos on that level
     lbadapt_patches_populate_halos(level);
 
@@ -3257,7 +3251,7 @@ inline void lb_collide_stream() {
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
-  for (level = lbpar.max_refinement_level; lbpar.min_refinement_level <= level; --level) {
+  for (level = p4est_params.max_ref_level; p4est_params.min_ref_level <= level; --level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
     lbadapt_gpu_execute_update_from_virtuals_kernel(level);
@@ -3304,7 +3298,7 @@ inline void lb_collide_stream() {
    * FIXME mind first and last step (regridding and end of simulation)
    * FIXME use different MPI_Tag for different levels
    * maybe use counter for each level to check if counters match
-   * use different finest_level_global and lbpar.max_refinement_level, i.e. do
+   * use different finest_level_global and p4est_params.max_ref_level, i.e. do
    * not make use of maximum set p4est refinement capability
    */
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
@@ -3313,7 +3307,7 @@ inline void lb_collide_stream() {
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
-    lvl_diff = lbpar.max_refinement_level - level;
+    lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
       if (hide_communication) {
         // level always relates to level of real cells
@@ -3333,7 +3327,7 @@ inline void lb_collide_stream() {
   for (level = forest_lb.finest_level_global;
        forest_lb.coarsest_level_global <= level; --level) {
     // level always relates to level of real cells
-    lvl_diff = lbpar.max_refinement_level - level;
+    lvl_diff = p4est_params.max_ref_level - level;
 
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef DUMP_GRID
@@ -3636,7 +3630,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   }
   if (dcnt <= 0)
     return;
-  double h_max = h[lbpar.max_refinement_level];
+  double h_max = h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
@@ -3733,7 +3727,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   }
 #else  // !LB_ADAPTIVE
   for (int x = 0; x < dcnt; ++x) {
-    if (n_lbsteps % (1 << (lbpar.max_refinement_level - level[x])) == 0) {
+    if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
       local_f = node_index[x]->lbfields.force;
       double level_fact = prefactors[level[x]] * prefactors[level[x]];
       // double level_fact =
@@ -3834,7 +3828,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
 
   dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
   double h = 1.0 / (double)(1 << level[0]);
-  double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
+  double h_max = 1.0 / (double)(1 << p4est_params.max_ref_level);
 
   v[0] = v[1] = v[2] = 0.0;
 
@@ -3953,7 +3947,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
     dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
   }
   double h = 1.0 / (double)(1 << level[0]);
-  double h_max = 1.0 / (double)(1 << lbpar.max_refinement_level);
+  double h_max = 1.0 / (double)(1 << p4est_params.max_ref_level);
 #endif // !LB_ADAPTIVE
 
   /* calculate fluid velocity at particle's position
@@ -4112,7 +4106,7 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
     // update ghost layer on all levels
-    for (int level = lbpar.min_refinement_level; level <= lbpar.max_refinement_level;
+    for (int level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level;
          ++level) {
       std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);

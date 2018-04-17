@@ -26,6 +26,12 @@
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
+p4est_parameters p4est_params = {
+  // min_ref_level
+  -1,
+  // max_ref_level
+  -1,
+};
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
 
@@ -239,9 +245,9 @@ int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << lbpar.max_refinement_level);
-  y = xyz[1] * (1 << lbpar.max_refinement_level);
-  z = xyz[2] * (1 << lbpar.max_refinement_level);
+  x = xyz[0] * (1 << p4est_params.max_ref_level);
+  y = xyz[1] * (1 << p4est_params.max_ref_level);
+  z = xyz[2] * (1 << p4est_params.max_ref_level);
 
   return p4est_utils_cell_morton_idx(x, y, z);
 }
@@ -311,7 +317,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // don not coarsen newly generated quadrants
   if (qid == -1) return 0;
   // avoid coarser cells than min_refinement_level
-  if (quads[0]->level == lbpar.min_refinement_level) return 0;
+  if (quads[0]->level == p4est_params.min_ref_level) return 0;
 
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
@@ -337,7 +343,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
   // refine if we have marked the cell as to be refined and add padding to flag
   // vector
-  if ((q->level < lbpar.max_refinement_level) &&
+  if ((q->level < p4est_params.max_ref_level) &&
       ((1 == (*flags)[qid] || refine))) {
     return 1;
   }
@@ -458,7 +464,7 @@ int p4est_utils_adapt_grid() {
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
   P4EST_ASSERT(p4est_is_equal(p4est_adapted, adapt_p4est, 0));
-  p8est_refine_ext(p4est_adapted, 0, lbpar.max_refinement_level,
+  p8est_refine_ext(p4est_adapted, 0, p4est_params.max_ref_level,
                    refinement_criteria, p4est_utils_qid_dummy, 0);
   // perform coarsening step
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);

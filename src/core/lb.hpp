@@ -216,12 +216,6 @@ typedef struct {
   lb_float bulk_viscosity;
   lb_float agrid;
   lb_float tau;
-
-  /** the initial level based on which the number of LB steps is defined */
-  int min_refinement_level;
-  /** the maximum refinement level */
-  int max_refinement_level;
-
   lb_float friction;
   lb_float ext_force[3]; /* Open question: Do we want a local force or global
                             force? */
@@ -272,7 +266,7 @@ extern int n_lbsteps;
 // save meshwidth for all available levels
 extern lb_float h[P8EST_MAXLEVEL];
 
-// calculate prefactors based on lbpar.max_refinement_level
+// calculate prefactors based on p4est_params.max_ref_level
 extern lb_float prefactors[P8EST_MAXLEVEL];
 #endif // LB_ADAPTIVE
 

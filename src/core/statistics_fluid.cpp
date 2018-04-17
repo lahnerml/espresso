@@ -32,6 +32,7 @@
 #include "lb-adaptive.hpp"
 #include "lbboundaries.hpp"
 #include "statistics_fluid.hpp"
+#include "p4est_utils.hpp"
 
 #ifdef LB
 
@@ -74,7 +75,7 @@ void lb_calc_fluid_momentum(double *result) {
 
   double h_max;
 #ifdef LB_ADAPTIVE
-  h_max = h[lbpar.max_refinement_level];
+  h_max = h[p4est_params.max_ref_level];
   p8est_iterate(adapt_p4est, nullptr, (void *)momentum, lbadapt_calc_local_j,
                 nullptr, nullptr, nullptr);
 #else  // LB_ADAPTIVE
@@ -113,7 +114,7 @@ void lb_calc_fluid_temp(double *result) {
   double h_max;
 
 #ifdef LB_ADAPTIVE
-  h_max = h[lbpar.max_refinement_level];
+  h_max = h[p4est_params.max_ref_level];
   temp_iter_t helper;
   p8est_iterate(adapt_p4est, nullptr, (void *)&helper, lbadapt_calc_local_temp,
                 nullptr, nullptr, nullptr);

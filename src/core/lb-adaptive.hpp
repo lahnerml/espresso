@@ -28,7 +28,6 @@
 #ifndef LB_ADAPTIVE_H
 #define LB_ADAPTIVE_H
 
-/* p4est includes; opted to go for pure 3D */
 #include "p4est_utils.hpp"
 
 #include "lb-adaptive-gpu.hpp"

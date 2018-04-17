@@ -2159,16 +2159,15 @@ void mpi_adapt_grid(int node, int level) {
 }
 
 void mpi_bcast_thresh_vel(int node, int level) {
-// TODO: make this work for DD_P4EST
-#if (defined(LB_ADAPTIVE)) // || defined(DD_P4EST))
-  MPI_Bcast(vel_thresh, 2, MPI_DOUBLE, 0, comm_cart);
-#endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
+#ifdef LB_ADAPTIVE
+  MPI_Bcast(p4est_params.threshold_velocity, 2, MPI_DOUBLE, 0, comm_cart);
+#endif // LB_ADAPTIVE
 }
 
 void mpi_bcast_thresh_vort(int node, int level) {
 // TODO: make this work for DD_P4EST
 #if (defined(LB_ADAPTIVE)) // || defined(DD_P4EST))
-  MPI_Bcast(vort_thresh, 2, MPI_DOUBLE, 0, comm_cart);
+  MPI_Bcast(p4est_params.threshold_vorticity, 2, MPI_DOUBLE, 0, comm_cart);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }
 

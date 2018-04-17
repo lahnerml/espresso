@@ -84,16 +84,27 @@ typedef struct {
   int min_ref_level;
   /** maximum allowed grid level */
   int max_ref_level;
+
+  /** Relative threshold values for dynamic adaptivity.  The first value gives a
+   * lower bound.  If the current cells value (v < first_value * max_value) the
+   * cell will be marked for coarsening.  If the current cells value
+   * (v > second_value * max_value) it will be marked for refinement.
+   * Default values are 0 and 1, such that all criteria have to be enabled
+   * manually by the user. */
+#ifdef LB_ADAPTIVE
+  /** velocity */
+  double threshold_velocity[2];
+  /** vorticity */
+  double threshold_vorticity[2];
+#endif // LB_ADAPTIVE
 } p4est_parameters;
 
 extern p4est_parameters p4est_params;
 
 #ifdef LB_ADAPTIVE
 extern int lb_conn_brick[3];
-// relative threshold values for refinement and coarsening.
-extern double vel_thresh[2];
-extern double vort_thresh[2];
 #endif // LB_ADAPTIVE
+
 
 enum class forest_order {
 #ifdef DD_P4EST
@@ -174,6 +185,43 @@ inline int p4est_utils_set_max_level(int lvl) {
 /** Get max level from p4est actor */
 inline int p4est_utils_get_max_level(int *lvl) {
   *lvl = p4est_params.max_ref_level;
+  return 0;
+}
+
+/** Set velocity threshold values for dynamic grid change */
+inline int p4est_utils_set_threshold_velocity(double *thresh) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < 2; ++i)
+    p4est_params.threshold_velocity[i] = thresh[i];
+  mpi_call(mpi_bcast_thresh_vel,-1, -1);
+#endif // LB_ADAPTIVE
+  return 0;
+}
+
+/** Get velocity threshold values for dynamic grid change */
+inline int p4est_utils_get_threshold_velocity(double *thresh) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < 2; ++i)
+    thresh[i] = p4est_params.threshold_velocity[i];
+#endif // LB_ADAPTIVE
+      return 0;
+}
+
+/** Set vorticity threshold values for dynamic grid change */
+inline int p4est_utils_set_threshold_vorticity(double *thresh) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < 2; ++i)
+    p4est_params.threshold_vorticity[i] = thresh[i];
+  mpi_call(mpi_bcast_thresh_vort,-1, -1);
+#endif // LB_ADAPTIVE
+  return 0;
+}
+/** Get vorticity threshold values for dynamic grid change */
+inline int p4est_utils_get_threshold_vorticity(double *thresh) {
+#ifdef LB_ADAPTIVE
+  for (int i = 0; i < 2; ++i)
+    thresh[i] = p4est_params.threshold_vorticity[i];
+#endif // LB_ADAPTIVE
   return 0;
 }
 /*@}*/

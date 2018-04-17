@@ -31,17 +31,16 @@ p4est_parameters p4est_params = {
   -1,
   // max_ref_level
   -1,
+  // threshold_velocity
+  {0.0, 1.0},
+  // threshold_vorticity
+  {0.0, 1.0},
 };
 // CAUTION: Do ONLY use this pointer in p4est_utils_adapt_grid
 std::vector<int> *flags;
 
 #ifdef LB_ADAPTIVE
 int lb_conn_brick[3] = {0, 0, 0};
-
-// relative threshold values for refinement and coarsening.  Initially they are
-// set such that they have no effect.  Order is coarsening - refinement.
-double vel_thresh[2] = {0., 1.};
-double vort_thresh[2] = {0., 1.};
 #endif // LB_ADAPTIVE
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
@@ -415,11 +414,12 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                     Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid + 2)));
     // Note, that this formulation stems from the fact that velocity is 0 at
     // boundaries
-    if (vel_thresh[1] * (v_max - v_min) < (v - v_min)) {
+    if (p4est_params.threshold_velocity[1] * (v_max - v_min) < (v - v_min)) {
       (*flags)[qid] = 1;
     }
     else if ((1 != (*flags)[qid]) &&
-             (v - v_min < vel_thresh[0] * (v_max - v_min))) {
+             (v - v_min < p4est_params.threshold_velocity[0] *
+                          (v_max - v_min))) {
       (*flags)[qid] = 2;
     }
 
@@ -431,11 +431,13 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         vort = vort_temp;
       }
     }
-    if (vort_thresh[1] * (vort_max - vort_min) < (vort - vort_min)) {
+    if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
+        (vort - vort_min)) {
       (*flags)[qid] = 1;
     }
     else if ((1 != (*flags)[qid]) &&
-             (vort - vort_min < vort_thresh[0] * (vort_max - vort_min))) {
+             (vort - vort_min < p4est_params.threshold_vorticity[0] *
+                                (vort_max - vort_min))) {
       (*flags)[qid] = 2;
     }
   }

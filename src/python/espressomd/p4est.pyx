@@ -37,7 +37,7 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
         """
 
-        # validate the given parameters on actor initalization
+        # validate the given parameters on actor initialization
         ####################################################
         def validate_params(self):
             default_params = self.default_params()
@@ -45,7 +45,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         # list of valid keys for parameters
         ####################################################
         def valid_keys(self):
-            return "min_ref_level", "max_ref_level"
+            return "min_ref_level", "max_ref_level", \
+                   "threshold_velocity", "threshold_vorticity"
 
         # list of esential keys required for the fluid
         ####################################################
@@ -56,7 +57,9 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         ####################################################
         def default_params(self):
             return {"min_ref_level": -1,
-                    "max_ref_level": -1}
+                    "max_ref_level": -1,
+                    "threshold_velocity": [0.0, 1.0],
+                    "threshold_vorticity": [0.0, 1.0]}
 
         # function that calls wrapper functions which set the parameters at C-Level
         ####################################################
@@ -68,7 +71,13 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
             if python_p4est_set_max_level(self._params["max_ref_level"]):
                 raise Exception("p4est_utils_set_max_level error")
-            utils.handle_errors("LB activation")
+
+            if python_p4est_set_threshold_velocity(self._params["threshold_velocity"]):
+                raise Exception("p4est_utils_set_threshold_velocity error")
+
+            if python_p4est_set_threshold_vorticity(self._params["threshold_vorticity"]):
+                raise Exception("p4est_utils_set_threshold_vorticity error")
+            utils.handle_errors("p4est activation")
 
         # function that calls wrapper functions which get the parameters from C-Level
         ####################################################
@@ -82,6 +91,14 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
             if not self._params["max_ref_level"] == default_params["max_ref_level"]:
                 if python_p4est_get_max_level(self._params["max_ref_level"]):
                     raise Exception("p4est_utils_get_max_level error")
+
+            if not self._params["threshold_velocity"] == default_params["threshold_velocity"]:
+                if python_p4est_get_threshold_velocity(self.params["threshold_velocity"]):
+                    raise Exception("p4est_utils_get_threshold_velocity error")
+
+            if not self._params["threshold_vorticity"] == default_params["threshold_vorticity"]:
+                if python_p4est_get_threshold_vorticity(self.params["threshold_vorticity"]):
+                    raise Exception("p4est_utils_get_threshold_vorticity error")
 
             return self._params
 

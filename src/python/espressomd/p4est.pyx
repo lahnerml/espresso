@@ -93,11 +93,11 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
                     raise Exception("p4est_utils_get_max_level error")
 
             if not self._params["threshold_velocity"] == default_params["threshold_velocity"]:
-                if python_p4est_get_threshold_velocity(self.params["threshold_velocity"]):
+                if python_p4est_get_threshold_velocity(self._params["threshold_velocity"]):
                     raise Exception("p4est_utils_get_threshold_velocity error")
 
             if not self._params["threshold_vorticity"] == default_params["threshold_vorticity"]:
-                if python_p4est_get_threshold_vorticity(self.params["threshold_vorticity"]):
+                if python_p4est_get_threshold_vorticity(self._params["threshold_vorticity"]):
                     raise Exception("p4est_utils_get_threshold_vorticity error")
 
             return self._params

@@ -194,9 +194,9 @@ inline int p4est_utils_get_max_level(int *lvl) {
 /** Set velocity threshold values for dynamic grid change */
 inline int p4est_utils_set_threshold_velocity(double *thresh) {
 #ifdef LB_ADAPTIVE
-  for (int i = 0; i < 2; ++i)
-    p4est_params.threshold_velocity[i] = thresh[i];
+  memcpy(p4est_params.threshold_velocity, thresh, 2 * sizeof(double));
   mpi_call(mpi_bcast_thresh_vel,-1, -1);
+  mpi_bcast_thresh_vel(0, 0);
 #endif // LB_ADAPTIVE
   return 0;
 }
@@ -213,9 +213,9 @@ inline int p4est_utils_get_threshold_velocity(double *thresh) {
 /** Set vorticity threshold values for dynamic grid change */
 inline int p4est_utils_set_threshold_vorticity(double *thresh) {
 #ifdef LB_ADAPTIVE
-  for (int i = 0; i < 2; ++i)
-    p4est_params.threshold_vorticity[i] = thresh[i];
+  memcpy(p4est_params.threshold_vorticity, thresh, 2 * sizeof(double));
   mpi_call(mpi_bcast_thresh_vort,-1, -1);
+  mpi_bcast_thresh_vort(0, 0);
 #endif // LB_ADAPTIVE
   return 0;
 }

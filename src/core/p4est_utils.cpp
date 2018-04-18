@@ -320,7 +320,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 #ifdef LB_ADAPTIVE
   // get quad id
   int qid = quads[0]->p.user_long;
-  // don not coarsen newly generated quadrants
+  // do not coarsen newly generated quadrants
   if (qid == -1) return 0;
   // avoid coarser cells than min_refinement_level
   if (quads[0]->level == p4est_params.min_ref_level) return 0;
@@ -347,8 +347,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // perform geometric refinement
   int refine = refine_geometric(p8est, which_tree, q);
 
-  // refine if we have marked the cell as to be refined and add padding to flag
-  // vector
+  // refine if we have cells marked for refinement
   if ((q->level < p4est_params.max_ref_level) &&
       ((1 == (*flags)[qid] || refine))) {
     return 1;

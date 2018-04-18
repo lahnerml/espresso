@@ -467,18 +467,19 @@ int p4est_utils_perform_adaptivity_step() {
   flags = new std::vector<int>(adapt_p4est->local_num_quadrants, 0);
   p4est_utils_collect_flags(flags);
 
-  p4est_iterate(adapt_p4est, adapt_ghost, 0, lbadapt_init_qid_payload, 0, 0, 0);
+  p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
+                nullptr, nullptr, nullptr);
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
   P4EST_ASSERT(p4est_is_equal(p4est_adapted, adapt_p4est, 0));
   p8est_refine_ext(p4est_adapted, 0, p4est_params.max_ref_level,
-                   refinement_criteria, p4est_utils_qid_dummy, 0);
+                   refinement_criteria, p4est_utils_qid_dummy, nullptr);
   // perform coarsening step
-  p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, 0, 0);
+  p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, nullptr, nullptr);
   delete flags;
   // balance forest after grid change
-  p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, 0, 0);
+  p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, nullptr, nullptr);
 
   // 2nd step: locally map data between forests.
   // de-allocate invalid storage and data-structures

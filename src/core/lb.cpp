@@ -4099,7 +4099,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
  * probably makes this method preferable compared to the above one.
  */
 void calc_particle_lattice_ia() {
-  double force[3];
+  double force[3] = {0., 0., 0.};
 
   if (transfer_momentum) {
 

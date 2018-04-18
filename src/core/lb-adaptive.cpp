@@ -42,6 +42,7 @@
 #include <iostream>
 #include <limits>
 #include <stdlib.h>
+#include <p8est_meshiter.h>
 
 #ifdef LB_ADAPTIVE
 
@@ -354,6 +355,12 @@ void lbadapt_reinit_fluid_per_cell() {
   int status;
   lbadapt_payload_t *data;
   lb_float h_max = h[p4est_params.max_ref_level];
+
+  /** prepare exchanging boundary values */
+  std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+  prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
+                         ghost_pointer);
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
   for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
     status = 0;
@@ -383,9 +390,11 @@ void lbadapt_reinit_fluid_per_cell() {
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi, h[level]);
 #ifdef LB_BOUNDARIES
-        double mp[3];
-        p4est_utils_get_midpoint(mesh_iter, mp);
-        data->lbfields.boundary = lbadapt_is_boundary(mp);
+        if (!mesh_iter->current_is_ghost) {
+          double mp[3];
+          p4est_utils_get_midpoint(mesh_iter, mp);
+          data->lbfields.boundary = lbadapt_is_boundary(mp);
+        }
 #endif // LB_BOUNDARIES
 #else  // LB_ADAPTIVE_GPU
         for (int patch_z = 1; patch_z <= LBADAPT_PATCHSIZE; ++patch_z) {
@@ -401,6 +410,12 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
+    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                             adapt_mesh, adapt_virtual,
+                                             adapt_virtual_ghost, level,
+                                             sizeof(lbadapt_payload_t),
+                                             (void**)local_pointer.data(),
+                                             (void**)ghost_pointer.data());
   }
 }
 

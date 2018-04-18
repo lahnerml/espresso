@@ -280,9 +280,11 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
     p4est_topidx_t tid = adapt_mesh->quad_to_tree[index];
     cmp_idx = p4est_utils_global_idx(q, tid);
     if (cmp_idx < idx) {
-      first = step + 1;
+      // if we found something smaller: move to latter part of search space
+      first = index + 1;
       count -= step + 1;
     } else {
+      // else limit search space to half the array
       count = step;
     }
   }

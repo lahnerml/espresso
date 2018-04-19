@@ -859,37 +859,49 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   tmp1 = local_pi[0] + local_pi[2];
   tmp2 = 2.0 * local_pi[1];
 
-  datafield[0][7] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[1]) +
+  datafield[0][7] = rho_times_coeff +
+                    1. / 12. * (local_j[0] + local_j[1]) +
                     0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][8] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[1]) +
+  datafield[0][8] = rho_times_coeff -
+                    1. / 12. * (local_j[0] + local_j[1]) +
                     0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][9] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[1]) +
+  datafield[0][9] = rho_times_coeff +
+                    1. / 12. * (local_j[0] - local_j[1]) +
                     0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][10] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[1]) +
+  datafield[0][10] = rho_times_coeff -
+                     1. / 12. * (local_j[0] - local_j[1]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[0] + local_pi[5];
   tmp2 = 2.0 * local_pi[3];
 
-  datafield[0][11] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[2]) +
+  datafield[0][11] = rho_times_coeff +
+                     1. / 12. * (local_j[0] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][12] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[2]) +
+  datafield[0][12] = rho_times_coeff -
+                     1. / 12. * (local_j[0] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][13] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[2]) +
+  datafield[0][13] = rho_times_coeff +
+                     1. / 12. * (local_j[0] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][14] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[2]) +
+  datafield[0][14] = rho_times_coeff -
+                     1. / 12. * (local_j[0] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[2] + local_pi[5];
   tmp2 = 2.0 * local_pi[4];
 
-  datafield[0][15] = rho_times_coeff + 1. / 12. * (local_j[1] + local_j[2]) +
+  datafield[0][15] = rho_times_coeff +
+                     1. / 12. * (local_j[1] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][16] = rho_times_coeff - 1. / 12. * (local_j[1] + local_j[2]) +
+  datafield[0][16] = rho_times_coeff -
+                     1. / 12. * (local_j[1] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][17] = rho_times_coeff + 1. / 12. * (local_j[1] - local_j[2]) +
+  datafield[0][17] = rho_times_coeff +
+                     1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][18] = rho_times_coeff - 1. / 12. * (local_j[1] - local_j[2]) +
+  datafield[0][18] = rho_times_coeff -
+                     1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 #else  // D3Q19
   int i;

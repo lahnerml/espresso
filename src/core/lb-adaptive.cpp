@@ -2818,6 +2818,8 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   int zidx = -1;
   castable_unique_ptr<sc_array_t> ne = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
+  p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
+  p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;
   for (int i = 0; i < 7; ++i) {
     p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
                              nidx[corner][i], nullptr, ne, ni);
@@ -2875,43 +2877,31 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     for (size_t n = 0; n < ne->elem_count; ++n) {
       int nidx = *((int *)sc_array_index_int(ni, n));
       int enc = *((int *)sc_array_index_int(ne, n));
-      if (enc > 0) {                   // local quadrant
-        if (enc >= 25 && enc <= 120) { // double size quad over face
-          if (i == 0)
-            xidx = ncnt;
-          if (i == 1)
-            yidx = ncnt;
-          if (i == 3)
-            zidx = ncnt;
-        }
+      if (24 <= enc && enc < 120) { // double size quad over face
+        if (i == 0)
+          xidx = ncnt;
+        if (i == 1)
+          yidx = ncnt;
+        if (i == 3)
+          zidx = ncnt;
+      }
+      if (0 <= nidx && nidx < lq) {                 // local quadrant
         quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nidx);
-        lvl = quad->level;
         sid = adapt_virtual->quad_qreal_offset[nidx];
         nodes[ncnt] = &lbadapt_local_data[lvl][sid];
-        delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                      delta_loc[didx[i + 1][2]];
-        delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
-        level[ncnt] = lvl;
-        ncnt += 1;
-      } else {                           // ghost quadrant
-        if (enc >= -120 && enc <= -25) { // double size quad over face
-          if (i == 0)
-            xidx = ncnt;
-          if (i == 1)
-            yidx = ncnt;
-          if (i == 3)
-            zidx = ncnt;
-        }
+      } else if (lq <= nidx && nidx < lq + gq) {
         quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, nidx);
-        lvl = quad->level;
         sid = adapt_virtual->quad_greal_offset[nidx];
         nodes[ncnt] = &lbadapt_ghost_data[lvl][sid];
-        delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                      delta_loc[didx[i + 1][2]];
-        delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
-        level[ncnt] = lvl;
-        ncnt += 1;
+      } else {
+        SC_ABORT_NOT_REACHED();
       }
+      lvl = quad->level;
+      delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
+                    delta_loc[didx[i + 1][2]];
+      delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
+      level[ncnt] = lvl;
+      ncnt += 1;
     }
     sc_array_truncate(ne);
     sc_array_truncate(ni);

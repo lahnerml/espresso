@@ -97,13 +97,8 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
       p4est_quadrant_t *q = &p4est->global_first_position[i];
       if (i < n_nodes) {
         double xyz[3];
-        p4est_qcoord_to_vertex(p4est->connectivity, q->p.which_tree,
-                               q->x, q->y, q->z, xyz);
         insert_elem.p4est_space_idx[i] =
-            p4est_utils_cell_morton_idx(
-                xyz[0] * (1 << insert_elem.finest_level_global),
-                xyz[1] * (1 << insert_elem.finest_level_global),
-                xyz[2] * (1 << insert_elem.finest_level_global));
+            p4est_utils_global_idx(q, q->p.which_tree);
       } else {
         double n_trees[3];
 #if defined(LB_ADAPTIVE)
@@ -283,7 +278,10 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
       // if we found something smaller: move to latter part of search space
       first = index + 1;
       count -= step + 1;
-    } else {
+    } else if (cmp_idx == idx) {
+      return index;
+    }
+    else {
       // else limit search space to half the array
       count = step;
     }

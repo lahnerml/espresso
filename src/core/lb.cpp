@@ -3979,8 +3979,8 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   } else {
     dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
   }
-  double h = 1.0 / (double)(1 << level[0]);
-  double h_max = 1.0 / (double)(1 << p4est_params.max_ref_level);
+  double h_local = h[level[0]];
+  double h_max = h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
   /* calculate fluid velocity at particle's position

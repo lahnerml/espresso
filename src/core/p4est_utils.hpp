@@ -120,7 +120,7 @@ enum class forest_order {
 
 struct p4est_utils_forest_info_t {
   p4est_t *p4est;
-  std::vector<int> p4est_space_idx;
+  std::vector<int64_t> p4est_space_idx;
   int coarsest_level_local;
   int coarsest_level_ghost;
   int coarsest_level_global;

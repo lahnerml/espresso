@@ -2789,7 +2789,8 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  int64_t qidx = lbadapt_map_pos_to_quad_ext(pos);
+  int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
+
   if (qidx < 0) {
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
     if (ncnt > 0) return ncnt;
@@ -2902,8 +2903,8 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
         sid = adapt_virtual->quad_qreal_offset[nidx];
         nodes[ncnt] = &lbadapt_local_data[lvl][sid];
       } else if (lq <= nidx && nidx < lq + gq) {
-        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, nidx);
-        sid = adapt_virtual->quad_greal_offset[nidx];
+        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, nidx - lq);
+        sid = adapt_virtual->quad_greal_offset[nidx - lq];
         nodes[ncnt] = &lbadapt_ghost_data[lvl][sid];
       } else {
         SC_ABORT_NOT_REACHED();

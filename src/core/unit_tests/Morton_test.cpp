@@ -24,8 +24,9 @@
 #define BOOST_TEST_MODULE morton test
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
+#define LB_ADAPTIVE
 
-#include "core/p4est_utils.hpp"
+#include "utils/Morton.hpp"
 
 #include <array>
 
@@ -34,7 +35,7 @@ BOOST_AUTO_TEST_CASE(Morton_Index_Check) {
   int lvl = 7;
   int n_idx = 1 << (dim * lvl);
   for (int idx = 0; idx < n_idx; ++idx) {
-    auto tmp = p4est_utils_idx_to_pos(idx);
-    BOOST_CHECK(idx == p4est_utils_cell_morton_idx(tmp[0], tmp[1], tmp[2]));
+    auto tmp = Utils::morton_idx_to_coords(idx);
+    BOOST_CHECK(idx == Utils::morton_coords_to_idx(tmp[0], tmp[1], tmp[2]));
   }
 }

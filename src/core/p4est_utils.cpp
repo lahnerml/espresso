@@ -6,6 +6,7 @@
 #include "domain_decomposition.hpp"
 #include "lb-adaptive.hpp"
 #include "p4est_dd.hpp"
+#include "utils/Morton.hpp"
 
 #include <algorithm>
 #include <array>
@@ -19,11 +20,6 @@
 #include <p8est_bits.h>
 #include <p8est_search.h>
 #include <vector>
-
-// For intrinsics version of cell_morton_idx
-#ifdef __BMI2__
-#include <x86intrin.h>
-#endif
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
@@ -212,67 +208,14 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
-#ifdef __BMI2__
-static unsigned
-_d2x(unsigned d, unsigned mask)
-{
-  return _pext_u32(d, mask);
-}
-#endif
-
 std::array<unsigned int, 3> p4est_utils_idx_to_pos (int64_t idx) {
-#ifdef __BMI2__
-  static const unsigned mask_x = 0x49249249;
-  static const unsigned mask_y = 0x92492492;
-  static const unsigned mask_z = 0x24924924;
-
-  std::array<unsigned int, 3> res = {{
-      _d2x(idx, mask_x),
-      _d2x(idx, mask_y),
-      _d2x(idx, mask_z)
-  }};
-#else
-  unsigned int x = 0;
-  unsigned int y = 0;
-  unsigned int z = 0;
-  for (int i = 0; i < 21; ++i) {
-    x |= (idx & (1 << (3 * i + 0))) << i;
-    y |= (idx & (1 << (3 * i + 1))) << i;
-    z |= (idx & (1 << (3 * i + 2))) << i;
-  }
-  std::array<unsigned int, 3> res = {{x, y, z}};
-#endif
-  return res;
+  return Utils::morton_idx_to_coords(idx);
 }
 
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
-#ifdef __BMI2__
-  //#warning "Using BMI2 for cell_morton_idx"
-  static const unsigned mask_x = 0x49249249;
-  static const unsigned mask_y = 0x92492492;
-  static const unsigned mask_z = 0x24924924;
-
-  return _pdep_u32(x, mask_x)
-           | _pdep_u32(y, mask_y)
-           | _pdep_u32(z, mask_z);
-#else
-//#warning "BMI2 not detected: Using slow loop version for cell_morton_idx"
-  int64_t idx = 0;
-  int64_t pos = 1;
-
-  for (int i = 0; i < 21; ++i) {
-    if ((x&1)) idx += pos;
-    x >>= 1; pos <<= 1;
-    if ((y&1)) idx += pos;
-    y >>= 1; pos <<= 1;
-    if ((z&1)) idx += pos;
-    z >>= 1; pos <<= 1;
-  }
-
-  return idx;
-#endif
+  return Utils::morton_coords_to_idx(x, y, z);
 }
 
 int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {

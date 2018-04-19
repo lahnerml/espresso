@@ -24,7 +24,6 @@
 #define BOOST_TEST_MODULE morton test
 #define BOOST_TEST_DYN_LINK
 #include <boost/test/unit_test.hpp>
-#define LB_ADAPTIVE
 
 #include "utils/Morton.hpp"
 #include <array>

@@ -284,7 +284,7 @@ IF LB_GPU:
                 return
             ELSE:
                 raise Exception("LB_GPU not compiled in")
-            
+
         def get_interpolated_velocity(self, pos):
             """Get LB fluid velocity at specified position.
 

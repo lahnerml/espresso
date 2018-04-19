@@ -392,9 +392,9 @@ void p4est_utils_get_front_lower_left(p8est_t *p8est,
  *                         of the current quadrant that mesh_iter is pointing
  *                         to.
  */
-
 void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
                                       double *xyz);
+
 /** Get the coordinates of the midpoint of a quadrant.
  *
  * \param [in]  p8est    the forest

@@ -17,7 +17,7 @@
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/** \file for_each_pair_test.cpp Unit tests for the Utils::for_each_pair.
+/** \file  Morton_test.cpp Unit tests p4est_utils Morton index calculation
  *
 */
 
@@ -27,15 +27,14 @@
 #define LB_ADAPTIVE
 
 #include "utils/Morton.hpp"
-
 #include <array>
 
 BOOST_AUTO_TEST_CASE(Morton_Index_Check) {
-  int dim = 3;
-  int lvl = 7;
-  int n_idx = 1 << (dim * lvl);
-  for (int idx = 0; idx < n_idx; ++idx) {
-    auto tmp = Utils::morton_idx_to_coords(idx);
+  const int dim = 3;
+  const int lvl = 7;
+  const int n_idx = 1 << (dim * lvl);
+  for (int64_t idx = 0; idx < n_idx; ++idx) {
+    std::array<unsigned int, 3> tmp = Utils::morton_idx_to_coords(idx);
     BOOST_CHECK(idx == Utils::morton_coords_to_idx(tmp[0], tmp[1], tmp[2]));
   }
 }

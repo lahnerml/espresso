@@ -29,9 +29,9 @@ inline std::array<unsigned int, 3> morton_idx_to_coords (int64_t idx) {
   unsigned int y = 0;
   unsigned int z = 0;
   for (int i = 0; i < 21; ++i) {
-    x |= (idx & (1 << (3 * i + 0))) << i;
-    y |= (idx & (1 << (3 * i + 1))) << i;
-    z |= (idx & (1 << (3 * i + 2))) << i;
+    x |= ((idx & (1 << (3 * i + 0))) != 0 ? 1 : 0) << i;
+    y |= ((idx & (1 << (3 * i + 1))) != 0 ? 1 : 0) << i;
+    z |= ((idx & (1 << (3 * i + 2))) != 0 ? 1 : 0) << i;
   }
   std::array<unsigned int, 3> res = {{x, y, z}};
 #endif

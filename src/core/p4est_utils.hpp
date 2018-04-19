@@ -325,6 +325,11 @@ inline void tree_to_boxlcoords(double x[3]) {
 #endif
 }
 
+/** Transform coordinates from p4est tree-coordinates to simulation domain
+ *
+ * @param x    Position to be transformed.
+ * @return     Position in simulation domain
+ */
 inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
   std::array<double, 3> res;
   tree_to_boxlcoords(res.data());
@@ -357,6 +362,11 @@ inline void boxl_to_treecoords(double x[3]) {
 #endif
 }
 
+/** Transform coordinates from simulation domain to p4est tree-coordinates
+ *
+ * @param x    Position to be transformed.
+ * @return     Position in p4est tree-coordinates
+ */
 inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
   std::array<double, 3> res = { x[0], x[1], x[2] };
   boxl_to_treecoords(res.data());
@@ -403,6 +413,8 @@ void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 
+std::array<int, 3> p4est_utils_idx_to_pos (forest_order forest, int64_t idx);
+
 /** Obtain a Morton-index by interleaving 3 integer coordinates.
  *
  * @param x, y, z  The coordinates
@@ -417,6 +429,25 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  * @return         Morton-index of given quadrant.
  */
 int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+
+/** Calculate a Morton-index from a position in Cartesian coordinates
+ *
+ * @param forest   The position of the forest info containing the p4est for
+ *                 which to map.
+ * @param xyz      The position to map.
+ * @return         Morton index of position in given p4est.
+ */
+int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]);
+
+/** Map a geometric position to the respective processor.
+ *
+ * @param forest   The position of the forest info containing the p4est for
+ *                 which to map.
+ * @param xyz      The position to map.
+ * @return         The MPI rank which holds a quadrant at the given position for
+ *                 the current p4est.
+ */
+p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz);
 
 /** Map a process-local Morton-index obtained from
  * \ref p4est_utils_cell_morton_idx to a local qid.

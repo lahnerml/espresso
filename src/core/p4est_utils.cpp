@@ -212,6 +212,40 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
+#ifdef __BMI2__
+static unsigned
+_d2x(unsigned d, unsigned mask)
+{
+  return _pext_u32(d, mask);
+}
+#endif
+
+std::array<int, 3> p4est_utils_idx_to_pos (forest_order forest, int64_t idx) {
+  const auto &fi = forest_info.at(static_cast<int>(forest));
+#ifdef __BMI2__
+  static const unsigned mask_x = 0x49249249;
+  static const unsigned mask_y = 0x92492492;
+  static const unsigned mask_z = 0x24924924;
+
+  std::array<int, 3> res = {
+      _d2x(idx, mask_x),
+      _d2x(idx, mask_y),
+      _d2x(idx, mask_z)
+  };
+#else
+  int x = 0;
+  int y = 0;
+  int z = 0;
+  for (int i = 0; i < 21; ++i) {
+    x &= (idx & 1 << (3 * i + 0));
+    y &= (idx & 1 << (3 * i + 1));
+    z &= (idx & 1 << (3 * i + 2));
+  }
+  std::array<int, 3> res = {x, y, z};
+#endif
+  return res;
+}
+
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
 int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
@@ -253,6 +287,15 @@ int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
   return p4est_utils_cell_morton_idx(x, y, z);
 }
 
+int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
+  const auto &fi = forest_info.at(static_cast<int>(forest));
+  std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
+  int xyz_mod[3];
+  for (int i = 0; i < P8EST_DIM; ++i)
+    xyz_mod[i] = pos[i] * (1 << fi.finest_level_global);
+  return p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
+}
+
 /** Perform a binary search for a given quadrant.
  * CAUTION: This only makes sense for adaptive grids and therefore we implicitly
  *          assume that we are operating on the potentially adaptive p4est of
@@ -289,6 +332,10 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   return first;
 }
 
+p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz) {
+  return p4est_utils_idx_to_qid(forest, p4est_utils_pos_to_index(forest, xyz));
+}
+
 p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
@@ -296,13 +343,7 @@ p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
 
 // Find the process that handles the position
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
-  const auto &fi = forest_info.at(static_cast<int>(forest));
-  std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
-  int xyz_mod[3];
-  for (int i = 0; i < P8EST_DIM; ++i)
-    xyz_mod[i] = pos[i] * (1 << fi.finest_level_global);
-  int idx = p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
-  return p4est_utils_idx_to_proc(forest, idx);
+  return p4est_utils_idx_to_proc(forest, p4est_utils_pos_to_index(forest, xyz));
 }
 
 int p4est_utils_idx_to_proc(forest_order forest, p4est_gloidx_t idx) {

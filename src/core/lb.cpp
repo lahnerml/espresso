@@ -3861,8 +3861,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
   int x, y, z;
 
   dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
-  double h = 1.0 / (double)(1 << level[0]);
-  double h_max = 1.0 / (double)(1 << p4est_params.max_ref_level);
+  double h_max = h[p4est_params.max_ref_level];
 
   v[0] = v[1] = v[2] = 0.0;
 

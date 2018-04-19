@@ -299,10 +299,10 @@ p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
 // Find the process that handles the position
 int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
-  boxl_to_treecoords(xyz);
+  std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
   int xyz_mod[3];
   for (int i = 0; i < P8EST_DIM; ++i)
-    xyz_mod[i] = xyz[i] * (1 << fi.finest_level_global);
+    xyz_mod[i] = pos[i] * (1 << fi.finest_level_global);
   int idx = p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
   return p4est_utils_idx_to_proc(forest, idx);
 }

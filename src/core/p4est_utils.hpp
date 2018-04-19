@@ -325,6 +325,12 @@ inline void tree_to_boxlcoords(double x[3]) {
 #endif
 }
 
+inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
+  std::array<double, 3> res;
+  tree_to_boxlcoords(res.data());
+  return res;
+}
+
 /** Transform coordinates in-place from simulation domain to p4est
  * tree-coordinates (a tree is a unit-cube).
  *
@@ -349,6 +355,12 @@ inline void boxl_to_treecoords(double x[3]) {
                   "LB_ADAPTIVE is activated.\n");
   errexit();
 #endif
+}
+
+inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
+  std::array<double, 3> res = { x[0], x[1], x[2] };
+  boxl_to_treecoords(res.data());
+  return res;
 }
 
 

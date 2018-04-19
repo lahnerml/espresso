@@ -220,28 +220,27 @@ _d2x(unsigned d, unsigned mask)
 }
 #endif
 
-std::array<int, 3> p4est_utils_idx_to_pos (forest_order forest, int64_t idx) {
-  const auto &fi = forest_info.at(static_cast<int>(forest));
+std::array<unsigned int, 3> p4est_utils_idx_to_pos (int64_t idx) {
 #ifdef __BMI2__
   static const unsigned mask_x = 0x49249249;
   static const unsigned mask_y = 0x92492492;
   static const unsigned mask_z = 0x24924924;
 
-  std::array<int, 3> res = {
+  std::array<unsigned int, 3> res = {{
       _d2x(idx, mask_x),
       _d2x(idx, mask_y),
       _d2x(idx, mask_z)
-  };
+  }};
 #else
-  int x = 0;
-  int y = 0;
-  int z = 0;
+  unsigned int x = 0;
+  unsigned int y = 0;
+  unsigned int z = 0;
   for (int i = 0; i < 21; ++i) {
-    x &= (idx & 1 << (3 * i + 0));
-    y &= (idx & 1 << (3 * i + 1));
-    z &= (idx & 1 << (3 * i + 2));
+    x |= (idx & (1 << (3 * i + 0))) << i;
+    y |= (idx & (1 << (3 * i + 1))) << i;
+    z |= (idx & (1 << (3 * i + 2))) << i;
   }
-  std::array<int, 3> res = {x, y, z};
+  std::array<unsigned int, 3> res = {{x, y, z}};
 #endif
   return res;
 }

@@ -1630,6 +1630,17 @@ int lb_lbfluid_get_interpolated_velocity_global(double *p, double *v) {
   return 0;
 }
 
+void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,
+                                                       double *velocities,
+                                                       int length) {
+  double *p = const_cast<double*>(positions);
+  double *v = velocities;
+  int i;
+  for (i = 0; i < length; ++i, p += 3, v += 3) {
+    lb_lbfluid_get_interpolated_velocity_global(p, v);
+  }
+}
+
 int lb_lbnode_get_pi(int *ind, double *p_pi) {
   double p0 = 0;
 
@@ -1864,6 +1875,18 @@ int lb_lbnode_set_u(int *ind, double *u) {
     j[1] = rho * u[1] * lbpar.tau * lbpar.agrid;
     j[2] = rho * u[2] * lbpar.tau * lbpar.agrid;
     mpi_send_fluid(node, index, rho, j, pi);
+#else
+    double rho;
+    double j[3];
+    double pi[6];
+    int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
+    lb_float h_max = h[p4est_params.max_ref_level];
+    mpi_recv_fluid(proc, index, &rho, j, pi);
+    // unit conversion
+    for (int i = 0; i < P8EST_DIM; ++i)
+      j[i] = u[i] * lbpar.tau * rho / h_max;
+    mpi_send_fluid(proc, index, rho, j, pi);
 #endif // LB_ADAPTIVE
 #endif // LB
   }
@@ -2702,6 +2725,17 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
     lbfluid[0][i][index] += coeff[i][3] * trace;
   }
 #endif // D3Q19
+#else
+  // get qid
+  int qid = p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
+  P4EST_ASSERT(0 <= qid && qid < adapt_p4est->local_num_quadrants);
+  p4est_quadrant_t *q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+  lbadapt_payload_t *data =
+      &lbadapt_local_data[q->level][adapt_virtual->quad_qreal_offset[qid]];
+  lb_float j_cast[3];
+  for (int i = 0; i < P8EST_DIM; ++i)
+    j_cast[i] = static_cast<lb_float>(j[i]);
+  lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j_cast, pi, h[q->level]);
 #endif // !LB_ADAPTIVE
 }
 

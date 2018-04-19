@@ -214,6 +214,54 @@ IF LB_GPU or LB:
             if lb_set_lattice_switch(0):
                 raise Exception("lb_set_lattice_switch error")
 
+        IF LB_ADAPTIVE:
+            def get_interpolated_velocity(self, pos):
+                """Get LB fluid velocity at specified position.
+
+                Parameters
+                ----------
+                pos : array_like :obj:`float`
+                      The position at which velocity is requested.
+
+                Returns
+                -------
+                v : array_like :obj:`float`
+                    The LB fluid velocity at ``pos``.
+
+                """
+                cdef double[3] p = pos
+                cdef double[3] v
+                lb_lbfluid_get_interpolated_velocity_global(p, v)
+                return v
+
+        @cython.boundscheck(False)
+        @cython.wraparound(False)
+        def get_interpolated_fluid_velocity_at_positions(self, np.ndarray[double, ndim=2, mode="c"] positions not None):
+            """Calculate the fluid velocity at given positions.
+
+            Parameters
+            ----------
+            positions : numpy-array of type :obj:`float` of shape (N,3)
+                        The 3-dimensional positions.
+
+            Returns
+            -------
+            velocities : numpy-array of type :obj:`float` of shape (N,3)
+                         The 3-dimensional LB fluid velocities.
+
+            Raises
+            ------
+            AssertionError
+                If shape of ``positions`` not (N,3).
+
+            """
+            assert positions.shape[1] == 3, "The input array must have shape (N,3)"
+            cdef int length
+            length = positions.shape[0]
+            velocities = np.empty_like(positions)
+            lb_lbfluid_get_interpolated_velocity_at_positions(<double *>np.PyArray_GETPTR2(positions, 0, 0), <double *>np.PyArray_GETPTR2(velocities, 0, 0), length)
+            return velocities
+
 IF LB_GPU:
     cdef class LBFluidGPU(LBFluid):
         """
@@ -299,7 +347,7 @@ IF LB or LB_GPU:
                 lb_lbnode_get_u(self.node, double_return)
                 return array_locked(double_return)
 
-            IF LB_GPU:
+            IF LB_GPU or LB_ADAPTIVE:
                 def __set__(self, value):
                     cdef double[3] host_velocity
                     if all(is_valid_type(v, float) for v in value) and len(value) == 3:

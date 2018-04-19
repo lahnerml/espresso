@@ -643,6 +643,10 @@ int lb_lbnode_set_pop(int *ind, double *pop);
  * position is not within the local lattice. This version of the function
  * can be called without the position needing to be on the local processor */
 int lb_lbfluid_get_interpolated_velocity_global(double *p, double *v);
+
+void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,
+                                                       double *velocities,
+                                                       int length);
 #endif // defined (LB) || defined(LB_GPU)
 
 #endif // !LB_ADAPTIVE_GPU

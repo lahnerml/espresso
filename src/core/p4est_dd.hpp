@@ -63,6 +63,12 @@ void dd_p4est_topology_init(CellPList *cl, bool isRepart = false);
  */
 void dd_p4est_write_particle_vtk(char* filename);
 
+/** Preprocessing before repart.
+ * 
+ * Enables the use of optimized resorting routine.
+ */
+void p4est_dd_repart_preprocessing();
+
 #ifdef DD_P4EST
 // Repartition a given p4est along the MD grid, so that processor domain boundaries are aligned
 void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn);

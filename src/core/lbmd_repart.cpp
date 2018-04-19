@@ -18,8 +18,17 @@ static std::vector<double> weights(const std::string& metric_desc)
     return repart::metric{metric_desc}();
 }
 
+static void preprocess()
+{
+    // Saves "old" nquads for later use to resort along the
+    // space-filling curve.
+    p4est_dd_repart_preprocessing();
+}
+
 static void postprocess()
 {
+    // This is save to do as dd_p4est_create_grid does not repartition
+    // (as it normally would) if LB_ADAPTIVE is defined.
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 }
 
@@ -33,6 +42,11 @@ static std::vector<double> weights(const std::string& metric_desc)
     return std::vector<double>{};
 }
 
+static void preprocess()
+{
+    // TODO
+}
+
 static void postprocess()
 {
     // TODO
@@ -44,15 +58,16 @@ static void postprocess()
 struct repart_info {
     forest_order fo;
     std::vector<double> (*weights)(const std::string&);
+    void (*preprocess)();
     void (*postprocess)();
 };
 
 std::vector<repart_info> repart_infos = {
 #ifdef DD_P4EST
-    { forest_order::short_range, __md_detail::weights, __md_detail::postprocess },
+    { forest_order::short_range, __md_detail::weights, __md_detail::preprocess, __md_detail::postprocess },
 #endif
 #ifdef LB_ADAPTIVE
-    { forest_order::adaptive_LB, __lbm_detail::weights, __lbm_detail::postprocess }
+    { forest_order::adaptive_LB, __lbm_detail::weights, __lbm_detail::preprocess, __lbm_detail::postprocess }
 #endif
 };
 
@@ -78,6 +93,10 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
         return;
     }
 
+    for (const auto& ri: repart_infos)
+        ri.preprocess();
+
+    ws.reserve(repart_infos.size());
     std::transform(std::begin(repart_infos), std::end(repart_infos),
                    std::begin(metrics), std::back_inserter(ws),
                    [](const repart_info& ri, const std::string& m){
@@ -89,10 +108,8 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
                                    tree_of(repart_infos[1]),
                                    ws[1], alphas[1]);
 
-    std::for_each(std::begin(repart_infos), std::end(repart_infos),
-                  [](const repart_info& ri){
+    for (const auto& ri: repart_infos)
         ri.postprocess();
-    });
 }
 
 }

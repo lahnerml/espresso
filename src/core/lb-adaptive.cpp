@@ -2755,7 +2755,7 @@ int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
       tmp <<= 1;
     while (tmp < ((box_l[2] / lb_conn_brick[2]) * (1 << p4est_params.max_ref_level)))
       tmp <<= 1;
-    qidx = tmp *tmp *tmp;
+    qidx = tmp * tmp * tmp;
   } else {
     q = &adapt_p4est->global_first_position[this_node + 1];
     qidx = p4est_utils_global_idx(q, q->p.which_tree);

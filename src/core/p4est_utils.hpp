@@ -368,7 +368,7 @@ inline void boxl_to_treecoords(double x[3]) {
  * @return     Position in p4est tree-coordinates
  */
 inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
-  std::array<double, 3> res = { x[0], x[1], x[2] };
+  std::array<double, 3> res = {{x[0], x[1], x[2]}};
   boxl_to_treecoords(res.data());
   return res;
 }

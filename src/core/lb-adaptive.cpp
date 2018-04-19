@@ -2220,9 +2220,9 @@ void check_vel(int qid, double local_h, lbadapt_payload_t *data,
                std::vector<std::array<double, 3>> &vel) {
 #ifndef LB_ADAPTIVE_GPU
   double rho;
-  if (vel[qid] == std::array<double, 3>{std::numeric_limits<double>::min(),
-                                        std::numeric_limits<double>::min(),
-                                        std::numeric_limits<double>::min()}) {
+  if (vel[qid] == std::array<double, 3>{{std::numeric_limits<double>::min(),
+                                         std::numeric_limits<double>::min(),
+                                         std::numeric_limits<double>::min()}}) {
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                               data->lbfields.boundary, data->lbfields.has_force,
                               local_h, &rho, vel[qid].data(), 0);
@@ -2244,14 +2244,14 @@ void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
       adapt_p4est->local_num_quadrants + adapt_ghost->ghosts.elem_count,
-      std::array<double, 3>({std::numeric_limits<double>::min(),
-                             std::numeric_limits<double>::min(),
-                             std::numeric_limits<double>::min()}));
+      std::array<double, 3>({{std::numeric_limits<double>::min(),
+                              std::numeric_limits<double>::min(),
+                              std::numeric_limits<double>::min()}}));
 
   int nq;
   int c_level;
   p4est_locidx_t lq = adapt_p4est->local_num_quadrants;
-  const std::array<int, 3> neighbor_dirs = std::array<int, 3>({1, 3, 5});
+  const std::array<int, 3> neighbor_dirs = std::array<int, 3>({{1, 3, 5}});
   castable_unique_ptr<sc_array_t> neighbor_qids = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> neighbor_encs = sc_array_new(sizeof(int));
   std::array<std::vector<int>, 3> n_qids;
@@ -2545,7 +2545,7 @@ void lbadapt_calc_local_temp(p8est_iter_volume_info_t *info, void *user_data) {
   std::array<lb_float, 3> j;
 
   if (data->lbfields.boundary) {
-    j = {0., 0., 0.};
+    j = {{0., 0., 0.}};
     ++ti->n_non_boundary_nodes;
   }
   else {
@@ -2795,7 +2795,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
     if (ncnt > 0) return ncnt;
     fprintf(stderr, "Particle not in local LB domain ");
-    fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx,
+    fprintf(stderr, "%i : %lli [%lf %lf %lf], ", this_node, qidx,
             pos[0], pos[1], pos[2]);
 #ifdef DD_P4EST
     fprintf(stderr, "belongs to MD process %i\n",

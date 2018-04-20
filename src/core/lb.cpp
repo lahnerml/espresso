@@ -136,13 +136,13 @@ HaloCommunicator update_halo_comm = {0, nullptr};
 /*@{*/
 
 #ifdef LB_ADAPTIVE
+#ifdef COMM_HIDING
+extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status (19, nullptr);
+#endif
+
 lb_float h[P8EST_MAXLEVEL] =          {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                        0., 0., 0., 0., 0., 0., 0., 0., 0.};
 lb_float prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
-lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                        0., 0., 0., 0., 0., 0., 0., 0., 0.};
-lb_float gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
                                        0., 0., 0., 0., 0., 0., 0., 0., 0.};
 #endif // LB_ADAPTIVE
 

@@ -3337,20 +3337,26 @@ inline void lb_collide_stream() {
    */
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
+#ifdef COMM_HIDING
   bool hide_communication = false;
+#endif
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
+#ifdef COMM_HIDING
       if (hide_communication) {
         // level always relates to level of real cells
         lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
         // TODO add .._exchange_data_end here
         lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
       } else {
+#endif
         lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
+#ifdef COMM_HIDING
       }
+#endif
     }
   }
   // increment counter half way to keep coarse quadrants from streaming early

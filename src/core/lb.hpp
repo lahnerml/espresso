@@ -32,6 +32,9 @@
 
 #ifdef LB_ADAPTIVE
 #include <p8est.h>
+#ifdef COMM_HIDING
+#include <p8est_virtual.h>
+#endif
 #endif // LB_ADAPTIVE
 
 #ifdef LB
@@ -229,6 +232,10 @@ typedef struct {
   int fluct;
   lb_float phi[19];
 } LB_Parameters;
+
+#ifdef COMM_HIDING
+extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status;
+#endif
 #endif // LB_ADAPTIVE
 
 /** The DnQm model to be used. */

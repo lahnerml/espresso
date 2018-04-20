@@ -415,7 +415,7 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular
  * grid on the finest level */
-std::array<unsigned int, 3> p4est_utils_idx_to_pos (int64_t idx);
+std::array<int64_t, 3> p4est_utils_idx_to_pos (int64_t idx);
 
 /** Obtain a Morton-index by interleaving 3 integer coordinates.
  *

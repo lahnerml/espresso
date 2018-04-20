@@ -208,7 +208,7 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
-std::array<unsigned int, 3> p4est_utils_idx_to_pos (int64_t idx) {
+std::array<int64_t, 3> p4est_utils_idx_to_pos (int64_t idx) {
   return Utils::morton_idx_to_coords(idx);
 }
 

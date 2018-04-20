@@ -30,10 +30,11 @@
 
 BOOST_AUTO_TEST_CASE(Morton_Index_Check) {
   const int dim = 3;
-  const int lvl = 7;
+  const int lvl = 20;
   const int n_idx = 1 << (dim * lvl);
+  std::array<int64_t, 3> tmp;
   for (int64_t idx = 0; idx < n_idx; ++idx) {
-    std::array<unsigned int, 3> tmp = Utils::morton_idx_to_coords(idx);
+    tmp = Utils::morton_idx_to_coords(idx);
     BOOST_CHECK(idx == Utils::morton_coords_to_idx(tmp[0], tmp[1], tmp[2]));
   }
 }

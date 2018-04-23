@@ -577,6 +577,10 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /** \name Grid Change                                                        */
 /*****************************************************************************/
 /*@{*/
+#ifdef COMM_HIDING
+int p4est_utils_end_pending_communication();
+#endif
+
 /** Function that handles grid alteration. After calling this function the grid
  * has changed and everything is set to perform the next integration step.
  */

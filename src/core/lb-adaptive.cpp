@@ -1730,7 +1730,9 @@ void lbadapt_bounce_back(int level) {
 #endif // LB_ADAPTIVE_GPU
 }
 
-void lbadapt_update_populations_from_virtuals(int level) {
+void lbadapt_update_populations_from_virtuals(int level,
+                                              p8est_meshiter_localghost_t
+                                              quads_to_update) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   int parent_sid;
@@ -1738,7 +1740,7 @@ void lbadapt_update_populations_from_virtuals(int level) {
   int vel;
   castable_unique_ptr<p4est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
       adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level + 1,
-      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCALGHOST, P8EST_TRAVERSE_VIRTUAL,
+      P8EST_CONNECT_EDGE, quads_to_update, P8EST_TRAVERSE_VIRTUAL,
       P8EST_TRAVERSE_PARBOUNDINNER);
 
   while (status != P8EST_MESHITER_DONE) {

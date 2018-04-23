@@ -441,6 +441,16 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
+int p4est_utils_end_pending_communication() {
+  for (int i = 0; i < p4est_params.max_ref_level; ++i) {
+    if (nullptr != exc_status[i]) {
+      p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
+      exc_status[i] = nullptr;
+    }
+  }
+  return 0;
+}
+
 int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
@@ -452,6 +462,11 @@ int p4est_utils_perform_adaptivity_step() {
 
   p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
                 nullptr, nullptr, nullptr);
+
+#ifdef COMM_HIDING
+  // get rid of any pending communication and avoid dangling messages
+  p4est_utils_end_pending_communication();
+#endif
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);

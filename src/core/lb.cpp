@@ -137,7 +137,7 @@ HaloCommunicator update_halo_comm = {0, nullptr};
 
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
-extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status (19, nullptr);
+std::vector<p8est_virtual_ghost_exchange_t*> exc_status (19, nullptr);
 #endif
 
 lb_float h[P8EST_MAXLEVEL] =          {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
@@ -3269,7 +3269,9 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  for (level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level; ++level) {
+  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  for (level = forest_lb.coarsest_level_global;
+       level <= forest_lb.finest_level_global; ++level) {
     // populate halos on that level
     lbadapt_patches_populate_halos(level);
 
@@ -3285,7 +3287,8 @@ inline void lb_collide_stream() {
   }
   ++n_lbsteps;
   // second part of subcycling; fine to coarse
-  for (level = p4est_params.max_ref_level; p4est_params.min_ref_level <= level; --level) {
+  for (level = forest_lb.coarsest_level_global;
+       level <= forest_lb.finest_level_global; ++level) {
     // update from virtual quadrants
     // TODO: implement; nop in regular case
     lbadapt_gpu_execute_update_from_virtuals_kernel(level);
@@ -3317,7 +3320,6 @@ inline void lb_collide_stream() {
 #else  // LB_ADAPTIVE_GPU
   int lvl_diff;
   // perform 1st half of subcycling here (process coarse before fine)
-  // TODO: which max refinement level is needed?
   /** TODO:
    * change to
    * for  (..) do
@@ -3330,32 +3332,24 @@ inline void lb_collide_stream() {
    * use array of status pointers (one pointer per level)
    *
    * FIXME mind first and last step (regridding and end of simulation)
-   * FIXME use different MPI_Tag for different levels
-   * maybe use counter for each level to check if counters match
-   * use different finest_level_global and p4est_params.max_ref_level, i.e. do
-   * not make use of maximum set p4est refinement capability
    */
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
-#ifdef COMM_HIDING
-  bool hide_communication = false;
-#endif
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
+    // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef COMM_HIDING
-      if (hide_communication) {
-        // level always relates to level of real cells
-        lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
-        // TODO add .._exchange_data_end here
-        lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
-      } else {
-#endif
-        lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
-#ifdef COMM_HIDING
+      lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
+      if (exc_status[level] != nullptr) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+        exc_status[level] = nullptr;
       }
+      lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
+#else
+      lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
 #endif
     }
   }
@@ -3363,14 +3357,22 @@ inline void lb_collide_stream() {
   ++n_lbsteps;
 
   // perform second half of subcycling here (process fine before coarse)
-  // TODO: which max refinement level is needed?
   for (level = forest_lb.finest_level_global;
        forest_lb.coarsest_level_global <= level; --level) {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
-
     if (n_lbsteps % (1 << lvl_diff) == 0) {
-      lbadapt_update_populations_from_virtuals(level);
+#ifdef COMM_HIDING
+      lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
+      if (exc_status[level] != nullptr) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+        exc_status[level] = nullptr;
+      }
+      lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
+#else
+      lbadapt_update_populations_from_virtuals(level,
+                                               P8EST_TRAVERSE_LOCALGHOST);
+#endif
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
       lbadapt_swap_pointers(level);
@@ -3381,14 +3383,20 @@ inline void lb_collide_stream() {
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
 
-      // TODO: do not use convenience function here
-      // if comm_hiding (exchange_data_begin)
+#ifdef COMM_HIDING
+      exc_status[level] =
+          p4est_virtual_ghost_exchange_data_level_begin(
+              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+              adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+              (void**)local_pointer.data(), (void**)ghost_pointer.data());
+#else
       p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                                adapt_mesh, adapt_virtual,
                                                adapt_virtual_ghost, level,
                                                sizeof(lbadapt_payload_t),
                                                (void**)local_pointer.data(),
                                                (void**)ghost_pointer.data());
+#endif
     }
   }
 #endif // LB_ADAPTIVE_GPU
@@ -3559,7 +3567,7 @@ inline void lb_stream_collide() {
  * monitor the time since the last lattice update.
  */
 void lattice_boltzmann_update() {
-  int factor = (int)round(lbpar.tau / time_step);
+  auto factor = (int)round(lbpar.tau / time_step);
 
   fluidstep += 1;
   if (fluidstep >= factor) {

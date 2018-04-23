@@ -259,20 +259,17 @@ int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m);
  * has virtual children, i.e. is adjacent to a refinement boundary
  *
  * \param [in] level             The level on which to perform the collision
- *                               step
- * \param [in] quads_to_collide  Which quads to collide: local, ghost, or both
+ *                               step.
+ * \param [in] quads_to_collide  Which quads to collide: local, ghost, or both.
  */
 void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
 
 /** Populate virtual cells with post-collision values from their respective
  * father cell
  *
- * \param [in] mesh_iter           The currently used mesh-based iterator
- * \param [in] source_populations  The post-collision populations of host cell
- *                                 that is to be copied to its 8 virtual
- *                                 subquadrants.
- * \param [in] source_boundary     The boundary value set in host cell that is
- *                                 copied to each virtual subquadrant.
+ * \param [in] mesh_iter         The mesh_iterator pointing to a specific
+ *                               host quadrant whose virtual subquads are to be
+ *                               populated.
  */
 void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter);
 
@@ -293,10 +290,14 @@ void lbadapt_bounce_back(int level);
 /** Update population of real cells from streaming steps from neighboring
  * quadrants.
  *
- * \param [in] level   The level of the real cells whose populations are updated
- *                     from their respective virtual subcells.
+ * \param [in] level             The level of the real cells whose populations
+ *                               are updated from their respective virtual
+ *                               subcells.
+ * \param [in] quads_to_update   Which quads to update: local, ghost, or both.
  */
-void lbadapt_update_populations_from_virtuals(int level);
+void lbadapt_update_populations_from_virtuals(int level,
+                                              p8est_meshiter_localghost_t
+                                              quads_to_update);
 
 /** swap pre- and poststreaming pointers
  *

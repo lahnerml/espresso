@@ -36,7 +36,7 @@ void lbadapt_gpu_init() {
     CUDA_CALL(cudaMalloc(&d_lbpar, sizeof(LB_Parameters)));
   }
   // update agrid value
-  lbpar.agrid = lbpar.h[lbpar.max_refinement_level];
+  lbpar.agrid = lbpar.h[p4est_params.max_ref_level];
   CUDA_CALL(cudaMemcpy(d_lbpar, &lbpar, sizeof(LB_Parameters),
                        cudaMemcpyHostToDevice));
 }
@@ -829,7 +829,7 @@ void lbadapt_gpu_execute_collision_kernel(int level) {
     dim3 threads_per_block(LBADAPT_PATCHSIZE_HALO, LBADAPT_PATCHSIZE_HALO,
         LBADAPT_PATCHSIZE_HALO);
 
-    lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+    lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(p4est_params.max_ref_level) /
       ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
     /** call kernels: calc modes, relax modes, thermalize modes, apply forces,
@@ -1006,7 +1006,7 @@ void lbadapt_gpu_execute_bounce_back_kernel(int level) {
   dim3 blocks_per_grid(1);
   dim3 threads_per_block(LBADAPT_PATCHSIZE, LBADAPT_PATCHSIZE,
       LBADAPT_PATCHSIZE);
-  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(lbpar.max_refinement_level) /
+  lb_float h_max = (lb_float)P8EST_QUADRANT_LEN(p4est_params.max_ref_level) /
     ((lb_float)LBADAPT_PATCHSIZE * (lb_float)P8EST_ROOT_LEN);
 
   if (local_num_real_quadrants_level[level]) {

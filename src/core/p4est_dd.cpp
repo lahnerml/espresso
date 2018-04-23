@@ -353,18 +353,23 @@ void dd_p4est_create_grid (bool isRepart) {
     ds::p4est = std::unique_ptr<p4est_t>(
         p4est_new_ext(comm_cart, ds::p4est_conn, 0, grid_level, true,
                       sizeof(quad_data_t), init_fn, NULL));
-  } else {
-    // Save global_first_quadrants for migration
-    old_global_first_quadrant.clear();
-    std::copy_n(ds::p4est->global_first_quadrant, n_nodes + 1,
-              std::back_inserter(old_global_first_quadrant));
   }
+  // In case of LB_ADAPTIVE, this is handled by lbmd_repart.[ch]pp
+#if !defined(LB_ADAPTIVE)
+  else {
+    p4est_dd_repart_preprocessing();
+  }
+#endif
   // Repartition uniformly if part_nquads is empty (because not repart has been
   // done yet). Else use part_nquads as given partitioning.
+  // If LB_ADAPTIVE is defined, do not repartition here at all, since we handle
+  // this case in lbmd_repart.[ch]pp.
   if (part_nquads.size() == 0)
     p4est_partition(ds::p4est, 0, NULL);
+#if !defined(LB_ADAPTIVE)
   else
     p4est_partition_given(ds::p4est, part_nquads.data());
+#endif
 
   auto p4est_ghost = castable_unique_ptr<p4est_ghost_t>(
       p4est_ghost_new(ds::p4est, P8EST_CONNECT_CORNER));
@@ -1921,6 +1926,15 @@ void dd_p4est_on_geometry_change(int flags) {
 #else
   cells_re_init(CELL_STRUCTURE_CURRENT);
 #endif
+}
+
+void
+p4est_dd_repart_preprocessing()
+{
+  // Save global_first_quadrants for migration
+  old_global_first_quadrant.clear();
+  std::copy_n(ds::p4est->global_first_quadrant, n_nodes + 1,
+            std::back_inserter(old_global_first_quadrant));
 }
 
 //--------------------------------------------------------------------------------------------------

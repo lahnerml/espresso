@@ -442,12 +442,14 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 int p4est_utils_end_pending_communication() {
+#ifdef COMM_HIDING
   for (int i = 0; i < p4est_params.max_ref_level; ++i) {
     if (nullptr != exc_status[i]) {
       p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
       exc_status[i] = nullptr;
     }
   }
+#endif
   return 0;
 }
 

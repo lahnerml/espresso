@@ -711,8 +711,11 @@ void lbadapt_patches_populate_halos(int level) {
 /*** Load Balance ***/
 int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
                              p8est_quadrant_t *q) {
-  return (
-      prefactors[p4est_params.min_ref_level + (p4est_params.max_ref_level - q->level)]);
+#ifdef LEVEL_PARTITION
+  return (prefactors[q->level]);
+#else
+  return 1;
+#endif
 }
 
 /*** REFINEMENT ***/

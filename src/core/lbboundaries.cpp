@@ -314,8 +314,8 @@ void lb_init_boundaries() {
         }
       }
     }
-  }
 #endif // defined(LB) && defined(LB_BOUNDARIES)
+  }
 #else
     lbadapt_get_boundary_status();
 #endif

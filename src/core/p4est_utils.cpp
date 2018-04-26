@@ -53,6 +53,10 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   return forest_info.at(static_cast<int>(fo));
 }
 
+// forward declaration
+int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
+                               p8est_quadrant_t *q,
+                               p4est_topidx_t which_tree);
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   if (p4est) {
     // fill element to insert
@@ -96,7 +100,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
       if (i < n_nodes) {
         double xyz[3];
         insert_elem.p4est_space_idx[i] =
-            p4est_utils_global_idx(q, q->p.which_tree);
+            p4est_utils_global_idx(insert_elem, q, q->p.which_tree);
       } else {
         double n_trees[3];
 #if defined(LB_ADAPTIVE)
@@ -220,15 +224,24 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
   return Utils::morton_coords_to_idx(x, y, z);
 }
 
-int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree) {
+int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
+                               p8est_quadrant_t *q,
+                               p4est_topidx_t which_tree) {
   int x, y, z;
   double xyz[3];
-  p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << p4est_params.max_ref_level);
-  y = xyz[1] * (1 << p4est_params.max_ref_level);
-  z = xyz[2] * (1 << p4est_params.max_ref_level);
+  p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z, xyz);
+  x = xyz[0] * (1 << fi.finest_level_global);
+  y = xyz[1] * (1 << fi.finest_level_global);
+  z = xyz[2] * (1 << fi.finest_level_global);
 
   return p4est_utils_cell_morton_idx(x, y, z);
+}
+
+
+int64_t p4est_utils_global_idx(forest_order forest, p8est_quadrant_t *q,
+                               p4est_topidx_t tree) {
+  const auto &fi = forest_info.at(static_cast<int>(forest));
+  return p4est_utils_global_idx(fi, q, tree);
 }
 
 int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {

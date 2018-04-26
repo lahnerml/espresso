@@ -3986,8 +3986,7 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
         }
 #else  // LB_BOUNDARIES
         lb_calc_modes(index, modes);
-        local_rho =
-            lbpar.rho[0] * h * h * h + modes[0];
+        local_rho = lbpar.rho * h * h * h + modes[0];
         local_j[0] = modes[1];
         local_j[1] = modes[2];
         local_j[2] = modes[3];

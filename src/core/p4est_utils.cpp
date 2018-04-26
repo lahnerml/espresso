@@ -28,10 +28,12 @@ p4est_parameters p4est_params = {
   -1,
   // max_ref_level
   -1,
+#ifdef LB_ADAPTIVE
   // threshold_velocity
   {0.0, 1.0},
   // threshold_vorticity
   {0.0, 1.0},
+#endif
 };
 
 #ifdef LB_ADAPTIVE

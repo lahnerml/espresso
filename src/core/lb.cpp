@@ -890,7 +890,7 @@ int lb_lbfluid_print_vtk_density(char *filename) {
   int ii;
 
   for (ii = 0; ii < LB_COMPONENTS; ++ii) {
-    FILE *fp = fopen(filename[ii], "w");
+    FILE *fp = fopen(&filename[ii], "w");
 
     if (fp == nullptr) {
       perror("lb_lbfluid_print_vtk_density");

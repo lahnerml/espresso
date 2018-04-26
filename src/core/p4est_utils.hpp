@@ -432,7 +432,8 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
  * @param tree     Tree-id holding given quadrant.
  * @return         Morton-index of given quadrant.
  */
-int64_t p4est_utils_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree);
+int64_t p4est_utils_global_idx(forest_order forest, p8est_quadrant_t *q,
+                               p4est_topidx_t tree);
 
 /** Calculate a Morton-index from a position in Cartesian coordinates
  *

@@ -166,6 +166,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
 /*****************************************************************************/
 /*@{*/
 /** Set min level from p4est actor */
+#if defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)
 inline int p4est_utils_set_min_level(int lvl) {
   p4est_params.min_ref_level = lvl;
   mpi_call(mpi_set_min_level, -1, lvl);
@@ -207,7 +208,7 @@ inline int p4est_utils_get_threshold_velocity(double *thresh) {
   for (int i = 0; i < 2; ++i)
     thresh[i] = p4est_params.threshold_velocity[i];
 #endif // LB_ADAPTIVE
-      return 0;
+  return 0;
 }
 
 /** Set vorticity threshold values for dynamic grid change */
@@ -293,6 +294,7 @@ inline int p4est_utils_adapt_grid() {
   mpi_adapt_grid(0, 0);
   return 0;
 }
+#endif // defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)
 /*@}*/
 
 /*****************************************************************************/

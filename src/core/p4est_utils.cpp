@@ -262,6 +262,7 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
  *                 that we are looking for.
  * @return         The qid of this quadrant in the adaptive p4est.
  */
+#ifdef LB_ADAPTIVE
 p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
@@ -288,14 +289,19 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   }
   return first;
 }
+#endif // LB_ADAPTIVE
 
 p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz) {
   return p4est_utils_idx_to_qid(forest, p4est_utils_pos_to_index(forest, xyz));
 }
 
 p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
+#ifdef LB_ADAPTIVE
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
+#else
+  return 0;
+#endif
 }
 
 // Find the process that handles the position
@@ -457,6 +463,7 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 int p4est_utils_end_pending_communication() {
+#ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
   for (int i = 0; i < p4est_params.max_ref_level; ++i) {
     if (nullptr != exc_status[i]) {
@@ -464,7 +471,8 @@ int p4est_utils_end_pending_communication() {
       exc_status[i] = nullptr;
     }
   }
-#endif
+#endif // COMM_HIDING
+#endif // LB_ADAPTIVE
   return 0;
 }
 

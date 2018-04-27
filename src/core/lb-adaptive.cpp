@@ -1671,21 +1671,20 @@ void lbadapt_bounce_back(int level) {
               currCellData->lbfields.boundary) {
             if (!data->lbfields.boundary) {
               // calculate population shift (velocity boundary condition)
-              population_shift = 0;
+              population_shift = 0.;
               for (int l = 0; l < 3; ++l) {
                 population_shift -=
                     h_max * h_max * h_max * lbpar.rho * 2 *
                     lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
-                    LBBoundaries::lbboundaries
-                        [currCellData->lbfields.boundary - 1].get()
-                            ->velocity()[l] * (lbpar.tau / h_max) /
-                    lbmodel.c_sound_sq;
+                        (*LBBoundaries::lbboundaries
+                         [currCellData->lbfields.boundary - 1]).velocity()[l] *
+                    (lbpar.tau / h_max) / lbmodel.c_sound_sq;
               }
 
               // sum up the force that the fluid applies on the boundary
               for (int l = 0; l < 3; ++l) {
-                LBBoundaries::lbboundaries
-                    [currCellData->lbfields.boundary - 1].get()->force()[l] +=
+                (*LBBoundaries::lbboundaries
+                    [currCellData->lbfields.boundary - 1]).force()[l] +=
                         (2 * currCellData->lbfluid[1][dir_ESPR] +
                          population_shift) * lbmodel.c[dir_ESPR][l];
               }
@@ -1709,8 +1708,8 @@ void lbadapt_bounce_back(int level) {
                 population_shift -=
                     h_max * h_max * h_max * lbpar.rho * 2 *
                     lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
-                    LBBoundaries::lbboundaries
-                        [data->lbfields.boundary - 1].get()->velocity()[l] *
+                        (*LBBoundaries::lbboundaries
+                        [data->lbfields.boundary - 1]).velocity()[l] *
                     (lbpar.tau / h_max) / lbmodel.c_sound_sq;
               }
 

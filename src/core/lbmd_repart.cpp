@@ -22,7 +22,12 @@ static void preprocess()
 {
     // Saves "old" nquads for later use to resort along the
     // space-filling curve.
+#ifdef DD_P4EST
     p4est_dd_repart_preprocessing();
+#endif
+#ifdef LB_ADAPTIVE
+
+#endif
 }
 
 static void postprocess()

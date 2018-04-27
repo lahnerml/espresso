@@ -2808,7 +2808,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
     if (ncnt > 0) return ncnt;
     fprintf(stderr, "Particle not in local LB domain ");
-    fprintf(stderr, "%i : %lli [%lf %lf %lf], ", this_node, qidx,
+    fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx,
             pos[0], pos[1], pos[2]);
 #ifdef DD_P4EST
     fprintf(stderr, "belongs to MD process %i\n",

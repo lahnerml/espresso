@@ -2797,6 +2797,12 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
+  if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
+    fprintf(stderr, "[p4est %i] %f, %f, %f => %li (lq: %i)\n",
+            this_node, pos[0], pos[1], pos[2], qidx,
+            adapt_p4est->local_num_quadrants);
+    qidx = -1;
+  }
 
   if (qidx < 0) {
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);

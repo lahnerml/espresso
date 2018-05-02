@@ -614,21 +614,6 @@ int p4est_utils_perform_adaptivity_step() {
 }
 
 template <typename T>
-int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
-                             p8est_virtual_t *virtual_quads,
-                             T ** data_levelwise, T *data_flat) {
-  p8est_quadrant_t *q;
-  for (p4est_locidx_t qid = 0; qid < p4est->local_num_quadrants; ++qid) {
-    q = p4est_mesh_get_quadrant(p4est, mesh, qid);
-    std::memcpy(data_flat + qid * sizeof(T),
-                data_levelwise[q->level] +
-                    (virtual_quads->quad_qreal_offset[qid] * sizeof(T)),
-                sizeof(T));
-  }
-  return 0;
-}
-
-template <typename T>
 int p4est_utils_post_gridadapt_map_data(
     p4est_t *p4est_old, p4est_mesh_t *mesh_old, p4est_virtual_t *virtual_quads,
     p4est_t *p8est_new, std::vector<std::vector<T>> &local_data_levelwise,

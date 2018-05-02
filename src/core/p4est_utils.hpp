@@ -631,7 +631,34 @@ template <typename T>
  */
 int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
                              p8est_virtual_t *virtual_quads,
-                             T **data_levelwise, T *data_flat);
+                             std::vector< std::vector<T> > &data_levelwise,
+                             std::vector<T> &data_flat) {
+  p8est_quadrant_t *q;
+  for (p4est_locidx_t qid = 0; qid < p4est->local_num_quadrants; ++qid) {
+    q = p4est_mesh_get_quadrant(p4est, mesh, qid);
+    std::memcpy(data_flat.data() + qid,
+                data_levelwise[q->level].data() +
+                virtual_quads->quad_qreal_offset[qid],
+                sizeof(T));
+  }
+  return 0;
+}
+
+template <typename T>
+int p4est_utils_unflatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
+                               p8est_virtual_t *virtual_quads,
+                               std::vector<T> &data_flat,
+                               std::vector< std::vector<T> > &data_levelwise) {
+  p8est_quadrant_t *q;
+  for (p4est_locidx_t qid = 0; qid < p4est->local_num_quadrants; ++qid) {
+    q = p4est_mesh_get_quadrant(p4est, mesh, qid);
+    std::memcpy(data_levelwise[q->level].data() +
+                virtual_quads->quad_qreal_offset[qid],
+                data_flat.data() + qid,
+                sizeof(T));
+  }
+  return 0;
+}
 
 template <typename T>
 /** Skeleton for copying data.

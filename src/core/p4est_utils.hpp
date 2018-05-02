@@ -290,8 +290,10 @@ inline int p4est_utils_inverse_geometric_refinement() {
 
 /** Trigger dynamic grid adaptation. */
 inline int p4est_utils_adapt_grid() {
-  mpi_call(mpi_adapt_grid, -1, 0);
-  mpi_adapt_grid(0, 0);
+  if (p4est_params.min_ref_level < p4est_params.max_ref_level) {
+    mpi_call(mpi_adapt_grid, -1, 0);
+    mpi_adapt_grid(0, 0);
+  }
   return 0;
 }
 #endif // defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)

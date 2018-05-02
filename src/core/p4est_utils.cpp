@@ -364,91 +364,101 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 #ifdef LB_ADAPTIVE
   // get refinement string for first grid change operation
   // velocity
-  // Euclidean norm
-  castable_unique_ptr<sc_array_t> vel_values =
-      sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
-  lbadapt_get_velocity_values(vel_values);
   double v;
   double v_min = std::numeric_limits<double>::max();
   double v_max = std::numeric_limits<double>::min();
-  for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-    v = sqrt(Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid)) +
-             Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 1)) +
-             Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 2)));
-    if (v < v_min) {
-      v_min = v;
+  castable_unique_ptr<sc_array_t> vel_values;
+  if (p4est_params.threshold_velocity != {0.0, 1.0}) {
+    // Euclidean norm
+    vel_values =
+        sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
+    lbadapt_get_velocity_values(vel_values);
+    for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
+      v = sqrt(Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
+               Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
+               Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
+      if (v < v_min) {
+        v_min = v;
+      }
+      if (v > v_max) {
+        v_max = v;
+      }
     }
-    if (v > v_max) {
-      v_max = v;
-    }
+    // sync
+    v = v_min;
+    MPI_Allreduce(&v, &v_min, 1, MPI_DOUBLE, MPI_MIN, adapt_p4est->mpicomm);
+    v = v_max;
+    MPI_Allreduce(&v, &v_max, 1, MPI_DOUBLE, MPI_MAX, adapt_p4est->mpicomm);
   }
-  // sync
-  v = v_min;
-  MPI_Allreduce(&v, &v_min, 1, MPI_DOUBLE, MPI_MIN, adapt_p4est->mpicomm);
-  v = v_max;
-  MPI_Allreduce(&v, &v_max, 1, MPI_DOUBLE, MPI_MAX, adapt_p4est->mpicomm);
 
   // vorticity
-  // max norm
-  castable_unique_ptr<sc_array_t> vort_values =
-      sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
-  lbadapt_get_vorticity_values(vort_values);
+  double vort_temp;
   double vort_min = std::numeric_limits<double>::max();
   double vort_max = std::numeric_limits<double>::min();
-  double vort_temp;
-  for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-    for (int d = 0; d < P4EST_DIM; ++d) {
-      vort_temp = abs(*(double*) sc_array_index(vort_values, 3 * qid + d));
-      if (vort_temp < vort_min) {
-        vort_min = vort_temp;
-      }
-      if (vort_temp > vort_max) {
-        vort_max = vort_temp;
+  castable_unique_ptr<sc_array_t> vort_values;
+  if (p4est_params.threshold_vorticity != {0.0, 1.0}) {
+    // max norm
+    vort_values =
+        sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
+    lbadapt_get_vorticity_values(vort_values);
+    for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
+      for (int d = 0; d < P4EST_DIM; ++d) {
+        vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
+        if (vort_temp < vort_min) {
+          vort_min = vort_temp;
+        }
+        if (vort_temp > vort_max) {
+          vort_max = vort_temp;
+        }
       }
     }
+    // sync
+    vort_temp = vort_min;
+    MPI_Allreduce(&vort_temp, &vort_min, 1, MPI_DOUBLE, MPI_MIN,
+                  adapt_p4est->mpicomm);
+    vort_temp = vort_max;
+    MPI_Allreduce(&vort_temp, &vort_max, 1, MPI_DOUBLE, MPI_MAX,
+                  adapt_p4est->mpicomm);
   }
-  // sync
-  vort_temp  = vort_min;
-  MPI_Allreduce(&vort_temp, &vort_min, 1, MPI_DOUBLE, MPI_MIN,
-                adapt_p4est->mpicomm);
-  vort_temp  = vort_max;
-  MPI_Allreduce(&vort_temp, &vort_max, 1, MPI_DOUBLE, MPI_MAX,
-                adapt_p4est->mpicomm);
 
-  // traverse forest and decide if the current quadrant is to be refined or
-  // coarsened
-  for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-    // velocity
-    double v = sqrt(Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid)) +
-                    Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid + 1)) +
-                    Utils::sqr(*(double*) sc_array_index(vel_values, 3 * qid + 2)));
-    // Note, that this formulation stems from the fact that velocity is 0 at
-    // boundaries
-    if (p4est_params.threshold_velocity[1] * (v_max - v_min) < (v - v_min)) {
-      (*flags)[qid] = 1;
-    }
-    else if ((1 != (*flags)[qid]) &&
-             (v - v_min < p4est_params.threshold_velocity[0] *
-                          (v_max - v_min))) {
-      (*flags)[qid] = 2;
-    }
-
-    // vorticity
-    double vort = std::numeric_limits<double>::min();
-    for (int d = 0; d < P4EST_DIM; ++d) {
-      vort_temp = abs(*(double*) sc_array_index(vort_values, 3 * qid + d));
-      if (vort < vort_temp) {
-        vort = vort_temp;
+  if ((std::numeric_limits<double>::min() < v_min) ||
+      (v_max < std::numeric_limits<double>::max()) ||
+      (std::numeric_limits<double>::min() < vort_min) ||
+      (vort_max < std::numeric_limits<double>::max())) {
+    // traverse forest and decide if the current quadrant is to be refined or
+    // coarsened
+    for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
+      // velocity
+      double v = sqrt(
+          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
+          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
+          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
+      // Note, that this formulation stems from the fact that velocity is 0 at
+      // boundaries
+      if (p4est_params.threshold_velocity[1] * (v_max - v_min) < (v - v_min)) {
+        (*flags)[qid] = 1;
+      } else if ((1 != (*flags)[qid]) &&
+                 (v - v_min < p4est_params.threshold_velocity[0] *
+                              (v_max - v_min))) {
+        (*flags)[qid] = 2;
       }
-    }
-    if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
-        (vort - vort_min)) {
-      (*flags)[qid] = 1;
-    }
-    else if ((1 != (*flags)[qid]) &&
-             (vort - vort_min < p4est_params.threshold_vorticity[0] *
-                                (vort_max - vort_min))) {
-      (*flags)[qid] = 2;
+
+      // vorticity
+      double vort = std::numeric_limits<double>::min();
+      for (int d = 0; d < P4EST_DIM; ++d) {
+        vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
+        if (vort < vort_temp) {
+          vort = vort_temp;
+        }
+      }
+      if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
+          (vort - vort_min)) {
+        (*flags)[qid] = 1;
+      } else if ((1 != (*flags)[qid]) &&
+                 (vort - vort_min < p4est_params.threshold_vorticity[0] *
+                                    (vort_max - vort_min))) {
+        (*flags)[qid] = 2;
+      }
     }
   }
 #endif // LB_ADAPTIVE

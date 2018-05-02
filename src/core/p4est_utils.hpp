@@ -617,6 +617,23 @@ int p4est_utils_end_pending_communication();
 int p4est_utils_perform_adaptivity_step();
 
 template <typename T>
+/** Flatten level-wise data, i.e. inverse operation of
+ * \ref p4est_utils_post_gridadapt_insert_data
+ *
+ * @tparam T                 Data type of numerical payload.
+ * @param p4est              The forest whose numerical payload is to be
+ *                           flattened.
+ * @param mesh               Mesh structure of current p4est.
+ * @param virtual_quads      Virtual quadrants containing the mapping between
+ *                           quadrant id and its storage id.
+ * @param data_levelwise     Level-wise data-structure containing original data.
+ * @param data_flat          Flat data-structure that will be populated.
+ */
+int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
+                             p8est_virtual_t *virtual_quads,
+                             T **data_levelwise, T *data_flat);
+
+template <typename T>
 /** Skeleton for copying data.
  *
  * @param T           Data-type of numerical payload.

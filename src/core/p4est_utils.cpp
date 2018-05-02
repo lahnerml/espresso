@@ -380,7 +380,8 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   double v_min = std::numeric_limits<double>::max();
   double v_max = std::numeric_limits<double>::min();
   castable_unique_ptr<sc_array_t> vel_values;
-  if (p4est_params.threshold_velocity != {0.0, 1.0}) {
+  if (p4est_params.threshold_velocity[0] != 0.0 &&
+      p4est_params.threshold_velocity[1] != 1.0) {
     // Euclidean norm
     vel_values =
         sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
@@ -408,7 +409,8 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   double vort_min = std::numeric_limits<double>::max();
   double vort_max = std::numeric_limits<double>::min();
   castable_unique_ptr<sc_array_t> vort_values;
-  if (p4est_params.threshold_vorticity != {0.0, 1.0}) {
+  if (p4est_params.threshold_vorticity[0] != 0.0 &&
+      p4est_params.threshold_vorticity[1] != 1.0) {
     // max norm
     vort_values =
         sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);

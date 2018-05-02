@@ -133,7 +133,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         c_thresh = p_thresh
         # call c-function
         if(p4est_utils_set_threshold_velocity(c_thresh)):
-            raise Exception("p4est_utils_set_threshold_velocity error at C-level interface")
+            raise Exception("p4est_utils_set_threshold_velocity error at"
+                            " C-level interface")
 
         return 0
 
@@ -146,7 +147,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         c_thresh = p_thresh
         # call c-function
         if(p4est_utils_set_threshold_vorticity(c_thresh)):
-            raise Exception("p4est_utils_set_threshold_vorticity error at C-level interface")
+            raise Exception("p4est_utils_set_threshold_vorticity error at"
+                            " C-level interface")
 
         return 0
 
@@ -163,7 +165,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         cdef int c_lvl[1]
         # call c-function
         if(p4est_utils_get_min_level(c_lvl)):
-            raise Exception("p4est_utils_get_min_level error at C-level interface")
+            raise Exception("p4est_utils_get_min_level error at C-level"
+                            " interface")
         if(isinstance(c_lvl, float)):
             p_lvl = <int > c_lvl[0]
         else:
@@ -178,7 +181,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         cdef int c_lvl[1]
         # call c-function
         if(p4est_utils_get_max_level(c_lvl)):
-            raise Exception("p4est_utils_get_max_level error at C-level interface")
+            raise Exception("p4est_utils_get_max_level error at C-level"
+                            " interface")
         if(isinstance(c_lvl, float)):
             p_lvl = <int > c_lvl[0]
         else:
@@ -188,11 +192,24 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
     ###############################################
 
+    cdef inline python_p4est_get_partitioning(p_part):
+        cdef string c_part
+        if (p4est_utils_get_partitioning(&c_part)):
+            raise Exception("p4est_utils_get_partitioning error at C-level"
+                            " interface")
+
+        p_part = c_part.decode("UTF-8")
+
+        return 0
+
+    ###############################################
+
     cdef inline python_p4est_get_threshold_velocity(p_thresh):
 
         cdef double c_thresh[2]
         if (p4est_utils_get_threshold_velocity(c_thresh)):
-            raise Exception("p4est_utils_get_threshold_velocity error at C-level interface")
+            raise Exception("p4est_utils_get_threshold_velocity error at"
+                            " C-level interface")
         p_thresh = c_thresh
 
         return 0
@@ -203,7 +220,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
         cdef double c_thresh[2]
         if (p4est_utils_get_threshold_vorticity(c_thresh)):
-            raise Exception("p4est_utils_get_threshold_vorticity error at C-level interface")
+            raise Exception("p4est_utils_get_threshold_vorticity error at"
+                            " C-level interface")
         p_thresh = c_thresh
 
         return 0

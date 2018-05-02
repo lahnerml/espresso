@@ -217,6 +217,7 @@ static int terminated = 0;
   CB(mpi_lbadapt_grid_init)                                                    \
   CB(mpi_set_min_level)                                                        \
   CB(mpi_set_max_level)                                                        \
+  CB(mpi_set_partitioning)                                                     \
   CB(mpi_lbadapt_vtk_print_boundary)                                           \
   CB(mpi_lbadapt_vtk_print_density)                                            \
   CB(mpi_lbadapt_vtk_print_velocity)                                           \
@@ -2227,6 +2228,10 @@ void mpi_set_max_level(int node, int l_max) {
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
+}
+
+void mpi_set_partitioning(int node, int param) {
+  boost::mpi::broadcast(comm_cart, p4est_params.partitioning, 0);
 }
 
 void mpi_lbadapt_vtk_print_boundary(int node, int len) {

@@ -709,13 +709,15 @@ void lbadapt_patches_populate_halos(int level) {
 #endif // LB_ADAPTIVE_GPU
 
 /*** Load Balance ***/
-int lbadapt_partition_weight(p8est_t *p8est, p4est_topidx_t which_tree,
-                             p8est_quadrant_t *q) {
-#ifdef LEVEL_PARTITION
-  return (prefactors[q->level]);
-#else
+int lbadapt_partition_weight_uniform(p8est_t *p8est, p4est_topidx_t which_tree,
+                                     p8est_quadrant_t *q) {
   return 1;
-#endif
+}
+
+int lbadapt_partition_weight_subcycling(p8est_t *p8est,
+                                        p4est_topidx_t which_tree,
+                                        p8est_quadrant_t *q) {
+  return (1 << (q->level - p4est_params.min_ref_level));
 }
 
 /*** REFINEMENT ***/

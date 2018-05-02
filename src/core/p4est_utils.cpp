@@ -28,6 +28,8 @@ p4est_parameters p4est_params = {
   -1,
   // max_ref_level
   -1,
+  // partitioning
+  "dummy strategy",
 #ifdef LB_ADAPTIVE
   // threshold_velocity
   {0.0, 1.0},
@@ -149,7 +151,17 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
 #elif defined(DD_P4EST)
   p4est_partition(dd_p4est_get_p4est(), 1, nullptr);
 #elif defined(LB_ADAPTIVE)
-  p4est_partition(adapt_p4est, 1, lbadapt_partition_weight);
+  if (p4est_params.partitioning == "n_cells") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_uniform);
+  }
+  else if (p4est_params.partitioning == "subcycling") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_subcycling);
+  }
+  else {
+    SC_ABORT_NOT_REACHED();
+  }
 #endif // DD_P4EST
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;
@@ -534,7 +546,17 @@ int p4est_utils_perform_adaptivity_step() {
   // FIXME: Synchronize partitioning between short-range MD and adaptive
   //        p4ests
   p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
-  p8est_partition_ext(p4est_partitioned, 1, lbadapt_partition_weight);
+  if (p4est_params.partitioning == "n_cells") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_uniform);
+  }
+  else if (p4est_params.partitioning == "subcycling") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_subcycling);
+  }
+  else {
+    SC_ABORT_NOT_REACHED();
+  }
   std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
       p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
   p4est_utils_post_gridadapt_data_partition_transfer(
@@ -876,6 +898,25 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
         (long long) shipped, shipped * 100. / p4est_mod->global_num_quadrants);
   }
   else {
+    p4est_t * existing_forest;
+    if (p4est_mod) {
+      existing_forest = p4est_mod;
+    }
+    else {
+      existing_forest = p4est_ref;
+    }
+    if (p4est_params.partitioning == "n_cells") {
+      p8est_partition_ext(existing_forest, 1,
+                          lbadapt_partition_weight_uniform);
+    }
+    else if (p4est_params.partitioning == "subcycling") {
+      p8est_partition_ext(existing_forest, 1,
+                          lbadapt_partition_weight_subcycling);
+    }
+    else {
+      SC_ABORT_NOT_REACHED();
+    }
+
     if (this_node == 0) {
       std::cerr
           << "Not all p4ests have been created yet. This may happen during"

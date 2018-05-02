@@ -85,6 +85,12 @@ typedef struct {
   /** maximum allowed grid level */
   int max_ref_level;
 
+  /** partitioning strategy:
+   * allowed values are "n_cells" and "subcycling".
+   * n_cells will assign each cell a weight of 1 while subcycling will assign
+   * each cell the weight 2**(level - min(level)). */
+  std::string partitioning;
+
   /** Relative threshold values for dynamic adaptivity.  The first value gives a
    * lower bound.  If the current cells value (v < first_value * max_value) the
    * cell will be marked for coarsening.  If the current cells value
@@ -189,6 +195,25 @@ inline int p4est_utils_set_max_level(int lvl) {
 /** Get max level from p4est actor */
 inline int p4est_utils_get_max_level(int *lvl) {
   *lvl = p4est_params.max_ref_level;
+  return 0;
+}
+
+/** Set partitioning strategy from p4est actor */
+inline int p4est_utils_set_partitioning(std::string part) {
+  if (!strcmp(part.data(), "n_cells") || !strcmp(part.data(), "subcycling")) {
+    p4est_params.partitioning.assign(part);
+    mpi_call(mpi_set_partitioning, -1, 0);
+    mpi_set_partitioning(0, 0);
+    return 0;
+  }
+  else {
+    return -1;
+  }
+}
+
+/** Get partitioning strategy from p4est actor */
+inline int p4est_utils_get_partitioning(std::string *part) {
+  part->assign(p4est_params.partitioning.data());
   return 0;
 }
 

@@ -21,6 +21,7 @@ from __future__ import print_function, absolute_import
 include "myconfig.pxi"
 from libcpp cimport bool
 from libcpp.vector cimport vector
+from libcpp.string cimport string
 from .actors cimport Actor
 
 cdef class GridInteraction(Actor):
@@ -44,6 +45,7 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         ctypedef struct p4est_parameters:
             int min_ref_level
             int max_ref_level
+            string partitioning
             double threshold_velocity[2]
             double threshold_vorticity[2]
 
@@ -65,6 +67,8 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         int p4est_utils_get_min_level(int *c_lvl)
         int p4est_utils_set_max_level(int c_lvl)
         int p4est_utils_get_max_level(int *c_lvl)
+        int p4est_utils_set_partitioning(string c_part)
+        int p4est_utils_get_partitioning(string *c_part)
         int p4est_utils_set_threshold_velocity(double *c_thresh)
         int p4est_utils_get_threshold_velocity(double *c_thresh)
         int p4est_utils_set_threshold_vorticity(double *c_thresh)
@@ -108,6 +112,16 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
             raise Exception("p4est_utils_set_max_level error at C-level"
                             " interface")
 
+        return 0
+
+    ###############################################
+
+    cdef inline python_p4est_set_partitioning(p_part):
+        cdef string c_part
+        c_part = p_part.encode("UTF-8")
+        if(p4est_utils_set_partitioning(c_part)):
+            raise Exception("p4est_utils_set_partitioning errot at C-level"
+                            " interface")
         return 0
 
     ###############################################

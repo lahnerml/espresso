@@ -581,6 +581,13 @@ void mpi_set_min_level (int node, int l_max);
  */
 void mpi_set_max_level (int node, int l_max);
 
+/** Set partitioning strategy
+ *
+ * @param [in] node   The node on which this function is called (all)
+ * @param [in] param  Unused.
+ */
+void mpi_set_partitioning(int node, int param);
+
 /** Call non-recursive uniform refinement function, i.e. all quadrants are
  * refined exactly once.
  */

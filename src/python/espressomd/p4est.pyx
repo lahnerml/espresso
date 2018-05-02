@@ -20,6 +20,7 @@ from globals cimport *
 from copy import deepcopy
 from . import utils
 from espressomd.utils import array_locked, is_valid_type
+from libcpp.string cimport string
 
 # Actor class
 ####################################################
@@ -46,6 +47,7 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         ####################################################
         def valid_keys(self):
             return "min_ref_level", "max_ref_level", \
+                   "partitioning", \
                    "threshold_velocity", "threshold_vorticity"
 
         # list of esential keys required for the fluid
@@ -58,6 +60,7 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         def default_params(self):
             return {"min_ref_level": -1,
                     "max_ref_level": -1,
+                    "partitioning" : "n_cells",
                     "threshold_velocity": [0.0, 1.0],
                     "threshold_vorticity": [0.0, 1.0]}
 
@@ -71,6 +74,9 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
             if python_p4est_set_max_level(self._params["max_ref_level"]):
                 raise Exception("p4est_utils_set_max_level error")
+
+            if python_p4est_set_partitioning(self._params["partitioning"]):
+                raise Exception("p4est_utils_set_partitioning error")
 
             if python_p4est_set_threshold_velocity(self._params["threshold_velocity"]):
                 raise Exception("p4est_utils_set_threshold_velocity error")
@@ -91,6 +97,10 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
             if not self._params["max_ref_level"] == default_params["max_ref_level"]:
                 if python_p4est_get_max_level(self._params["max_ref_level"]):
                     raise Exception("p4est_utils_get_max_level error")
+
+            if not self._params["partitioning"] == default_params["partitioning"]:
+                if python_p4est_get_partitioning(self._params["partitioning"]):
+                    raise Exception("p4est_utils_get_partitioning error")
 
             if not self._params["threshold_velocity"] == default_params["threshold_velocity"]:
                 if python_p4est_get_threshold_velocity(self._params["threshold_velocity"]):

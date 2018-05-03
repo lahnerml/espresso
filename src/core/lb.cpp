@@ -3364,11 +3364,15 @@ inline void lb_collide_stream() {
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef COMM_HIDING
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
-      if (exc_status[level] != nullptr) {
-        p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
-        exc_status[level] = nullptr;
+      // Stop ghost exchange "early" if there are virtual quadrants on that
+      // level.
+      if (0 < (adapt_virtual->virtual_qlevels + level + 1)->elem_count) {
+        if (exc_status[level] != nullptr) {
+          p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+          exc_status[level] = nullptr;
+        }
+        lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
       }
-      lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_update_populations_from_virtuals(level,
                                                P8EST_TRAVERSE_LOCALGHOST);

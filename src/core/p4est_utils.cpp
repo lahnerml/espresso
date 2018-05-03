@@ -29,7 +29,7 @@ p4est_parameters p4est_params = {
   // max_ref_level
   -1,
   // partitioning
-  "dummy strategy",
+  "n_cells",
 #ifdef LB_ADAPTIVE
   // threshold_velocity
   {0.0, 1.0},

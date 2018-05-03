@@ -16,8 +16,10 @@
 } while(0)
 #endif
 
+#ifdef DD_P4EST
 /** Get pointer to short-range MD p4est */
 p4est_t* dd_p4est_get_p4est();
+#endif
 
 /** Get number of trees in current p4est_connectivity structure for given
  * direction.

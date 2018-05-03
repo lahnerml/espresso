@@ -42,7 +42,6 @@
 #include <iostream>
 #include <limits>
 #include <stdlib.h>
-#include <p8est_meshiter.h>
 
 #ifdef LB_ADAPTIVE
 

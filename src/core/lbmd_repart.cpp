@@ -2,7 +2,6 @@
 #include <cstdio>
 #include <vector>
 #include <string>
-#include <p8est.h>
 
 #include "lbmd_repart.hpp"
 #include "repart.hpp"
@@ -10,6 +9,7 @@
 #include "cells.hpp"
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
+#include <p8est.h>
 
 namespace __md_detail {
 

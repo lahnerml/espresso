@@ -2217,21 +2217,27 @@ void mpi_lbadapt_grid_init(int node, int level) {
 }
 
 void mpi_set_min_level(int node, int l_min) {
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   p4est_params.min_ref_level = l_min;
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
+#endif
 }
 
 void mpi_set_max_level(int node, int l_max) {
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   p4est_params.max_ref_level = l_max;
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
 #endif // LB_ADAPTIVE
+#endif
 }
 
 void mpi_set_partitioning(int node, int param) {
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   boost::mpi::broadcast(comm_cart, p4est_params.partitioning, 0);
+#endif
 }
 
 void mpi_lbadapt_vtk_print_boundary(int node, int len) {

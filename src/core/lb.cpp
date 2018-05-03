@@ -3366,7 +3366,7 @@ inline void lb_collide_stream() {
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
       // Stop ghost exchange "early" if there are virtual quadrants on that
       // level.
-      if (0 < (adapt_virtual->virtual_qlevels + level + 1)->elem_count) {
+      if (0 < (adapt_virtual->virtual_glevels + level + 1)->elem_count) {
         if (exc_status[level] != nullptr) {
           p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
           exc_status[level] = nullptr;

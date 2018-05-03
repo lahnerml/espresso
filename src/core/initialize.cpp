@@ -102,9 +102,9 @@ void on_program_start() {
   init_node_grid();
 
 #if (defined(DD_P4EST) || defined(LB_ADAPTIVE))
-  //auto verbosity = SC_LP_ESSENTIAL;
+  // auto verbosity = SC_LP_ESSENTIAL;
   auto verbosity = SC_LP_PRODUCTION;
-  //auto verbosity = SC_LP_VERBOSE;
+  // auto verbosity = SC_LP_VERBOSE;
   sc_init (comm_cart, 1, 1, NULL, verbosity);
   p4est_init(NULL, verbosity);
 #endif

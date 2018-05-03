@@ -144,6 +144,7 @@ python_test(FILE thole.py MAX_NUM_PROC 4)
 python_test(FILE lb_switch.py MAX_NUM_PROC 1)
 python_test(FILE lb_test.py MAX_NUM_PROC 1)
 python_test(FILE lb_boundary_velocity.py MAX_NUM_PROC 1)
+python_test(FILE lb_boundary_velocity_adaptive.py MAX_NUM_PROC 2)
 
 if(PY_H5PY)
   python_test(FILE h5md.py MAX_NUM_PROC 2)

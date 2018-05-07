@@ -361,7 +361,8 @@ void lbadapt_reinit_fluid_per_cell() {
   prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
                          ghost_pointer);
   castable_unique_ptr<p4est_meshiter_t> mesh_iter;
-  for (int level = 0; level < P8EST_MAXLEVEL; ++level) {
+  for (int level = p4est_params.min_ref_level;
+       level <= p4est_params.max_ref_level; ++level) {
     status = 0;
 
     mesh_iter.reset(p8est_meshiter_new_ext(

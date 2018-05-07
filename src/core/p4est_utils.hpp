@@ -608,7 +608,7 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /*****************************************************************************/
 /*@{*/
 #ifdef COMM_HIDING
-int p4est_utils_end_pending_communication();
+int p4est_utils_end_pending_communication(int level = -1);
 #endif
 
 /** Function that handles grid alteration. After calling this function the grid

@@ -486,13 +486,22 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
-int p4est_utils_end_pending_communication() {
+int p4est_utils_end_pending_communication(int level) {
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
-  for (int i = 0; i < p4est_params.max_ref_level; ++i) {
-    if (nullptr != exc_status[i]) {
-      p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
-      exc_status[i] = nullptr;
+  if (-1 == level) {
+    for (int i = p4est_params.min_ref_level;
+         i < p4est_params.max_ref_level; ++i) {
+      if (nullptr != exc_status[i]) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
+        exc_status[i] = nullptr;
+      }
+    }
+  }
+  else {
+    if (nullptr != exc_status[level]) {
+      p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+      exc_status[level] = nullptr;
     }
   }
 #endif // COMM_HIDING

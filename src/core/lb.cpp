@@ -3320,19 +3320,6 @@ inline void lb_collide_stream() {
 #else  // LB_ADAPTIVE_GPU
   int lvl_diff;
   // perform 1st half of subcycling here (process coarse before fine)
-  /** TODO:
-   * change to
-   * for  (..) do
-   * collide_populate_local
-   * od
-   * p8est_ghostvirt_exchange_data_end
-   * for (..) do
-   * collide_populate_ghost
-   * od
-   * use array of status pointers (one pointer per level)
-   *
-   * FIXME mind first and last step (regridding and end of simulation)
-   */
   /** TODO: Include timers for each operation (ASAP -> see optimization results)
    */
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);

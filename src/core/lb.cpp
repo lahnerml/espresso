@@ -4097,19 +4097,33 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
     // update ghost layer on all levels
-    for (int level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level;
-         ++level) {
-      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
-      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
-      prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                             lbadapt_ghost_data, ghost_pointer);
-
-      p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                               adapt_mesh, adapt_virtual,
-                                               adapt_virtual_ghost, level,
-                                               sizeof(lbadapt_payload_t),
-                                               (void**)local_pointer.data(),
-                                               (void**)ghost_pointer.data());
+    if (!ghost_cells.particles().empty()) {
+      // TODO: Reconsider if this really is necessary.
+      //       This can at least be relaxed:
+      //       If there are no particles in the ghost layer, we do not have to
+      //       end communication.  Additionally, there is no need to do any more
+      //       than ending a pending communication.
+      for (int level = p4est_params.min_ref_level;
+           level <= p4est_params.max_ref_level;
+           ++level) {
+        std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+        std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+        prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                               lbadapt_ghost_data, ghost_pointer);
+#ifdef COMM_HIDING
+        if (exc_status[level]) {
+          p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+          exc_status[level] = nullptr;
+        }
+#else  // COMM_HIDING
+        p4est_virtual_ghost_exchange_data_level(adapt_p4est, adapt_ghost,
+                                                adapt_mesh, adapt_virtual,
+                                                adapt_virtual_ghost, level,
+                                                sizeof(lbadapt_payload_t),
+                                                (void **) local_pointer.data(),
+                                                (void **) ghost_pointer.data());
+#endif // COMM_HIDING
+      }
     }
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE

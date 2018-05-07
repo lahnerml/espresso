@@ -85,7 +85,7 @@ if( CMAKE_VERSION VERSION_GREATER 3.5.2 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clan
   option(WITH_CLANG_TIDY "Run Clang-Tidy during compilation" OFF)
 endif()
 option(WARNINGS_ARE_ERRORS "Treat warnings as errors during compilation" OFF)
-option(USE_INTRINSICS "Use hardware optimized code" OFF)
+option(USE_INTRINSICS "Use hardware optimized code" ON)
 
 # Write compile commands to file, for various tools...
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

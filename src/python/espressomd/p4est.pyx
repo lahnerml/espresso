@@ -186,3 +186,15 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
                 raise Exception("p4est_utils_adapt_grid error")
 
             return 0
+
+        ####################################################
+
+        def set_refinement_area(self, p_bb_coords, p_vel):
+            cdef double c_bb_coords[6]
+            c_bb_coords = p_bb_coords
+            cdef double c_vel[3]
+            c_vel = p_vel
+            if (p4est_utils_set_refinement_area(c_bb_coords, c_vel)):
+                raise Exception("p4est_utils_set_refinement_area error")
+
+            return 0

@@ -230,6 +230,7 @@ static int terminated = 0;
   CB(mpi_geometric_refinement)                                                 \
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
+  CB(mpi_set_refinement_area)                                                  \
   CB(mpi_dd_p4est_write_particle_vtk)                                          \
   CB(mpi_lbadapt_grid_reset)                                                   \
   CB(mpi_recv_interpolated_velocity_slave)
@@ -2673,6 +2674,13 @@ void mpi_exclude_boundary(int node, int param) {
   if (it == LBBoundaries::exclude_in_geom_ref.end()) {
     LBBoundaries::exclude_in_geom_ref.push_back(param);
   }
+#endif // LB_ADAPTIVE
+}
+
+void mpi_set_refinement_area(int node, int param) {
+#ifdef LB_ADAPTIVE
+  MPI_Bcast(coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
+  MPI_Bcast(vel_reg_ref, 3, MPI_DOUBLE, 0, comm_cart);
 #endif // LB_ADAPTIVE
 }
 

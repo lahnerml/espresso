@@ -46,10 +46,13 @@ p4est_parameters p4est_params = {
 int lb_conn_brick[3] = {0, 0, 0};
 #endif // LB_ADAPTIVE
 
-double coords_for_regional_refinement[6] = {
-    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-    std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-    std::numeric_limits<double>::min(), std::numeric_limits<double>::max()};
+double coords_for_regional_refinement[6] =
+    { std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+      std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+      std::numeric_limits<double>::min(), std::numeric_limits<double>::max() };
+double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
+                          std::numeric_limits<double>::min(),
+                          std::numeric_limits<double>::min() };
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
 std::vector<int> *flags;

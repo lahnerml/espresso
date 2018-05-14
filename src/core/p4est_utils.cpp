@@ -28,7 +28,7 @@ p4est_parameters p4est_params = {
   -1,
   // max_ref_level
   -1,
-  // h
+ // h
   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
   // prefactors
   {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
@@ -529,7 +529,37 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                   adapt_p4est->mpicomm);
   }
 
-  if ((v_min < std::numeric_limits<double>::max()) ||
+  p8est_quadrant_t *q;
+  std::array<double, 3> midpoint, bbox_min, bbox_max;
+  bbox_min = {std::fmod(coords_for_regional_refinement[0] +
+                        sim_time * vel_reg_ref[0], box_l[0]),
+              std::fmod(coords_for_regional_refinement[2] +
+                        sim_time * vel_reg_ref[1], box_l[1]),
+              std::fmod(coords_for_regional_refinement[4] +
+                        sim_time * vel_reg_ref[2], box_l[2])};
+  bbox_max = {std::fmod(coords_for_regional_refinement[1] +
+                        sim_time * vel_reg_ref[0], box_l[0]),
+              std::fmod(coords_for_regional_refinement[3] +
+                        sim_time * vel_reg_ref[1], box_l[1]),
+              std::fmod(coords_for_regional_refinement[5] +
+                        sim_time * vel_reg_ref[2], box_l[2])};
+  bool overlap[3] = {bbox_max[0] < bbox_min[0],
+                     bbox_max[1] < bbox_min[1],
+                     bbox_max[2] < bbox_min[2]};
+  if (!this_node) {
+    fprintf(stderr,
+            "simtime: %f, bbox min: %f, %f, %f, bbox max: %f, %f, %f, "
+            "vel_reg_ref %f, %f, %f, overlap: %i %i %i\n",
+            sim_time,
+            bbox_min[0], bbox_min[1], bbox_min[2],
+            bbox_max[0], bbox_max[1], bbox_max[2],
+            vel_reg_ref[0], vel_reg_ref[1], vel_reg_ref[2],
+            overlap[0], overlap[1], overlap[2]);
+  }
+  if ((vel_reg_ref[0] != std::numeric_limits<double>::min() &&
+       vel_reg_ref[1] != std::numeric_limits<double>::min() &&
+       vel_reg_ref[2] != std::numeric_limits<double>::min()) ||
+      (v_min < std::numeric_limits<double>::max()) ||
       (std::numeric_limits<double>::min() < v_max) ||
       (vort_min < std::numeric_limits<double>::max()) ||
       (vort_max < std::numeric_limits<double>::min())) {
@@ -571,6 +601,36 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         } else if ((1 != (*flags)[qid]) &&
                    (vort - vort_min < p4est_params.threshold_vorticity[0] *
                                       (vort_max - vort_min))) {
+          (*flags)[qid] = 2;
+        }
+      }
+
+      // geometry
+      if (vel_reg_ref[0] != std::numeric_limits<double>::min() &&
+          vel_reg_ref[1] != std::numeric_limits<double>::min() &&
+          vel_reg_ref[2] != std::numeric_limits<double>::min()) {
+        q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+        p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qid], q,
+                                 midpoint.data());
+        // support boundary moving out of domain as well:
+        // 3 comparisons:
+        // (min - box_l) < c && c < max -> wrap min
+        // min < c && c < (max + box_l) -> wrap max
+        // min < c && c < max           -> standard
+        if (((!overlap[0] &&
+              (bbox_min[0] < midpoint[0] && midpoint[0] < bbox_max[0])) ||
+             (overlap[0] &&
+              (midpoint[0] < bbox_max[0] || bbox_min[0] < midpoint[0]))) &&
+            ((!overlap[1] &&
+              (bbox_min[1] < midpoint[1] && midpoint[1] < bbox_max[1])) ||
+             (overlap[1] &&
+              (midpoint[1] < bbox_max[1] || bbox_min[1] < midpoint[1]))) &&
+            ((!overlap[2] &&
+              (bbox_min[2] < midpoint[2] && midpoint[2] < bbox_max[2])) ||
+             (overlap[2] &&
+              (midpoint[2] < bbox_max[2] || bbox_min[2] < midpoint[2])))) {
+          (*flags)[qid] = 1;
+        } else if ((*flags)[qid] != 1) {
           (*flags)[qid] = 2;
         }
       }

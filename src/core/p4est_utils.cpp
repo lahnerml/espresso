@@ -546,16 +546,6 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   bool overlap[3] = {bbox_max[0] < bbox_min[0],
                      bbox_max[1] < bbox_min[1],
                      bbox_max[2] < bbox_min[2]};
-  if (!this_node) {
-    fprintf(stderr,
-            "simtime: %f, bbox min: %f, %f, %f, bbox max: %f, %f, %f, "
-            "vel_reg_ref %f, %f, %f, overlap: %i %i %i\n",
-            sim_time,
-            bbox_min[0], bbox_min[1], bbox_min[2],
-            bbox_max[0], bbox_max[1], bbox_max[2],
-            vel_reg_ref[0], vel_reg_ref[1], vel_reg_ref[2],
-            overlap[0], overlap[1], overlap[2]);
-  }
   if ((vel_reg_ref[0] != std::numeric_limits<double>::min() &&
        vel_reg_ref[1] != std::numeric_limits<double>::min() &&
        vel_reg_ref[2] != std::numeric_limits<double>::min()) ||

@@ -381,7 +381,7 @@ inline void tree_to_boxlcoords(double x[3]) {
  * @return     Position in simulation domain
  */
 inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
-  std::array<double, 3> res;
+  std::array<double, 3> res = {{x[0], x[1], x[2]}};
   tree_to_boxlcoords(res.data());
   return res;
 }
@@ -591,15 +591,17 @@ int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
   data = std::vector<std::vector<T>>(P8EST_QMAXLEVEL, std::vector<T>());
   P4EST_ASSERT(data.size() == P8EST_QMAXLEVEL);
 
-  int quads_on_level;
+  size_t quads_on_level;
 
   for (size_t level = 0; level < P8EST_QMAXLEVEL; ++level) {
     quads_on_level =
         local_data
             ? (mesh->quad_level + level)->elem_count +
-                  P8EST_CHILDREN * (virtual_quads->virtual_qlevels + level)->elem_count
+                  P8EST_CHILDREN * (virtual_quads->virtual_qlevels +
+                                    level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
-                  P8EST_CHILDREN * (virtual_quads->virtual_glevels + level)->elem_count;
+                  P8EST_CHILDREN * (virtual_quads->virtual_glevels +
+                                    level)->elem_count;
     data[level] = std::vector<T>(quads_on_level);
     P4EST_ASSERT(data[level].size() == (size_t) quads_on_level);
   }
@@ -789,11 +791,15 @@ template <typename T>
  *                          needs to be MPI_Size long, individual subvectors
  *                          will be allocated by the function and they will be
  *                          used as receive buffers.
+ * @param requests    Vector of MPI_Requests initially set to MPI_REQUEST_NULL
+ *                    such that p4est structs can be built while data transfer
+ *                    finishes.
  * @return int
  */
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> &data_partitioned);
+    std::vector<std::vector<T>> &data_partitioned,
+    std::vector<MPI_Request> &requests);
 
 template <typename T>
 /** After all local data has been received insert in newly allocated level-wise

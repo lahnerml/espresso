@@ -105,8 +105,8 @@ void on_program_start() {
   // auto verbosity = SC_LP_ESSENTIAL;
   auto verbosity = SC_LP_PRODUCTION;
   // auto verbosity = SC_LP_VERBOSE;
-  sc_init (comm_cart, 1, 1, NULL, verbosity);
-  p4est_init(NULL, verbosity);
+  sc_init (comm_cart, 1, 1, nullptr, verbosity);
+  p4est_init(nullptr, verbosity);
 #endif
 
   /* initially go for domain decomposition */

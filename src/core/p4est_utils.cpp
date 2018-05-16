@@ -139,7 +139,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     return insert_elem;
   }
   else {
-    return nullptr;
+    return p4est_utils_forest_info_t(nullptr);
   }
 }
 
@@ -751,13 +751,14 @@ int p4est_utils_perform_adaptivity_step() {
   }
   std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
       p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
+  std::vector<MPI_Request> requests(2 * n_nodes, MPI_REQUEST_NULL);
   p4est_utils_post_gridadapt_data_partition_transfer(
-      p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned);
-
+      p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned,
+      requests);
   p4est_destroy(p4est_adapted);
   P4EST_FREE(mapped_data_flat);
 
-  // 4th step: Insert received data into new levelwise data-structure
+  // 4th step: Create p4est meta-structures
   adapt_p4est.reset(p4est_partitioned);
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
   adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
@@ -771,11 +772,18 @@ int p4est_utils_perform_adaptivity_step() {
                                          adapt_virtual, true);
   p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
                                          adapt_virtual, false);
+
+  /** Wait for communication initiated by data_transfer to finish */
+  int mpiret =
+      MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+  SC_CHECK_MPI(mpiret);
+
+  // 5th step: Insert received data into level-data-structure
   p4est_utils_post_gridadapt_insert_data(p4est_partitioned, adapt_mesh,
                                          adapt_virtual, data_partitioned,
                                          lbadapt_local_data);
 
-  // 5th step: Prepare next integration step
+  // 6th step: Prepare next integration step
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd_p4est_get_p4est());
@@ -902,7 +910,8 @@ int p4est_utils_post_gridadapt_map_data(
 template <typename T>
 int p4est_utils_post_gridadapt_data_partition_transfer(
     p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> &data_partitioned) {
+    std::vector<std::vector<T>> &data_partitioned,
+    std::vector<MPI_Request> &requests) {
   // simple consistency checks
   P4EST_ASSERT(p4est_old->mpirank == p4est_new->mpirank);
   P4EST_ASSERT(p4est_old->mpisize == p4est_new->mpisize);
@@ -924,7 +933,6 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
 
   int mpiret;
   MPI_Request r;
-  std::vector<MPI_Request> requests(2 * size, MPI_REQUEST_NULL);
 
   // determine from which processors we receive quadrants
   /** there are 5 cases to distinguish
@@ -948,7 +956,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     r = requests[p];
     mpiret =
         MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
-                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
+                  MPI_BYTE, p, 3172, p4est_new->mpicomm, &r);
     requests[p] = r;
     SC_CHECK_MPI(mpiret);
   }
@@ -965,15 +973,11 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     r = requests[size + p];
     mpiret =
         MPI_Isend((void *)(data_mapped + send_offset), data_length * sizeof(T),
-                  MPI_BYTE, p, 0, p4est_new->mpicomm, &r);
+                  MPI_BYTE, p, 3172, p4est_new->mpicomm, &r);
     requests[size + p] = r;
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;
   }
-
-  /** Wait for communication to finish */
-  mpiret = MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
-  SC_CHECK_MPI(mpiret);
 
   return 0;
 }

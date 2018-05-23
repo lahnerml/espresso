@@ -788,7 +788,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   for (auto it = LBBoundaries::lbboundaries.begin();
        it != LBBoundaries::lbboundaries.end(); ++it, ++n) {
 
-    if (!LBBoundaries::exclude_in_geom_ref.size()) {
+    if (LBBoundaries::exclude_in_geom_ref.empty()) {
       auto search_it = std::find(LBBoundaries::exclude_in_geom_ref.begin(),
                             LBBoundaries::exclude_in_geom_ref.end(), n);
       if (search_it != LBBoundaries::exclude_in_geom_ref.end()) {
@@ -2675,7 +2675,7 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
 }
 
 int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
-                               int displace[3]) {
+                               const int displace[3]) {
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
@@ -2719,7 +2719,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   return -1;
 }
 
-int64_t lbadapt_map_pos_to_quad_ext(double pos[3]) {
+int64_t lbadapt_map_pos_to_quad_ext(const double pos[3]) {
   int xid, yid, zid;
   p8est_quadrant_t *q;
   for (int d = 0; d < 3; ++d) {

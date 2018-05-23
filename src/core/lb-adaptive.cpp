@@ -38,10 +38,10 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <limits>
-#include <stdlib.h>
 
 #ifdef LB_ADAPTIVE
 

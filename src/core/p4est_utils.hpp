@@ -448,6 +448,9 @@ void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 
+bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3],
+                                  bool ghost = false);
+
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular
  * grid on the finest level */
 std::array<int64_t, 3> p4est_utils_idx_to_pos (int64_t idx);

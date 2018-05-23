@@ -2804,6 +2804,8 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
     //        this_node, pos[0], pos[1], pos[2], qidx,
     //        adapt_p4est->local_num_quadrants);
     qidx = -1;
+  } else {
+    P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos));
   }
 
   if (qidx < 0) {

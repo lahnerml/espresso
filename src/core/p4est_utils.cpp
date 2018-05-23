@@ -230,7 +230,26 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
-std::array<int64_t, 3> p4est_utils_idx_to_pos (int64_t idx) {
+bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost) {
+  std::array<double, 3> qpos;
+  p8est_quadrant_t *quad;
+  if (ghost) {
+    quad =
+        *(p8est_quadrant_t **) p4est_quadrant_array_index(&adapt_ghost->ghosts,
+                                                          qid);
+  }
+  else {
+    quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+  }
+  p4est_utils_get_front_lower_left(adapt_p4est, adapt_mesh->quad_to_tree[qid],
+                                   quad, qpos.data());
+  return (
+      (qpos[0] <= pos[0] && pos[0] < qpos[0] + p4est_params.h[quad->level]) &&
+      (qpos[1] <= pos[1] && pos[1] < qpos[1] + p4est_params.h[quad->level]) &&
+      (qpos[2] <= pos[2] && pos[2] < qpos[2] + p4est_params.h[quad->level]));
+}
+
+std::array<int64_t, 3> p4est_utils_idx_to_pos(int64_t idx) {
   return Utils::morton_idx_to_coords(idx);
 }
 

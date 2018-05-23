@@ -28,6 +28,10 @@ p4est_parameters p4est_params = {
   -1,
   // max_ref_level
   -1,
+  // h
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
+  // prefactors
+  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
   // partitioning
   "n_cells",
 #ifdef LB_ADAPTIVE

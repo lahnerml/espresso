@@ -85,6 +85,12 @@ typedef struct {
   /** maximum allowed grid level */
   int max_ref_level;
 
+  // save meshwidth for all available levels
+  double h[P8EST_MAXLEVEL];
+
+  // prefactors based on p4est_params.max_ref_level
+  double prefactors[P8EST_MAXLEVEL];
+
   /** partitioning strategy:
    * allowed values are "n_cells" and "subcycling".
    * n_cells will assign each cell a weight of 1 while subcycling will assign

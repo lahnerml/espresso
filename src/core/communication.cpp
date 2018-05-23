@@ -2042,7 +2042,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
                               data->lbfields.boundary, data->lbfields.has_force,
-                              h[lvl], rho, j, pi);
+                              p4est_params.h[lvl], rho, j, pi);
 #endif // !LB_ADAPTIVE
   } else {
     double data[10];
@@ -2082,7 +2082,8 @@ void mpi_recv_fluid_slave(int node, int index) {
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
     lbadapt_calc_local_fields(dat->lbfluid, dat->lbfields.force,
                               dat->lbfields.boundary, dat->lbfields.has_force,
-                              h[lvl], &data[0], &data[1], &data[4]);
+                              p4est_params.h[lvl], &data[0], &data[1],
+                              &data[4]);
 #endif // !LB_ADAPTIVE
     MPI_Send(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }

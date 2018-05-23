@@ -175,13 +175,6 @@ extern lb_float lblambda;
 /** Eigenvalue of collision operator corresponding to bulk viscosity. */
 extern lb_float lblambda_bulk;
 
-extern lb_float h[P8EST_MAXLEVEL];
-extern int prefactors[P8EST_MAXLEVEL];
-extern lb_float gamma_shear[P8EST_MAXLEVEL];
-extern lb_float gamma_bulk[P8EST_MAXLEVEL];
-
-extern lb_float gamma_odd;
-extern lb_float gamma_even;
 extern lb_float lb_phi[19];
 extern lb_float lb_coupl_pref;
 extern lb_float lb_coupl_pref2;

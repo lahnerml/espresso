@@ -193,7 +193,7 @@ typedef struct {
   int n_veloc;
   lb_float (*c)[3];
   lb_float (*coeff)[4];
-  lb_float(*w);
+  lb_float *w;
   lb_float **e;
   lb_float c_sound_sq;
 } LB_Model;
@@ -270,11 +270,6 @@ extern int transfer_momentum;
 // count number of LB steps to control subcycling
 extern int n_lbsteps;
 
-// save meshwidth for all available levels
-extern lb_float h[P8EST_MAXLEVEL];
-
-// calculate prefactors based on p4est_params.max_ref_level
-extern lb_float prefactors[P8EST_MAXLEVEL];
 #endif // LB_ADAPTIVE
 
 /************************************************************/

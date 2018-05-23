@@ -75,17 +75,6 @@ int transfer_momentum = 0;
 /** flag indicating if there is brownian motion */
 int fluct;
 
-lb_float h[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                            0., 0., 0., 0., 0., 0., 0., 0., 0.};
-int prefactors[P8EST_MAXLEVEL] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-lb_float gamma_shear[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                      0., 0., 0., 0., 0., 0., 0., 0., 0.};
-lb_float gamma_bulk[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                     0., 0., 0., 0., 0., 0., 0., 0., 0.};
-/** relaxation of the odd kinetic modes */
-lb_float gamma_odd = 0.0;
-/** relaxation of the even kinetic modes */
-lb_float gamma_even = 0.0;
 /** amplitudes of the fluctuations of the modes */
 lb_float lb_phi[19];
 /** amplitude of the fluctuations in the viscous coupling */

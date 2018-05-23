@@ -139,11 +139,7 @@ HaloCommunicator update_halo_comm = {0, nullptr};
 #ifdef COMM_HIDING
 std::vector<p8est_virtual_ghost_exchange_t*> exc_status (19, nullptr);
 #endif
-
-lb_float h[P8EST_MAXLEVEL] =          {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
-lb_float prefactors[P8EST_MAXLEVEL] = {0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
-                                       0., 0., 0., 0., 0., 0., 0., 0., 0.};
+int n_lbsteps = 0;
 #endif // LB_ADAPTIVE
 
 /** amplitude of the fluctuations in the viscous coupling */
@@ -163,10 +159,6 @@ static int rancounter = 0;
 
 /***********************************************************************/
 #endif // !LB_ADAPTIVE_GPU
-
-#ifdef LB_ADAPTIVE
-int n_lbsteps = 0;
-#endif // LB_ADAPTIVE
 #endif // LB
 
 #if defined(LB) || defined(LB_GPU)
@@ -1477,7 +1469,7 @@ int lb_lbnode_get_rho(int *ind, double *p_rho) {
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
-    lb_float h_max = h[p4est_params.max_ref_level];
+    lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     rho *= 1 / h_max / h_max / h_max;
@@ -1531,7 +1523,7 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
-    lb_float h_max = h[p4est_params.max_ref_level];
+    lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     p_u[0] = j[0] / rho * h_max / lbpar.tau;
@@ -1881,7 +1873,7 @@ int lb_lbnode_set_u(int *ind, double *u) {
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
-    lb_float h_max = h[p4est_params.max_ref_level];
+    lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
     for (int i = 0; i < P8EST_DIM; ++i)
@@ -2735,7 +2727,8 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
   lb_float j_cast[3];
   for (int i = 0; i < P8EST_DIM; ++i)
     j_cast[i] = static_cast<lb_float>(j[i]);
-  lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j_cast, pi, h[q->level]);
+  lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j_cast, pi,
+                               p4est_params.h[q->level]);
 #endif // !LB_ADAPTIVE
 }
 
@@ -3617,7 +3610,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   }
   if (dcnt <= 0)
     return;
-  double h_max = h[p4est_params.max_ref_level];
+  double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
@@ -3716,7 +3709,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   for (int x = 0; x < dcnt; ++x) {
     if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
       local_f = node_index[x]->lbfields.force;
-      double level_fact = prefactors[level[x]] * prefactors[level[x]];
+      double level_fact = p4est_params.prefactors[level[x]] *
+          p4est_params.prefactors[level[x]];
       // double level_fact =
       // prefactors[level[x]]*prefactors[level[x]]*prefactors[level[x]];
 
@@ -3814,7 +3808,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
   int x, y, z;
 
   dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
-  double h_max = h[p4est_params.max_ref_level];
+  double h_max = p4est_params.h[p4est_params.max_ref_level];
 
   v[0] = v[1] = v[2] = 0.0;
 
@@ -3932,8 +3926,8 @@ int lb_lbfluid_get_interpolated_velocity(double *p, double *v, bool ghost) {
   } else {
     dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
   }
-  double h_local = h[level[0]];
-  double h_max = h[p4est_params.max_ref_level];
+  double h_local = p4est_params.h[level[0]];
+  double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
   /* calculate fluid velocity at particle's position

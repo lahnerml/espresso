@@ -2696,18 +2696,16 @@ int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
 
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
-  int xid, yid, zid;
+  int64_t pidx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
+  int64_t qidx, zlvlfill;
+
   for (int d = 0; d < 3; ++d) {
     if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
       return -1;
     if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
       return -1;
   }
-  xid = (pos[0]) * (1 << p4est_params.max_ref_level);
-  yid = (pos[1]) * (1 << p4est_params.max_ref_level);
-  zid = (pos[2]) * (1 << p4est_params.max_ref_level);
-  int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
-  int64_t qidx, zlvlfill;
+
   for (size_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
     q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
     qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
@@ -2800,9 +2798,9 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   };
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    fprintf(stderr, "[p4est %i] %f, %f, %f => %li (lq: %i)\n",
-            this_node, pos[0], pos[1], pos[2], qidx,
-            adapt_p4est->local_num_quadrants);
+    //fprintf(stderr, "[p4est %i] %f, %f, %f => %li (lq: %i)\n",
+    //        this_node, pos[0], pos[1], pos[2], qidx,
+    //        adapt_p4est->local_num_quadrants);
     qidx = -1;
   }
 

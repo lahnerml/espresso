@@ -8,7 +8,7 @@ from tests_common import abspath
 from itertools import product
 
 @ut.skipIf(not espressomd.has_features(["LB"]) or
-           espressmod.has_features(["LB_ADAPTIVE"]),
+           espressomd.has_features(["LB_ADAPTIVE"]),
            "Features not available, skipping test!")
 class LBSwitchActor(ut.TestCase):
     system = espressomd.System(box_l=[10.0, 10.0, 10.0])

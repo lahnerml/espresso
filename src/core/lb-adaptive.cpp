@@ -261,7 +261,8 @@ void lbadapt_init() {
 } // lbadapt_init();
 
 void lbadapt_reinit_parameters() {
-  for (int i = p4est_params.max_ref_level; 0 <= i; --i) {
+  for (int i = p4est_params.max_ref_level;
+       p4est_params.min_ref_level <= i; --i) {
     p4est_params.prefactors[i] = 1 << (p4est_params.max_ref_level - i);
 
 #ifdef LB_ADAPTIVE_GPU

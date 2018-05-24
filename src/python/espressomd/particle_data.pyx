@@ -27,6 +27,7 @@ from . cimport particle_data
 from .interactions import BondedInteraction
 from .interactions import BondedInteractions
 from copy import copy
+from . import utils
 from globals cimport max_seen_particle, time_step, smaller_time_step, box_l, n_part, n_rigidbonds, n_particle_types
 import collections
 import functools
@@ -1996,6 +1997,9 @@ Set quat and scalar dipole moment (dipm) instead.")
                 for t in types:
                     if p.type == t or t == "all":
                         vtk.write("{} {} {}\n".format(*p.v))
+
+    def write_par_vtk(self, filename):
+        dd_p4est_write_parallel_vtk(utils.to_char_pointer(filename))
 
     property highest_particle_id:
         """

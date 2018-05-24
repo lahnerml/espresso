@@ -1769,14 +1769,24 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 }
 
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_write_particle_vtk(char *filename) {
-  // strip file endings
-  char *pos_file_ending = strrchr(filename, '.');
-  if (pos_file_ending != 0) {
+void dd_p4est_write_parallel_vtk(char *filename) {
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending;
+  pos_file_ending = strrchr(filename, '.');
+  if (pos_file_ending != nullptr) {
     *pos_file_ending = '\0';
-  } else {
-    pos_file_ending = strpbrk(filename, "\0");
   }
+  int len = static_cast<int>(strlen(filename));
+  ++len;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_dd_p4est_write_particle_vtk, -1, len);
+
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  dd_p4est_write_particle_vtk(filename);
+}
+
+void dd_p4est_write_particle_vtk(char *filename) {
   char fname[1024];
   // node 0 writes the header file
   if (this_node == 0) {
@@ -1826,8 +1836,8 @@ void dd_p4est_write_particle_vtk(char *filename) {
     int np = local_cells.cell[c]->n;
     Particle *part = local_cells.cell[c]->part;
     for (int p = 0; p < np; ++p) {
-      fprintf(h, "\t\t\t\t\t%le %le %le\n", part[p].r.p[0], part[p].r.p[1],
-              part[p].r.p[2]);
+      std::array <double, 3> t_pos = boxl_to_treecoords_copy(part[p].r.p);
+      fprintf(h, "\t\t\t\t\t%le %le %le\n", t_pos[0], t_pos[1], t_pos[2]);
     }
   }
   fprintf(h, "\t\t\t\t</DataArray>\n\t\t\t</Points>\n\t\t\t");

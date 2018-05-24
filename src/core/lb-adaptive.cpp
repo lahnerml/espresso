@@ -2816,7 +2816,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       };
     }
     for (size_t n = 0; n < ne->elem_count; ++n) {
-      int nidx = *((int *)sc_array_index_int(ni, n));
+      int idx = *((int *)sc_array_index_int(ni, n));
       int enc = *((int *)sc_array_index_int(ne, n));
       if (24 <= enc && enc < 120) { // double size quad over face
         if (i == 0)
@@ -2826,18 +2826,19 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
         if (i == 3)
           zidx = ncnt;
       }
-      if (0 <= nidx && nidx < lq) {                 // local quadrant
-        quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, nidx);
-        sid = adapt_virtual->quad_qreal_offset[nidx];
-        nodes[ncnt] = &lbadapt_local_data[lvl][sid];
-      } else if (lq <= nidx && nidx < lq + gq) {
-        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, nidx - lq);
-        sid = adapt_virtual->quad_greal_offset[nidx - lq];
-        nodes[ncnt] = &lbadapt_ghost_data[lvl][sid];
+      if (0 <= idx && idx < lq) {                 // local quadrant
+        quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
+        lvl = quad->level;
+        sid = adapt_virtual->quad_qreal_offset[idx];
+        nodes[ncnt] = &lbadapt_local_data[lvl].at(sid);
+      } else if (lq <= idx && idx < lq + gq) {
+        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx - lq);
+        lvl = quad->level;
+        sid = adapt_virtual->quad_greal_offset[idx - lq];
+        nodes[ncnt] = &lbadapt_ghost_data[lvl].at(sid);
       } else {
         SC_ABORT_NOT_REACHED();
       }
-      lvl = quad->level;
       delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                     delta_loc[didx[i + 1][2]];
       delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
@@ -2851,7 +2852,7 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   for (int i = 0; i < ncnt; ++i)
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
-    printf("%le\n", dsum);
+    printf("dsum larger round error precision: %le\n", dsum);
   if (ncnt > 20)
     printf("too many neighbours\n");
   return ncnt;

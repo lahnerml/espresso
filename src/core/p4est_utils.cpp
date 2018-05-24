@@ -305,6 +305,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
+  p4est_locidx_t zlvlfill;
   first = 0;
   count = adapt_p4est->local_num_quadrants;
   while (0 < count) {
@@ -313,7 +314,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
     q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, index);
     p4est_topidx_t tid = adapt_mesh->quad_to_tree[index];
     cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
-    p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
     if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
       return index;
     } else if (cmp_idx < idx) {
@@ -326,13 +327,19 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
       count = step;
     }
   }
-  return first;
+  if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
+    return first;
+  }
+  else {
+    return -1;
+  }
 }
 
 p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
+  p4est_locidx_t zlvlfill;
   first = 0;
   count = adapt_ghost->ghosts.elem_count;
   while (0 < count) {
@@ -341,7 +348,7 @@ p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
     q = p4est_quadrant_array_index(&adapt_ghost->ghosts, index);
     p4est_topidx_t tid = q->p.piggy1.which_tree;
     cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
-    p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
     if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
       return index;
     } else if (cmp_idx < idx) {
@@ -354,7 +361,6 @@ p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
       count = step;
     }
   }
-  p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
   if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
     return first;
   }

@@ -2674,28 +2674,6 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   q->p.user_long = info->quadid;
 }
 
-int64_t lbadapt_get_global_idx(p8est_quadrant_t *q, p4est_topidx_t tree,
-                               const int displace[3]) {
-  int x, y, z;
-  double xyz[3];
-  p8est_qcoord_to_vertex(adapt_p4est->connectivity, tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << p4est_params.max_ref_level) + displace[0];
-  y = xyz[1] * (1 << p4est_params.max_ref_level) + displace[1];
-  z = xyz[2] * (1 << p4est_params.max_ref_level) + displace[2];
-
-  int ub = lb_conn_brick[0] * (1 << p4est_params.max_ref_level);
-  if (x >= ub) x -= ub;
-  if (x < 0) x += ub;
-  ub = lb_conn_brick[1] * (1 << p4est_params.max_ref_level);
-  if (y >= ub) y -= ub;
-  if (y < 0) y += ub;
-  ub = lb_conn_brick[2] * (1 << p4est_params.max_ref_level);
-  if (z >= ub) z -= ub;
-  if (z < 0) z += ub;
-
-  return p4est_utils_cell_morton_idx(x, y, z);
-}
-
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
   int64_t pidx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
@@ -2708,78 +2686,11 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
       return -1;
   }
 
-  for (size_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
-    q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
-    qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
-                                  q->p.piggy3.which_tree);
-    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
-    if (qidx <= pidx && pidx < qidx + zlvlfill)
-      return i;
+  qidx = p4est_utils_bin_search_quad(pidx, true);
+  if (-1 != qidx) {
+    P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos, true));
   }
-  return -1;
-}
-
-int64_t lbadapt_map_pos_to_quad_ext(const double pos[3]) {
-  int xid, yid, zid;
-  p8est_quadrant_t *q;
-  for (int d = 0; d < 3; ++d) {
-    if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
-      return -1;
-    if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
-      return -1;
-  }
-  xid = (pos[0]) * ((double) lb_conn_brick[0] / box_l[0]) * (1 << p4est_params.max_ref_level);
-  yid = (pos[1]) * ((double) lb_conn_brick[1] / box_l[1]) * (1 << p4est_params.max_ref_level);
-  zid = (pos[2]) * ((double) lb_conn_brick[2] / box_l[2]) * (1 << p4est_params.max_ref_level);
-  int64_t pidx = p4est_utils_cell_morton_idx(xid, yid, zid);
-  int64_t ret[8], sidx[8], qidx;
-  int cnt = 0;
-  for (int z = -1; z <= 1; z += 2) {
-    for (int y = -1; y <= 1; y += 2) {
-      for (int x = -1; x <= 1; x += 2) {
-        xid = (pos[0] + x * ((double) lb_conn_brick[0] / box_l[0]) * ROUND_ERROR_PREC);
-        yid = (pos[1] + y * ((double) lb_conn_brick[1] / box_l[1]) * ROUND_ERROR_PREC);
-        zid = (pos[2] + z * ((double) lb_conn_brick[2] / box_l[2]) * ROUND_ERROR_PREC);
-        ret[cnt] = -1;
-        sidx[cnt++] = p4est_utils_cell_morton_idx(xid, yid, zid);
-      }
-    }
-  }
-  for (int64_t i = 0; i < adapt_p4est->local_num_quadrants; ++i) {
-    q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, i);
-    qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
-                                  adapt_mesh->quad_to_tree[i]);
-    if (qidx > pidx)
-      return i - 1;
-    for (int j = 0; j < 8; ++j)
-      if (qidx > sidx[j])
-        ret[j] = i - 1;
-  }
-  if (this_node + 1 >= n_nodes) {
-    int64_t tmp = (1 << p4est_params.max_ref_level);
-    while (tmp < ((box_l[0] / lb_conn_brick[0]) * (1 << p4est_params.max_ref_level)))
-      tmp <<= 1;
-    while (tmp < ((box_l[1] / lb_conn_brick[1]) * (1 << p4est_params.max_ref_level)))
-      tmp <<= 1;
-    while (tmp < ((box_l[2] / lb_conn_brick[2]) * (1 << p4est_params.max_ref_level)))
-      tmp <<= 1;
-    qidx = tmp * tmp * tmp;
-  } else {
-    q = &adapt_p4est->global_first_position[this_node + 1];
-    qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
-                                  q->p.which_tree);
-  }
-  if (pidx < qidx) {
-    return adapt_p4est->local_num_quadrants - 1;
-  } else {
-    for (int j = 0; j < 8; ++j) {
-      if (sidx[j] < qidx)
-        ret[j] = adapt_p4est->local_num_quadrants - 1;
-      if (ret[j] >= 0)
-        return ret[j];
-    }
-    return -1;
-  }
+  return qidx;
 }
 
 int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],

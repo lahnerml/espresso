@@ -503,43 +503,50 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                   adapt_p4est->mpicomm);
   }
 
-  if ((std::numeric_limits<double>::min() < v_min) ||
-      (v_max < std::numeric_limits<double>::max()) ||
-      (std::numeric_limits<double>::min() < vort_min) ||
-      (vort_max < std::numeric_limits<double>::max())) {
+  if ((v_min < std::numeric_limits<double>::max()) ||
+      (std::numeric_limits<double>::min() < v_max) ||
+      (vort_min < std::numeric_limits<double>::max()) ||
+      (vort_max < std::numeric_limits<double>::min())) {
     // traverse forest and decide if the current quadrant is to be refined or
     // coarsened
     for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
       // velocity
-      double v = sqrt(
-          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
-          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
-          Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
-      // Note, that this formulation stems from the fact that velocity is 0 at
-      // boundaries
-      if (p4est_params.threshold_velocity[1] * (v_max - v_min) < (v - v_min)) {
-        (*flags)[qid] = 1;
-      } else if ((1 != (*flags)[qid]) &&
-                 (v - v_min < p4est_params.threshold_velocity[0] *
-                              (v_max - v_min))) {
-        (*flags)[qid] = 2;
+      if ((v_min < std::numeric_limits<double>::max()) ||
+          (std::numeric_limits<double>::min() < v_max)) {
+        double v = sqrt(
+            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
+            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
+            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
+        // Note, that this formulation stems from the fact that velocity is 0 at
+        // boundaries
+        if (p4est_params.threshold_velocity[1] * (v_max - v_min) <
+            (v - v_min)) {
+          (*flags)[qid] = 1;
+        } else if ((1 != (*flags)[qid]) &&
+                   (v - v_min < p4est_params.threshold_velocity[0] *
+                                (v_max - v_min))) {
+          (*flags)[qid] = 2;
+        }
       }
 
       // vorticity
-      double vort = std::numeric_limits<double>::min();
-      for (int d = 0; d < P4EST_DIM; ++d) {
-        vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
-        if (vort < vort_temp) {
-          vort = vort_temp;
+      if ((vort_min < std::numeric_limits<double>::max()) ||
+          (std::numeric_limits<double>::min() < vort_max)) {
+        double vort = std::numeric_limits<double>::min();
+        for (int d = 0; d < P4EST_DIM; ++d) {
+          vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
+          if (vort < vort_temp) {
+            vort = vort_temp;
+          }
         }
-      }
-      if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
-          (vort - vort_min)) {
-        (*flags)[qid] = 1;
-      } else if ((1 != (*flags)[qid]) &&
-                 (vort - vort_min < p4est_params.threshold_vorticity[0] *
-                                    (vort_max - vort_min))) {
-        (*flags)[qid] = 2;
+        if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
+            (vort - vort_min)) {
+          (*flags)[qid] = 1;
+        } else if ((1 != (*flags)[qid]) &&
+                   (vort - vort_min < p4est_params.threshold_vorticity[0] *
+                                      (vort_max - vort_min))) {
+          (*flags)[qid] = 2;
+        }
       }
     }
   }

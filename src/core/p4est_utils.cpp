@@ -59,17 +59,10 @@ const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   return forest_info.at(static_cast<int>(fo));
 }
 
-// forward declaration
-int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
-                               p8est_quadrant_t *q,
-                               p4est_topidx_t which_tree);
 static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   if (p4est) {
     // fill element to insert
     p4est_utils_forest_info_t insert_elem(p4est);
-
-    // allocate a local send buffer to insert local quadrant offsets
-    std::vector<p4est_locidx_t> local_tree_offsets(p4est->trees->elem_count);
 
     // only inspect local trees if current process hosts quadrants
     if (p4est->local_num_quadrants != 0) {
@@ -234,9 +227,7 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
   std::array<double, 3> qpos;
   p8est_quadrant_t *quad;
   if (ghost) {
-    quad =
-        *(p8est_quadrant_t **) p4est_quadrant_array_index(&adapt_ghost->ghosts,
-                                                          qid);
+    quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, qid);
   }
   else {
     quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
@@ -261,13 +252,25 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
 
 int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
                                p8est_quadrant_t *q,
-                               p4est_topidx_t which_tree) {
+                               p4est_topidx_t which_tree,
+                               std::array<int, 3> displace) {
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z, xyz);
-  x = xyz[0] * (1 << fi.finest_level_global);
-  y = xyz[1] * (1 << fi.finest_level_global);
-  z = xyz[2] * (1 << fi.finest_level_global);
+  x = xyz[0] * (1 << fi.finest_level_global) + displace[0];
+  y = xyz[1] * (1 << fi.finest_level_global) + displace[1];
+  z = xyz[2] * (1 << fi.finest_level_global) + displace[2];
+
+  // fold
+  int ub = lb_conn_brick[0] * (1 << fi.finest_level_global);
+  if (x >= ub) x -= ub;
+  if (x < 0) x += ub;
+  ub = lb_conn_brick[1] * (1 << fi.finest_level_global);
+  if (y >= ub) y -= ub;
+  if (y < 0) y += ub;
+  ub = lb_conn_brick[2] * (1 << fi.finest_level_global);
+  if (z >= ub) z -= ub;
+  if (z < 0) z += ub;
 
   return p4est_utils_cell_morton_idx(x, y, z);
 }
@@ -284,10 +287,11 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
   std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
   int xyz_mod[3];
   for (int i = 0; i < P8EST_DIM; ++i)
-    xyz_mod[i] = pos[i] * (1 << fi.finest_level_global);
+    xyz_mod[i] = pos[i] * (1 << p4est_params.max_ref_level);
   return p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
 }
 
+#if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 /** Perform a binary search for a given quadrant.
  * CAUTION: This only makes sense for adaptive grids and therefore we implicitly
  *          assume that we are operating on the potentially adaptive p4est of
@@ -297,7 +301,6 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
  *                 that we are looking for.
  * @return         The qid of this quadrant in the adaptive p4est.
  */
-#ifdef LB_ADAPTIVE
 p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
@@ -310,12 +313,13 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
     q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, index);
     p4est_topidx_t tid = adapt_mesh->quad_to_tree[index];
     cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
-    if (cmp_idx < idx) {
+    p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+    if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
+      return index;
+    } else if (cmp_idx < idx) {
       // if we found something smaller: move to latter part of search space
       first = index + 1;
       count -= step + 1;
-    } else if (cmp_idx == idx) {
-      return index;
     }
     else {
       // else limit search space to half the array
@@ -324,7 +328,48 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   }
   return first;
 }
-#endif // LB_ADAPTIVE
+
+p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
+  p4est_gloidx_t cmp_idx;
+  p4est_locidx_t count, step, index, first;
+  p4est_quadrant_t *q;
+  first = 0;
+  count = adapt_ghost->ghosts.elem_count;
+  while (0 < count) {
+    step = 0.5 * count;
+    index = first + step;
+    q = p4est_quadrant_array_index(&adapt_ghost->ghosts, index);
+    p4est_topidx_t tid = q->p.piggy1.which_tree;
+    cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
+    p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+    if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
+      return index;
+    } else if (cmp_idx < idx) {
+      // if we found something smaller: move to latter part of search space
+      first = index + 1;
+      count -= step + 1;
+    }
+    else {
+      // else limit search space to half the array
+      count = step;
+    }
+  }
+  p4est_locidx_t zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+  if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
+    return first;
+  }
+  else {
+    return -1;
+  }
+}
+
+p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost) {
+  if (ghost)
+    return bin_search_ghost_quads(index);
+  else
+    return bin_search_loc_quads(index);
+}
+#endif // defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 
 p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz) {
   return p4est_utils_idx_to_qid(forest, p4est_utils_pos_to_index(forest, xyz));

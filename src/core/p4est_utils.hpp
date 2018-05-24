@@ -448,8 +448,21 @@ void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 
+/** Verify that a quadrant contains the given position
+ *
+ * @param qid      Quadrant index 0 .. local_num_quadrants for local quadrants
+ *                 or 0 .. ghost_num_quadrants for ghost quadrants
+ * @param pos      Position that is supposed to be contained within quadrant
+ * @param ghost    True if index is a ghost index
+ * @return         True if quadrant extends over spatial position
+ */
 bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3],
                                   bool ghost = false);
+
+#if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
+/** Binary search for a quadrant within the adaptive p4est */
+p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost);
+#endif
 
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular
  * grid on the finest level */
@@ -464,12 +477,16 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 
 /** Obtain a Morton-index from a quadrant and its treeid.
  *
+ * @param fi       Forest info containing p4est
  * @param q        Quadrant of a given tree.
  * @param tree     Tree-id holding given quadrant.
+ * @param displace Optional offset-argument to move index coordinates
  * @return         Morton-index of given quadrant.
  */
-int64_t p4est_utils_global_idx(forest_order forest, p8est_quadrant_t *q,
-                               p4est_topidx_t tree);
+int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
+                               p8est_quadrant_t *q,
+                               p4est_topidx_t tree,
+                               std::array<int, 3> displace = {0, 0, 0});
 
 /** Calculate a Morton-index from a position in Cartesian coordinates
  *

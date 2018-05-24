@@ -2677,7 +2677,7 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
 int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   p8est_quadrant_t *q;
   int64_t pidx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
-  int64_t qidx, zlvlfill;
+  int64_t qidx;
 
   for (int d = 0; d < 3; ++d) {
     if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
@@ -2904,7 +2904,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   // collect over all 7 direction wrt. to corner
   int cnt_dir = 1;
   for (int dir = 1; dir < 8; ++dir) {
-    int displace[3] = {0, 0, 0};
+    std::array<int, 3> displace = {0, 0, 0};
     if ((dir&1)) {
       if ((corner&1)) displace[0] = zsize;
       else displace[0] = -zsize;
@@ -2917,11 +2917,11 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       if ((corner&4)) displace[2] = zsize;
       else displace[2] = -zsize;
     }
-    int64_t nidx = lbadapt_get_global_idx(quad, tree, displace);
-    for (int64_t i=0; i<adapt_ghost->mirrors.elem_count; ++i) {
+    auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+    int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
+    for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
-      qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
-                                    q->p.piggy3.which_tree);
+      qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_qreal_offset[q->p.piggy3.local_num];
         nodes[ncnt] = &lbadapt_local_data[q->level][sid];
@@ -2939,8 +2939,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     }
     for (int64_t i=0; i<adapt_ghost->ghosts.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
-      qidx = p4est_utils_global_idx(forest_order::adaptive_LB, q,
-                                    q->p.piggy3.which_tree);
+      qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level][sid];

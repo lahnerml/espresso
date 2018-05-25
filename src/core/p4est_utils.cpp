@@ -249,9 +249,12 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
   p4est_utils_get_front_lower_left(adapt_p4est, adapt_mesh->quad_to_tree[qid],
                                    quad, qpos.data());
   return (
-      (qpos[0] <= pos[0] && pos[0] < qpos[0] + p4est_params.h[quad->level]) &&
-      (qpos[1] <= pos[1] && pos[1] < qpos[1] + p4est_params.h[quad->level]) &&
-      (qpos[2] <= pos[2] && pos[2] < qpos[2] + p4est_params.h[quad->level]));
+      (qpos[0] <= pos[0] + ROUND_ERROR_PREC &&
+       pos[0] < qpos[0] + p4est_params.h[quad->level] + ROUND_ERROR_PREC) &&
+      (qpos[1] <= pos[1] + ROUND_ERROR_PREC &&
+       pos[1] < qpos[1] + p4est_params.h[quad->level] + ROUND_ERROR_PREC) &&
+      (qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
+       pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC));
 }
 
 std::array<int64_t, 3> p4est_utils_idx_to_pos(int64_t idx) {

@@ -26,12 +26,15 @@ int Utils::check_dangling_MPI_messages (MPI_Comm comm) {
   MPI_Barrier(comm);
   MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm, &flag, &status);
   if (flag) {
-    std::cout << "trailing message: found."
+    std::cerr << "trailing message: found."
               << " source: " << status.MPI_SOURCE
               << " tag: " << status.MPI_TAG
               << " error code: " << status.MPI_ERROR
               << std::endl;
     errexit();
+  }
+  else {
+    std::cerr << "No dangling messages found" << std::endl;
   }
   return 0;
 }

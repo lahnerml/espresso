@@ -102,9 +102,23 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
             p4est_utils_global_idx(insert_elem, q, q->p.which_tree);
       } else {
         double n_trees[3];
-#if defined(LB_ADAPTIVE)
-        for (int i = 0; i < P8EST_DIM; ++i)
+        double n_trees_alt[3];
+#if defined(LB_ADAPTIVE) && defined(DD_P4EST)
+        for (int i = 0; i < P8EST_DIM; ++i) {
           n_trees[i] = lb_conn_brick[i];
+          n_trees_alt[i] = dd_p4est_get_n_trees(i);
+          P4EST_ASSERT((n_trees[i] == n_trees_alt[i]) ||
+                       ((n_trees[i] < n_trees_alt[i]) && n_trees[i] == 0) ||
+                       ((n_trees_alt[i] < n_trees[i]) && n_trees_alt[i] == 0));
+          if (n_trees[i] < n_trees_alt[i]) {
+            P4EST_ASSERT (n_trees[i] == 0);
+            n_trees[i] = n_trees_alt[i];
+          }
+        }
+#elif defined(LB_ADAPTIVE)
+        for (int i = 0; i < P8EST_DIM; ++i) {
+          n_trees[i] = lb_conn_brick[i];
+        }
 #elif defined(DD_P4EST)
         for (int i = 0; i < P8EST_DIM; ++i)
           n_trees[i] = dd_p4est_get_n_trees(i);

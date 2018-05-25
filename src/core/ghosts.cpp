@@ -625,10 +625,10 @@ static void ghost_communicator_async(GhostCommunicator *gc)
         // Post the Irecv for the bonds replacing(!) the MPI_Request of the particles
         MPI_Irecv(buf.bondbuf().data(), n_bonds, MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gcnr]);
       } else {
-        put_recv_buffer(buf, gcn, gc->data_parts);
+        put_recv_buffer(buf, gcn, data_parts);
       }
     } else {
-      put_recv_buffer(buf, gcn, gc->data_parts);
+      put_recv_buffer(buf, gcn, data_parts);
     }
   }
 

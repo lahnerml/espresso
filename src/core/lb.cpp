@@ -2249,14 +2249,23 @@ int lb_sanity_checks() {
     runtimeErrorMsg() << "Lattice Boltzmann fluid viscosity not set";
     ret = 1;
   }
+#ifndef LB_ADAPTIVE
   if (cell_structure.type != CELL_STRUCTURE_DOMDEC) {
     runtimeErrorMsg() << "LB requires domain-decomposition cellsystem";
     ret = -1;
   }
+#else
+  if (cell_structure.type != CELL_STRUCTURE_P4EST) {
+    runtimeErrorMsg() << "Adaptive LB requires p4est cellsystem";
+    ret = -1;
+  }
+#endif
+#ifndef LB_ADAPTIVE
   if (skin == 0.0) {
     runtimeErrorMsg() << "LB requires a positive skin";
     ret = 1;
   }
+#endif
   if (cell_structure.use_verlet_list && skin >= lbpar.agrid / 2.0) {
     runtimeErrorMsg() << "LB requires either no Verlet lists or that the skin "
                          "of the verlet list to be less than half of "

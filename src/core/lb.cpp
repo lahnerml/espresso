@@ -2255,7 +2255,8 @@ int lb_sanity_checks() {
     ret = -1;
   }
 #else
-  if (cell_structure.type != CELL_STRUCTURE_P4EST) {
+  if (!local_cells.particles().empty() &&
+      cell_structure.type != CELL_STRUCTURE_P4EST) {
     runtimeErrorMsg() << "Adaptive LB requires p4est cellsystem";
     ret = -1;
   }

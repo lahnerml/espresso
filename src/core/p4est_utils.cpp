@@ -307,7 +307,7 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
   std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
   int xyz_mod[3];
   for (int i = 0; i < P8EST_DIM; ++i)
-    xyz_mod[i] = pos[i] * (1 << p4est_params.max_ref_level);
+    xyz_mod[i] = pos[i] * (1 << fi.finest_level_global);
   return p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
 }
 

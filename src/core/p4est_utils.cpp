@@ -546,6 +546,24 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   bool overlap[3] = {bbox_max[0] < bbox_min[0],
                      bbox_max[1] < bbox_min[1],
                      bbox_max[2] < bbox_min[2]};
+
+  // particle criterion: Refine cells where we have particles
+  p4est_locidx_t qid, nqid;
+  castable_unique_ptr<sc_array_t> nqids = sc_array_new(sizeof(p4est_locidx_t));
+  for (auto p: local_cells.particles()) {
+    qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p);
+    (*flags)[qid] = 1;
+    for (int i = 0; i < 26; ++i) {
+      sc_array_truncate(nqids);
+      p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid, i,
+                               nullptr, nullptr, nqids);
+      for (int j = 0; j < nqids->elem_count; ++j) {
+        nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
+        (*flags)[nqid] = 1;
+      }
+    }
+  }
+
   if ((vel_reg_ref[0] != std::numeric_limits<double>::min() &&
        vel_reg_ref[1] != std::numeric_limits<double>::min() &&
        vel_reg_ref[2] != std::numeric_limits<double>::min()) ||
@@ -624,6 +642,10 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
           (*flags)[qid] = 2;
         }
       }
+    }
+  } else {
+    for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
+      (*flags)[qid] = (*flags)[qid] ? 1 : 2;
     }
   }
 #endif // LB_ADAPTIVE

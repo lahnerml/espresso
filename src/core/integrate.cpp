@@ -48,7 +48,7 @@
 #include "nemd.hpp"
 #include "accumulators.hpp"
 #include "p3m.hpp"
-// #include "p4est_utils.hpp" TODO: Check if needed
+#include "p4est_utils.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
 #include "rattle.hpp"
@@ -976,6 +976,19 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
+  if (0.0 == sim_time) {
+    if(!this_node) {
+      fprintf(stderr, "Dynamically refine grid around particles\n");
+    }
+    for(int i = p4est_params.min_ref_level;
+        i < p4est_params.max_ref_level; ++i) {
+      mpi_call(mpi_adapt_grid, -1, 0);
+      mpi_adapt_grid(0, 0);
+    }
+    if(!this_node) {
+      fprintf(stderr, "Done refinement around particles\n");
+    }
+  }
   /* perform integration */
   if (!Correlators::auto_update_enabled() &&
       !Accumulators::auto_update_enabled()) {

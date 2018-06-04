@@ -2733,7 +2733,7 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
   P4EST_ASSERT(0 <= qid && qid < adapt_p4est->local_num_quadrants);
   p4est_quadrant_t *q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
   lbadapt_payload_t *data =
-      &lbadapt_local_data[q->level].at(adapt_virtual->quad_qreal_offset[qid];
+      &lbadapt_local_data[q->level].at(adapt_virtual->quad_qreal_offset[qid]);
   lb_float j_cast[3];
   for (int i = 0; i < P8EST_DIM; ++i)
     j_cast[i] = static_cast<lb_float>(j[i]);

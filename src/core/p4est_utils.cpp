@@ -559,7 +559,11 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                                nullptr, nullptr, nqids);
       for (int j = 0; j < nqids->elem_count; ++j) {
         nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
-        (*flags)[nqid] = 1;
+        P4EST_ASSERT (0 <= nqid &&
+                      nqid < adapt_mesh->local_num_quadrants +
+                             adapt_mesh->ghost_num_quadrants);
+        if (nqid < adapt_p4est->local_num_quadrants)
+          (*flags)[nqid] = 1;
       }
     }
   }

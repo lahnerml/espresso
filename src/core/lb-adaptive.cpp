@@ -2760,11 +2760,11 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
           break;
         case 5: // Y-Z edge
           if (yidx >= 0)
-            delta[xidx] +=
+            delta[yidx] +=
                 (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                  delta_loc[didx[i + 1][2]]);
           else if (zidx >= 0)
-            delta[yidx] +=
+            delta[zidx] +=
                 (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                  delta_loc[didx[i + 1][2]]);
           break;
@@ -2774,11 +2774,11 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
                 (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                  delta_loc[didx[i + 1][2]]);
           else if (yidx >= 0)
-            delta[xidx] +=
+            delta[yidx] +=
                 (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                  delta_loc[didx[i + 1][2]]);
           else if (zidx >= 0)
-            delta[yidx] +=
+            delta[zidx] +=
                 (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
                  delta_loc[didx[i + 1][2]]);
           break;

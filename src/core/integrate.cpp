@@ -976,15 +976,28 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
-  if (0.0 == sim_time) {
+  if (n_part && 0.0 == sim_time) {
     if(!this_node) {
       fprintf(stderr, "Dynamically refine grid around particles\n");
     }
+    std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
+    std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,
+                2 * sizeof(double));
+    std::memcpy(thresh_vort_temp.data(), p4est_params.threshold_velocity,
+                2 * sizeof(double));
+    p4est_params.threshold_velocity[0] = 0.;
+    p4est_params.threshold_velocity[1] = 1.;
+    p4est_params.threshold_vorticity[0] = 0.;
+    p4est_params.threshold_vorticity[1] = 1.;
     for(int i = p4est_params.min_ref_level;
         i < p4est_params.max_ref_level; ++i) {
       mpi_call(mpi_adapt_grid, -1, 0);
       mpi_adapt_grid(0, 0);
     }
+    std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
+                2 * sizeof(double));
+    std::memcpy(p4est_params.threshold_vorticity, thresh_vort_temp.data(),
+                2 * sizeof(double));
     if(!this_node) {
       fprintf(stderr, "Done refinement around particles\n");
     }

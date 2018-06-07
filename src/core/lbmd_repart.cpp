@@ -38,18 +38,17 @@ namespace __lbm_detail {
 
 static std::vector<double> weights(const std::string& metric_desc)
 {
-    // TODO
-    return std::vector<double>{};
+  return p4est_utils_get_adapt_weights(metric_desc);
 }
 
 static void preprocess()
 {
-    // TODO
+  p4est_utils_repart_preprocess();
 }
 
 static void postprocess()
 {
-    // TODO
+  p4est_utils_repart_postprocess();
 }
 
 }

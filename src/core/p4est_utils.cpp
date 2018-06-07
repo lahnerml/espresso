@@ -56,6 +56,8 @@ double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
 std::vector<int> *flags;
+std::vector<p4est_gloidx_t> old_partition_table;
+std::vector<lbadapt_payload_t> linear_payload_lbm;
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -753,8 +755,9 @@ int p4est_utils_perform_adaptivity_step() {
       p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
   std::vector<MPI_Request> requests(2 * n_nodes, MPI_REQUEST_NULL);
   p4est_utils_post_gridadapt_data_partition_transfer(
-      p4est_adapted, p4est_partitioned, mapped_data_flat, data_partitioned,
-      requests);
+      p4est_adapted->global_first_quadrant,
+      p4est_partitioned->global_first_quadrant, mapped_data_flat,
+      data_partitioned, requests);
   p4est_destroy(p4est_adapted);
   P4EST_FREE(mapped_data_flat);
 
@@ -909,21 +912,15 @@ int p4est_utils_post_gridadapt_map_data(
 
 template <typename T>
 int p4est_utils_post_gridadapt_data_partition_transfer(
-    p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> &data_partitioned,
+    p4est_gloidx_t *old_partition_table, p4est_gloidx_t *new_partition_table,
+    T *data_mapped, std::vector<std::vector<T>> &data_partitioned,
     std::vector<MPI_Request> &requests) {
-  // simple consistency checks
-  P4EST_ASSERT(p4est_old->mpirank == p4est_new->mpirank);
-  P4EST_ASSERT(p4est_old->mpisize == p4est_new->mpisize);
-  P4EST_ASSERT(p4est_old->global_num_quadrants ==
-               p4est_new->global_num_quadrants);
-
-  int rank = p4est_old->mpirank;
-  int size = p4est_old->mpisize;
-  int lb_old_local = p4est_old->global_first_quadrant[rank];
-  int ub_old_local = p4est_old->global_first_quadrant[rank + 1];
-  int lb_new_local = p4est_new->global_first_quadrant[rank];
-  int ub_new_local = p4est_new->global_first_quadrant[rank + 1];
+  int rank = this_node;
+  int size = n_nodes;
+  int lb_old_local = old_partition_table[rank];
+  int ub_old_local = old_partition_table[rank + 1];
+  int lb_new_local = new_partition_table[rank];
+  int ub_new_local = new_partition_table[rank + 1];
   int lb_old_remote = 0;
   int ub_old_remote = 0;
   int lb_new_remote = 0;
@@ -944,7 +941,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
    */
   for (int p = 0; p < size; ++p) {
     lb_old_remote = ub_old_remote;
-    ub_old_remote = p4est_old->global_first_quadrant[p + 1];
+    ub_old_remote = old_partition_table[p + 1];
 
     // number of quadrants from which payload will be received
     data_length = std::max(0,
@@ -956,7 +953,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     r = requests[p];
     mpiret =
         MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
-                  MPI_BYTE, p, 3172, p4est_new->mpicomm, &r);
+                  MPI_BYTE, p, 3172 + sizeof(T), comm_cart, &r);
     requests[p] = r;
     SC_CHECK_MPI(mpiret);
   }
@@ -964,7 +961,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
   // send respective quadrants to other processors
   for (int p = 0; p < size; ++p) {
     lb_new_remote = ub_new_remote;
-    ub_new_remote = p4est_new->global_first_quadrant[p + 1];
+    ub_new_remote = new_partition_table[p + 1];
 
     data_length = std::max(0,
                            std::min(ub_old_local, ub_new_remote) -
@@ -973,7 +970,7 @@ int p4est_utils_post_gridadapt_data_partition_transfer(
     r = requests[size + p];
     mpiret =
         MPI_Isend((void *)(data_mapped + send_offset), data_length * sizeof(T),
-                  MPI_BYTE, p, 3172, p4est_new->mpicomm, &r);
+                  MPI_BYTE, p, 3172 + sizeof(T), comm_cart, &r);
     requests[size + p] = r;
     SC_CHECK_MPI(mpiret);
     send_offset += data_length;
@@ -1021,6 +1018,60 @@ int p4est_utils_post_gridadapt_insert_data(
 
   // verify that all real quadrants have been processed
   P4EST_ASSERT(qid == mesh_new->local_num_quadrants);
+
+  return 0;
+}
+
+void get_subc_weights(p8est_iter_volume_info_t *info, void *user_data) {
+  std::vector<double> *w = reinterpret_cast<std::vector<double>* >(user_data);
+  w->at(info->quadid) = 1 << (p4est_params.max_ref_level - info->quad->level);
+}
+
+std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
+  std::vector<double> weights (adapt_p4est->local_num_quadrants, 1.0);
+  if (metric == "subcycling") {
+    p4est_iterate(adapt_p4est, nullptr, &weights, get_subc_weights, nullptr,
+                  nullptr, nullptr);
+  } else if (metric != "n_cells") {
+    fprintf(stderr, "Unknown metric: %s\n", metric.c_str());
+    errexit();
+  }
+  return weights;
+}
+
+int p4est_utils_repart_preprocess() {
+  if (linear_payload_lbm.empty()) {
+    linear_payload_lbm.reserve(adapt_p4est->local_num_quadrants);
+    p4est_utils_flatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
+                             lbadapt_local_data, linear_payload_lbm);
+  }
+  old_partition_table.reserve(n_nodes);
+  std::memcpy(old_partition_table.data(), adapt_p4est->global_first_quadrant,
+              n_nodes * sizeof(p4est_gloidx_t));
+  return 0;
+}
+
+int p4est_utils_repart_postprocess() {
+  // transfer payload
+  std::vector< std::vector<lbadapt_payload_t> > recv_buffer(
+      n_nodes, std::vector<lbadapt_payload_t>());
+  std::vector<MPI_Request> requests_lbm(2 * n_nodes, MPI_REQUEST_NULL);
+  p4est_utils_post_gridadapt_data_partition_transfer(
+      old_partition_table.data(), adapt_p4est->global_first_quadrant,
+      linear_payload_lbm.data(), recv_buffer, requests_lbm);
+
+  // clear linear data-structure
+  linear_payload_lbm.clear();
+
+  // recreate p4est structs after partitioning
+  p4est_utils_rebuild_p4est_structs(P8EST_CONNECT_FULL);
+
+  // wait for transfer of payload to finish
+  MPI_Waitall(sizeof(requests_lbm), requests_lbm.data(), MPI_STATUSES_IGNORE);
+
+  // insert data in per-level data-structure
+  p4est_utils_post_gridadapt_insert_data(adapt_p4est, adapt_mesh, adapt_virtual,
+                                         recv_buffer, lbadapt_local_data);
 
   return 0;
 }

@@ -784,8 +784,8 @@ template <typename T>
  * partition table.
  *
  * @param T           Data-type of numerical payload.
- * @param p4est_old   p4est before calling p4est_partition.
- * @param p4est_new   p4est after calling p4est_partition.
+ * @param old_partition_table   Partition table before partitioning.
+ * @param new_partition_table   Partition table after partitioning.
  * @param data_mapped Mapped data, result of calling post_gridadapt_map_data.
  * @param data_partitioned  Partitioned data, sorted by rank of origin. Vector
  *                          needs to be MPI_Size long, individual subvectors
@@ -797,8 +797,8 @@ template <typename T>
  * @return int
  */
 int p4est_utils_post_gridadapt_data_partition_transfer(
-    p8est_t *p4est_old, p8est_t *p4est_new, T *data_mapped,
-    std::vector<std::vector<T>> &data_partitioned,
+    p4est_gloidx_t *old_partition_table, p4est_gloidx_t *new_partition_table,
+    T *data_mapped, std::vector<std::vector<T>> &data_partitioned,
     std::vector<MPI_Request> &requests);
 
 template <typename T>
@@ -817,6 +817,28 @@ int p4est_utils_post_gridadapt_insert_data(
     p4est_t *p4est_new, p4est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
     std::vector<std::vector<T>> &data_partitioned,
     std::vector<std::vector<T>> &data_levelwise);
+/*@}*/
+
+/*****************************************************************************/
+/** \name Partition adaptive p4ests; Helper functions                        */
+/*****************************************************************************/
+/*@{*/
+/** Get weights based on given metric
+ *
+ * @param metric   String of metric. Currently supported are
+ *                 n_cells      Each cell is weighted as 1.
+ *                 subcycling   Each cell is weighted with 2**(l_max - l_curr)
+ * @return
+ */
+std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric);
+
+/** Preprocess repartitioning, i.e. store former partitioning table.
+ */
+int p4est_utils_repart_preprocess();
+
+/** Postprocess repartitioning, i.e. move data to respective processors.
+ */
+int p4est_utils_repart_postprocess();
 /*@}*/
 
 /*****************************************************************************/

@@ -791,26 +791,12 @@ int p4est_utils_perform_adaptivity_step() {
                          lbadapt_ghost_data, ghost_pointer);
   for (int level = new_forest.coarsest_level_global;
        level <= new_forest.finest_level_global; ++level) {
-#ifdef COMM_HIDING
-    sc_flops_snap(&fi_comm, &snapshot_comm);
-    exc_status[level] =
-        p4est_virtual_ghost_exchange_data_level_begin(
-            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-            (void**)local_pointer.data(), (void**)ghost_pointer.data());
-    sc_flops_shot(&fi_comm, &snapshot_comm);
-#else // COMM_HIDING
-    sc_flops_snap(&fi, &snapshot);
     p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                              adapt_mesh, adapt_virtual,
                                              adapt_virtual_ghost, level,
                                              sizeof(lbadapt_payload_t),
                                              (void**)local_pointer.data(),
                                              (void**)ghost_pointer.data());
-    sc_flops_shot(&fi, &snapshot);
-    sc_stats_accumulate(&stats[TIMING_GHOST_EXC_L00 + level],
-                        snapshot.iwtime);
-#endif // COMM_HIDING
   }
 
 #endif // LB_ADAPTIVE

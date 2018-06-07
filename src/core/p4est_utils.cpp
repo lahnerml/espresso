@@ -802,12 +802,20 @@ int p4est_utils_perform_adaptivity_step() {
                          lbadapt_ghost_data, ghost_pointer);
   for (int level = new_forest.coarsest_level_global;
        level <= new_forest.finest_level_global; ++level) {
+#ifdef COMM_HIDING
+    exc_status[level] =
+        p4est_virtual_ghost_exchange_data_level_begin(
+            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+            (void**)local_pointer.data(), (void**)ghost_pointer.data());
+#else // COMM_HIDING
     p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                              adapt_mesh, adapt_virtual,
                                              adapt_virtual_ghost, level,
                                              sizeof(lbadapt_payload_t),
                                              (void**)local_pointer.data(),
                                              (void**)ghost_pointer.data());
+#endif // COMM_HIDING
   }
 
 #endif // LB_ADAPTIVE

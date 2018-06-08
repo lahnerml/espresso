@@ -10,6 +10,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -71,7 +72,8 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
 
     // only inspect local trees if current process hosts quadrants
     if (p4est->local_num_quadrants != 0) {
-      for (int i = p4est->first_local_tree; i <= p4est->last_local_tree; ++i) {
+      for (p4est_topidx_t i = p4est->first_local_tree;
+           i <= p4est->last_local_tree; ++i) {
         p8est_tree_t *tree = p8est_tree_array_index(p4est->trees, i);
         // local max level
         if (insert_elem.finest_level_local < tree->maxlevel) {
@@ -101,7 +103,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     insert_elem.p4est_space_idx.resize(n_nodes + 1);
     for (int i = 0; i <= n_nodes; ++i) {
       p4est_quadrant_t *q = &p4est->global_first_position[i];
-      if (i < n_nodes) {
+      if (i < n_nodes && q->p.which_tree < p4est->trees->elem_count) {
         double xyz[3];
         insert_elem.p4est_space_idx[i] =
             p4est_utils_global_idx(insert_elem, q, q->p.which_tree);
@@ -343,16 +345,14 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
       // if we found something smaller: move to latter part of search space
       first = index + 1;
       count -= step + 1;
-    }
-    else {
+    } else {
       // else limit search space to half the array
       count = step;
     }
   }
   if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
     return first;
-  }
-  else {
+  } else {
     return -1;
   }
 }
@@ -377,16 +377,14 @@ p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
       // if we found something smaller: move to latter part of search space
       first = index + 1;
       count -= step + 1;
-    }
-    else {
+    } else {
       // else limit search space to half the array
       count = step;
     }
   }
   if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
     return first;
-  }
-  else {
+  } else {
     return -1;
   }
 }
@@ -701,6 +699,9 @@ int p4est_utils_perform_adaptivity_step() {
   flags = new std::vector<int>(adapt_p4est->local_num_quadrants, 0);
   p4est_utils_collect_flags(flags);
 
+  // To guarantee that we can map quadrants probably to their qids write each
+  // quadrant's qid into a payload (this is needed due to p4est relying on
+  // mempool by libsc).
   p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
                 nullptr, nullptr, nullptr);
 
@@ -723,12 +724,16 @@ int p4est_utils_perform_adaptivity_step() {
   // 2nd step: locally map data between forests.
   // de-allocate invalid storage and data-structures
   p4est_utils_deallocate_levelwise_storage(lbadapt_ghost_data);
+  adapt_virtual_ghost.reset();
+  adapt_ghost.reset();
+
   // locally map data between forests.
-  lbadapt_payload_t *mapped_data_flat =
-      P4EST_ALLOC_ZERO(lbadapt_payload_t, p4est_adapted->local_num_quadrants);
+  linear_payload_lbm.resize(p4est_adapted->local_num_quadrants);
+
   p4est_utils_post_gridadapt_map_data(adapt_p4est, adapt_mesh, adapt_virtual,
                                       p4est_adapted, lbadapt_local_data,
-                                      mapped_data_flat);
+                                      linear_payload_lbm.data());
+
   // cleanup
   p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
   adapt_virtual.reset();
@@ -737,8 +742,7 @@ int p4est_utils_perform_adaptivity_step() {
 
   // 3rd step: partition grid and transfer data to respective new owner ranks
   // FIXME: Interface to Steffen's partitioning logic
-  // FIXME: Synchronize partitioning between short-range MD and adaptive
-  //        p4ests
+  // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
   p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
   if (p4est_params.partitioning == "n_cells") {
     p8est_partition_ext(p4est_partitioned, 1,
@@ -751,15 +755,15 @@ int p4est_utils_perform_adaptivity_step() {
   else {
     SC_ABORT_NOT_REACHED();
   }
-  std::vector<std::vector<lbadapt_payload_t>> data_partitioned(
-      p4est_partitioned->mpisize, std::vector<lbadapt_payload_t>());
-  std::vector<MPI_Request> requests(2 * n_nodes, MPI_REQUEST_NULL);
+  std::vector<std::vector<lbadapt_payload_t>> data_partitioned_lbm(
+      n_nodes, std::vector<lbadapt_payload_t>());
+  std::vector<MPI_Request> requests_lbm(2 * n_nodes, MPI_REQUEST_NULL);
   p4est_utils_post_gridadapt_data_partition_transfer(
       p4est_adapted->global_first_quadrant,
-      p4est_partitioned->global_first_quadrant, mapped_data_flat,
-      data_partitioned, requests);
+      p4est_partitioned->global_first_quadrant, linear_payload_lbm.data(),
+      data_partitioned_lbm, requests_lbm);
+
   p4est_destroy(p4est_adapted);
-  P4EST_FREE(mapped_data_flat);
 
   // 4th step: Create p4est meta-structures
   adapt_p4est.reset(p4est_partitioned);
@@ -777,13 +781,16 @@ int p4est_utils_perform_adaptivity_step() {
                                          adapt_virtual, false);
 
   /** Wait for communication initiated by data_transfer to finish */
-  int mpiret =
-      MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+  int mpiret = MPI_Waitall(requests_lbm.size(), requests_lbm.data(),
+                           MPI_STATUSES_IGNORE);
   SC_CHECK_MPI(mpiret);
+
+  // free linear payload (i.e. send buffer)
+  linear_payload_lbm.clear();
 
   // 5th step: Insert received data into level-data-structure
   p4est_utils_post_gridadapt_insert_data(p4est_partitioned, adapt_mesh,
-                                         adapt_virtual, data_partitioned,
+                                         adapt_virtual, data_partitioned_lbm,
                                          lbadapt_local_data);
 
   // 6th step: Prepare next integration step
@@ -793,15 +800,14 @@ int p4est_utils_perform_adaptivity_step() {
 #endif // DD_P4EST
   forests.push_back(adapt_p4est);
   p4est_utils_prepare(forests);
-  const p4est_utils_forest_info_t new_forest =
-      p4est_utils_get_forest_info(forest_order::adaptive_LB);
+
   // synchronize ghost data for next collision step
   std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                          lbadapt_ghost_data, ghost_pointer);
-  for (int level = new_forest.coarsest_level_global;
-       level <= new_forest.finest_level_global; ++level) {
+  for (int level = p4est_params.min_ref_level;
+       level <= p4est_params.max_ref_level; ++level) {
 #ifdef COMM_HIDING
     exc_status[level] =
         p4est_virtual_ghost_exchange_data_level_begin(

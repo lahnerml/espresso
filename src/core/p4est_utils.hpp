@@ -676,6 +676,7 @@ int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
                              std::vector< std::vector<T> > &data_levelwise,
                              std::vector<T> &data_flat) {
   p8est_quadrant_t *q;
+  data_flat.resize(p4est->local_num_quadrants);
   for (p4est_locidx_t qid = 0; qid < p4est->local_num_quadrants; ++qid) {
     q = p4est_mesh_get_quadrant(p4est, mesh, qid);
     std::memcpy(data_flat.data() + qid,

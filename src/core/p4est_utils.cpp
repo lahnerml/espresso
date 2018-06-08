@@ -326,7 +326,7 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
  * @return         The qid of this quadrant in the adaptive p4est.
  */
 p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
-  p4est_gloidx_t cmp_idx;
+  p4est_gloidx_t cmp_idx = -1;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
   p4est_locidx_t zlvlfill = 0;
@@ -358,7 +358,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
 }
 
 p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
-  p4est_gloidx_t cmp_idx;
+  p4est_gloidx_t cmp_idx = -1;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
   p4est_locidx_t zlvlfill = 0;

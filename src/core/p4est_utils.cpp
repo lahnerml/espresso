@@ -329,7 +329,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
-  p4est_locidx_t zlvlfill;
+  p4est_locidx_t zlvlfill = 0;
   first = 0;
   count = adapt_p4est->local_num_quadrants;
   while (0 < count) {
@@ -361,7 +361,7 @@ p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
   p4est_gloidx_t cmp_idx;
   p4est_locidx_t count, step, index, first;
   p4est_quadrant_t *q;
-  p4est_locidx_t zlvlfill;
+  p4est_locidx_t zlvlfill = 0;
   first = 0;
   count = adapt_ghost->ghosts.elem_count;
   while (0 < count) {

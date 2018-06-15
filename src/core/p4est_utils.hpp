@@ -500,7 +500,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
                                p8est_quadrant_t *q,
                                p4est_topidx_t tree,
-                               std::array<int, 3> displace = {0, 0, 0});
+                               std::array<int, 3> displace = {{0, 0, 0}});
 
 /** Calculate a Morton-index from a position in Cartesian coordinates
  *

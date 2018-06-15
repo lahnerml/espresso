@@ -89,9 +89,9 @@ LB_Parameters lbpar = {
     // gamma_even
     0.,
     // gamma_shear
-    0.,
+    {0.},
     // gamma_bulk
-    0.,
+    {0.},
     // is_TRT
     false,
     // resend_halo
@@ -99,7 +99,7 @@ LB_Parameters lbpar = {
     // fluct
     0,
     // phi
-    0.,
+    {0.},
 };
 
 /** The DnQm model to be used. */

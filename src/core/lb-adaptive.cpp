@@ -2846,15 +2846,13 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   if (qidx < 0) return 0;
 
   int lvl, sid, tree, zarea, zsize;
-  p8est_quadrant_t *quad;
-
-  quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, qidx);
+  p8est_quadrant_t *quad =
+      p8est_quadrant_array_index(&adapt_ghost->ghosts, qidx);
   tree = quad->p.piggy3.which_tree;
   lvl = quad->level;
   sid = adapt_virtual->quad_greal_offset[qidx];
   nodes[0] = &lbadapt_ghost_data[lvl].at(sid);
   level[0] = lvl;
-
 
   int corner = 0;
   double delta_loc[6];
@@ -2868,38 +2866,42 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     delta_loc[d] = dis;
     delta_loc[d + 3] = 1.0 - dis;
   }
-  delta[0] = delta_loc[didx[0][0]] * delta_loc[didx[0][1]] * delta_loc[didx[0][2]];
+  delta[0] = delta_loc[didx[0][0]] * delta_loc[didx[0][1]] *
+             delta_loc[didx[0][2]];
   zsize = 1 << (p4est_params.max_ref_level - lvl);
-  zarea = zsize*zsize*zsize;
+  zarea = zsize * zsize * zsize;
 
   int ncnt = 1;
 
   // collect over all 7 direction wrt. to corner
   int cnt_dir = 1;
   for (int dir = 1; dir < 8; ++dir) {
-    std::array<int, 3> displace = {0, 0, 0};
-    if ((dir&1)) {
-      if ((corner&1)) displace[0] = zsize;
+    std::array<int, 3> displace = {{0, 0, 0}};
+    if ((dir & 1)) {
+      if ((corner & 1)) displace[0] = zsize;
       else displace[0] = -zsize;
     }
-    if ((dir&2)) {
-      if ((corner&2)) displace[1] = zsize;
+    if ((dir & 2)) {
+      if ((corner & 2)) displace[1] = zsize;
       else displace[1] = -zsize;
     }
-    if ((dir&4)) {
-      if ((corner&4)) displace[2] = zsize;
+    if ((dir & 4)) {
+      if ((corner & 4)) displace[2] = zsize;
       else displace[2] = -zsize;
     }
     auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
-    int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
+    const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
-      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
+      p8est_quadrant_t *q =
+          p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_qreal_offset[q->p.piggy3.local_num];
         nodes[ncnt] = &lbadapt_local_data[q->level].at(sid);
         level[ncnt] = q->level;
-        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] * delta_loc[didx[dir][2]];
+        delta[ncnt] = delta_loc[didx[dir][0]] *
+                      delta_loc[didx[dir][1]] *
+                      delta_loc[didx[dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             delta[ncnt] *= 0.25;
@@ -2911,13 +2913,15 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       }
     }
     for (int64_t i=0; i<adapt_ghost->ghosts.elem_count; ++i) {
-      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
+      p8est_quadrant_t *q =
+          p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
       qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level].at(sid);
         level[ncnt] = q->level;
-        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] * delta_loc[didx[dir][2]];
+        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] *
+            delta_loc[didx[dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             delta[ncnt] *= 0.25;
@@ -2929,21 +2933,25 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       }
     }
   }
-  if (cnt_dir != 255) { // not all neighbors for all directions exist => in outside halo
+  if (cnt_dir != 255) {
+    // not all neighbors for all directions exist => in outside halo
     return 0;
   }
   return ncnt;
 }
 
 int lbadapt_sanity_check_parameters() {
-  for (int level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level; ++level) {
+  for (int level = p4est_params.min_ref_level;
+       level <= p4est_params.max_ref_level; ++level) {
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
-      fprintf(stderr, "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
+      fprintf(stderr,
+              "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
               level, lbpar.gamma_shear[level]);
       errexit();
     }
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
-      fprintf(stderr, "Bad relaxation parameter gamma_bulk on level %i (%lf)\n",
+      fprintf(stderr,
+              "Bad relaxation parameter gamma_bulk on level %i (%lf)\n",
               level, lbpar.gamma_bulk[level]);
       errexit();
     }

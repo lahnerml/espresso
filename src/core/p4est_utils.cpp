@@ -534,18 +534,18 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 
   p8est_quadrant_t *q;
   std::array<double, 3> midpoint, bbox_min, bbox_max;
-  bbox_min = {std::fmod(coords_for_regional_refinement[0] +
-                        sim_time * vel_reg_ref[0], box_l[0]),
-              std::fmod(coords_for_regional_refinement[2] +
-                        sim_time * vel_reg_ref[1], box_l[1]),
-              std::fmod(coords_for_regional_refinement[4] +
-                        sim_time * vel_reg_ref[2], box_l[2])};
-  bbox_max = {std::fmod(coords_for_regional_refinement[1] +
-                        sim_time * vel_reg_ref[0], box_l[0]),
-              std::fmod(coords_for_regional_refinement[3] +
-                        sim_time * vel_reg_ref[1], box_l[1]),
-              std::fmod(coords_for_regional_refinement[5] +
-                        sim_time * vel_reg_ref[2], box_l[2])};
+  bbox_min = {{std::fmod(coords_for_regional_refinement[0] +
+                         sim_time * vel_reg_ref[0], box_l[0]),
+               std::fmod(coords_for_regional_refinement[2] +
+                         sim_time * vel_reg_ref[1], box_l[1]),
+               std::fmod(coords_for_regional_refinement[4] +
+                         sim_time * vel_reg_ref[2], box_l[2])}};
+  bbox_max = {{std::fmod(coords_for_regional_refinement[1] +
+                         sim_time * vel_reg_ref[0], box_l[0]),
+               std::fmod(coords_for_regional_refinement[3] +
+                         sim_time * vel_reg_ref[1], box_l[1]),
+               std::fmod(coords_for_regional_refinement[5] +
+                         sim_time * vel_reg_ref[2], box_l[2])}};
   bool overlap[3] = {bbox_max[0] < bbox_min[0],
                      bbox_max[1] < bbox_min[1],
                      bbox_max[2] < bbox_min[2]};

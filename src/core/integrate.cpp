@@ -1020,6 +1020,10 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
         return ES_ERROR;
     }
   }
+#ifdef COMM_HIDING
+  p4est_utils_end_pending_communication();
+#endif // COMM_HIDING
+
   return ES_OK;
 }
 

@@ -758,18 +758,19 @@ int p4est_utils_perform_adaptivity_step() {
   else {
     SC_ABORT_NOT_REACHED();
   }
-  std::vector<lbadapt_payload_t> data_partitioned_lbm;;
+
+  std::vector<lbadapt_payload_t> data_partitioned_lbm;
   data_partitioned_lbm.resize(p4est_partitioned->local_num_quadrants);
 
 #ifdef COMM_HIDING
   auto data_transfer_handle = p4est_transfer_fixed_begin(
-      p4est_adapted->global_first_quadrant,
-      p4est_partitioned->global_first_quadrant, comm_cart,
+      p4est_partitioned->global_first_quadrant,
+      p4est_adapted->global_first_quadrant, comm_cart,
       3172 + sizeof(lbadapt_payload_t), data_partitioned_lbm.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #else  // COMM_HIDING
-  p4est_transfer_fixed(p4est_adapted->global_first_quadrant,
-                       p4est_partitioned->global_first_quadrant, comm_cart,
+  p4est_transfer_fixed(p4est_partitioned->global_first_quadrant,
+                       p4est_adapted->global_first_quadrant, comm_cart,
                        3172 + sizeof(lbadapt_payload_t),
                        data_partitioned_lbm.data(), linear_payload_lbm.data(),
                        sizeof(lbadapt_payload_t));
@@ -970,12 +971,12 @@ int p4est_utils_repart_postprocess() {
 
 #ifdef COMM_HIDING
   auto data_transfer_handle = p4est_transfer_fixed_begin(
-      old_partition_table.data(), adapt_p4est->global_first_quadrant, comm_cart,
+      adapt_p4est->global_first_quadrant, old_partition_table.data(), comm_cart,
       3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #else  // COMM_HIDING
-  p4est_transfer_fixed(old_partition_table.data(),
-                       adapt_p4est->global_first_quadrant, comm_cart,
+  p4est_transfer_fixed(adapt_p4est->global_first_quadrant,
+                       old_partition_table.data(), comm_cart,
                        3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
                        linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #endif // COMM_HIDING

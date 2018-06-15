@@ -16,11 +16,14 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <vector>
+
 #include <mpi.h>
+
 #include <p8est_algorithms.h>
 #include <p8est_bits.h>
+#include <p8est_communication.h>
 #include <p8est_search.h>
-#include <vector>
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
@@ -755,13 +758,22 @@ int p4est_utils_perform_adaptivity_step() {
   else {
     SC_ABORT_NOT_REACHED();
   }
-  std::vector<std::vector<lbadapt_payload_t>> data_partitioned_lbm(
-      n_nodes, std::vector<lbadapt_payload_t>());
-  std::vector<MPI_Request> requests_lbm(2 * n_nodes, MPI_REQUEST_NULL);
-  p4est_utils_post_gridadapt_data_partition_transfer(
+  std::vector<lbadapt_payload_t> data_partitioned_lbm;;
+  data_partitioned_lbm.resize(p4est_partitioned->local_num_quadrants);
+
+#ifdef COMM_HIDING
+  auto data_transfer_handle = p4est_transfer_fixed_begin(
       p4est_adapted->global_first_quadrant,
-      p4est_partitioned->global_first_quadrant, linear_payload_lbm.data(),
-      data_partitioned_lbm, requests_lbm);
+      p4est_partitioned->global_first_quadrant, comm_cart,
+      3172 + sizeof(lbadapt_payload_t), data_partitioned_lbm.data(),
+      linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
+#else  // COMM_HIDING
+  p4est_transfer_fixed(p4est_adapted->global_first_quadrant,
+                       p4est_partitioned->global_first_quadrant, comm_cart,
+                       3172 + sizeof(lbadapt_payload_t),
+                       data_partitioned_lbm.data(), linear_payload_lbm.data(),
+                       sizeof(lbadapt_payload_t));
+#endif // COMM_HIDING
 
   p4est_destroy(p4est_adapted);
 
@@ -780,18 +792,16 @@ int p4est_utils_perform_adaptivity_step() {
   p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
                                          adapt_virtual, false);
 
-  /** Wait for communication initiated by data_transfer to finish */
-  int mpiret = MPI_Waitall(requests_lbm.size(), requests_lbm.data(),
-                           MPI_STATUSES_IGNORE);
-  SC_CHECK_MPI(mpiret);
+#ifdef COMM_HIDING
+  p4est_transfer_fixed_end(data_transfer_handle);
+#endif // COMM_HIDING
 
   // free linear payload (i.e. send buffer)
   linear_payload_lbm.clear();
 
   // 5th step: Insert received data into level-data-structure
-  p4est_utils_post_gridadapt_insert_data(p4est_partitioned, adapt_mesh,
-                                         adapt_virtual, data_partitioned_lbm,
-                                         lbadapt_local_data);
+  p4est_utils_unflatten_data(p4est_partitioned, adapt_mesh, adapt_virtual,
+                             data_partitioned_lbm, lbadapt_local_data);
 
   // 6th step: Prepare next integration step
   std::vector<p4est_t *> forests;
@@ -924,118 +934,6 @@ int p4est_utils_post_gridadapt_map_data(
   return 0;
 }
 
-template <typename T>
-int p4est_utils_post_gridadapt_data_partition_transfer(
-    p4est_gloidx_t *old_partition_table, p4est_gloidx_t *new_partition_table,
-    T *data_mapped, std::vector<std::vector<T>> &data_partitioned,
-    std::vector<MPI_Request> &requests) {
-  int rank = this_node;
-  int size = n_nodes;
-  int lb_old_local = old_partition_table[rank];
-  int ub_old_local = old_partition_table[rank + 1];
-  int lb_new_local = new_partition_table[rank];
-  int ub_new_local = new_partition_table[rank + 1];
-  int lb_old_remote = 0;
-  int ub_old_remote = 0;
-  int lb_new_remote = 0;
-  int ub_new_remote = 0;
-  int data_length = 0;
-  int send_offset = 0;
-
-  int mpiret;
-  MPI_Request r;
-
-  // determine from which processors we receive quadrants
-  /** there are 5 cases to distinguish
-   * 1. no quadrants of neighbor need to be received; neighbor rank < rank
-   * 2. some quadrants of neighbor need to be received; neighbor rank < rank
-   * 3. all quadrants of neighbor need to be received from neighbor
-   * 4. some quadrants of neighbor need to be received; neighbor rank > rank
-   * 5. no quadrants of neighbor need to be received; neighbor rank > rank
-   */
-  for (int p = 0; p < size; ++p) {
-    lb_old_remote = ub_old_remote;
-    ub_old_remote = old_partition_table[p + 1];
-
-    // number of quadrants from which payload will be received
-    data_length = std::max(0,
-                           std::min(ub_old_remote, ub_new_local) -
-                               std::max(lb_old_remote, lb_new_local));
-
-    // allocate receive buffer and wait for messages
-    data_partitioned[p].resize(data_length);
-    r = requests[p];
-    mpiret =
-        MPI_Irecv((void *)data_partitioned[p].data(), data_length * sizeof(T),
-                  MPI_BYTE, p, 3172 + sizeof(T), comm_cart, &r);
-    requests[p] = r;
-    SC_CHECK_MPI(mpiret);
-  }
-
-  // send respective quadrants to other processors
-  for (int p = 0; p < size; ++p) {
-    lb_new_remote = ub_new_remote;
-    ub_new_remote = new_partition_table[p + 1];
-
-    data_length = std::max(0,
-                           std::min(ub_old_local, ub_new_remote) -
-                               std::max(lb_old_local, lb_new_remote));
-
-    r = requests[size + p];
-    mpiret =
-        MPI_Isend((void *)(data_mapped + send_offset), data_length * sizeof(T),
-                  MPI_BYTE, p, 3172 + sizeof(T), comm_cart, &r);
-    requests[size + p] = r;
-    SC_CHECK_MPI(mpiret);
-    send_offset += data_length;
-  }
-
-  return 0;
-}
-
-template <typename T>
-int p4est_utils_post_gridadapt_insert_data(
-    p8est_t *p4est_new, p8est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
-    std::vector<std::vector<T>> &data_partitioned,
-    std::vector<std::vector<T>> &data_levelwise) {
-  int size = p4est_new->mpisize;
-  // counters
-  unsigned int tid = p4est_new->first_local_tree;
-  int qid = 0;
-  unsigned int tqid = 0;
-
-  // trees
-  p8est_tree_t *curr_tree = p8est_tree_array_index(p4est_new->trees, tid);
-  // quadrants
-  p8est_quadrant_t *curr_quad;
-
-  int level, sid;
-
-  for (int p = 0; p < size; ++p) {
-    for (unsigned int q = 0; q < data_partitioned[p].size(); ++q) {
-      // wrap multiple trees
-      if (tqid == curr_tree->quadrants.elem_count) {
-        ++tid;
-        P4EST_ASSERT(tid < p4est_new->trees->elem_count);
-        curr_tree = p8est_tree_array_index(p4est_new->trees, tid);
-        tqid = 0;
-      }
-      curr_quad = p8est_quadrant_array_index(&curr_tree->quadrants, tqid);
-      level = curr_quad->level;
-      sid = virtual_quads->quad_qreal_offset[qid];
-      std::memcpy(&data_levelwise[level][sid], &data_partitioned[p][q],
-                  sizeof(T));
-      ++tqid;
-      ++qid;
-    }
-  }
-
-  // verify that all real quadrants have been processed
-  P4EST_ASSERT(qid == mesh_new->local_num_quadrants);
-
-  return 0;
-}
-
 void get_subc_weights(p8est_iter_volume_info_t *info, void *user_data) {
   std::vector<double> *w = reinterpret_cast<std::vector<double>* >(user_data);
   w->at(info->quadid) = 1 << (p4est_params.max_ref_level - info->quad->level);
@@ -1055,7 +953,7 @@ std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
 
 int p4est_utils_repart_preprocess() {
   if (linear_payload_lbm.empty()) {
-    linear_payload_lbm.reserve(adapt_p4est->local_num_quadrants);
+    linear_payload_lbm.resize(adapt_p4est->local_num_quadrants);
     p4est_utils_flatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              lbadapt_local_data, linear_payload_lbm);
   }
@@ -1067,25 +965,34 @@ int p4est_utils_repart_preprocess() {
 
 int p4est_utils_repart_postprocess() {
   // transfer payload
-  std::vector< std::vector<lbadapt_payload_t> > recv_buffer(
-      n_nodes, std::vector<lbadapt_payload_t>());
-  std::vector<MPI_Request> requests_lbm(2 * n_nodes, MPI_REQUEST_NULL);
-  p4est_utils_post_gridadapt_data_partition_transfer(
-      old_partition_table.data(), adapt_p4est->global_first_quadrant,
-      linear_payload_lbm.data(), recv_buffer, requests_lbm);
+  std::vector<lbadapt_payload_t> recv_buffer;
+  recv_buffer.resize(adapt_p4est->local_num_quadrants);
 
-  // clear linear data-structure
-  linear_payload_lbm.clear();
+#ifdef COMM_HIDING
+  auto data_transfer_handle = p4est_transfer_fixed_begin(
+      old_partition_table.data(), adapt_p4est->global_first_quadrant, comm_cart,
+      3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
+      linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
+#else  // COMM_HIDING
+  p4est_transfer_fixed(old_partition_table.data(),
+                       adapt_p4est->global_first_quadrant, comm_cart,
+                       3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
+                       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
+#endif // COMM_HIDING
 
   // recreate p4est structs after partitioning
   p4est_utils_rebuild_p4est_structs(P8EST_CONNECT_FULL);
 
-  // wait for transfer of payload to finish
-  MPI_Waitall(sizeof(requests_lbm), requests_lbm.data(), MPI_STATUSES_IGNORE);
+#ifdef COMM_HIDING
+  p4est_transfer_fixed_end(data_transfer_handle);
+#endif // COMM_HIDING
+
+  // clear linear data-structure
+  linear_payload_lbm.clear();
 
   // insert data in per-level data-structure
-  p4est_utils_post_gridadapt_insert_data(adapt_p4est, adapt_mesh, adapt_virtual,
-                                         recv_buffer, lbadapt_local_data);
+  p4est_utils_unflatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
+                             recv_buffer, lbadapt_local_data);
 
   return 0;
 }

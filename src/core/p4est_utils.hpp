@@ -778,46 +778,6 @@ int p4est_utils_post_gridadapt_map_data(
     p4est_t *p4est_old, p4est_mesh_t *mesh_old,
     p4est_virtual_t *virtual_quads, p4est_t *p4est_new,
     std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
-
-template <typename T>
-/** Generic function to re-establish a proper load balacing after the grid has
- * changed. Transfer data to the respective processors according to new
- * partition table.
- *
- * @param T           Data-type of numerical payload.
- * @param old_partition_table   Partition table before partitioning.
- * @param new_partition_table   Partition table after partitioning.
- * @param data_mapped Mapped data, result of calling post_gridadapt_map_data.
- * @param data_partitioned  Partitioned data, sorted by rank of origin. Vector
- *                          needs to be MPI_Size long, individual subvectors
- *                          will be allocated by the function and they will be
- *                          used as receive buffers.
- * @param requests    Vector of MPI_Requests initially set to MPI_REQUEST_NULL
- *                    such that p4est structs can be built while data transfer
- *                    finishes.
- * @return int
- */
-int p4est_utils_post_gridadapt_data_partition_transfer(
-    p4est_gloidx_t *old_partition_table, p4est_gloidx_t *new_partition_table,
-    T *data_mapped, std::vector<std::vector<T>> &data_partitioned,
-    std::vector<MPI_Request> &requests);
-
-template <typename T>
-/** After all local data has been received insert in newly allocated level-wise
- * data structure.
- *
- * @param T           Data-type of numerical payload.
- * @param p4est_new   p4est after partitioning.
- * @param mesh_new    Lookup tables referring to \a p4est_new
- * @param data_partitioned  Partitioned data, sorted by rank of origin. Vector
- *                          needs to be MPI_Size long.
- * @param data_levelwise  Level-wise numerical payload.
- * @return int
- */
-int p4est_utils_post_gridadapt_insert_data(
-    p4est_t *p4est_new, p4est_mesh_t *mesh_new, p4est_virtual_t *virtual_quads,
-    std::vector<std::vector<T>> &data_partitioned,
-    std::vector<std::vector<T>> &data_levelwise);
 /*@}*/
 
 /*****************************************************************************/

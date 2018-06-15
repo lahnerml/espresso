@@ -1787,6 +1787,9 @@ void dd_p4est_write_parallel_vtk(char *filename) {
 }
 
 void dd_p4est_write_particle_vtk(char *filename) {
+  char foo[1024];
+  sprintf(foo, "%s_grid", filename);
+  p4est_vtk_write_file(ds::p4est, nullptr, foo);
   char fname[1024];
   // node 0 writes the header file
   if (this_node == 0) {

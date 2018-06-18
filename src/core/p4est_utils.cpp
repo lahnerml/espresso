@@ -247,6 +247,46 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
+bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
+                                    p4est_quadrant_t* q2, p4est_topidx_t tree2)
+{
+  std::array<double, 3> pos1, pos2, p1, p2;
+  double h1 = p4est_params.h[q1->level];
+  double h2 = p4est_params.h[q2->level];
+  p4est_utils_get_front_lower_left(adapt_p4est, tree1, q1, pos1.data());
+  p4est_utils_get_front_lower_left(adapt_p4est, tree2, q2, pos2.data());
+
+  bool touching = false;
+  for (int i = 0; !touching && i < P8EST_CHILDREN; ++i) {
+    p1 = pos1;
+    if (i & 1) {
+      p1[0] += h1;
+    }
+    if (i & 2) {
+      p1[1] += h1;
+    }
+    if (i & 4) {
+      p1[2] += h1;
+    }
+    for (int j = 0; j < P8EST_CHILDREN; ++j) {
+      p2 = pos2;
+      if (j & 1) {
+        p2[0] += h2;
+      }
+      if (j & 2) {
+        p2[1] += h2;
+      }
+      if (j & 4) {
+        p2[2] += h2;
+      }
+      touching = (p1 == p2);
+      if (touching) break;
+    }
+  }
+
+  return touching;
+}
+
 bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost) {
   std::array<double, 3> qpos;
   p8est_quadrant_t *quad;
@@ -471,7 +511,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int p4est_utils_collect_flags(std::vector<int> *flags) {
 #ifdef LB_ADAPTIVE
-  // get refinement string for first grid change operation
+  // get refinement string for grid change
   // velocity
   double v;
   double v_min = std::numeric_limits<double>::max();
@@ -554,6 +594,11 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   if (n_part) {
     p4est_locidx_t qid, nqid;
     castable_unique_ptr<sc_array_t> nqids = sc_array_new(sizeof(p4est_locidx_t));
+    std::vector<p4est_locidx_t> ghost_ids;
+    ghost_ids.reserve(adapt_ghost->ghosts.elem_count);
+    for (auto p: ghost_cells.particles()) {
+      ghost_ids.push_back(lbadapt_map_pos_to_ghost(p.r.p));
+    }
     for (auto p: local_cells.particles()) {
       qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p);
       (*flags)[qid] = 1;
@@ -568,6 +613,14 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                                adapt_mesh->ghost_num_quadrants);
           if (nqid < adapt_p4est->local_num_quadrants)
             (*flags)[nqid] = 1;
+          else if (!ghost_ids.empty()) {
+            auto search_it =
+                std::find(ghost_ids.begin(), ghost_ids.end(),
+                          nqid - adapt_mesh->local_num_quadrants);
+            if (search_it != ghost_ids.end()){
+              (*flags)[qid] = 1;
+            }
+          }
         }
       }
     }

@@ -61,7 +61,7 @@ struct repart_info {
     void (*postprocess)();
 };
 
-std::vector<repart_info> repart_infos = {
+const static std::vector<repart_info> repart_infos = {
 #ifdef DD_P4EST
     { forest_order::short_range, __md_detail::weights, __md_detail::preprocess, __md_detail::postprocess },
 #endif

@@ -992,8 +992,6 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
         i < p4est_params.max_ref_level; ++i) {
       mpi_call(mpi_adapt_grid, -1, 0);
       mpi_adapt_grid(0, 0);
-      std::string filename = "refinement_check_" + std::to_string(i);
-      lb_lbfluid_print_vtk_boundary(const_cast<char *>(filename.c_str()));
     }
     std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
                 2 * sizeof(double));

@@ -784,7 +784,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   for (auto it = LBBoundaries::lbboundaries.begin();
        it != LBBoundaries::lbboundaries.end(); ++it, ++n) {
 
-    if (LBBoundaries::exclude_in_geom_ref.empty()) {
+    if (!LBBoundaries::exclude_in_geom_ref.empty()) {
       auto search_it = std::find(LBBoundaries::exclude_in_geom_ref.begin(),
                             LBBoundaries::exclude_in_geom_ref.end(), n);
       if (search_it != LBBoundaries::exclude_in_geom_ref.end()) {

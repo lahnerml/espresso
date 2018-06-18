@@ -976,10 +976,9 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
+#ifdef LB_ADAPTIVE
   if (n_part && 0.0 == sim_time) {
-    if(!this_node) {
-      fprintf(stderr, "Dynamically refine grid around particles\n");
-    }
+    fprintf(stderr, "Dynamically refine grid around particles\n");
     std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
     std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,
                 2 * sizeof(double));
@@ -993,15 +992,17 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
         i < p4est_params.max_ref_level; ++i) {
       mpi_call(mpi_adapt_grid, -1, 0);
       mpi_adapt_grid(0, 0);
+      std::string filename = "refinement_check_" + std::to_string(i);
+      lb_lbfluid_print_vtk_boundary(const_cast<char *>(filename.c_str()));
     }
     std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
                 2 * sizeof(double));
     std::memcpy(p4est_params.threshold_vorticity, thresh_vort_temp.data(),
                 2 * sizeof(double));
-    if(!this_node) {
-      fprintf(stderr, "Done refinement around particles\n");
-    }
+    fprintf(stderr, "Done refinement around particles\n");
   }
+#endif // LB_ADAPTIVE
+
   /* perform integration */
   if (!Correlators::auto_update_enabled() &&
       !Accumulators::auto_update_enabled()) {

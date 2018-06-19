@@ -1149,12 +1149,16 @@ bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2) {
 void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
                                     double a1, p4est_t *t2,
                                     const std::vector<double> &w2, double a2) {
+  P4EST_ASSERT(w1.size() == t1->local_num_quadrants);
+  P4EST_ASSERT(w2.size() == t2->local_num_quadrants);
   P4EST_ASSERT(p4est_utils_check_alignment(t1, t2));
 
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
+  P4EST_ASSERT(p4est_is_valid(fct.get()));
   P4EST_ASSERT(p4est_utils_check_alignment(fct.get(), t1));
 
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
+
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
   std::vector<size_t> t2_quads_per_fct_quad(fct->local_num_quadrants, 0);
   std::vector<p4est_locidx_t> t1_quads_per_proc(fct->mpisize, 0);

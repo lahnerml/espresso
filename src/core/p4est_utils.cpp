@@ -1186,15 +1186,16 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
 }
 
 bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2) {
-  if (!p4est_connectivity_is_equivalent(t1->connectivity, t2->connectivity)) return false;
+  if (!p4est_connectivity_is_equivalent(t1->connectivity, t2->connectivity))
+    return false;
   if (t1->first_local_tree != t2->first_local_tree) return false;
   if (t1->last_local_tree != t2->last_local_tree) return false;
   p4est_quadrant_t *q1 = &t1->global_first_position[t1->mpirank];
   p4est_quadrant_t *q2 = &t2->global_first_position[t2->mpirank];
-  if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
+  if (!p4est_quadrant_is_equal(q1, q2)) return false;
   q1 = &t1->global_first_position[t1->mpirank+1];
   q2 = &t2->global_first_position[t2->mpirank+1];
-  if (q1->x != q2->x && q1->y != q2->y && q1->z != q2->z) return false;
+  if (!p4est_quadrant_is_equal(q1, q2)) return false;
   return true;
 }
 
@@ -1204,6 +1205,8 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   P4EST_ASSERT(p4est_utils_check_alignment(t1, t2));
 
   std::unique_ptr<p4est_t> fct(p4est_utils_create_fct(t1, t2));
+  P4EST_ASSERT(p4est_utils_check_alignment(fct.get(), t1));
+
   std::vector<double> w_fct(fct->local_num_quadrants, 0.0);
   std::vector<size_t> t1_quads_per_fct_quad(fct->local_num_quadrants, 0);
   std::vector<size_t> t2_quads_per_fct_quad(fct->local_num_quadrants, 0);

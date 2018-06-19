@@ -1095,16 +1095,18 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 #endif // defined(DD_P4EST) && defined(LB_ADAPTIVE)
 }
 
-int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
+static int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
                    p4est_quadrant_t *quad[]) {
   p4est_t *cmp = (p4est_t *)p4est->user_pointer;
   p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
   for (unsigned int i = 0; i < tree->quadrants.elem_count; ++i) {
     p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
-    if (p4est_quadrant_overlaps(q, quad[0]) && q->level >= quad[0]->level)
-      return 0;
+    if (p4est_quadrant_overlaps(q, quad[0]))
+      return q->level < quad[0]->level;
   }
-  return 1;
+
+  // We have to find at least one overlapping quadrant in the above loop
+  SC_ABORT_NOT_REACHED();
 }
 
 p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {

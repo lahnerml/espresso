@@ -1092,8 +1092,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
       curr_tree = p8est_tree_array_index(p4est_mod->trees, tid);
     }
 
-    // Check for each of the quadrants of the given p4est, to which MD cell it
-    // maps
+    // Check for each of the quadrants of the given p4est, to which cell it maps
+    // in the other forest
     for (int qid = 0; qid < p4est_mod->local_num_quadrants; ++qid) {
       // wrap multiple trees
       if (tqid == curr_tree->quadrants.elem_count) {
@@ -1134,8 +1134,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
     P4EST_GLOBAL_PRODUCTIONF(
         "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
         (long long) shipped, shipped * 100. / p4est_mod->global_num_quadrants);
-  }
-  else {
+  } else {
     p4est_t * existing_forest;
     if (p4est_mod) {
       existing_forest = p4est_mod;
@@ -1234,7 +1233,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
         q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
       }
       while (p4est_quadrant_overlaps(q_fct, q2)) {
-        w_fct[w_idx] += a2*w2[w_id2++];
+        w_fct[w_idx] += a2 * w2[w_id2++];
         ++t2_quads_per_fct_quad[w_idx];
         if (++q_id2 >= t_t2->quadrants.elem_count) {
           // complain if last quad in t2 does not overlap with last quad of FCT

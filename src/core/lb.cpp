@@ -3720,8 +3720,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       local_f = node_index[x]->lbfields.force;
       double level_fact = p4est_params.prefactors[level[x]] *
           p4est_params.prefactors[level[x]];
-      // double level_fact =
-      // prefactors[level[x]]*prefactors[level[x]]*prefactors[level[x]];
 
       local_f[0] += delta[x] * delta_j[0] / level_fact;
       local_f[1] += delta[x] * delta_j[1] / level_fact;

@@ -784,7 +784,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   for (auto it = LBBoundaries::lbboundaries.begin();
        it != LBBoundaries::lbboundaries.end(); ++it, ++n) {
 
-    if (LBBoundaries::exclude_in_geom_ref.empty()) {
+    if (!LBBoundaries::exclude_in_geom_ref.empty()) {
       auto search_it = std::find(LBBoundaries::exclude_in_geom_ref.begin(),
                             LBBoundaries::exclude_in_geom_ref.end(), n);
       if (search_it != LBBoundaries::exclude_in_geom_ref.end()) {
@@ -2843,7 +2843,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
 
   int64_t qidx = lbadapt_map_pos_to_ghost(pos);
 
-  if (qidx < 0) return 0;
+  if (qidx < 0 || adapt_ghost->ghosts.elem_count <= qidx) return 0;
 
   int lvl, sid, tree, zarea, zsize;
   p8est_quadrant_t *quad =
@@ -2866,7 +2866,8 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     delta_loc[d] = dis;
     delta_loc[d + 3] = 1.0 - dis;
   }
-  delta[0] = delta_loc[didx[0][0]] * delta_loc[didx[0][1]] *
+  delta[0] = delta_loc[didx[0][0]] *
+             delta_loc[didx[0][1]] *
              delta_loc[didx[0][2]];
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
@@ -2892,11 +2893,15 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
     const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
-      p8est_quadrant_t *q =
-          p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
-      qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
-      if (qidx >= nidx && qidx < nidx + zarea) {
-        sid = adapt_virtual->quad_qreal_offset[q->p.piggy3.local_num];
+      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
+      qid = adapt_mesh->mirror_qid[i];
+      qidx = p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
+      if (qidx >= nidx && qidx < nidx + zarea &&
+          p4est_utils_quadrants_touching(quad, tree, q,
+                                         adapt_mesh->quad_to_tree[qid])) {
+        sid = adapt_virtual->quad_qreal_offset[qid];
+        P4EST_ASSERT(ncnt <= 20);
+        P4EST_ASSERT(0 <= q->level && q->level < P8EST_QMAXLEVEL);
         nodes[ncnt] = &lbadapt_local_data[q->level].at(sid);
         level[ncnt] = q->level;
         delta[ncnt] = delta_loc[didx[dir][0]] *
@@ -2912,16 +2917,18 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         cnt_dir |= 1 << dir;
       }
     }
-    for (int64_t i=0; i<adapt_ghost->ghosts.elem_count; ++i) {
-      p8est_quadrant_t *q =
-          p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
+    for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
+      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
       qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
-      if (qidx >= nidx && qidx < nidx + zarea) {
+      if (qidx >= nidx && qidx < nidx + zarea &&
+          p4est_utils_quadrants_touching(quad, tree, q,
+                                         adapt_mesh->quad_to_tree[qid])) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level].at(sid);
         level[ncnt] = q->level;
-        delta[ncnt] = delta_loc[didx[dir][0]] * delta_loc[didx[dir][1]] *
-            delta_loc[didx[dir][2]];
+        delta[ncnt] = delta_loc[didx[dir][0]]
+                    * delta_loc[didx[dir][1]]
+                    * delta_loc[didx[dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             delta[ncnt] *= 0.25;

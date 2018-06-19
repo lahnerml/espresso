@@ -171,6 +171,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
   auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
   if (afi.coarsest_level_global == afi.finest_level_global) {
+    p4est_dd_repart_preprocessing();
     auto sfi = forest_info.at(static_cast<size_t>(forest_order::short_range));
     auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
                forest_order::adaptive_LB : forest_order::short_range;
@@ -178,6 +179,10 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
                forest_order::short_range : forest_order::adaptive_LB;
     p4est_utils_partition_multiple_forests(ref, mod);
     p4est_utils_prepare(forests);
+
+    // copied from lbmd_repart short-range MD postprocess
+    if (mod == forest_order::short_range)
+      cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
   }
 
   std::vector<std::string> metrics;
@@ -822,6 +827,10 @@ int p4est_utils_perform_adaptivity_step() {
   std::vector<std::string> metrics;
   metrics = {"ncells", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
+  std::vector<p8est_t *> forests;
+  forests.push_back(dd_p4est_get_p4est());
+  forests.push_back(adapt_p4est);
+  p4est_utils_prepare(forests);
 
   lbmd::repart_all(metrics, alpha);
 

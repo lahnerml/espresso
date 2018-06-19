@@ -1223,11 +1223,12 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
     size_t q_id1, q_id2;
     q_id1 = q_id2 = 0;
     p4est_quadrant_t *q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
-    p4est_quadrant_t *q2 = p4est_quadrant_array_index(&t_t1->quadrants, q_id2);
+    p4est_quadrant_t *q2 = p4est_quadrant_array_index(&t_t2->quadrants, q_id2);
     for (size_t q_idx = 0; q_idx < t_fct->quadrants.elem_count; ++q_idx) {
-      p4est_quadrant_t *q_fct = p4est_quadrant_array_index(&t_fct->quadrants, q_idx);
+      p4est_quadrant_t *q_fct =
+          p4est_quadrant_array_index(&t_fct->quadrants, q_idx);
       while (p4est_quadrant_overlaps(q_fct, q1)) {
-        w_fct[w_idx] += a1*w1[w_id1++];
+        w_fct[w_idx] += a1 * w1[w_id1++];
         ++t1_quads_per_fct_quad[w_idx];
         if (++q_id1 >= t_t1->quadrants.elem_count) {
           // complain if last quad in t1 does not overlap with last quad of FCT

@@ -462,6 +462,15 @@ void p4est_utils_get_midpoint(p8est_t *p8est, p4est_topidx_t which_tree,
  */
 void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
 
+/** Check if two quadrants touch
+ *
+ * \param [in]  q1, q2     The two quadrants
+ * \param [in] tree1, tree2  Tree id of respective quadrants
+ * \return                 True if the quadrants touch via face, edge, or corner
+ */
+bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
+                                    p4est_quadrant_t* q2, p4est_topidx_t tree2);
+
 /** Verify that a quadrant contains the given position
  *
  * @param qid      Quadrant index 0 .. local_num_quadrants for local quadrants
@@ -500,7 +509,7 @@ int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
 int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
                                p8est_quadrant_t *q,
                                p4est_topidx_t tree,
-                               std::array<int, 3> displace = {0, 0, 0});
+                               std::array<int, 3> displace = {{0, 0, 0}});
 
 /** Calculate a Morton-index from a position in Cartesian coordinates
  *

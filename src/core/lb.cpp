@@ -89,9 +89,9 @@ LB_Parameters lbpar = {
     // gamma_even
     0.,
     // gamma_shear
-    0.,
+    {0.},
     // gamma_bulk
-    0.,
+    {0.},
     // is_TRT
     false,
     // resend_halo
@@ -99,7 +99,7 @@ LB_Parameters lbpar = {
     // fluct
     0,
     // phi
-    0.,
+    {0.},
 };
 
 /** The DnQm model to be used. */
@@ -3720,8 +3720,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       local_f = node_index[x]->lbfields.force;
       double level_fact = p4est_params.prefactors[level[x]] *
           p4est_params.prefactors[level[x]];
-      // double level_fact =
-      // prefactors[level[x]]*prefactors[level[x]]*prefactors[level[x]];
 
       local_f[0] += delta[x] * delta_j[0] / level_fact;
       local_f[1] += delta[x] * delta_j[1] / level_fact;

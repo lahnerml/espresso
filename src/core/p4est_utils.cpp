@@ -1121,7 +1121,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                          std::end(num_quad_per_proc_global), 0);
 
     if (sum < p4est_mod->global_num_quadrants) {
-      printf("%i : quadrants lost while partitioning\n", this_node);
+      fprintf(stderr, "%i : %li quadrants lost while partitioning\n",
+              this_node, p4est_mod->global_num_quadrants - sum);
       errexit();
     }
 

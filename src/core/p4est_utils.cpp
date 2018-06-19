@@ -1026,9 +1026,10 @@ int p4est_utils_repart_preprocess() {
     p4est_utils_flatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              lbadapt_local_data, linear_payload_lbm);
   }
-  old_partition_table.reserve(n_nodes);
-  std::memcpy(old_partition_table.data(), adapt_p4est->global_first_quadrant,
-              n_nodes * sizeof(p4est_gloidx_t));
+  // Save global_first_quadrants for migration
+  old_partition_table.clear();
+  std::copy_n(adapt_p4est->global_first_quadrant, n_nodes + 1,
+              std::back_inserter(old_partition_table));
   return 0;
 }
 

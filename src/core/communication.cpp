@@ -2213,7 +2213,6 @@ void mpi_lbadapt_grid_init(int node, int level) {
     adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0,
                                     NULL, NULL));
   }
-
   p4est_utils_rebuild_p4est_structs(btype);
 #endif // LB_ADAPTIVE
 }

@@ -1644,8 +1644,10 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
-// Maps a position to the cartesian grid and returns the morton index of this coordinates
-// Note: the global morton index returned here is NOT equal to the local cell index!!!
+// Maps a position to the Cartesian grid and returns the Morton index of this
+// coordinates.
+// Note: The global Morton index returned here is NOT equal to the local cell
+//       index!!!
 int64_t dd_p4est_pos_morton_idx(double pos[3]) {
   double pfold[3] = {pos[0], pos[1], pos[2]};
   int im[3] = {0, 0, 0}; /* dummy */
@@ -1887,44 +1889,6 @@ void dd_p4est_write_particle_vtk(char *filename) {
 }
 
 
-//--------------------------------------------------------------------------------------------------
-// Repartitions the given p4est, such that process boundaries do not intersect the partition of the
-// p4est_dd grid. This only works if both grids have a common p4est_connectivity and the given forest
-// is on the same or finer level.
-void dd_p4est_partition(p4est_t *p4est, p4est_mesh_t *mesh, p4est_connectivity_t *conn) {
-  std::vector<p4est_locidx_t> num_quad_per_proc(n_nodes, 0);
-  std::vector<p4est_locidx_t> num_quad_per_proc_global(n_nodes);
-  
-  // Check for each of the quadrants of the given p4est, to which MD cell it maps
-  for (int i=0;i<p4est->local_num_quadrants;++i) {
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(p4est,mesh,i);
-    double xyz[3];
-    p4est_qcoord_to_vertex(conn,mesh->quad_to_tree[i],q->x,q->y,q->z,xyz);
-    /*int64_t idx = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
-                                           xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
-                                           //dd_p4est_pos_morton_idx(xyz);
-    for (int n=1;n<=n_nodes;++n) {
-      if (p4est_space_idx[n] > idx) {
-        num_quad_per_proc[n - 1] += 1;
-        break;
-      }
-    }*/
-    num_quad_per_proc[dd_p4est_pos_to_proc(xyz)] += 1;
-  }
-
-  // Geather this information over all processes
-  MPI_Allreduce(num_quad_per_proc.data(), num_quad_per_proc_global.data(), n_nodes, P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
-
-  p4est_locidx_t sum = std::accumulate(num_quad_per_proc_global.begin(), num_quad_per_proc_global.end(), 0);
-
-  if (sum < p4est->global_num_quadrants) {
-    printf("%i : quadrants lost while partitioning\n", this_node);
-    return;
-  }
-
-  // Repartition with the computed distribution
-  p4est_partition_given(p4est, num_quad_per_proc_global.data());
-}
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change
 void dd_p4est_on_geometry_change(int flags) {

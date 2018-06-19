@@ -2922,8 +2922,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
       qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
       if (qidx >= nidx && qidx < nidx + zarea &&
-          p4est_utils_quadrants_touching(quad, tree, q,
-                                         adapt_mesh->quad_to_tree[qid])) {
+          p4est_utils_quadrants_touching(quad, tree, q, q->p.which_tree)) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[ncnt] = &lbadapt_ghost_data[q->level].at(sid);
         level[ncnt] = q->level;

@@ -1243,7 +1243,8 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   double target = sum / fct->mpisize;
 
   for (size_t idx = 0; idx < (size_t) fct->local_num_quadrants; ++idx) {
-    int proc = std::min<int>(w_fct[idx] / target, fct->mpisize - 1);
+    prefix += w_fct[idx];
+    int proc = std::min<int>(prefix / target, fct->mpisize - 1);
     t1_quads_per_proc[proc] += t1_quads_per_fct_quad[idx];
     t2_quads_per_proc[proc] += t2_quads_per_fct_quad[idx];
   }

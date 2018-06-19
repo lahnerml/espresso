@@ -816,93 +816,17 @@ int p4est_utils_perform_adaptivity_step() {
   adapt_mesh.reset();
 
   // 3rd step: partition grid and transfer data to respective new owner ranks
-  // FIXME: Interface to Steffen's partitioning logic
-  // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
-  p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
+  //           including all preparations for next time step
+  adapt_p4est.reset(p4est_adapted);
 
   std::vector<std::string> metrics;
   metrics = {"ncells", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
-  adapt_p4est.reset(p4est_adapted);
-  forest_info.at(static_cast<size_t>(forest_order::adaptive_LB)).p4est = p4est_adapted;
+
   lbmd::repart_all(metrics, alpha);
-
-  std::vector<lbadapt_payload_t> data_partitioned_lbm;
-  data_partitioned_lbm.resize(p4est_partitioned->local_num_quadrants);
-
-#ifdef COMM_HIDING
-  auto data_transfer_handle = p4est_transfer_fixed_begin(
-      p4est_partitioned->global_first_quadrant,
-      p4est_adapted->global_first_quadrant, comm_cart,
-      3172 + sizeof(lbadapt_payload_t), data_partitioned_lbm.data(),
-      linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
-#else  // COMM_HIDING
-  p4est_transfer_fixed(p4est_partitioned->global_first_quadrant,
-                       p4est_adapted->global_first_quadrant, comm_cart,
-                       3172 + sizeof(lbadapt_payload_t),
-                       data_partitioned_lbm.data(), linear_payload_lbm.data(),
-                       sizeof(lbadapt_payload_t));
-#endif // COMM_HIDING
-
-  p4est_destroy(p4est_adapted);
-
-  // 4th step: Create p4est meta-structures
-  adapt_p4est.reset(p4est_partitioned);
-  adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
-  p4est_utils_allocate_levelwise_storage(lbadapt_local_data, adapt_mesh,
-                                         adapt_virtual, true);
-  p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
-                                         adapt_virtual, false);
-
-#ifdef COMM_HIDING
-  p4est_transfer_fixed_end(data_transfer_handle);
-#endif // COMM_HIDING
 
   // free linear payload (i.e. send buffer)
   linear_payload_lbm.clear();
-
-  // 5th step: Insert received data into level-data-structure
-  p4est_utils_unflatten_data(p4est_partitioned, adapt_mesh, adapt_virtual,
-                             data_partitioned_lbm, lbadapt_local_data);
-
-  // 6th step: Prepare next integration step
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd_p4est_get_p4est());
-#endif // DD_P4EST
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
-
-  // synchronize ghost data for next collision step
-  std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
-  std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
-  prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                         lbadapt_ghost_data, ghost_pointer);
-  for (int level = p4est_params.min_ref_level;
-       level <= p4est_params.max_ref_level; ++level) {
-#ifdef COMM_HIDING
-    exc_status[level] =
-        p4est_virtual_ghost_exchange_data_level_begin(
-            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-            (void**)local_pointer.data(), (void**)ghost_pointer.data());
-#else // COMM_HIDING
-    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                             adapt_mesh, adapt_virtual,
-                                             adapt_virtual_ghost, level,
-                                             sizeof(lbadapt_payload_t),
-                                             (void**)local_pointer.data(),
-                                             (void**)ghost_pointer.data());
-#endif // COMM_HIDING
-  }
-
 #endif // LB_ADAPTIVE
   return 0;
 }
@@ -1063,6 +987,29 @@ int p4est_utils_repart_postprocess() {
   // insert data in per-level data-structure
   p4est_utils_unflatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              recv_buffer, lbadapt_local_data);
+
+  // synchronize ghost data for next collision step
+  std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+  prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                         lbadapt_ghost_data, ghost_pointer);
+  for (int level = p4est_params.min_ref_level;
+       level <= p4est_params.max_ref_level; ++level) {
+#ifdef COMM_HIDING
+    exc_status[level] =
+        p4est_virtual_ghost_exchange_data_level_begin(
+            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+            (void**)local_pointer.data(), (void**)ghost_pointer.data());
+#else // COMM_HIDING
+    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+                                             adapt_mesh, adapt_virtual,
+                                             adapt_virtual_ghost, level,
+                                             sizeof(lbadapt_payload_t),
+                                             (void**)local_pointer.data(),
+                                             (void**)ghost_pointer.data());
+#endif // COMM_HIDING
+  }
 
   return 0;
 }

@@ -5,6 +5,7 @@
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
 #include "lb-adaptive.hpp"
+#include "lbmd_repart.hpp"
 #include "p4est_dd.hpp"
 #include "utils/Morton.hpp"
 
@@ -166,9 +167,28 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
   forests.push_back(adapt_p4est);
 #endif // LB_ADAPTIVE
   p4est_utils_prepare(forests);
+
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
-  p4est_utils_partition_multiple_forests(forest_order::short_range,
-                                         forest_order::adaptive_LB);
+  auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
+  if (afi.coarsest_level_global == afi.finest_level_global) {
+    auto sfi = forest_info.at(static_cast<size_t>(forest_order::short_range));
+    auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+               forest_order::adaptive_LB : forest_order::short_range;
+    auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+               forest_order::short_range : forest_order::adaptive_LB;
+    p4est_utils_partition_multiple_forests(ref, mod);
+    p4est_utils_prepare(forests);
+  }
+
+  std::vector<std::string> metrics;
+  std::vector<double> alpha = {1., 1.};
+  std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
+                                 1.0);
+  std::vector<double> weights_lb =
+      p4est_utils_get_adapt_weights(p4est_params.partitioning);
+  p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
+                                 adapt_p4est, weights_lb, 1.0);
+  p4est_utils_prepare(forests);
 #elif defined(DD_P4EST)
   p4est_partition(dd_p4est_get_p4est(), 1, nullptr);
 #elif defined(LB_ADAPTIVE)
@@ -794,23 +814,18 @@ int p4est_utils_perform_adaptivity_step() {
   p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
   adapt_virtual.reset();
   adapt_mesh.reset();
-  adapt_p4est.reset();
 
   // 3rd step: partition grid and transfer data to respective new owner ranks
   // FIXME: Interface to Steffen's partitioning logic
   // FIXME: Synchronize partitioning between short-range MD and adaptive p4ests
   p8est_t *p4est_partitioned = p8est_copy(p4est_adapted, 0);
-  if (p4est_params.partitioning == "n_cells") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_uniform);
-  }
-  else if (p4est_params.partitioning == "subcycling") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_subcycling);
-  }
-  else {
-    SC_ABORT_NOT_REACHED();
-  }
+
+  std::vector<std::string> metrics;
+  metrics = {"ncells", p4est_params.partitioning};
+  std::vector<double> alpha = {1., 1.};
+  adapt_p4est.reset(p4est_adapted);
+  forest_info.at(static_cast<size_t>(forest_order::adaptive_LB)).p4est = p4est_adapted;
+  lbmd::repart_all(metrics, alpha);
 
   std::vector<lbadapt_payload_t> data_partitioned_lbm;
   data_partitioned_lbm.resize(p4est_partitioned->local_num_quadrants);

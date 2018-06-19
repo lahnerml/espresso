@@ -171,12 +171,13 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
   auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
   if (afi.coarsest_level_global == afi.finest_level_global) {
-    p4est_dd_repart_preprocessing();
     auto sfi = forest_info.at(static_cast<size_t>(forest_order::short_range));
     auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
                forest_order::adaptive_LB : forest_order::short_range;
     auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
                forest_order::short_range : forest_order::adaptive_LB;
+    if (mod == forest_order::short_range)
+      p4est_dd_repart_preprocessing();
     p4est_utils_partition_multiple_forests(ref, mod);
     p4est_utils_prepare(forests);
 

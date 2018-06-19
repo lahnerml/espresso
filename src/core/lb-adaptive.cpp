@@ -2892,6 +2892,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     }
     auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
     const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
+    p4est_locidx_t qid;
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qid = adapt_mesh->mirror_qid[i];

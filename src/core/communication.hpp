@@ -117,9 +117,6 @@ void mpi_loop();
 /** Abort Espresso using MPI_Abort. */
 void mpi_abort();
 
-/** Finalize MPI. Called by all nodes upon exit */
-void mpi_finalize();
-
 /**
  * @brief Replace the MPI communicator by a new one with the given periodicity
  * and node grid.

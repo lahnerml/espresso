@@ -323,13 +323,6 @@ void mpi_init() {
   on_program_start();
 }
 
-void mpi_finalize() {
-#ifdef COMM_HIDING
-  p4est_utils_end_pending_communication();
-#endif
-  MPI_Finalize();
-}
-
 void mpi_reshape_communicator(std::array<int, 3> const &node_grid,
                               std::array<int, 3> const &periodicity) {
   MPI_Comm temp_comm;

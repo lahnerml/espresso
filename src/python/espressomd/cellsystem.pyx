@@ -73,9 +73,13 @@ class P4estDD:
         return PyMetric(desc)
 
     def repart(self, m, verbose=False):
+        if self.__instance.call_method("is_lb_adaptive_defined"):
+            raise RuntimeError("Cannot call MD-only repart with LB_ADAPTIVE defined.")
         self.__instance.call_method("repart", metric=m.get_metric(), verbose=verbose)
 
     def repart_lbmd(self, md_alpha=1.0, md_metric="", lb_alpha=1.0, lb_metric=""):
+        if not self.__lbmd_instance.call_method("is_lb_adaptive_defined"):
+            raise RuntimeError("Cannot call LBMD repart without LB_ADAPTIVE defined.")
         if md_metric == "" or lb_metric == "":
             raise ValueError("Supply md_metric and lb_metric parameters.")
         # Same ordering as forest_order!

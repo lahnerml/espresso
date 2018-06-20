@@ -63,6 +63,12 @@ public:
                   << "Continuing without repart." << std::endl;
       }
       p4est_dd_repartition(m, verbose);
+    } else if (name == "is_lb_adaptive_defined") {
+#ifdef LB_ADAPTIVE
+      return true;
+#else
+      return false;
+#endif
     }
     return {};
   }

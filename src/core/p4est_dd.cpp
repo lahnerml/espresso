@@ -222,7 +222,6 @@ int dd_p4est_get_n_trees(int dir = 0) {
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
 int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
 #ifdef __BMI2__
-//#warning "Using BMI2 for cell_morton_idx"
   static const unsigned mask_x = 0x49249249;
   static const unsigned mask_y = 0x92492492;
   static const unsigned mask_z = 0x24924924;
@@ -231,7 +230,6 @@ int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
            | _pdep_u32(y, mask_y)
            | _pdep_u32(z, mask_z);
 #else
-//#warning "BMI2 not detected: Using slow loop version for cell_morton_idx"
   int64_t idx = 0;
   int64_t pos = 1;
 
@@ -503,12 +501,12 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
 }
 
 void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {
-  // geather cell neighbors
+  // Gather cell neighbors
   std::vector<uint64_t> quads;
   std::vector<local_shell_t> shell;
   castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
   
-  // Loop all local cells to geather information for those
+  // Loop all local cells to gather information for those
   for (int i=0;i<ds::p4est->local_num_quadrants;++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds::p4est,p4est_mesh,i);
     quad_data_t *data = (quad_data_t*)(q->p.user_data);
@@ -529,7 +527,7 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
     ls.coord[1] = y;
     ls.coord[2] = z;
     ls.p_cnt = 0;
-    // Geather all inforamtion about neighboring cells
+    // Gather all information about neighboring cells
     for (int n=0;n<26;++n) {
       ls.neighbor[n] = -1;
       p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n, NULL, NULL, ni);
@@ -549,10 +547,6 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
     shell.push_back(ls);
   }
     
-  //char fname[100];
-  //sprintf(fname,"cells_%i.list",this_node);
-  //FILE* h = fopen(fname,"w");
-  
   // compute ghost, mirror and boundary information
   // here the ghost layer around the local domain is computed
   for (int i=0;i<ds::p4est->local_num_quadrants;++i) {
@@ -564,7 +558,6 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
     uint64_t x = xyz[0]*ql;
     uint64_t y = xyz[1]*ql;
     uint64_t z = xyz[2]*ql;
-    //fprintf(h,"%i %li %ix%ix%i ",i,dd_p4est_cell_morton_idx(x,y,z), shell[i].coord[0],shell[i].coord[1],shell[i].coord[2]);
     
     // Loop all 27 cells in the fullshell
     for (uint64_t zi=0;zi <= 2;zi++)
@@ -616,7 +609,7 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
             shell.push_back(ls); // add the new ghost cell to all cells
             shell[i].shell = 1; // The cell for which this one was added is at the domain bound
           } else { // Cell already exists in list
-            if (shell[pos].shell == 2) { // is it a ghost cell, then ubdate the boundary info
+            if (shell[pos].shell == 2) { // is it a ghost cell, then update the boundary info
               // of the current local cell, since they are neighbors
               shell[i].shell = 1; // this local cell is at domain boundary
               // Update boundary info
@@ -641,7 +634,7 @@ void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh
 }
 //--------------------------------------------------------------------------------------------------
 
-// Compute communication partners and the cells that need to be comunicated
+// Compute communication partners and the cells that need to be communicated
 #ifdef MINIMAL_GHOST
 void dd_p4est_comm () {
   // List of cell idx marked for send/recv for each process
@@ -733,11 +726,7 @@ void dd_p4est_comm () {
   comm_proc.resize(n_nodes);
   std::fill(std::begin(comm_proc), std::end(comm_proc), -1);
 
-  // create send and receive list
-  //char fname[100];
-  //sprintf(fname,"cells_conn_%i.list",this_node);
-  //FILE* h = fopen(fname,"w");
-  // Loop all cells
+  // Create send and receive list
   for (int i=0;i<num_cells;++i) {
     // is ghost cell that is linked to a process? -> add to recv list
     if (ds::p4est_shell[i].rank >= 0 && ds::p4est_shell[i].shell == 2) {
@@ -754,7 +743,7 @@ void dd_p4est_comm () {
       } else if (ds::p4est_shell[recv_idx[irank][pos]].idx != ds::p4est_shell[i].idx) {
         recv_idx[irank].insert(recv_idx[irank].begin() + pos, i);
         recv_tag[irank].insert(recv_tag[irank].begin() + pos, 1L<<ds::p4est_shell[i].boundary);
-      // update diraction info for communication if already added but for other direction
+      // update direction info for communication if already added but for other direction
       } else {
         recv_tag[irank][pos] |= 1L<<ds::p4est_shell[i].boundary;        
       }
@@ -891,7 +880,6 @@ void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
       comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
     }
     ++cnt;
-    //printf("\n");
   }
 
 }
@@ -1015,7 +1003,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
       Particle* part = &cell->part[p];
       int x,y,z;
 
-      // Check if particle has left the cell. (The local domain is extenden by half round error)
+      // Check if particle has left the cell. (The local domain is extended by half round error)
       if (part->r.p[0] < cell_lc[0]) x = 0;
       else if (part->r.p[0] >= cell_hc[0]) x = 2;
       else x = 1;
@@ -1527,17 +1515,14 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
       MPI_Isend(send_num_part[p].data(),
                 send_quads[p], MPI_INT, p, REP_EX_CNT_TAG,
                 comm_cart, &sreq[p]);
-      //fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_CNT_TAG);
       if (sendbuf[p].n > 0) {
         MPI_Isend(sendbuf[p].part, 
                   sendbuf[p].n * sizeof(Particle), MPI_BYTE, p, REP_EX_PART_TAG,
                   comm_cart, &sreq[p + n_nodes]);
-        //fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_PART_TAG);
         if (sendbuf_dyn[p].size() > 0) {
           MPI_Isend(sendbuf_dyn[p].data(), 
                     sendbuf_dyn[p].size(), MPI_INT, p, REP_EX_DYN_TAG,
                     comm_cart, &sreq[p + 2 * n_nodes]);
-        //fprintf(stderr, "[%i] : send %i (%i)\n", this_node, p, REP_EX_DYN_TAG);
         }
       }
     }
@@ -1566,7 +1551,6 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
         if (sum > 0) {
           MPI_Irecv(recvbuf[source].part, sum * sizeof(Particle),
                     MPI_BYTE, source, REP_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-          //fprintf(stderr, "[%i] : recv %i (%i)\n", this_node, source, REP_EX_PART_TAG);
           commstat.next(recvidx);
         }
       }

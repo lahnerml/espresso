@@ -336,15 +336,15 @@ static void dd_p4est_initialize_grid() {
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
 
   // Create p4est structs
-    auto oldconn = std::move(ds::p4est_conn);
-    ds::p4est_conn =
-        std::unique_ptr<p4est_connectivity_t>(p8est_connectivity_new_brick(
-            brick_size[0], brick_size[1], brick_size[2], PERIODIC(0),
-            PERIODIC(1), PERIODIC(2)));
-    ds::p4est = std::unique_ptr<p4est_t>(
-        p4est_new_ext(comm_cart, ds::p4est_conn, 0, grid_level, true,
-                      sizeof(quad_data_t), init_fn, NULL));
-  }
+  auto oldconn = std::move(ds::p4est_conn);
+  ds::p4est_conn =
+      std::unique_ptr<p4est_connectivity_t>(p8est_connectivity_new_brick(
+          brick_size[0], brick_size[1], brick_size[2], PERIODIC(0),
+          PERIODIC(1), PERIODIC(2)));
+  ds::p4est = std::unique_ptr<p4est_t>(
+      p4est_new_ext(comm_cart, ds::p4est_conn, 0, grid_level, true,
+                    sizeof(quad_data_t), init_fn, NULL));
+}
 
 void dd_p4est_create_grid (bool isRepart) {
   // Note: In case of LB_ADAPTIVE (lb_adaptive_is_defined), calling
@@ -371,10 +371,10 @@ void dd_p4est_create_grid (bool isRepart) {
   // If LB_ADAPTIVE is defined, do not repartition here at all, since we handle
   // this case in lbmd_repart.[ch]pp.
 #if !defined(LB_ADAPTIVE)
-  if (part_nquads.size() == 0)
-    p4est_partition(ds::p4est, 0, NULL);
-  else
-    p4est_partition_given(ds::p4est, part_nquads.data());
+    if (part_nquads.size() == 0)
+      p4est_partition(ds::p4est, 0, NULL);
+    else
+      p4est_partition_given(ds::p4est, part_nquads.data());
 #endif
 
   auto p4est_ghost = castable_unique_ptr<p4est_ghost_t>(

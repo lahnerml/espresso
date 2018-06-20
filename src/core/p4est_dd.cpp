@@ -414,12 +414,12 @@ void dd_p4est_create_grid (bool isRepart) {
   // Fill internal communator lists
   dd_p4est_comm();
 
-  std::vector<p4est_t *> forests;
-  forests.push_back(dd_p4est_get_p4est());
+  p4est_utils_prepare({
+    ds::p4est,
 #ifdef LB_ADAPTIVE
-  forests.push_back(adapt_p4est);
-#endif // LB_ADAPTIVE
-  p4est_utils_prepare(forests);
+    adapt_p4est,
+#endif
+  });
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {

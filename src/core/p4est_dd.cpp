@@ -93,7 +93,6 @@ static int64_t dd_p4est_pos_morton_idx(double pos[3]);
     communication types GHOST_SEND <-> GHOST_RECV. */
 static void dd_p4est_revert_comm_order (GhostCommunicator *comm);
 
-static void dd_p4est_init_internal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
 static void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
 //--------------------------------------------------------------------------------------------------
 #define CELLS_MAX_NEIGHBORS 14

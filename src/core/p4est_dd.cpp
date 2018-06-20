@@ -323,18 +323,10 @@ int dd_p4est_cellsize_even () {
   return lvl; // Return level > 0 if max_range <= 0.5
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_create_grid (bool isRepart) {
-  // Clear data to prevent accidental use of old stuff
-  comm_rank.clear();
-  comm_proc.clear();
-  comm_recv.clear();
-  comm_send.clear();
-  p4est_space_idx.clear();
-  ds::p4est_shell.clear();
-
-  grid_level = dd_p4est_cellsize_optimal();
-
-  // set global variables
+// Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
+static void dd_p4est_initialize_grid() {
+  // Set global variables
+  grid_level = dd_p4est_cellsize_optimal(); // Sets grid_size and brick_size
   dd.cell_size[0] = box_l[0]/(double)grid_size[0];
   dd.cell_size[1] = box_l[1]/(double)grid_size[1];
   dd.cell_size[2] = box_l[2]/(double)grid_size[2];
@@ -343,8 +335,7 @@ void dd_p4est_create_grid (bool isRepart) {
   dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
   max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
 
-  // create p4est structs
-  if (!isRepart) {
+  // Create p4est structs
     auto oldconn = std::move(ds::p4est_conn);
     ds::p4est_conn =
         std::unique_ptr<p4est_connectivity_t>(p8est_connectivity_new_brick(
@@ -354,12 +345,27 @@ void dd_p4est_create_grid (bool isRepart) {
         p4est_new_ext(comm_cart, ds::p4est_conn, 0, grid_level, true,
                       sizeof(quad_data_t), init_fn, NULL));
   }
-  // In case of LB_ADAPTIVE, this is handled by lbmd_repart.[ch]pp
+
+void dd_p4est_create_grid (bool isRepart) {
+  // Note: In case of LB_ADAPTIVE (lb_adaptive_is_defined), calling
+  // p4est_partition is handled by lbmd_repart.[ch]pp. This means that must not
+  // do anything related torepartitioning in this case.
+
+  // Clear data to prevent accidental use of old stuff
+  comm_rank.clear();
+  comm_proc.clear();
+  comm_recv.clear();
+  comm_send.clear();
+  p4est_space_idx.clear();
+  ds::p4est_shell.clear();
+
+  if (!isRepart) 
+    dd_p4est_initialize_grid();
 #if !defined(LB_ADAPTIVE)
-  else {
-    p4est_dd_repart_preprocessing();
-  }
+  else
+    p4est_dd_repart_preprocessing(); // In case of LB_ADAPTIVE, lbmd_repart does this
 #endif
+
   // Repartition uniformly if part_nquads is empty (because not repart has been
   // done yet). Else use part_nquads as given partitioning.
   // If LB_ADAPTIVE is defined, do not repartition here at all, since we handle

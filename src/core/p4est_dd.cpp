@@ -364,9 +364,9 @@ void dd_p4est_create_grid (bool isRepart) {
   // done yet). Else use part_nquads as given partitioning.
   // If LB_ADAPTIVE is defined, do not repartition here at all, since we handle
   // this case in lbmd_repart.[ch]pp.
+#if !defined(LB_ADAPTIVE)
   if (part_nquads.size() == 0)
     p4est_partition(ds::p4est, 0, NULL);
-#if !defined(LB_ADAPTIVE)
   else
     p4est_partition_given(ds::p4est, part_nquads.data());
 #endif
@@ -386,7 +386,8 @@ void dd_p4est_create_grid (bool isRepart) {
       double xyz[3];
       p4est_qcoord_to_vertex(ds::p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
       p4est_space_idx[i] = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
-                                                    xyz[1]*(1<<grid_level),xyz[2]*(1<<grid_level));
+                                                    xyz[1]*(1<<grid_level),
+                                                    xyz[2]*(1<<grid_level));
     } else {
       int64_t tmp = 1<<grid_level;
       while(tmp < grid_size[0]) tmp <<= 1;

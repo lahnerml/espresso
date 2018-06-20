@@ -387,7 +387,6 @@ void dd_p4est_create_grid (bool isRepart) {
   p4est_space_idx.resize(n_nodes + 1);
   for (int i=0;i<=n_nodes;++i) {
     p4est_quadrant_t *q = &ds::p4est->global_first_position[i];
-    //p4est_quadrant_t c;
     if (i < n_nodes) {
       double xyz[3];
       p4est_qcoord_to_vertex(ds::p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);

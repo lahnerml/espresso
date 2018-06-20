@@ -1028,6 +1028,15 @@ int p4est_utils_repart_postprocess() {
   // clear linear data-structure
   linear_payload_lbm.clear();
 
+  // allocate data
+  p4est_utils_allocate_levelwise_storage(lbadapt_local_data, adapt_mesh,
+                                         adapt_virtual, true);
+
+  if (adapt_ghost->ghosts.elem_count) {
+    p4est_utils_allocate_levelwise_storage(lbadapt_ghost_data, adapt_mesh,
+                                           adapt_virtual, false);
+  }
+
   // insert data in per-level data-structure
   p4est_utils_unflatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              recv_buffer, lbadapt_local_data);

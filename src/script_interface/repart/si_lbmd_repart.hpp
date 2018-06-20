@@ -66,7 +66,7 @@ public:
       }
 #endif
 
-#if defined(DD_P4EST) || defined(LB_ADAPTIVE)
+#if defined(DD_P4EST) && defined(LB_ADAPTIVE)
       lbmd::repart_all(ms, as);
 #endif
     } else if (name == "is_lb_adaptive_defined") {

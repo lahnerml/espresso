@@ -1662,17 +1662,6 @@ int dd_p4est_pos_to_proc(double pos[3]) {
   return std::distance(std::begin(p4est_space_idx), it) - 1;
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_assign_prefetches (GhostCommunicator *comm) {
-  int cnt;
-
-  for(cnt=0; cnt<comm->num; cnt += 2) {
-    if (comm->comm[cnt].type == GHOST_RECV && comm->comm[cnt + 1].type == GHOST_SEND) {
-      comm->comm[cnt].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
-      comm->comm[cnt + 1].type |= GHOST_PREFETCH | GHOST_PSTSTORE;
-    }
-  }
-}
-//--------------------------------------------------------------------------------------------------
 void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 
   int c,p,np;
@@ -1702,14 +1691,8 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
 
   /* collect forces has to be done in reverted order! */
   dd_p4est_revert_comm_order(&cell_structure.collect_ghost_force_comm);
-  dd_p4est_assign_prefetches(&cell_structure.ghost_cells_comm);
-  dd_p4est_assign_prefetches(&cell_structure.exchange_ghosts_comm);
-  dd_p4est_assign_prefetches(&cell_structure.update_ghost_pos_comm);
-  dd_p4est_assign_prefetches(&cell_structure.collect_ghost_force_comm);
-
 #ifdef LB
   dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING);
-  dd_p4est_assign_prefetches(&cell_structure.ghost_lbcoupling_comm);
 #endif
 
 #ifdef IMMERSED_BOUNDARY
@@ -1717,12 +1700,10 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   // This is different than usual collect_ghost_force_comm (not in reverse order)
   // Therefore we need our own communicator
   dd_p4est_prepare_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
-  dd_p4est_assign_prefetches(&cell_structure.ibm_ghost_force_comm);
 #endif
 
 #ifdef ENGINE
   dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING);
-  dd_p4est_assign_prefetches(&cell_structure.ghost_swimming_comm);
 #endif
 
   /* initialize cell neighbor structures */

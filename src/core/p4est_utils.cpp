@@ -196,8 +196,10 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
                                  1.0);
   std::vector<double> weights_lb =
       p4est_utils_get_adapt_weights(p4est_params.partitioning);
+  p4est_dd_repart_preprocessing();
   p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
                                  adapt_p4est, weights_lb, 1.0);
+  cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
   p4est_utils_prepare(forests);
 #elif defined(DD_P4EST)
   p4est_partition(dd_p4est_get_p4est(), 1, nullptr);

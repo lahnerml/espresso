@@ -658,6 +658,7 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /** \name Grid Change                                                        */
 /*****************************************************************************/
 /*@{*/
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
 int p4est_utils_end_pending_communication(int level = -1);
 #endif
@@ -787,12 +788,14 @@ int p4est_utils_post_gridadapt_map_data(
     p4est_t *p4est_old, p4est_mesh_t *mesh_old,
     p4est_virtual_t *virtual_quads, p4est_t *p4est_new,
     std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 /*@}*/
 
 /*****************************************************************************/
 /** \name Partition adaptive p4ests; Helper functions                        */
 /*****************************************************************************/
 /*@{*/
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 /** Get weights based on given metric
  *
  * @param metric   String of metric. Currently supported are
@@ -809,6 +812,7 @@ int p4est_utils_repart_preprocess();
 /** Postprocess repartitioning, i.e. move data to respective processors.
  */
 int p4est_utils_repart_postprocess();
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 /*@}*/
 
 /*****************************************************************************/

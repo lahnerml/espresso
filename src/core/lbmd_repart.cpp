@@ -8,8 +8,8 @@
 #include "p4est_utils.hpp"
 #include "cells.hpp"
 
-#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
-#include <p8est.h>
+#if ((defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)) && \
+     (defined(DD_P4EST)))
 
 namespace __md_detail {
 

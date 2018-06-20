@@ -976,7 +976,7 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
-#ifdef LB_ADAPTIVE
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
   if (n_part && 0.0 == sim_time) {
     fprintf(stderr, "Dynamically refine grid around particles\n");
     std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
@@ -999,7 +999,7 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
                 2 * sizeof(double));
     fprintf(stderr, "Done refinement around particles\n");
   }
-#endif // LB_ADAPTIVE
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
   /* perform integration */
   if (!Correlators::auto_update_enabled() &&
@@ -1019,9 +1019,11 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
         return ES_ERROR;
     }
   }
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
   p4est_utils_end_pending_communication();
 #endif // COMM_HIDING
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
   return ES_OK;
 }

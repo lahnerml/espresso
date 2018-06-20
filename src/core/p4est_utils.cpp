@@ -60,9 +60,13 @@ double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
                           std::numeric_limits<double>::min() };
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 std::vector<int> *flags;
 std::vector<p4est_gloidx_t> old_partition_table;
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+#ifdef LB_ADAPTIVE
 std::vector<lbadapt_payload_t> linear_payload_lbm;
+#endif // LB_ADAPTIVE
 
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo) {
   // Use at() here because forest_info might not have been initialized yet.
@@ -273,6 +277,8 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
+
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
                                     p4est_quadrant_t* q2, p4est_topidx_t tree2)
 {
@@ -332,6 +338,7 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
       (qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
        pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC));
 }
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
 std::array<int64_t, 3> p4est_utils_idx_to_pos(int64_t idx) {
   return Utils::morton_idx_to_coords(idx);
@@ -354,14 +361,37 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
   y = xyz[1] * (1 << fi.finest_level_global) + displace[1];
   z = xyz[2] * (1 << fi.finest_level_global) + displace[2];
 
+  double n_trees[3];
+  double n_trees_alt[3];
+#if defined(LB_ADAPTIVE) && defined(DD_P4EST)
+  for (int i = 0; i < P8EST_DIM; ++i) {
+    n_trees[i] = lb_conn_brick[i];
+    n_trees_alt[i] = dd_p4est_get_n_trees(i);
+    P4EST_ASSERT((n_trees[i] == n_trees_alt[i]) ||
+                 ((n_trees[i] < n_trees_alt[i]) && n_trees[i] == 0) ||
+                 ((n_trees_alt[i] < n_trees[i]) && n_trees_alt[i] == 0));
+    if (n_trees[i] < n_trees_alt[i]) {
+      P4EST_ASSERT (n_trees[i] == 0);
+      n_trees[i] = n_trees_alt[i];
+    }
+  }
+#elif defined(LB_ADAPTIVE)
+  for (int i = 0; i < P8EST_DIM; ++i) {
+          n_trees[i] = lb_conn_brick[i];
+        }
+#elif defined(DD_P4EST)
+        for (int i = 0; i < P8EST_DIM; ++i)
+          n_trees[i] = dd_p4est_get_n_trees(i);
+#endif
+
   // fold
-  int ub = lb_conn_brick[0] * (1 << fi.finest_level_global);
+  int ub = n_trees[0] * (1 << fi.finest_level_global);
   if (x >= ub) x -= ub;
   if (x < 0) x += ub;
-  ub = lb_conn_brick[1] * (1 << fi.finest_level_global);
+  ub = n_trees[1] * (1 << fi.finest_level_global);
   if (y >= ub) y -= ub;
   if (y < 0) y += ub;
-  ub = lb_conn_brick[2] * (1 << fi.finest_level_global);
+  ub = n_trees[2] * (1 << fi.finest_level_global);
   if (z >= ub) z -= ub;
   if (z < 0) z += ub;
 
@@ -942,6 +972,8 @@ void get_subc_weights(p8est_iter_volume_info_t *info, void *user_data) {
   w->at(info->quadid) = 1 << (p4est_params.max_ref_level - info->quad->level);
 }
 
+
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
   std::vector<double> weights (adapt_p4est->local_num_quadrants, 1.0);
   if (metric == "subcycling") {
@@ -1023,6 +1055,7 @@ int p4est_utils_repart_postprocess() {
 
   return 0;
 }
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
 void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify) {

@@ -301,25 +301,6 @@ int dd_p4est_cellsize_optimal() {
   return lvl; // return the level of the grid
 }
 //--------------------------------------------------------------------------------------------------
-// Creates a forest with box_l trees in each direction
-int dd_p4est_cellsize_even () {
-  brick_size[0] = box_l[0];
-  brick_size[1] = box_l[1];
-  brick_size[2] = box_l[2];
-
-  int ncells = 1;
-  if (max_range > ROUND_ERROR_PREC * box_l[0])
-    ncells = std::max<int>(1.0 / max_range, 1);
-
-  int lvl = Utils::nat_log2_floor(ncells);
-
-  grid_size[0] = brick_size[0] << lvl;
-  grid_size[1] = brick_size[1] << lvl;
-  grid_size[2] = brick_size[2] << lvl;
-
-  return lvl; // Return level > 0 if max_range <= 0.5
-}
-//--------------------------------------------------------------------------------------------------
 // Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
 static void dd_p4est_initialize_grid() {
   // Set global variables

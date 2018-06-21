@@ -3325,8 +3325,8 @@ inline void lb_collide_stream() {
 
   // perform 1st half of subcycling here (process coarse before fine)
   auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
-  for (level = forest_lb.coarsest_level_global;
-       level <= forest_lb.finest_level_global; ++level) {
+  for (level = p4est_params.min_ref_level;
+       level <= p4est_params.max_ref_level; ++level) {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
@@ -3343,8 +3343,8 @@ inline void lb_collide_stream() {
   ++n_lbsteps;
 
   // perform second half of subcycling here (process fine before coarse)
-  for (level = forest_lb.finest_level_global;
-       forest_lb.coarsest_level_global <= level; --level) {
+  for (level = p4est_params.max_ref_level;
+       p4est_params.min_ref_level <= level; --level) {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {

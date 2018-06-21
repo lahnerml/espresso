@@ -2683,27 +2683,28 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
   };
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    //fprintf(stderr, "[p4est %i] %f, %f, %f => %li (lq: %i)\n",
-    //        this_node, pos[0], pos[1], pos[2], qidx,
-    //        adapt_p4est->local_num_quadrants);
-    qidx = -1;
+    int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
+    if (ncnt > 0) return ncnt;
+    fprintf(stderr, "Particle not in local LB domain ");
+    fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
+            this_node, qidx, pos[0], pos[1], pos[2]);
+    for (int i = 0; i <= n_nodes; ++i) {
+      fprintf(stderr, "%li, ",
+              p4est_utils_get_forest_info(
+                  forest_order::adaptive_LB).p4est_space_idx[i]);
+    }
+#ifdef DD_P4EST
+    fprintf(stderr, "belongs to MD process %i\n",
+            cell_structure.position_to_node(pos));
+#else
+  fprintf(stderr, "\n");
+#endif
+    errexit();
+    return -1;
   } else {
     P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos));
   }
 
-  if (qidx < 0) {
-    int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
-    if (ncnt > 0) return ncnt;
-    fprintf(stderr, "Particle not in local LB domain ");
-    fprintf(stderr, "%i : %li [%lf %lf %lf], ", this_node, qidx,
-            pos[0], pos[1], pos[2]);
-#ifdef DD_P4EST
-    fprintf(stderr, "belongs to MD process %i\n",
-            cell_structure.position_to_node(pos));
-#endif
-    errexit();
-    return -1;
-  }
   int lvl, sid;
   p8est_quadrant_t *quad;
   quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qidx);

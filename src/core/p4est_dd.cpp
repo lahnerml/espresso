@@ -9,7 +9,6 @@
 #include <p4est_to_p8est.h>
 #include <p8est_ghost.h>
 #include <p8est_mesh.h>
-#include <p8est_vtk.h>
 #include <p8est_extended.h>
 #include <p8est_bits.h>
 #include <p8est_algorithms.h>
@@ -1446,12 +1445,9 @@ void dd_p4est_write_parallel_vtk(char *filename) {
 }
 
 void dd_p4est_write_particle_vtk(char *filename) {
-  char foo[1024];
-  sprintf(foo, "%s_grid", filename);
-  p4est_vtk_write_file(ds::p4est, nullptr, foo);
   char fname[1024];
   // node 0 writes the header file
-  if (this_node == 0) {
+  if (!this_node) {
     sprintf(fname, "%s.pvtp", filename);
     FILE *h = fopen(fname, "w");
     fprintf(h, "<?xml version=\"1.0\"?>\n");

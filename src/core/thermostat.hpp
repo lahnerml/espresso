@@ -335,48 +335,57 @@ inline void fluid_velocity(double pos[3], double vfxyz[3])
   // Look up the values of the 8 points of the grid
 
   u000 = veluu(x0, y0, z0);
-  u100 = veluu(x0, y0, z1);
-  u010 = veluu(x1, y0, z0);
-  u001 = veluu(x0, y1, z0);
-  u101 = veluu(x0, y1, z1);
-  u011 = veluu(x1, y1, z0);
-  u110 = veluu(x1, y0, z1);
+  u100 = veluu(x1, y0, z0);
+  u010 = veluu(x0, y1, z0);
+  u001 = veluu(x0, y0, z1);
+  u101 = veluu(x1, y0, z1);
+  u011 = veluu(x0, y1, z1);
+  u110 = veluu(x1, y1, z0);
   u111 = veluu(x1, y1, z1);
 
   v000 = velvv(x0, y0, z0);
-  v100 = velvv(x0, y0, z1);
-  v010 = velvv(x1, y0, z0);
-  v001 = velvv(x0, y1, z0);
-  v101 = velvv(x0, y1, z1);
-  v011 = velvv(x1, y1, z0);
-  v110 = velvv(x1, y0, z1);
+  v100 = velvv(x1, y0, z0);
+  v010 = velvv(x0, y1, z0);
+  v001 = velvv(x0, y0, z1);
+  v101 = velvv(x1, y0, z1);
+  v011 = velvv(x0, y1, z1);
+  v110 = velvv(x1, y1, z0);
   v111 = velvv(x1, y1, z1);
 
   w000 = velww(x0, y0, z0);
-  w100 = velww(x0, y0, z1);
-  w010 = velww(x1, y0, z0);
-  w001 = velww(x0, y1, z0);
-  w101 = velww(x0, y1, z1);
-  w011 = velww(x1, y1, z0);
-  w110 = velww(x1, y0, z1);
+  w100 = velww(x1, y0, z0);
+  w010 = velww(x0, y1, z0);
+  w001 = velww(x0, y0, z1);
+  w101 = velww(x1, y0, z1);
+  w011 = velww(x0, y1, z1);
+  w110 = velww(x1, y1, z0);
   w111 = velww(x1, y1, z1);
 
   // Compute the velocity components u, v, w at point
-  vfxyz[0] = u000 * (1 - wx) * (1 - wy) * (1 - wz) +
-             u100 * wx * (1 - wy) * (1 - wz) + u010 * (1 - wx) * wy * (1 - wz) +
-             u001 * (1 - wx) * (1 - wy) * wz + u101 * wx * (1 - wy) * wz +
-             u011 * (1 - wx) * wy * wz + u110 * wx * wy * (1 - wz) +
-             u111 * wx * wy * wz;
-  vfxyz[1] = v000 * (1 - wx) * (1 - wy) * (1 - wz) +
-             v100 * wx * (1 - wy) * (1 - wz) + v010 * (1 - wx) * wy * (1 - wz) +
-             v001 * (1 - wx) * (1 - wy) * wz + v101 * wx * (1 - wy) * wz +
-             v011 * (1 - wx) * wy * wz + v110 * wx * wy * (1 - wz) +
-             v111 * wx * wy * wz;
-  vfxyz[2] = w000 * (1 - wx) * (1 - wy) * (1 - wz) +
-             w100 * wx * (1 - wy) * (1 - wz) + w010 * (1 - wx) * wy * (1 - wz) +
-             w001 * (1 - wx) * (1 - wy) * wz + w101 * wx * (1 - wy) * wz +
-             w011 * (1 - wx) * wy * wz + w110 * wx * wy * (1 - wz) +
-             w111 * wx * wy * wz;
+  vfxyz[0] =  u000 * (1 - wx) * (1 - wy) * (1 - wz)
+            + u100 * wx * (1 - wy) * (1 - wz)
+            + u010 * (1 - wx) * wy * (1 - wz)
+            + u001 * (1 - wx) * (1 - wy) * wz
+            + u101 * wx * (1 - wy) * wz
+            + u011 * (1 - wx) * wy * wz
+            + u110 * wx * wy * (1 - wz)
+            + u111 * wx * wy * wz;
+  vfxyz[1] =   v000 * (1 - wx) * (1 - wy) * (1 - wz)
+             + v100 * wx * (1 - wy) * (1 - wz)
+             + v010 * (1 - wx) * wy * (1 - wz)
+             + v001 * (1 - wx) * (1 - wy) * wz
+             + v101 * wx * (1 - wy) * wz
+             + v011 * (1 - wx) * wy * wz
+             + v110 * wx * wy * (1 - wz)
+             + v111 * wx * wy * wz;
+  vfxyz[2] =   w000 * (1 - wx) * (1 - wy) * (1 - wz)
+             + w100 * wx * (1 - wy) * (1 - wz)
+             + w010 * (1 - wx) * wy * (1 - wz)
+             + w001 * (1 - wx) * (1 - wy) * wz
+             + w101 * wx * (1 - wy) * wz
+             + w011 * (1 - wx) * wy * wz
+             + w110 * wx * wy * (1 - wz)
+             + w111 * wx * wy * wz;
 }
 #endif // USE_FLOWFIELD
 

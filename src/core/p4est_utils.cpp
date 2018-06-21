@@ -873,7 +873,7 @@ int p4est_utils_perform_adaptivity_step() {
   adapt_p4est.reset(p4est_adapted);
 
   std::vector<std::string> metrics;
-  metrics = {"ncells", p4est_params.partitioning};
+  metrics = {"npart", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
   std::vector<p8est_t *> forests;
   forests.push_back(dd_p4est_get_p4est());

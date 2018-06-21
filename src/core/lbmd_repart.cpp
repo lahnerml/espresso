@@ -6,9 +6,10 @@
 
 #include <p8est_extended.h>
 
-#include "repart.hpp"
-#include "p4est_utils.hpp"
 #include "cells.hpp"
+#include "lb-adaptive.hpp"
+#include "p4est_utils.hpp"
+#include "repart.hpp"
 
 #if ((defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)) && \
      (defined(DD_P4EST)))
@@ -111,11 +112,11 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
                                        ws[1], alphas[1]);
     } else {
         if (p4est_params.partitioning == "n_cells") {
-            p8est_partition_ext(p4est_partitioned, 1,
+            p8est_partition_ext(adapt_p4est, 1,
                                 lbadapt_partition_weight_uniform);
         }
         else if (p4est_params.partitioning == "subcycling") {
-            p8est_partition_ext(p4est_partitioned, 1,
+            p8est_partition_ext(adapt_p4est, 1,
                                 lbadapt_partition_weight_subcycling);
         }
         else {

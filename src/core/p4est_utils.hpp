@@ -171,8 +171,10 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
  * refinement before the simulation has started.
  *
  * @param btype      Neighbor information that is to be included
+ * @param partition  Should the p4est be repartitioned while structs are built
  */
-void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype);
+void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
+                                       bool partition = true);
 
 /*****************************************************************************/
 /** \name Python interface                                                   */

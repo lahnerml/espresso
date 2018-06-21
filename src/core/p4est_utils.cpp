@@ -162,7 +162,8 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
                  std::back_inserter(forest_info), p4est_to_forest_info);
 }
 
-void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
+void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
+                                       bool partition) {
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd_p4est_get_p4est());
@@ -172,50 +173,54 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype) {
 #endif // LB_ADAPTIVE
   p4est_utils_prepare(forests);
 
+  if (partition) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
-  auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
-  if (afi.coarsest_level_global == afi.finest_level_global) {
-    auto sfi = forest_info.at(static_cast<size_t>(forest_order::short_range));
-    auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
-               forest_order::adaptive_LB : forest_order::short_range;
-    auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
-               forest_order::short_range : forest_order::adaptive_LB;
-    if (mod == forest_order::short_range)
-      p4est_dd_repart_preprocessing();
-    p4est_utils_partition_multiple_forests(ref, mod);
+    auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
+    if (afi.coarsest_level_global == afi.finest_level_global) {
+      auto sfi = forest_info.at(static_cast<size_t>(forest_order::short_range));
+      auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+                 forest_order::adaptive_LB : forest_order::short_range;
+      auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+                 forest_order::short_range : forest_order::adaptive_LB;
+      if (mod == forest_order::short_range)
+        p4est_dd_repart_preprocessing();
+      p4est_utils_partition_multiple_forests(ref, mod);
+      p4est_utils_prepare(forests);
+
+      // copied from lbmd_repart short-range MD postprocess
+      if (mod == forest_order::short_range)
+        cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
+    }
+
+    std::vector<std::string> metrics;
+    std::vector<double> alpha = {1., 1.};
+    std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
+                                   1.0);
+    std::vector<double> weights_lb =
+        p4est_utils_get_adapt_weights(p4est_params.partitioning);
+    p4est_dd_repart_preprocessing();
+    p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
+                                   adapt_p4est, weights_lb, 1.0);
+    cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
     p4est_utils_prepare(forests);
-
-    // copied from lbmd_repart short-range MD postprocess
-    if (mod == forest_order::short_range)
-      cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
-  }
-
-  std::vector<std::string> metrics;
-  std::vector<double> alpha = {1., 1.};
-  std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
-                                 1.0);
-  std::vector<double> weights_lb =
-      p4est_utils_get_adapt_weights(p4est_params.partitioning);
-  p4est_dd_repart_preprocessing();
-  p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
-                                 adapt_p4est, weights_lb, 1.0);
-  cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
-  p4est_utils_prepare(forests);
-#elif defined(DD_P4EST)
-  p4est_partition(dd_p4est_get_p4est(), 1, nullptr);
 #elif defined(LB_ADAPTIVE)
-  if (p4est_params.partitioning == "n_cells") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_uniform);
-  }
-  else if (p4est_params.partitioning == "subcycling") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_subcycling);
-  }
-  else {
-    SC_ABORT_NOT_REACHED();
-  }
+    if (p4est_params.partitioning == "n_cells") {
+      p8est_partition_ext(p4est_partitioned, 1,
+                          lbadapt_partition_weight_uniform);
+    }
+    else if (p4est_params.partitioning == "subcycling") {
+      p8est_partition_ext(p4est_partitioned, 1,
+                          lbadapt_partition_weight_subcycling);
+    }
+    else {
+      SC_ABORT_NOT_REACHED();
+    }
+#elif defined(DD_P4EST)
+    p4est_dd_repart_preprocessing();
+    p4est_partition(dd_p4est_get_p4est(), 1, nullptr);
+    cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 #endif // DD_P4EST
+  }
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;
 #endif // LB_ADAPTIVE_GPU
@@ -1048,7 +1053,7 @@ int p4est_utils_repart_postprocess() {
 #endif // COMM_HIDING
 
   // recreate p4est structs after partitioning
-  p4est_utils_rebuild_p4est_structs(P8EST_CONNECT_FULL);
+  p4est_utils_rebuild_p4est_structs(P8EST_CONNECT_FULL, false);
 
 #ifdef COMM_HIDING
   p4est_transfer_fixed_end(data_transfer_handle);

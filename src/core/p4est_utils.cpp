@@ -630,6 +630,7 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                   adapt_p4est->mpicomm);
   }
 
+  // refinement in a potentially moving box
   p8est_quadrant_t *q;
   std::array<double, 3> midpoint, bbox_min, bbox_max;
   bbox_min = {{std::fmod(coords_for_regional_refinement[0] +
@@ -651,12 +652,15 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
   // particle criterion: Refine cells where we have particles
   if (n_part) {
     p4est_locidx_t qid, nqid;
-    castable_unique_ptr<sc_array_t> nqids = sc_array_new(sizeof(p4est_locidx_t));
+    castable_unique_ptr<sc_array_t> nqids =
+        sc_array_new(sizeof(p4est_locidx_t));
     std::vector<p4est_locidx_t> ghost_ids;
     ghost_ids.reserve(adapt_ghost->ghosts.elem_count);
     for (auto p: ghost_cells.particles()) {
       ghost_ids.push_back(lbadapt_map_pos_to_ghost(p.r.p));
     }
+    p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
+    p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;
     for (auto p: local_cells.particles()) {
       qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p);
       (*flags)[qid] = 1;
@@ -666,17 +670,28 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
                                  nullptr, nullptr, nqids);
         for (int j = 0; j < nqids->elem_count; ++j) {
           nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
-          P4EST_ASSERT (0 <= nqid &&
-                        nqid < adapt_mesh->local_num_quadrants +
-                               adapt_mesh->ghost_num_quadrants);
-          if (nqid < adapt_p4est->local_num_quadrants)
+          P4EST_ASSERT (0 <= nqid && nqid < lq + gq);
+          if (nqid < lq)
             (*flags)[nqid] = 1;
-          else if (!ghost_ids.empty()) {
-            auto search_it =
-                std::find(ghost_ids.begin(), ghost_ids.end(),
-                          nqid - adapt_mesh->local_num_quadrants);
-            if (search_it != ghost_ids.end()){
-              (*flags)[qid] = 1;
+        }
+      }
+    }
+    if (!ghost_ids.empty()) {
+      for (int i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
+        qid = adapt_mesh->mirror_qid[i];
+        for (int i = 0; i < 26; ++i) {
+          sc_array_truncate(nqids);
+          p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid, i,
+                                   nullptr, nullptr, nqids);
+          for (int j = 0; j < nqids->elem_count; ++j) {
+            nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
+            P4EST_ASSERT (0 <= nqid && nqid < lq + gq);
+            if (lq <= nqid) {
+              auto search_it = std::find(ghost_ids.begin(), ghost_ids.end(),
+                                         nqid - lq);
+              if (search_it != ghost_ids.end()) {
+                (*flags)[qid] = 1;
+              }
             }
           }
         }

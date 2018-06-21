@@ -872,6 +872,7 @@ int p4est_utils_perform_adaptivity_step() {
   //           including all preparations for next time step
   adapt_p4est.reset(p4est_adapted);
 
+#ifdef DD_P4EST
   std::vector<std::string> metrics;
   metrics = {"npart", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
@@ -881,6 +882,19 @@ int p4est_utils_perform_adaptivity_step() {
   p4est_utils_prepare(forests);
 
   lbmd::repart_all(metrics, alpha);
+#else
+  if (p4est_params.partitioning == "n_cells") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_uniform);
+  }
+  else if (p4est_params.partitioning == "subcycling") {
+    p8est_partition_ext(p4est_partitioned, 1,
+                        lbadapt_partition_weight_subcycling);
+  }
+  else {
+    SC_ABORT_NOT_REACHED();
+  }
+#endif
 
   // free linear payload (i.e. send buffer)
   linear_payload_lbm.clear();

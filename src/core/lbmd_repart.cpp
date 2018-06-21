@@ -1,9 +1,11 @@
+#include "lbmd_repart.hpp"
 
 #include <cstdio>
 #include <vector>
 #include <string>
 
-#include "lbmd_repart.hpp"
+#include <p8est_extended.h>
+
 #include "repart.hpp"
 #include "p4est_utils.hpp"
 #include "cells.hpp"
@@ -102,10 +104,24 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
         return ri.weights(m);
     });
 
-    p4est_utils_weighted_partition(tree_of(repart_infos[0]),
-                                   ws[0], alphas[0],
-                                   tree_of(repart_infos[1]),
-                                   ws[1], alphas[1]);
+    if (n_part) {
+        p4est_utils_weighted_partition(tree_of(repart_infos[0]),
+                                       ws[0], alphas[0],
+                                       tree_of(repart_infos[1]),
+                                       ws[1], alphas[1]);
+    } else {
+        if (p4est_params.partitioning == "n_cells") {
+            p8est_partition_ext(p4est_partitioned, 1,
+                                lbadapt_partition_weight_uniform);
+        }
+        else if (p4est_params.partitioning == "subcycling") {
+            p8est_partition_ext(p4est_partitioned, 1,
+                                lbadapt_partition_weight_subcycling);
+        }
+        else {
+            SC_ABORT_NOT_REACHED();
+        }
+    }
 
     for (const auto& ri: repart_infos)
         ri.postprocess();

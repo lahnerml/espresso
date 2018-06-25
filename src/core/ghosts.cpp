@@ -542,14 +542,8 @@ static int is_recv_op(int comm_type, int node)
  *
  * \param gc Communication specification, see \ref GhostCommunicator
  */
-static void ghost_communicator_async(GhostCommunicator *gc)
+static void ghost_communicator_async(GhostCommunicator *gc, int data_parts)
 {
-  int data_parts = gc->data_parts;
-  /* if ghosts should have uptodate velocities, they have to be updated like
-     positions (except for shifting...) */
-  if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
-    data_parts |= GHOSTTRANS_MOMENTUM;
-
   std::vector<CommBuf> commbufs(gc->num);
   // Reqs has size 2 * gc->num. In the first gc->num elements the requests of
   // particle data Isend and Irecv are stored. In the second half requests of
@@ -639,13 +633,11 @@ static void ghost_communicator_async(GhostCommunicator *gc)
 /** Synchronous communication.
  * \param gc Communication specification, see \ref GhostCommunicator
  */
-static void ghost_communicator_sync(GhostCommunicator *gc)
+static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts)
 {
   static CommBuf s_buffer, r_buffer;
   MPI_Status status;
   int n, n2;
-  int data_parts = gc->data_parts;
-
 
   GHOST_TRACE(fprintf(stderr, "%d: ghost_comm %p, data_parts %d\n", this_node, (void*) gc, data_parts));
 
@@ -810,10 +802,16 @@ static void ghost_communicator_sync(GhostCommunicator *gc)
 
 void ghost_communicator(GhostCommunicator *gc)
 {
+  int data_parts = gc->data_parts;
+  /* if ghosts should have uptodate velocities, they have to be updated like
+     positions (except for shifting...) */
+  if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
+    data_parts |= GHOSTTRANS_MOMENTUM;
+
   if (gc->async)
-    ghost_communicator_async(gc);
+    ghost_communicator_async(gc, data_parts);
   else
-    ghost_communicator_sync(gc);
+    ghost_communicator_sync(gc, data_parts);
 }
 
 void ghost_init()

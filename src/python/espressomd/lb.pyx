@@ -259,34 +259,6 @@ IF LB_GPU or LB:
                 lb_lbfluid_get_interpolated_velocity_global(p, v)
                 return v
 
-        @cython.boundscheck(False)
-        @cython.wraparound(False)
-        def get_interpolated_fluid_velocity_at_positions(self, np.ndarray[double, ndim=2, mode="c"] positions not None):
-            """Calculate the fluid velocity at given positions.
-
-            Parameters
-            ----------
-            positions : numpy-array of type :obj:`float` of shape (N,3)
-                        The 3-dimensional positions.
-
-            Returns
-            -------
-            velocities : numpy-array of type :obj:`float` of shape (N,3)
-                         The 3-dimensional LB fluid velocities.
-
-            Raises
-            ------
-            AssertionError
-                If shape of ``positions`` not (N,3).
-
-            """
-            assert positions.shape[1] == 3, "The input array must have shape (N,3)"
-            cdef int length
-            length = positions.shape[0]
-            velocities = np.empty_like(positions)
-            lb_lbfluid_get_interpolated_velocity_at_positions(<double *>np.PyArray_GETPTR2(positions, 0, 0), <double *>np.PyArray_GETPTR2(velocities, 0, 0), length)
-            return velocities
-
 IF LB_GPU:
     cdef class LBFluidGPU(LBFluid):
         """

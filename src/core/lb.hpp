@@ -645,9 +645,11 @@ int lb_lbnode_set_pop(int *ind, double *pop);
  * can be called without the position needing to be on the local processor */
 int lb_lbfluid_get_interpolated_velocity_global(Vector<3, double> p, double* v);
 
+#ifdef LB_GPU
 void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,
                                                        double *velocities,
                                                        int length);
+#endif // LB_GPU
 #endif // defined (LB) || defined(LB_GPU)
 
 #endif // !LB_ADAPTIVE_GPU

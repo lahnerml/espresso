@@ -127,9 +127,6 @@ HaloCommunicator update_halo_comm = {0, nullptr};
 /*@{*/
 
 #ifdef LB_ADAPTIVE
-#ifdef COMM_HIDING
-std::vector<p8est_virtual_ghost_exchange_t*> exc_status (19, nullptr);
-#endif
 int n_lbsteps = 0;
 #endif // LB_ADAPTIVE
 
@@ -3103,7 +3100,7 @@ inline void lb_collide_stream() {
                              lbadapt_ghost_data, ghost_pointer);
 
 #ifdef COMM_HIDING
-      exc_status[level] =
+      exc_status_lb[level] =
           p4est_virtual_ghost_exchange_data_level_begin(
               adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
               adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),

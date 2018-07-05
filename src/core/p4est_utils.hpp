@@ -86,6 +86,9 @@ extern castable_unique_ptr<p4est_ghost_t> adapt_ghost;
 extern castable_unique_ptr<p4est_mesh_t> adapt_mesh;
 extern castable_unique_ptr<p4est_virtual_t> adapt_virtual;
 extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+#ifdef COMM_HIDING
+extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb;
+#endif
 #endif
 
 /** Struct containing information to adjust p4est behavior */

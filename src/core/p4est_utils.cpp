@@ -35,6 +35,9 @@ castable_unique_ptr<p4est_ghost_t> adapt_ghost;
 castable_unique_ptr<p4est_mesh_t> adapt_mesh;
 castable_unique_ptr<p4est_virtual_t> adapt_virtual;
 castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+#ifdef COMM_HIDING
+std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (19, nullptr);
+#endif
 #endif
 
 p4est_parameters p4est_params = {
@@ -816,16 +819,16 @@ int p4est_utils_end_pending_communication(int level) {
   if (-1 == level) {
     for (int i = p4est_params.min_ref_level;
          i < p4est_params.max_ref_level; ++i) {
-      if (nullptr != exc_status[i]) {
-        p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
-        exc_status[i] = nullptr;
+      if (nullptr != exc_status_lb[i]) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status_lb[i]);
+        exc_status_lb[i] = nullptr;
       }
     }
   }
   else {
-    if (nullptr != exc_status[level]) {
-      p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
-      exc_status[level] = nullptr;
+    if (nullptr != exc_status_lb[level]) {
+      p4est_virtual_ghost_exchange_data_level_end(exc_status_lb[level]);
+      exc_status_lb[level] = nullptr;
     }
   }
 #endif // COMM_HIDING
@@ -1092,7 +1095,7 @@ int p4est_utils_repart_postprocess() {
   for (int level = p4est_params.min_ref_level;
        level <= p4est_params.max_ref_level; ++level) {
 #ifdef COMM_HIDING
-    exc_status[level] =
+    exc_status_lb[level] =
         p4est_virtual_ghost_exchange_data_level_begin(
             adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
             adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),

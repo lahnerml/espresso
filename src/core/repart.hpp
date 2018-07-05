@@ -9,19 +9,6 @@
 
 namespace repart {
 
-struct RuntimeRecorder {
-  RuntimeRecorder(double& t): t(t) { t -= MPI_Wtime(); }
-  ~RuntimeRecorder() { t += MPI_Wtime() - t; }
-private:
-  double& t;
-};
-
-extern double ivv_runtime;
-extern double fc_runtime;
-extern double lc_runtime;
-extern std::vector<double> lc_cell_runtime;
-
-
 // Print general information about cell process mapping
 //void print_cell_info(const std::string& prefix, const std::string& method);
 
@@ -44,7 +31,7 @@ struct metric {
    * of addition, e.g. "-1.0*ncells -1.7*nghostpart".
    * Single metric names are also acceptable and interpreted as "1.0<name>".
    * Valid metrics are: ncells, npart, ndistpairs, nforcepairs, nbondedia,
-   * nghostcells, nghostpart, runtime and rand.
+   * nghostcells, nghostpart and rand.
    * \param desc string to describe the metric
    */
   void set_metric(const std::string& desc);

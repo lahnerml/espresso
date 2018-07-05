@@ -65,8 +65,6 @@
 #include <cstring>
 #include <mpi.h>
 
-#include "repart.hpp"
-
 #ifdef VALGRIND_INSTRUMENTATION
 #include <callgrind.h>
 #endif
@@ -208,9 +206,6 @@ void integrate_ensemble_init() {
 /************************************************************/
 
 void integrate_vv(int n_steps, int reuse_forces) {
-  // TODO: Fix compilation error
-  //repart::RuntimeRecorder(repart::ivv_runtime);
-
   /* Prepare the Integrator */
   on_integration_start();
 

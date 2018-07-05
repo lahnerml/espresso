@@ -970,7 +970,7 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
   }
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
-  p4est_utils_end_pending_communication();
+  p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 

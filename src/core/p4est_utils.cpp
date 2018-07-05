@@ -813,22 +813,23 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
-int p4est_utils_end_pending_communication(int level) {
+template <typename T>
+int p4est_utils_end_pending_communication(std::vector<T> exc_status, int level) {
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
   if (-1 == level) {
     for (int i = p4est_params.min_ref_level;
          i < p4est_params.max_ref_level; ++i) {
-      if (nullptr != exc_status_lb[i]) {
-        p4est_virtual_ghost_exchange_data_level_end(exc_status_lb[i]);
-        exc_status_lb[i] = nullptr;
+      if (nullptr != exc_status[i]) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
+        exc_status[i] = nullptr;
       }
     }
   }
   else {
-    if (nullptr != exc_status_lb[level]) {
-      p4est_virtual_ghost_exchange_data_level_end(exc_status_lb[level]);
-      exc_status_lb[level] = nullptr;
+    if (nullptr != exc_status[level]) {
+      p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+      exc_status[level] = nullptr;
     }
   }
 #endif // COMM_HIDING
@@ -853,7 +854,7 @@ int p4est_utils_perform_adaptivity_step() {
 
 #ifdef COMM_HIDING
   // get rid of any pending communication and avoid dangling messages
-  p4est_utils_end_pending_communication();
+  p4est_utils_end_pending_communication(exc_status_lb);
 #endif
 
   // copy forest and perform refinement step.

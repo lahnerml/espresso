@@ -3061,7 +3061,7 @@ inline void lb_collide_stream() {
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef COMM_HIDING
       lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
-      p4est_utils_end_pending_communication(level);
+      p4est_utils_end_pending_communication(exc_status_lb, level);
       lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
@@ -3082,7 +3082,7 @@ inline void lb_collide_stream() {
       // Stop ghost exchange "early" if there are virtual quadrants on that
       // level.
       if (0 < (adapt_virtual->virtual_glevels + level + 1)->elem_count) {
-        p4est_utils_end_pending_communication(level);
+        p4est_utils_end_pending_communication(exc_status_lb, level);
         lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
       }
 #else
@@ -3734,7 +3734,7 @@ void calc_particle_lattice_ia() {
       // If we do not want to overlap communication and computation we don't
       // have to do anything here, as the ghost layer is collided redundantly.
       // TODO: Do we really have to terminate all ghost communication here?
-      p4est_utils_end_pending_communication();
+      p4est_utils_end_pending_communication(exc_status_lb);
     }
 #endif // COMM_HIDING
 #endif // DD_P4EST

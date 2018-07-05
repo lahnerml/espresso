@@ -26,33 +26,28 @@
 
 #include "config.hpp"
 
-#include <cmath>
-#include "utils.hpp"
+#include "Vector.hpp"
+#include "cells.hpp"
 #include "debug.hpp"
-#include "particle_data.hpp"
-#include "random.hpp"
+#include "dpd.hpp"
 #include "global.hpp"
 #include "integrate.hpp"
-#include "cells.hpp"
 #include "lb.hpp"
-#include "dpd.hpp"
+#include "particle_data.hpp"
+#include "random.hpp"
 #include "virtual_sites.hpp"
-#include "Vector.hpp"
+#include <cmath>
 
 /** \name Thermostat switches*/
 /************************************************************/
 /*@{*/
 
-#define THERMO_OFF        0
-#define THERMO_LANGEVIN   1
-#define THERMO_DPD        2
-#define THERMO_NPT_ISO    4
-#define THERMO_LB         8
-#define THERMO_INTER_DPD  16
-#define THERMO_GHMC       32
-#define THERMO_CPU        64
-#define THERMO_SD         128
-#define THERMO_BD         256
+#define THERMO_OFF 0
+#define THERMO_LANGEVIN 1
+#define THERMO_DPD 2
+#define THERMO_NPT_ISO 4
+#define THERMO_LB 8
+#define THERMO_GHMC 32
 /*@}*/
 
 namespace Thermostat {
@@ -101,42 +96,6 @@ extern double nptiso_gammav;
 extern int ghmc_nmd;
 /** Phi parameter for GHMC partial momenum update step */
 extern double ghmc_phi;
-
-#ifdef USE_FLOWFIELD
-void fluid_init();
-
-/** Flow field langevin parameter */
-extern double langevin_pref3;
-
-/** Flow field itself */
-extern std::vector<double> velu, velv, velw;
-
-/** File names */
-extern std::string ff_name_u, ff_name_v, ff_name_w;
-
-// Flowfield size in one dimension
-#ifndef FLOWFIELD_SIZE
-#define FLOWFIELD_SIZE 64
-#endif
-// Overflow is unlikely (who has that much memory). But prevent silent
-// execution or segmentation faults because of accidentally wrongly set
-// flowfield sizes.
-#define CBRT_SIZE_MAX 2642245UL
-#if (FLOWFIELD_SIZE > CBRT_SIZE_MAX)
-#  error Flowfield size too great for size_t
-#endif
-
-#define veluu(xi, yj, zk) (velu[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
-#define velvv(xi, yj, zk) (velv[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
-#define velww(xi, yj, zk) (velw[FLOWFIELD_SIZE * FLOWFIELD_SIZE * zk + FLOWFIELD_SIZE * yj + xi])
-
-#define PY_USE_FLOWFIELD 1
-#define PY_FLOWFIELD_SIZE FLOWFIELD_SIZE
-#else // USE_FLOWFIELD
-#define PY_USE_FLOWFIELD 0
-#define PY_FLOWFIELD_SIZE -1
-#endif // USE_FLOWFIELD
-
 
 /************************************************
  * functions
@@ -205,8 +164,8 @@ inline void thermo_convert_forces_body_to_space(Particle *p, double *force) {
              A[2 + 3 * 2] * p->f.f[2];
 }
 
-inline void thermo_convert_vel_space_to_body(Particle *p, double *vel_space,
-                                             double *vel_body) {
+inline void thermo_convert_vel_space_to_body(Particle *p, const Vector3d& vel_space,
+                                             Vector3d&  vel_body) {
   double A[9];
   thermo_define_rotation_matrix(p, A);
 
@@ -225,7 +184,7 @@ inline void thermo_convert_vel_space_to_body(Particle *p, double *vel_space,
     @param vel    velocity vector
     @param pos    position vector
     @return       adjusted (or not) i^th velocity coordinate */
-inline double le_frameV(int i, double *vel, double *pos) {
+inline double le_frameV(int i, const Vector3d&  vel, const Vector3d&  pos) {
 #ifdef LEES_EDWARDS
 
   if (i == 0) {
@@ -241,13 +200,13 @@ inline double le_frameV(int i, double *vel, double *pos) {
 #ifdef NPT
 /** add velocity-dependend noise and friction for NpT-sims to the particle's
    velocity
-    @param dt_vj  j-component of the velocity scaled by time_step dt
+    @param vj     j-component of the velocity
     @return       j-component of the noise added to the velocity, also scaled by
    dt (contained in prefactors) */
-inline double friction_therm0_nptiso(double dt_vj) {
+inline double friction_therm0_nptiso(double vj) {
   extern double nptiso_pref1, nptiso_pref2;
   if (thermo_switch & THERMO_NPT_ISO)
-    return (nptiso_pref1 * dt_vj + nptiso_pref2 * Thermostat::noise());
+    return (nptiso_pref1 * vj + nptiso_pref2 * Thermostat::noise());
 
   return 0.0;
 }
@@ -262,146 +221,12 @@ inline double friction_thermV_nptiso(double p_diff) {
 }
 #endif
 
-
-#ifdef USE_FLOWFIELD
-inline void fluid_velocity(double pos[3], double vfxyz[3])
-{
-  // Exit if flowfield has not already been set
-  if (velu.size() == static_cast<size_t>(0)) {
-    vfxyz[0] = vfxyz[1] = vfxyz[2] = 0.0;
-    return;
-  }
-
-  // Velocities at the corners of the grid cell particle p is in.
-  double u000, u100, u010, u001, u101, u011, u110, u111;
-  double v000, v100, v010, v001, v101, v011, v110, v111;
-  double w000, w100, w010, w001, w101, w011, w110, w111;
-
-  std::array<double, 3> ff_cellsize = {{ box_l[0] / FLOWFIELD_SIZE,
-                                         box_l[1] / FLOWFIELD_SIZE,
-                                         box_l[2] / FLOWFIELD_SIZE}};
-  // Cell index and upper cell index
-  // In combination 000, 001, 010, ... all 8 neighboring grid points of p
-  int x0 = pos[0] / ff_cellsize[0];
-  int x1 = x0 + 1;
-
-  int y0 = pos[1] / ff_cellsize[1];
-  int y1 = y0 + 1;
-
-  int z0 = pos[2] / ff_cellsize[2];
-  int z1 = z0 + 1;
-
-  // Interpolation weights
-  double wx = (pos[0] - (x0 * ff_cellsize[0])) / ff_cellsize[0];
-  double wy = (pos[1] - (y0 * ff_cellsize[1])) / ff_cellsize[1];
-  double wz = (pos[2] - (z0 * ff_cellsize[2])) / ff_cellsize[2];
-
-  // Correct for oob particles (only correct for slightly oob particles).
-  // In parallel they cannot be far oob because otherwise they would be
-  // transferred to the corresponding process.
-  if (pos[0] >= box_l[0]) {
-    x0 = 0;
-    x1 = 1;
-  } else if (pos[0] < 0) {
-    x0 = FLOWFIELD_SIZE - 2;
-    x1 = FLOWFIELD_SIZE - 1;
-  }
-
-  if (pos[1] >= box_l[1]) {
-    y0 = 0;
-    y1 = 1;
-  } else if (pos[1] < 0) {
-    y0 = FLOWFIELD_SIZE - 2;
-    y1 = FLOWFIELD_SIZE - 1;
-  }
-
-  if (pos[2] >= box_l[2]) {
-    z0 = 0;
-    z1 = 1;
-  } else if (pos[2] < 0) {
-    z0 = FLOWFIELD_SIZE - 2;
-    z1 = FLOWFIELD_SIZE - 1;
-  }
-
-  // Account for particles in the last cell (periodic boundary conditions)
-  if (x1 == FLOWFIELD_SIZE)
-    x1 = 0;
-  if (y1 == FLOWFIELD_SIZE)
-    y1 = 0;
-  if (z1 == FLOWFIELD_SIZE)
-    z1 = 0;
-
-
-  // Look up the values of the 8 points of the grid
-
-  u000 = veluu(x0, y0, z0);
-  u100 = veluu(x1, y0, z0);
-  u010 = veluu(x0, y1, z0);
-  u001 = veluu(x0, y0, z1);
-  u101 = veluu(x1, y0, z1);
-  u011 = veluu(x0, y1, z1);
-  u110 = veluu(x1, y1, z0);
-  u111 = veluu(x1, y1, z1);
-
-  v000 = velvv(x0, y0, z0);
-  v100 = velvv(x1, y0, z0);
-  v010 = velvv(x0, y1, z0);
-  v001 = velvv(x0, y0, z1);
-  v101 = velvv(x1, y0, z1);
-  v011 = velvv(x0, y1, z1);
-  v110 = velvv(x1, y1, z0);
-  v111 = velvv(x1, y1, z1);
-
-  w000 = velww(x0, y0, z0);
-  w100 = velww(x1, y0, z0);
-  w010 = velww(x0, y1, z0);
-  w001 = velww(x0, y0, z1);
-  w101 = velww(x1, y0, z1);
-  w011 = velww(x0, y1, z1);
-  w110 = velww(x1, y1, z0);
-  w111 = velww(x1, y1, z1);
-
-  // Compute the velocity components u, v, w at point
-  vfxyz[0] =  u000 * (1 - wx) * (1 - wy) * (1 - wz)
-            + u100 * wx * (1 - wy) * (1 - wz)
-            + u010 * (1 - wx) * wy * (1 - wz)
-            + u001 * (1 - wx) * (1 - wy) * wz
-            + u101 * wx * (1 - wy) * wz
-            + u011 * (1 - wx) * wy * wz
-            + u110 * wx * wy * (1 - wz)
-            + u111 * wx * wy * wz;
-  vfxyz[1] =   v000 * (1 - wx) * (1 - wy) * (1 - wz)
-             + v100 * wx * (1 - wy) * (1 - wz)
-             + v010 * (1 - wx) * wy * (1 - wz)
-             + v001 * (1 - wx) * (1 - wy) * wz
-             + v101 * wx * (1 - wy) * wz
-             + v011 * (1 - wx) * wy * wz
-             + v110 * wx * wy * (1 - wz)
-             + v111 * wx * wy * wz;
-  vfxyz[2] =   w000 * (1 - wx) * (1 - wy) * (1 - wz)
-             + w100 * wx * (1 - wy) * (1 - wz)
-             + w010 * (1 - wx) * wy * (1 - wz)
-             + w001 * (1 - wx) * (1 - wy) * wz
-             + w101 * wx * (1 - wy) * wz
-             + w011 * (1 - wx) * wy * wz
-             + w110 * wx * wy * (1 - wz)
-             + w111 * wx * wy * wz;
-}
-#endif // USE_FLOWFIELD
-
 /** overwrite the forces of a particle with
     the friction term, i.e. \f$ F_i= -\gamma v_i + \xi_i\f$.
 */
 inline void friction_thermo_langevin(Particle *p) {
   extern Thermostat::GammaType langevin_pref1, langevin_pref2;
   Thermostat::GammaType langevin_pref1_temp, langevin_pref2_temp;
-
-#ifdef MULTI_TIMESTEP
-  extern double langevin_pref1_small;
-#ifndef LANGEVIN_PER_PARTICLE
-  extern double langevin_pref2_small;
-#endif /* LANGEVIN_PER_PARTICLE */
-#endif /* MULTI_TIMESTEP */
 
   int j;
   double switch_trans = 1.0;
@@ -432,30 +257,24 @@ inline void friction_thermo_langevin(Particle *p) {
 #endif /* VIRTUAL_SITES */
 
   // Get velocity effective in the thermostatting
-  double velocity[3];
+  Vector3d velocity;
   for (int i = 0; i < 3; i++) {
     // Particle velocity
     velocity[i] = p->m.v[i];
-#ifdef USE_FLOWFIELD
-    double vfxyz[3];
-    // Fluid velocity
-    fluid_velocity(p->r.p, vfxyz);
-    velocity[i] -= langevin_pref3 * vfxyz[i];
-#endif // USE_FLOWFIELD
 #ifdef ENGINE
     // In case of the engine feature, the velocity is relaxed
     // towards a swimming velocity oriented parallel to the
     // particles director
-    velocity[i] -= (p->swim.v_swim * time_step) * p->r.quatu[i];
+    velocity[i] -= p->swim.v_swim * p->r.quatu[i];
 #endif
 
     // Local effective velocity for leeds-edwards boundary conditions
     velocity[i] = le_frameV(i, velocity, p->r.p);
   } // for
 
-// Determine prefactors for the friction and the noise term
+  // Determine prefactors for the friction and the noise term
 
-// first, set defaults
+  // first, set defaults
   langevin_pref1_temp = langevin_pref1;
   langevin_pref2_temp = langevin_pref2;
 
@@ -464,7 +283,7 @@ inline void friction_thermo_langevin(Particle *p) {
   auto const constexpr langevin_temp_coeff = 24.0;
 
   if (p->p.gamma >= Thermostat::GammaType{}) {
-    langevin_pref1_temp = -p->p.gamma / time_step;
+    langevin_pref1_temp = -p->p.gamma;
     // Is a particle-specific temperature also specified?
     if (p->p.T >= 0.)
       langevin_pref2_temp =
@@ -476,7 +295,7 @@ inline void friction_thermo_langevin(Particle *p) {
 
   } // particle specific gamma
   else {
-    langevin_pref1_temp = -langevin_gamma / time_step;
+    langevin_pref1_temp = -langevin_gamma;
     // No particle-specific gamma, but is there particle-specific temperature
     if (p->p.T >= 0.)
       langevin_pref2_temp =
@@ -488,29 +307,15 @@ inline void friction_thermo_langevin(Particle *p) {
 
 #endif /* LANGEVIN_PER_PARTICLE */
 
-// Multi-timestep handling
-// This has to be last, as it may set the prefactors to 0.
-#ifdef MULTI_TIMESTEP
-  if (smaller_time_step > 0.) {
-    langevin_pref1_temp *= time_step / smaller_time_step;
-    if (p->p.smaller_timestep == 1 && current_time_step_is_small == 1)
-      langevin_pref2_temp *= sqrt(time_step / smaller_time_step);
-    else if (p->p.smaller_timestep != current_time_step_is_small) {
-      langevin_pref1_temp = 0.;
-      langevin_pref2_temp = 0.;
-    }
-  }
-#endif /* MULTI_TIMESTEP */
-
 #ifdef PARTICLE_ANISOTROPY
   // Particle frictional isotropy check
   auto aniso_flag = (langevin_pref1_temp[0] != langevin_pref1_temp[1]) ||
-               (langevin_pref1_temp[1] != langevin_pref1_temp[2]) ||
-               (langevin_pref2_temp[0] != langevin_pref2_temp[1]) ||
-               (langevin_pref2_temp[1] != langevin_pref2_temp[2]);
-  double velocity_body[3] = {0.0, 0.0, 0.0};
+                    (langevin_pref1_temp[1] != langevin_pref1_temp[2]) ||
+                    (langevin_pref2_temp[0] != langevin_pref2_temp[1]) ||
+                    (langevin_pref2_temp[1] != langevin_pref2_temp[2]);
+  Vector3d velocity_body = {0.0, 0.0, 0.0};
   if (aniso_flag) {
-     thermo_convert_vel_space_to_body(p, velocity, velocity_body);
+    thermo_convert_vel_space_to_body(p, velocity, velocity_body);
   }
 #endif
 

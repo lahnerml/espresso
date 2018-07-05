@@ -126,7 +126,7 @@ for key in list(p3m_params.keys()):
     print("{} = {}".format(key, p3m_params[key]))
 
 print("\nSCRIPT--->Explicit tune call\n")
-p3m.Tune(accuracy=1e3)
+p3m.tune(accuracy=1e3)
 
 print("\nSCRIPT--->P3M parameter:\n")
 p3m_params = p3m.get_params()
@@ -172,7 +172,7 @@ while (i < warm_n_times and act_min_dist < min_dist):
 import pprint
 pprint.pprint(system.cell_system.get_state(), width=1)
 # pprint.pprint(system.part.__getstate__(), width=1)
-pprint.pprint(system.__getstate__(), width=1)
+pprint.pprint(system.__getstate__())
 
 
 # write parameter file

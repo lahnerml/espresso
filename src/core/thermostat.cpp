@@ -23,7 +23,6 @@
  */
 #include "thermostat.hpp"
 #include "communication.hpp"
-#include "lattice.hpp"
 #include "npt.hpp"
 #include "ghmc.hpp"
 #include "lb.hpp"
@@ -75,17 +74,11 @@ int ghmc_nmd = 1;
 // phi parameter for partial momentum update step in GHMC
 double ghmc_phi = 0;
 
-#ifdef MULTI_TIMESTEP
-GammaType langevin_pref1_small, langevin_pref2_small;
-static GammaType langevin_pref2_small_buffer;
-#endif
-
 /** buffers for the work around for the correlated random values which cool the
    system,
     and require a magical heat up whenever reentering the integrator. */
 static GammaType langevin_pref2_buffer;
 static GammaType langevin_pref2_rotation_buffer;
-double langevin_pref3;
 
 #ifdef NPT
 double nptiso_pref1;
@@ -94,76 +87,9 @@ double nptiso_pref3;
 double nptiso_pref4;
 #endif
 
-#ifdef USE_FLOWFIELD
-std::vector<double> velu, velv, velw;
-std::string ff_name_u, ff_name_v, ff_name_w;
-
-struct CFile {
-  CFile(const char *filename, const char *mode) {
-    if (!(fp = fopen(filename, mode))) {
-      fprintf(stderr, "[%i] Cannot open file: `%s'.\n", this_node, filename);
-      errexit();
-    }
-  }
-  ~CFile() { fclose(fp); }
-  operator FILE *() { return fp; }
-private:
-  FILE *fp;
-};
-
-void fluid_init()
-{
-  if (ff_name_u == "") {
-    if (this_node == 0)
-      fprintf(stderr, "Warning: fluid_init(): Flow field file names not set. Omitting loading flow fields.\n");
-    return;
-    //errexit();
-  }
-  CFile fp(ff_name_u.c_str(), "rb"), fq(ff_name_v.c_str(), "rb"), fr(ff_name_w.c_str(), "rb");
-  const size_t ffs = static_cast<size_t>(FLOWFIELD_SIZE);
-  const size_t nelem = ffs * ffs * ffs;
-  size_t relem;
-
-  velu.resize(nelem);
-  velv.resize(nelem);
-  velw.resize(nelem);
-
-  if ((relem = fread(velu.data(), sizeof(double), nelem, fp)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_u.c_str(), nelem, relem);
-    errexit();
-  }
-  if ((relem = fread(velv.data(), sizeof(double), nelem, fq)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_v.c_str(), nelem, relem);
-    errexit();
-  }
-  if ((relem = fread(velw.data(), sizeof(double), nelem, fr)) != nelem) {
-    fprintf(stderr, "[%i] Error: Flowfield \"%s\" has too few elements. Expected: %zu. Read: %zu\n", this_node, ff_name_w.c_str(), nelem, relem);
-    errexit();
-  }
-}
-#endif // USE_FLOWFIELD
-
 void thermo_init_langevin() {
-  langevin_pref1 = -langevin_gamma / time_step;
+  langevin_pref1 = -langevin_gamma;
   langevin_pref2 = sqrt(24.0 * temperature / time_step * langevin_gamma);
-  langevin_pref3 = time_step;
-  ;
-
-#ifdef MULTI_TIMESTEP
-  if (smaller_time_step > 0.) {
-    langevin_pref1_small = -langevin_gamma / smaller_time_step;
-#ifndef LANGEVIN_PER_PARTICLE
-    langevin_pref2_small =
-        sqrt(24.0 * temperature * langevin_gamma / smaller_time_step);
-#endif
-  } else {
-    langevin_pref1_small = -langevin_gamma / time_step;
-#ifndef LANGEVIN_PER_PARTICLE
-    langevin_pref2_small =
-        sqrt(24.0 * temperature * langevin_gamma / time_step);
-#endif
-  }
-#endif
 
   /* If gamma_rotation is not set explicitly,
      use the linear one. */
@@ -198,24 +124,15 @@ void thermo_init_langevin() {
       stderr, "%d: thermo_init_langevin: langevin_pref1=%f, langevin_pref2=%f",
       this_node, langevin_pref1, langevin_pref2));
 #endif
-
-#ifdef USE_FLOWFIELD
-  fluid_init();
-#endif // USE_FLOWFIELD
 }
 
 #ifdef NPT
 void thermo_init_npt_isotropic() {
   if (nptiso.piston != 0.0) {
     nptiso_pref1 = -nptiso_gamma0 * 0.5 * time_step;
-#ifdef MULTI_TIMESTEP
-    if (smaller_time_step > 0.)
-      nptiso_pref2 = sqrt(12.0 * temperature * nptiso_gamma0 * time_step) *
-                     smaller_time_step;
-    else
-#endif
+
       nptiso_pref2 =
-          sqrt(12.0 * temperature * nptiso_gamma0 * time_step) * time_step;
+          sqrt(12.0 * temperature * nptiso_gamma0 * time_step);
     nptiso_pref3 = -nptiso_gammav * (1.0 / nptiso.piston) * 0.5 * time_step;
     nptiso_pref4 = sqrt(12.0 * temperature * nptiso_gammav * time_step);
     THERMO_TRACE(fprintf(
@@ -261,11 +178,6 @@ void langevin_heat_up() {
 
   langevin_pref2_rotation_buffer = langevin_pref2_rotation;
   langevin_pref2_rotation *= sqrt(3);
-
-#ifdef MULTI_TIMESTEP
-  langevin_pref2_small_buffer = langevin_pref2_small;
-  langevin_pref2_small *= sqrt(3);
-#endif
 }
 
 void thermo_heat_up() {
@@ -286,10 +198,6 @@ void thermo_heat_up() {
 void langevin_cool_down() {
   langevin_pref2 = langevin_pref2_buffer;
   langevin_pref2_rotation = langevin_pref2_rotation_buffer;
-
-#ifdef MULTI_TIMESTEP
-  langevin_pref2_small = langevin_pref2_small_buffer;
-#endif
 }
 
 void thermo_cool_down() {

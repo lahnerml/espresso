@@ -56,7 +56,7 @@ extern std::vector<int> exclude_in_geom_ref;
  *  and marks them with a corresponding flag.
  */
 void lb_init_boundaries();
-void lbboundary_mindist_position(double pos[3], double *mindist,
+void lbboundary_mindist_position(const Vector3d& pos, double *mindist,
                                  double distvec[3], int *no);
 
 int lbboundary_get_force(int no, double *f);

@@ -24,15 +24,12 @@
 #include "initialize.hpp"
 #include "cells.hpp"
 #include "communication.hpp"
-#include "correlators/Correlator.hpp"
-#include "accumulators/Accumulator.hpp"
 #include "cuda_init.hpp"
 #include "cuda_interface.hpp"
 #include "debye_hueckel.hpp"
 #include "elc.hpp"
 #include "energy.hpp"
 #include "errorhandling.hpp"
-#include "external_potential.hpp"
 #include "forces.hpp"
 #include "ghmc.hpp"
 #include "ghosts.hpp"
@@ -59,7 +56,7 @@
 #include "pressure.hpp"
 #include "random.hpp"
 #include "rattle.hpp"
-#include "reaction.hpp"
+#include "swimmer_reaction.hpp"
 #include "reaction_ensemble.hpp"
 #include "reaction_field.hpp"
 #include "rotation.hpp"
@@ -113,15 +110,12 @@ void on_program_start() {
   topology_init(CELL_STRUCTURE_DOMDEC, &local_cells);
 #endif
 
-  ghost_init();
-
 #ifdef P3M
   p3m_pre_init();
 #endif
 #ifdef DP3M
   dp3m_pre_init();
 #endif
-  external_potential_pre_init();
 
 #ifdef LB_GPU
   if (this_node == 0) {
@@ -132,7 +126,7 @@ void on_program_start() {
   lb_pre_init();
 #endif
 
-#ifdef CATALYTIC_REACTIONS
+#ifdef SWIMMER_REACTIONS
   reaction.eq_rate = 0.0;
   reaction.sing_mult = 0;
   reaction.swap = 0;
@@ -161,7 +155,7 @@ void on_integration_start() {
   integrator_npt_sanity_checks();
 #endif
   interactions_sanity_checks();
-#ifdef CATALYTIC_REACTIONS
+#ifdef SWIMMER_REACTIONS
   reactions_sanity_checks();
 #endif
 #ifdef LB

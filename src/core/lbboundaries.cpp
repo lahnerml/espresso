@@ -27,7 +27,6 @@
 
 #include "config.hpp"
 
-
 #include <limits>
 
 #include "communication.hpp"
@@ -36,13 +35,13 @@
 #include "electrokinetics_pdb_parse.hpp"
 #include "interaction_data.hpp"
 #include "lb-adaptive.hpp"
-#include "lbboundaries.hpp"
 #include "lb.hpp"
+#include "lbboundaries.hpp"
+#include "lbboundaries/LBBoundary.hpp"
 #include "lbgpu.hpp"
 #include "utils.hpp"
-#include <vector>
 #include <memory>
-#include "lbboundaries/LBBoundary.hpp"
+#include <vector>
 
 namespace LBBoundaries {
 
@@ -52,7 +51,7 @@ std::vector<int> exclude_in_geom_ref = std::vector<int>();
 #endif // LB_ADAPTIVE
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 
-void lbboundary_mindist_position(double pos[3], double *mindist,
+void lbboundary_mindist_position(const Vector3d& pos, double *mindist,
                                  double distvec[3], int *no) {
 
   double vec[3] = {std::numeric_limits<double>::infinity(),
@@ -63,7 +62,7 @@ void lbboundary_mindist_position(double pos[3], double *mindist,
 
   int n = 0;
   for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end(); ++lbb, n++) {
-    (**lbb).calc_dist(pos, &dist, vec);
+    (**lbb).calc_dist(pos.data(), &dist, vec);
 
     if (dist < *mindist || lbb == lbboundaries.begin()) {
       *no = n;
@@ -75,14 +74,10 @@ void lbboundary_mindist_position(double pos[3], double *mindist,
   }
 }
 
-
 /** Initialize boundary conditions for all constraints in the system. */
 void lb_init_boundaries() {
-#ifndef LB_ADAPTIVE
-  int x, y, z;
-  // char *errtxt;
-  double pos[3], dist, dist_tmp = 0.0, dist_vec[3];
 
+  double pos[3];
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined(LB_GPU) && defined(LB_BOUNDARIES_GPU)
     int number_of_boundnodes = 0;
@@ -127,15 +122,16 @@ void lb_init_boundaries() {
       }
     }
 #endif
-
-    for (z = 0; z < int(lbpar_gpu.dim_z); z++) {
-      for (y = 0; y < int(lbpar_gpu.dim_y); y++) {
-        for (x = 0; x < int(lbpar_gpu.dim_x); x++) {
+    for (int z = 0; z < int(lbpar_gpu.dim_z); z++) {
+      for (int y = 0; y < int(lbpar_gpu.dim_y); y++) {
+        for (int x = 0; x < int(lbpar_gpu.dim_x); x++) {
           pos[0] = (x + 0.5) * lbpar_gpu.agrid;
           pos[1] = (y + 0.5) * lbpar_gpu.agrid;
           pos[2] = (z + 0.5) * lbpar_gpu.agrid;
 
-          dist = 1e99;
+          double dist = 1e99;
+          double dist_tmp = 0.0;
+          double dist_vec[3];
 
 #ifdef EK_BOUNDARIES
           if (ek_initialized) {
@@ -148,7 +144,8 @@ void lb_init_boundaries() {
 #endif
 
           int n = 0;
-          for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end(); ++lbb, n++) {
+          for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end();
+               ++lbb, n++) {
             (**lbb).calc_dist(pos, &dist_tmp, dist_vec);
 
             if (dist > dist_tmp || n == 0) {
@@ -162,9 +159,10 @@ void lb_init_boundaries() {
                 node_wallcharge += (**lbb).charge_density() *
                                    ek_parameters.agrid * ek_parameters.agrid *
                                    ek_parameters.agrid;
-                (**lbb).set_net_charge((**lbb).net_charge() +
+                (**lbb).set_net_charge(
+                    (**lbb).net_charge() +
                     (**lbb).charge_density() * ek_parameters.agrid *
-                    ek_parameters.agrid * ek_parameters.agrid);
+                        ek_parameters.agrid * ek_parameters.agrid);
               }
             }
 #endif
@@ -177,8 +175,8 @@ void lb_init_boundaries() {
                                    ek_parameters.dim_x * y + x]) {
             dist = -1;
             boundary_number = lbboundaries.size(); // Makes sure that
-                                                   // boundary_number is not used by
-                                                   // a constraint
+            // boundary_number is not used by
+            // a constraint
           }
 #endif
           if (dist <= 0 && boundary_number >= 0 &&
@@ -240,7 +238,8 @@ void lb_init_boundaries() {
     float *boundary_velocity =
         (float *)Utils::malloc(3 * (lbboundaries.size() + 1) * sizeof(float));
     int n = 0;
-    for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end(); ++lbb, n++) {
+    for (auto lbb = lbboundaries.begin(); lbb != lbboundaries.end();
+         ++lbb, n++) {
       boundary_velocity[3 * n + 0] = (**lbb).velocity()[0];
       boundary_velocity[3 * n + 1] = (**lbb).velocity()[1];
       boundary_velocity[3 * n + 2] = (**lbb).velocity()[2];
@@ -268,7 +267,7 @@ void lb_init_boundaries() {
 #endif
 
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
-  } else { 
+  } else {
 #if defined(LB) && defined(LB_BOUNDARIES)
     int node_domain_position[3], offset[3];
     int the_boundary = -1;
@@ -285,18 +284,21 @@ void lb_init_boundaries() {
     if (lblattice.halo_grid_volume == 0)
       return;
 
-    for (z = 0; z < lblattice.grid[2] + 2; z++) {
-      for (y = 0; y < lblattice.grid[1] + 2; y++) {
-        for (x = 0; x < lblattice.grid[0] + 2; x++) {
+    for (int z = 0; z < lblattice.grid[2] + 2; z++) {
+      for (int y = 0; y < lblattice.grid[1] + 2; y++) {
+        for (int x = 0; x < lblattice.grid[0] + 2; x++) {
           pos[0] = (offset[0] + (x - 0.5)) * lblattice.agrid[0];
           pos[1] = (offset[1] + (y - 0.5)) * lblattice.agrid[1];
           pos[2] = (offset[2] + (z - 0.5)) * lblattice.agrid[2];
 
-          dist = 1e99;
+          double dist = 1e99;
+          double dist_tmp = 0.0;
+          double dist_vec[3];
 
-	  int n = 0;
-	  for (auto it = lbboundaries.begin(); it != lbboundaries.end(); ++it, ++n) {
-	    (**it).calc_dist(pos, &dist_tmp, dist_vec);
+          int n = 0;
+          for (auto it = lbboundaries.begin(); it != lbboundaries.end();
+               ++it, ++n) {
+            (**it).calc_dist(pos, &dist_tmp, dist_vec);
 
             if (dist_tmp < dist || n == 0) {
               dist = dist_tmp;
@@ -304,7 +306,8 @@ void lb_init_boundaries() {
             }
           }
 
-          if (dist <= 0 && the_boundary >= 0 && LBBoundaries::lbboundaries.size() > 0) {
+          if (dist <= 0 && the_boundary >= 0 &&
+              LBBoundaries::lbboundaries.size() > 0) {
             lbfields[get_linear_index(x, y, z, lblattice.halo_grid)].boundary =
                 the_boundary + 1;
           } else {
@@ -322,7 +325,7 @@ void lb_init_boundaries() {
 }
 
 // TODO dirty hack. please someone get rid of void*
-int lbboundary_get_force(void* lbb, double *f) {
+int lbboundary_get_force(void *lbb, double *f) {
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 
   int no = 0;
@@ -331,14 +334,15 @@ int lbboundary_get_force(void* lbb, double *f) {
       break;
   }
   if (no == lbboundaries.size())
-    throw std::runtime_error("You probably tried to get the force of an lbboundary that was not added to system.lbboundaries.");
+    throw std::runtime_error("You probably tried to get the force of an "
+                             "lbboundary that was not added to "
+                             "system.lbboundaries.");
 
-  double *forces =
-    (double *)Utils::malloc(3 * lbboundaries.size() * sizeof(double));
+  std::vector<double> forces(3*lbboundaries.size());
 
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined(LB_BOUNDARIES_GPU) && defined(LB_GPU)
-    lb_gpu_get_boundary_forces(forces);
+    lb_gpu_get_boundary_forces(forces.data());
 
     f[0] = -forces[3 * no + 0];
     f[1] = -forces[3 * no + 1];
@@ -351,16 +355,18 @@ int lbboundary_get_force(void* lbb, double *f) {
     if(0 == this_node) {
       mpi_gather_stats(8, forces, nullptr, nullptr, nullptr);
 
-      f[0] = forces[3 * no + 0] * lbpar.agrid / lbpar.tau; // lbpar.tau; TODO this makes the units wrong and 
-      f[1] = forces[3 * no + 1] * lbpar.agrid / lbpar.tau; // lbpar.tau; the result correct. But it's 3.13AM
-      f[2] = forces[3 * no + 2] * lbpar.agrid / lbpar.tau; // lbpar.tau; on a Saturday at the ICP. Someone fix.
+      f[0] = forces[3 * no + 0] * lbpar.agrid /
+             lbpar.tau; // lbpar.tau; TODO this makes the units wrong and
+      f[1] = forces[3 * no + 1] * lbpar.agrid /
+             lbpar.tau; // lbpar.tau; the result correct. But it's 3.13AM
+      f[2] = forces[3 * no + 2] * lbpar.agrid /
+             lbpar.tau; // lbpar.tau; on a Saturday at the ICP. Someone fix.
     }
 #else
     return ES_ERROR;
 #endif
   }
 
-  free(forces);
 #endif
   return 0;
 }
@@ -419,7 +425,8 @@ void lb_bounce_back() {
                   lbpar.agrid * lbpar.agrid * lbpar.agrid * lbpar.rho * 2 *
                   lbmodel.c[i][l] * lbmodel.w[i] *
                   (*LBBoundaries::lbboundaries[lbfields[k].boundary - 1])
-                .velocity()[l] * (lbpar.tau / lbpar.agrid) / // TODO
+                      .velocity()[l] *
+                  (lbpar.tau / lbpar.agrid) / // TODO
                   lbmodel.c_sound_sq;
             }
 
@@ -457,4 +464,4 @@ void lb_bounce_back() {
 }
 
 #endif
-} // namespace 
+} // namespace

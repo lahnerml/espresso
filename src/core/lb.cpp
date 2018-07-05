@@ -1528,12 +1528,12 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
  * couple to MD beads when near a wall, see
  * lb_lbfluid_get_interpolated_velocity.
  */
-int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v) {
+int lb_lbfluid_get_interpolated_velocity_global(Vector<3, double> p, double* v) {
 #ifdef LB_ADAPTIVE
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(p, im);
-  int node = p4est_utils_pos_to_proc(forest_order::adaptive_LB, p);
-  mpi_recv_interpolated_velocity(node, p, v);
+  int node = p4est_utils_pos_to_proc(forest_order::adaptive_LB, p.data());
+  mpi_recv_interpolated_velocity(node, p.data(), v);
 #else // LB_ADAPTIVE
   double local_v[3] = {0, 0, 0},
          delta[6]{}; // velocity field, relative positions to surrounding nodes
@@ -1605,17 +1605,6 @@ int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v) {
   }
 #endif // LB_ADAPTIVE
   return 0;
-}
-
-void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,
-                                                       double *velocities,
-                                                       int length) {
-  double *p = const_cast<double*>(positions);
-  double *v = velocities;
-  int i;
-  for (i = 0; i < length; ++i, p += 3, v += 3) {
-    lb_lbfluid_get_interpolated_velocity_global(p, v);
-  }
 }
 
 int lb_lbnode_get_pi(int *ind, double *p_pi) {
@@ -2917,74 +2906,6 @@ inline void lb_reset_force_densities(Lattice::index_t index) {
 #endif // LB_ADAPTIVE
 }
 
-<<<<<<< HEAD
-inline void lb_calc_n_from_modes(Lattice::index_t index, double *mode) {
-#ifndef LB_ADAPTIVE
-  double *w = lbmodel.w;
-
-#ifdef D3Q19
-  double(*e)[19] = d3q19_modebase;
-  double m[19];
-
-  /* normalization factors enter in the back transformation */
-  for (int i = 0; i < 19; i++)
-    m[i] = (1. / e[19][i]) * mode[i];
-
-  lbfluid[0][0][index] = m[0] - m[4] + m[16];
-  lbfluid[0][1][index] =
-      m[0] + m[1] + m[5] + m[6] - m[17] - m[18] - 2. * (m[10] + m[16]);
-  lbfluid[0][2][index] =
-      m[0] - m[1] + m[5] + m[6] - m[17] - m[18] + 2. * (m[10] - m[16]);
-  lbfluid[0][3][index] =
-      m[0] + m[2] - m[5] + m[6] + m[17] - m[18] - 2. * (m[11] + m[16]);
-  lbfluid[0][4][index] =
-      m[0] - m[2] - m[5] + m[6] + m[17] - m[18] + 2. * (m[11] - m[16]);
-  lbfluid[0][5][index] = m[0] + m[3] - 2. * (m[6] + m[12] + m[16] - m[18]);
-  lbfluid[0][6][index] = m[0] - m[3] - 2. * (m[6] - m[12] + m[16] - m[18]);
-  lbfluid[0][7][index] = m[0] + m[1] + m[2] + m[4] + 2. * m[6] + m[7] + m[10] +
-                         m[11] + m[13] + m[14] + m[16] + 2. * m[18];
-  lbfluid[0][8][index] = m[0] - m[1] - m[2] + m[4] + 2. * m[6] + m[7] - m[10] -
-                         m[11] - m[13] - m[14] + m[16] + 2. * m[18];
-  lbfluid[0][9][index] = m[0] + m[1] - m[2] + m[4] + 2. * m[6] - m[7] + m[10] -
-                         m[11] + m[13] - m[14] + m[16] + 2. * m[18];
-  lbfluid[0][10][index] = m[0] - m[1] + m[2] + m[4] + 2. * m[6] - m[7] - m[10] +
-                          m[11] - m[13] + m[14] + m[16] + 2. * m[18];
-  lbfluid[0][11][index] = m[0] + m[1] + m[3] + m[4] + m[5] - m[6] + m[8] +
-                          m[10] + m[12] - m[13] + m[15] + m[16] + m[17] - m[18];
-  lbfluid[0][12][index] = m[0] - m[1] - m[3] + m[4] + m[5] - m[6] + m[8] -
-                          m[10] - m[12] + m[13] - m[15] + m[16] + m[17] - m[18];
-  lbfluid[0][13][index] = m[0] + m[1] - m[3] + m[4] + m[5] - m[6] - m[8] +
-                          m[10] - m[12] - m[13] - m[15] + m[16] + m[17] - m[18];
-  lbfluid[0][14][index] = m[0] - m[1] + m[3] + m[4] + m[5] - m[6] - m[8] -
-                          m[10] + m[12] + m[13] + m[15] + m[16] + m[17] - m[18];
-  lbfluid[0][15][index] = m[0] + m[2] + m[3] + m[4] - m[5] - m[6] + m[9] +
-                          m[11] + m[12] - m[14] - m[15] + m[16] - m[17] - m[18];
-  lbfluid[0][16][index] = m[0] - m[2] - m[3] + m[4] - m[5] - m[6] + m[9] -
-                          m[11] - m[12] + m[14] + m[15] + m[16] - m[17] - m[18];
-  lbfluid[0][17][index] = m[0] + m[2] - m[3] + m[4] - m[5] - m[6] - m[9] +
-                          m[11] - m[12] - m[14] + m[15] + m[16] - m[17] - m[18];
-  lbfluid[0][18][index] = m[0] - m[2] + m[3] + m[4] - m[5] - m[6] - m[9] -
-                          m[11] + m[12] + m[14] - m[15] + m[16] - m[17] - m[18];
-
-  /* weights enter in the back transformation */
-  for (int i = 0; i < lbmodel.n_veloc; i++)
-    lbfluid[0][i][index] *= w[i];
-
-#else  // D3Q19
-  double **e = lbmodel.e;
-  for (int i = 0; i < lbmodel.n_veloc; i++) {
-    lbfluid[0][i][index] = 0.0;
-    for (int j = 0; j < lbmodel.n_veloc; j++)
-      lbfluid[0][i][index] += mode[j] * e[j][i] / e[19][j];
-
-    lbfluid[0][i][index] *= w[i];
-  }
-#endif // D3Q19
-#else
-  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
-#endif // LB_ADAPTIVE
-}
-
 inline void lb_calc_n_from_modes_push(Lattice::index_t index, double *m) {
 #ifndef LB_ADAPTIVE
   int yperiod = lblattice.halo_grid[0];
@@ -3263,8 +3184,6 @@ inline void lb_collide_stream() {
 #endif // LB_ADAPTIVE
 }
 
-}
-
 /***********************************************************************/
 /** \name Update step for the lattice Boltzmann fluid                  */
 /***********************************************************************/
@@ -3334,9 +3253,9 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   double h_max = lbpar.agrid;
 #else  // !LB_ADAPTIVE
   if (ghost) {
-    dcnt = lbadapt_interpolate_pos_ghost(p->r.p, node_index, delta, level);
+    dcnt = lbadapt_interpolate_pos_ghost(p->r.p.data(), node_index, delta, level);
   } else {
-    dcnt = lbadapt_interpolate_pos_adapt(p->r.p, node_index, delta, level);
+    dcnt = lbadapt_interpolate_pos_adapt(p->r.p.data(), node_index, delta, level);
   }
   if (dcnt <= 0)
     return;
@@ -3649,9 +3568,9 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
   double h_max = h;
 #else  // !LB_ADAPTIVE
   if (ghost) {
-    dcnt = lbadapt_interpolate_pos_ghost(pos, node_index, delta, level);
+    dcnt = lbadapt_interpolate_pos_ghost(pos.data(), node_index, delta, level);
   } else {
-    dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
+    dcnt = lbadapt_interpolate_pos_adapt(pos.data(), node_index, delta, level);
   }
   double h_local = p4est_params.h[level[0]];
   double h_max = p4est_params.h[p4est_params.max_ref_level];
@@ -4001,6 +3920,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
     halo regions have been exchanged correctly.
 */
 void lb_check_halo_regions() {
+#ifndef LB_ADAPTIVE
   Lattice::index_t index;
   int i, x, y, z, s_node, r_node, count = lbmodel.n_veloc;
   double *s_buffer, *r_buffer;
@@ -4190,6 +4110,7 @@ void lb_check_halo_regions() {
 
   // if (check_runtime_errors());
   // else fprintf(stderr,"halo check successful\n");
+#endif // !LB_ADAPTIVE
 }
 
 #if 0 /* These debug functions are used nowhere. If you need it, here they     \

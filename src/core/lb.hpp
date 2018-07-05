@@ -219,8 +219,8 @@ typedef struct {
   lb_float agrid;
   lb_float tau;
   lb_float friction;
-  lb_float ext_force[3]; /* Open question: Do we want a local force or global
-                            force? */
+  lb_float ext_force_density[3]; /* Open question: Do we want a local force or global
+                                    force? */
   lb_float rho_lb_units;
   lb_float gamma_odd;
   lb_float gamma_even;
@@ -334,8 +334,8 @@ void calc_particle_lattice_ia();
  * lattice. Note that it can lead to undefined behaviour if the
  * position is not within the local lattice. */
 int lb_lbfluid_get_interpolated_velocity_cells_only(double *p, double *v); // TODO: needed?
-int lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v);
-int lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool ghost);
+void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v);
+void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool ghost);
 
 inline void lb_calc_local_fields(Lattice::index_t index, double *rho, double *j,
                                  double *pi);
@@ -643,7 +643,7 @@ int lb_lbnode_set_pop(int *ind, double *pop);
  * lattice. Note that it can lead to undefined behaviour if the
  * position is not within the local lattice. This version of the function
  * can be called without the position needing to be on the local processor */
-int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v);
+int lb_lbfluid_get_interpolated_velocity_global(Vector<3, double> p, double* v);
 
 void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,
                                                        double *velocities,

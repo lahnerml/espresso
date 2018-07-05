@@ -268,7 +268,7 @@ void lb_init_boundaries() {
 
 #endif /* defined (LB_GPU) && defined (LB_BOUNDARIES_GPU) */
   } else {
-#if defined(LB) && defined(LB_BOUNDARIES)
+#if defined(LB) && defined(LB_BOUNDARIES) && !defined(LB_ADAPTIVE)
     int node_domain_position[3], offset[3];
     int the_boundary = -1;
     map_node_array(this_node, node_domain_position);
@@ -317,11 +317,10 @@ void lb_init_boundaries() {
         }
       }
     }
-#endif // defined(LB) && defined(LB_BOUNDARIES)
-  }
-#else
+#elseif defined(LB_ADAPTIVE)
     lbadapt_get_boundary_status();
-#endif
+#endif // defined(LB) && defined(LB_BOUNDARIES) && !defined(LB_ADAPTIVE)
+  }
 }
 
 // TODO dirty hack. please someone get rid of void*
@@ -353,7 +352,7 @@ int lbboundary_get_force(void *lbb, double *f) {
   } else {
 #if defined(LB_BOUNDARIES) && defined(LB)
     if(0 == this_node) {
-      mpi_gather_stats(8, forces, nullptr, nullptr, nullptr);
+      mpi_gather_stats(8, forces.data(), nullptr, nullptr, nullptr);
 
       f[0] = forces[3 * no + 0] * lbpar.agrid /
              lbpar.tau; // lbpar.tau; TODO this makes the units wrong and

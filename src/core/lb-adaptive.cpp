@@ -171,18 +171,18 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #ifdef LB_ADAPTIVE_GPU
 // unit conversion: force density
   data->force[0] =
-      prefactors[level] * lbpar.ext_force[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      prefactors[level] * lbpar.ext_force_density[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
   data->force[1] =
-      prefactors[level] * lbpar.ext_force[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      prefactors[level] * lbpar.ext_force_density[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
   data->force[2] =
-      prefactors[level] * lbpar.ext_force[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #else  // LB_ADAPTIVE_GPU
   data->lbfields.force[0] =
-      p4est_params.prefactors[level] * lbpar.ext_force[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      p4est_params.prefactors[level] * lbpar.ext_force_density[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
   data->lbfields.force[1] =
-      p4est_params.prefactors[level] * lbpar.ext_force[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      p4est_params.prefactors[level] * lbpar.ext_force_density[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
   data->lbfields.force[2] =
-      p4est_params.prefactors[level] * lbpar.ext_force[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+      p4est_params.prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #endif // LB_ADAPTIVE_GPU
 #else  // EXTERNAL_FORCES
 #ifdef LB_ADAPTIVE_GPU
@@ -1281,9 +1281,9 @@ int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float local_h) {
 // reset force to external force (remove influences from particle coupling)
 #ifdef EXTERNAL_FORCES
   // unit conversion: force density
-  f[0] = p4est_params.prefactors[level] * lbpar.ext_force[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  f[1] = p4est_params.prefactors[level] * lbpar.ext_force[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  f[2] = p4est_params.prefactors[level] * lbpar.ext_force[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  f[0] = p4est_params.prefactors[level] * lbpar.ext_force_density[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  f[1] = p4est_params.prefactors[level] * lbpar.ext_force_density[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  f[2] = p4est_params.prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #else  // EXTERNAL_FORCES
   f[0] = 0.0;
   f[1] = 0.0;

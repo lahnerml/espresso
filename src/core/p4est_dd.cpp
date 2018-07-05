@@ -597,7 +597,7 @@ void dd_p4est_init_cell_interactions() {
     cells[i].m_neighbors.reserve(CELLS_MAX_NEIGHBORS);
     for (int n = 1; n < CELLS_MAX_NEIGHBORS; ++n) {
       auto neighidx = ds::p4est_shell[i].neighbor[half_neighbor_idx[n]];
-      local_cells.cell[i]->m_neighbors.emplace_back(std::ref(cells[neighidx]));
+      local_cells.cell[i]->m_neighbors.emplace_back(&cells[neighidx]);
     }
   }
 }
@@ -774,15 +774,16 @@ static int dd_async_exchange_insert_particles(ParticleList *recvbuf, int global_
     dynsiz += recvbuf->part[p].el.n;
 #endif
 
-    Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p);
+    Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p.data());
     if (target) {
       append_indexed_particle(target, std::move(recvbuf->part[p]));
     } else {
       fprintf(stderr, "proc %i received remote particle p %i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n",
         this_node, recvbuf->part[p].p.identity, global_flag, from,
         recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2],
-        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p), dd_p4est_pos_to_proc(recvbuf->part[p].r.p),
-        op[0], op[1], op[2]);
+        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p.data()),
+               dd_p4est_pos_to_proc(recvbuf->part[p].r.p.data()),
+               op[0], op[1], op[2]);
       errexit();
     }
   }
@@ -950,7 +951,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
     for (int p = 0; p < pl->n; p++) {
       Particle *part = &pl->part[p];
       // fold_position(part->r.p, part->l.i);
-      int rank = dd_p4est_pos_to_proc(part->r.p);
+      int rank = dd_p4est_pos_to_proc(part->r.p.data());
       if (rank != this_node) {  // It is actually a remote particle -> copy all
                                 // data to sendbuffer
         if (rank > n_nodes || rank < 0) {
@@ -1055,7 +1056,7 @@ void dd_p4est_exchange_and_sort_particles (int global_flag) {
       Cell *pl = local_cells.cell[c];
       for (int p = 0; p < pl->n; p++) {
         //fold_position(pl->part[p].r.p, pl->part[p].l.i);
-        Cell *nc = dd_p4est_save_position_to_cell(pl->part[p].r.p);
+        Cell *nc = dd_p4est_save_position_to_cell(pl->part[p].r.p.data());
         if (nc == NULL) { // Belongs to other node
           int pid = pl->part[p].p.identity;
           move_indexed_particle(&sendbuf, pl, p);
@@ -1406,7 +1407,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
       for (p = 0; p < np; p++) {
         fold_position(part[p].r.p, part[p].l.i);
 
-        Cell *nc = dd_p4est_save_position_to_cell(part[p].r.p);
+        Cell *nc = dd_p4est_save_position_to_cell(part[p].r.p.data());
         if (nc == NULL) { // Particle is on other process, move it to cell[0]
           append_unindexed_particle(local_cells.cell[0], std::move(part[p]));
         } else { // It is on this node, move it to right local_cell
@@ -1494,7 +1495,7 @@ void dd_p4est_write_particle_vtk(char *filename) {
     int np = local_cells.cell[c]->n;
     Particle *part = local_cells.cell[c]->part;
     for (int p = 0; p < np; ++p) {
-      std::array <double, 3> t_pos = boxl_to_treecoords_copy(part[p].r.p);
+      std::array <double, 3> t_pos = boxl_to_treecoords_copy(part[p].r.p.data());
       fprintf(h, "\t\t\t\t\t%le %le %le\n", t_pos[0], t_pos[1], t_pos[2]);
     }
   }

@@ -43,7 +43,7 @@ static void metric_npart(std::vector<double> &weights) {
 int cell_ndistpairs(Cell *c) {
   int nnp =
       std::accumulate(std::begin(c->m_neighbors), std::end(c->m_neighbors), 0,
-                      [](int acc, const Cell &neigh) { return acc + neigh.n; });
+                      [](int acc, const Cell *neigh) { return acc + neigh->n; });
   return c->n * nnp;
 }
 

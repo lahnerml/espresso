@@ -203,9 +203,6 @@ void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async =
 /** Free a communicator. */
 void free_comm(GhostCommunicator *comm);
 
-/** Initialize ghosts. */
-void ghost_init();
-
 /** Do a ghost communication, either synchronous or asynchronous depending on the async flag. */
 void ghost_communicator(GhostCommunicator *gc);
 

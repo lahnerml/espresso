@@ -76,16 +76,6 @@ public:
 */
 int ghosts_have_v = 0;
 
-/** add force to another. This is used when collecting ghost forces. */
-inline void add_force(ParticleForce *F_to, ParticleForce *F_add) {
-  for (int i = 0; i < 3; i++)
-    F_to->f[i] += F_add->f[i];
-#ifdef ROTATION
-  for (int i = 0; i < 3; i++)
-    F_to->torque[i] += F_add->torque[i];
-#endif
-}
-
 void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
 {
   assert(comm);
@@ -741,13 +731,20 @@ static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts)
             }
           }
           break;
-        case GHOST_RDCE:
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm reduce to %d (%d bytes)\n", this_node, node, s_buffer.size()));
+        case GHOST_RDCE: {
+          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm reduce to %d (%d bytes)\n",
+                              this_node, node, n_s_buffer));
+
           if (node == this_node)
-            MPI_Reduce(s_buffer, r_buffer, s_buffer.size(), MPI_BYTE, MPI_FORCES_SUM, node, comm_cart);
+            MPI_Reduce(reinterpret_cast<double *>(static_cast<char *>(s_buffer)),
+                      reinterpret_cast<double *>(static_cast<char *>(r_buffer)),
+                      s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
+                      comm_cart);
           else
-            MPI_Reduce(s_buffer, nullptr, s_buffer.size(), MPI_BYTE, MPI_FORCES_SUM, node, comm_cart);
-          break;
+            MPI_Reduce(reinterpret_cast<double *>(static_cast<char *>(s_buffer)), nullptr,
+                      s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
+                      comm_cart);
+          } break;
       }
       GHOST_TRACE(fprintf(stderr, "%d: ghost_comm done\n", this_node));
 
@@ -808,11 +805,6 @@ void ghost_communicator(GhostCommunicator *gc)
     ghost_communicator_async(gc, data_parts);
   else
     ghost_communicator_sync(gc, data_parts);
-}
-
-void ghost_init()
-{
-  MPI_Op_create(reduce_forces_sum, 1, &MPI_FORCES_SUM);
 }
 
 /** Go through \ref ghost_cells and remove the ghost entries from \ref

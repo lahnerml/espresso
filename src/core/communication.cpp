@@ -2424,7 +2424,7 @@ void mpi_unif_refinement(int node, int ref_iterations) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 
@@ -2458,7 +2458,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 
@@ -2488,7 +2488,7 @@ void mpi_reg_refinement(int node, int param) {
 
   // FIXME: Implement mapping between two trees
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 
@@ -2512,7 +2512,7 @@ void mpi_reg_coarsening(int node, int param) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 
@@ -2535,7 +2535,7 @@ void mpi_geometric_refinement(int node, int param) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 
@@ -2558,7 +2558,7 @@ void mpi_inv_geometric_refinement(int node, int param) {
   p4est_utils_rebuild_p4est_structs(btype);
 
   lb_reinit_fluid();
-  lb_reinit_forces();
+  lb_reinit_force_densities();
 #endif // LB_ADAPTIVE
 }
 

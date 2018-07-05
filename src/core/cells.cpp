@@ -46,8 +46,6 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "repart.hpp"
-
 /* Variables */
 
 /** list of all cells. */
@@ -283,10 +281,6 @@ void cells_re_init(int new_cs, bool isRepart, bool omitLBinit) {
     resort_particles = Cells::RESORT_GLOBAL;
 
   on_cell_structure_change(omitLBinit);
-
-  // Linked cell runtime.
-  std::fill(std::begin(repart::lc_cell_runtime), std::end(repart::lc_cell_runtime), 0.0);
-  repart::lc_cell_runtime.resize(local_cells.n);
 }
 
 /************************************************************/

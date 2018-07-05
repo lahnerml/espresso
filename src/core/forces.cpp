@@ -34,7 +34,6 @@
 #include "p3m_gpu.hpp"
 #include "forcecap.hpp"
 #include "short_range_loop.hpp"
-#include "repart.hpp"
 
 #include <cassert>
 
@@ -90,9 +89,6 @@ void check_forces() {
 }
 
 void force_calc() {
-  // TODO: Fix compilation error
-  // repart::RuntimeRecorder(repart::fc_runtime);
-
   // Communication step: distribute ghost positions
   cells_update_ghosts();
 

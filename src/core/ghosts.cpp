@@ -31,6 +31,7 @@
 #include "debug.hpp"
 #include "errorhandling.hpp"
 #include "domain_decomposition.hpp"
+#include "utils/mpi/waitany.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -38,6 +39,7 @@
 #include <cstring>
 #include <mpi.h>
 #include <vector>
+#include <boost/serialization/vector.hpp>
 
 /** Tag for communication in ghost_comm. */
 #define REQ_GHOST_SEND 100
@@ -46,14 +48,13 @@
  * This class is not provided to encapsulate access to the underlying data
  * buffer but to be able to remove the old global variables.
  */
-class CommBuf {
+struct CommBuf {
     std::vector<char> buf;
     std::vector<int> bondbuffer;
 
-public:
     /** Returns the size in bytes set by the last call to ensure_and_set_size.
      */
-    int size() { return buf.size(); }
+    int size() const { return buf.size(); }
 
     /** Ensures that this buffer can hold at least nb bytes of data.
      * Also sets the internal state so that subsequent calls to size() return nb.
@@ -67,7 +68,36 @@ public:
     /** Access the associated bond buffer.
      */
     std::vector<int>& bondbuf() { return bondbuffer; }
+
+    /* Returns if size > 0.
+     */
+    bool has_particles() const { return size() > 0; }
 };
+
+// Serialization for CommBuf
+namespace boost {
+namespace serialization {
+template <class Archive>
+void load(Archive &ar, CommBuf &cb,
+          const unsigned int /* version */) {
+  ar >> cb.buf;
+  ar >> cb.bondbuffer;
+}
+
+template <class Archive>
+void save(Archive &ar, CommBuf const &cb,
+          const unsigned int /* version */) {
+  ar << cb.buf;
+  ar << cb.bondbuffer;
+}
+
+template <typename Archive>
+void serialize(Archive &ar, CommBuf &cb, unsigned int file_version) {
+  split_free(ar, cb, file_version);
+}
+}
+}
+
 
 
 /** whether the ghosts should also have velocity information, e. g. for DPD or RATTLE.
@@ -532,89 +562,49 @@ static int is_recv_op(int comm_type, int node)
 static void ghost_communicator_async(GhostCommunicator *gc, int data_parts)
 {
   std::vector<CommBuf> commbufs(gc->num);
-  // Reqs has size 2 * gc->num. In the first gc->num elements the requests of
-  // particle data Isend and Irecv are stored. In the second half requests of
-  // bond Isends are stored. After reception of the particle data, the finished
-  // Irecv requests are replaced by new bond Irecv requests.
-  std::vector<MPI_Request> reqs(2 * gc->num, MPI_REQUEST_NULL);
+  // Need the full "gc->num" elements here (although we might omit transfers
+  // below) as the wait_any code below needs to be able to associate an index to
+  // "reqs" with a element in "commbufs".
+  std::vector<boost::mpi::request> reqs(gc->num);
 
-  // Prepare receive buffers and post receives
+  reqs.reserve(gc->num);
   for (int i = 0; i < gc->num; i++) {
-    GhostCommunication *gcn = &gc->comm[i];
-    const int comm_type = gcn->type & GHOST_JOBMASK;
-    if (comm_type == GHOST_RECV) {
-      prepare_recv_buffer(commbufs[i], gcn, data_parts);
-      if (commbufs[i].size() <= 0)
-        continue;
-      MPI_Irecv(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
-    } else if (comm_type != GHOST_SEND) {
-      // Check for invalid operations
+    GhostCommunication &gcn = gc->comm[i];
+
+    switch (gcn.type & GHOST_JOBMASK) {
+    case GHOST_RECV:
+      prepare_recv_buffer(commbufs[i], &gcn, data_parts);
+      if (commbufs[i].has_particles())
+        reqs[i] = comm_cart.irecv(gcn.node, gcn.tag, commbufs[i]);
+      break;
+    case GHOST_SEND:
+      prepare_send_buffer(commbufs[i], &gcn, data_parts);
+      if (commbufs[i].has_particles())
+        reqs[i] = comm_cart.isend(gcn.node, gcn.tag, commbufs[i]);
+      break;
+    default:
       fprintf(stderr, "Asynchronous ghost communication only support SEND and RECEIVE\n");
       errexit();
     }
   }
 
-  // Prepare send buffers and post sends
   for (int i = 0; i < gc->num; i++) {
-    GhostCommunication *gcn = &gc->comm[i];
-    const int comm_type = gcn->type & GHOST_JOBMASK;
-    if (comm_type == GHOST_SEND) {
-      prepare_send_buffer(commbufs[i], gcn, data_parts);
-      if (commbufs[i].size() <= 0)
-        continue;
-      MPI_Isend(commbufs[i], commbufs[i].size(), MPI_BYTE, gcn->node, gcn->tag, comm_cart, &reqs[i]);
-
-      // MPI guarantees ordered communication for the same pair of (receiver, tag)
-      std::vector<int>& bbuf = commbufs[i].bondbuf();
-      if (bbuf.size() <= 0)
-        continue;
-      MPI_Isend(bbuf.data(), bbuf.size(), MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gc->num + i]);
-    }
-  }
-
-  // Wait for requests and postprocess them if they are receives
-// Removed. Does not work with bonds as requests get replaced by new ones in this case
-// and put_recv_buffer is never executed.
-//#ifndef ASYNC_COMM_IGNORE_BINARY_REPRODUCABILITY
-//  MPI_Waitall(gc->num, reqs.data(), MPI_STATUSES_IGNORE);
-//  for (int gcnr = 0; gcnr < gc->num; ++gcnr) {
-//#else
-  while (true) {
-    int gcnr;
-    // Wait only for the first half. The second half does not hold receive
-    // requests
-    MPI_Waitany(gc->num, reqs.data(), &gcnr, MPI_STATUS_IGNORE);
-    if (gcnr == MPI_UNDEFINED)
+    auto p = Utils::Mpi::wait_any(std::begin(reqs), std::end(reqs));
+    // Some transmissions might have been omitted.
+    // Could also be counted in the above send/recv loop but here it is less code.
+    if (p.second == std::end(reqs))
       break;
-//#endif
 
-    GhostCommunication *gcn = &gc->comm[gcnr];
-    int comm_type = gcn->type & GHOST_JOBMASK;
-    if (comm_type != GHOST_RECV)
+    auto rno = std::distance(std::begin(reqs), p.second);
+    GhostCommunication *gcn = &gc->comm[rno];
+    if ((gcn->type & GHOST_JOBMASK) != GHOST_RECV)
       continue;
 
-    // Postprocess receives
-    CommBuf& buf = commbufs[gcnr];
-    if (data_parts == GHOSTTRANS_FORCE /*&& comm_type != GHOST_RDCE*/) {
-      add_forces_from_recv_buffer(buf, gcn);
-    } else if (data_parts & GHOSTTRANS_PROPRTS) {
-      int n_bonds = *(int *)((char *) buf + buf.size() - sizeof(int));
-      // If no bonds have been received yet the bondbuffer has zero
-      // size since it is reset in put_recv_buffer
-      if (n_bonds > 0 && buf.bondbuf().size() != static_cast<size_t>(n_bonds)) {
-        buf.bondbuf().resize(n_bonds);
-        // Post the Irecv for the bonds replacing(!) the MPI_Request of the particles
-        MPI_Irecv(buf.bondbuf().data(), n_bonds, MPI_INT, gcn->node, gcn->tag, comm_cart, &reqs[gcnr]);
-      } else {
-        put_recv_buffer(buf, gcn, data_parts);
-      }
-    } else {
-      put_recv_buffer(buf, gcn, data_parts);
-    }
+    if (data_parts == GHOSTTRANS_FORCE)
+      add_forces_from_recv_buffer(commbufs[rno], gcn);
+    else
+      put_recv_buffer(commbufs[rno], gcn, data_parts);
   }
-
-  // Wait for the bond send requests (second half of reqs)
-  MPI_Waitall(gc->num, reqs.data() + gc->num, MPI_STATUS_IGNORE);
 }
 
 /** Synchronous communication.

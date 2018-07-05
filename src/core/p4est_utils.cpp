@@ -662,12 +662,12 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
     std::vector<p4est_locidx_t> ghost_ids;
     ghost_ids.reserve(adapt_ghost->ghosts.elem_count);
     for (auto p: ghost_cells.particles()) {
-      ghost_ids.push_back(lbadapt_map_pos_to_ghost(p.r.p));
+      ghost_ids.push_back(lbadapt_map_pos_to_ghost(p.r.p.data()));
     }
     p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
     p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;
     for (auto p: local_cells.particles()) {
-      qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p);
+      qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p.data());
       (*flags)[qid] = 1;
       for (int i = 0; i < 26; ++i) {
         sc_array_truncate(nqids);

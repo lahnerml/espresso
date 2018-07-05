@@ -28,6 +28,15 @@
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+castable_unique_ptr<p4est_t> adapt_p4est;
+castable_unique_ptr<p4est_connectivity_t> adapt_conn;
+castable_unique_ptr<p4est_ghost_t> adapt_ghost;
+castable_unique_ptr<p4est_mesh_t> adapt_mesh;
+castable_unique_ptr<p4est_virtual_t> adapt_virtual;
+castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+#endif
+
 p4est_parameters p4est_params = {
   // min_ref_level
   -1,

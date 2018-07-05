@@ -567,7 +567,6 @@ static void ghost_communicator_async(GhostCommunicator *gc, int data_parts)
   // "reqs" with a element in "commbufs".
   std::vector<boost::mpi::request> reqs(gc->num);
 
-  reqs.reserve(gc->num);
   for (int i = 0; i < gc->num; i++) {
     GhostCommunication &gcn = gc->comm[i];
 

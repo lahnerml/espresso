@@ -22,16 +22,13 @@ include "myconfig.pxi"
 cimport numpy as np
 import numpy as np
 from . cimport utils
+from . import utils
 from espressomd.utils cimport *
 from . cimport particle_data
 from .interactions import BondedInteraction
 from .interactions import BondedInteractions
 from copy import copy
 from globals cimport max_seen_particle, time_step, box_l, n_part, n_rigidbonds, max_seen_particle_type
-import collections
-import functools
-import types
-from espressomd.utils import nesting_level, array_locked, is_valid_type
 import collections
 import functools
 import types

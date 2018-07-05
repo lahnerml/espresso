@@ -78,6 +78,16 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator void *() const { return this->get(); }
 };
 
+/* "global variables" */
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+extern castable_unique_ptr<p4est_t> adapt_p4est;
+extern castable_unique_ptr<p4est_connectivity_t> adapt_conn;
+extern castable_unique_ptr<p4est_ghost_t> adapt_ghost;
+extern castable_unique_ptr<p4est_mesh_t> adapt_mesh;
+extern castable_unique_ptr<p4est_virtual_t> adapt_virtual;
+extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
+#endif
+
 /** Struct containing information to adjust p4est behavior */
 typedef struct {
   /** minimum required grid level */

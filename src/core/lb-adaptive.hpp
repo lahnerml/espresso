@@ -48,14 +48,6 @@
 #include <string.h>
 #include <vector>
 
-/* "global variables" */
-extern castable_unique_ptr<p4est_t> adapt_p4est;
-extern castable_unique_ptr<p4est_connectivity_t> adapt_conn;
-extern castable_unique_ptr<p4est_ghost_t> adapt_ghost;
-extern castable_unique_ptr<p4est_mesh_t> adapt_mesh;
-extern castable_unique_ptr<p4est_virtual_t> adapt_virtual;
-extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
-
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 extern std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 

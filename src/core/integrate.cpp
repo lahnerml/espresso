@@ -921,7 +921,7 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
   }
 
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  if (n_part && 0.0 == sim_time) {
+  if (n_part && 0.0 == sim_time && adapt_p4est != nullptr) {
     fprintf(stderr, "Dynamically refine grid around particles\n");
     std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
     std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,

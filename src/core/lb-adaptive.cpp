@@ -63,13 +63,6 @@
        // !defined(GAUSSRANDOM))
 
 /* "external variables" */
-castable_unique_ptr<p4est_t> adapt_p4est;
-castable_unique_ptr<p4est_connectivity_t> adapt_conn;
-castable_unique_ptr<p4est_ghost_t> adapt_ghost;
-castable_unique_ptr<p4est_mesh_t> adapt_mesh;
-castable_unique_ptr<p4est_virtual_t> adapt_virtual;
-castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
-
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_local_data;
 std::vector<std::vector<lbadapt_payload_t>> lbadapt_ghost_data;
 

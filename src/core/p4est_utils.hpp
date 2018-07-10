@@ -675,9 +675,8 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /*@{*/
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
-template <typename T>
-int p4est_utils_end_pending_communication(std::vector<T> exc_status,
-                                          int level = -1);
+int p4est_utils_end_pending_communication(
+    std::vector<p8est_virtual_ghost_exchange_t*> exc_status, int level = -1);
 #endif
 
 /** Function that handles grid alteration. After calling this function the grid

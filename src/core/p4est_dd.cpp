@@ -41,6 +41,7 @@ typedef struct {
                 // Cells with shell-type 1 store information about which face is a boundary
                 // Cells with shell-type 2 are set if the are in the periodic halo
   int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
+                    // Might be "-1" if searching for neighbors over a non-periodic boundary.
   int coord[3]; // cartesian coordinates of the cell
   int p_cnt; // periodic count of this cell, local cells are always 0, for each new periodic occurence
              // the new occurence is increased by one
@@ -444,11 +445,6 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
         }
       }
       sc_array_truncate(ni);
-
-      if (ds::p4est_shell[i].neighbor[n] < 0 || ds::p4est_shell[i].neighbor[n] >= num_cells) {
-        printf("Index OOB %i of %li (%li,%li)\n", ds::p4est_shell[i].neighbor[n], num_cells, num_local_cells, num_ghost_cells);
-        //errexit();
-      }
     }
   }
   
@@ -597,7 +593,9 @@ void dd_p4est_init_cell_interactions() {
     cells[i].m_neighbors.reserve(CELLS_MAX_NEIGHBORS);
     for (int n = 1; n < CELLS_MAX_NEIGHBORS; ++n) {
       auto neighidx = ds::p4est_shell[i].neighbor[half_neighbor_idx[n]];
-      local_cells.cell[i]->m_neighbors.emplace_back(&cells[neighidx]);
+      // Check for invalid cells
+      if (neighidx >= 0 && neighidx < num_cells)
+        local_cells.cell[i]->m_neighbors.emplace_back(&cells[neighidx]);
     }
   }
 }

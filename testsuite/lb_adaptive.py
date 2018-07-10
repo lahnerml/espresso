@@ -10,13 +10,13 @@ from espressomd import *
 from tests_common import abspath
 
 
-@ut.skipIf(not espressomd.has_features(["LB"]) or
-           espressomd.has_features(["LB_ADAPTIVE"]),
+@ut.skipIf(not espressomd.has_features(["LB_ADAPTIVE"]) or
+           espressomd.has_features(["LB_ADAPTIVE_GPU"]),
            "Features not available, skipping test!")
 class LBTest(ut.TestCase):
     """
     Basic tests of the Lattice Boltzmann implementation
-    
+
     1) check conservation of fluid mass
     2) check conservation of total momentum
     3) measure temperature of colloid and fluid
@@ -30,7 +30,7 @@ class LBTest(ut.TestCase):
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
-              'box_l': 12.0,
+              'box_l': 16.0,
               'dens': 0.85,
               'viscosity': 30.0,
               'friction': 2.0,
@@ -145,18 +145,18 @@ class LBTest(ut.TestCase):
             e = self.system.analysis.energy()
             temp_particle = 2.0 / self.dof * e["kinetic"] / self.n_col_part
             self.avg_temp = self.avg_temp + \
-                temp_particle / self.params['int_times']
+                            temp_particle / self.params['int_times']
             # check temp of fluid
             fluid_temp = 0
             for j in range(len(node_dens_list)):
                 fluid_temp = fluid_temp + (1.0 / 3.0) * (node_v_list[j][0]**2.0 + node_v_list[j][1] ** 2.0 +
                                                          node_v_list[j][2]**2.0) * node_dens_list[j] * (self.params['box_l'])**3 / len(node_dens_list)**2
             self.avg_fluid_temp = self.avg_fluid_temp + \
-                fluid_temp / self.params['int_times']
+                                  fluid_temp / self.params['int_times']
 
         temp_dev = (2.0 / (self.n_col_part * 3.0))**0.5
         temp_prec = self.params['temp_confidence'] * \
-            temp_dev / (self.params['int_times'])**0.5
+                    temp_dev / (self.params['int_times'])**0.5
 
         print("maximal mass deviation: {}  accepted deviation: {}".format(
             self.max_dmass, self.params['mass_prec_per_node']))

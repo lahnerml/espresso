@@ -167,11 +167,25 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
   }
 }
 
+/** For algorithms like mapping a position to a quadrant to work we need a
+ * synchronized version of the quadrant offsets of each tree.
+ *
+ * @param p4ests     List of all p4ests in the current simulation
+ */
 void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
   forest_info.clear();
 
   std::transform(std::begin(p4ests), std::end(p4ests),
                  std::back_inserter(forest_info), p4est_to_forest_info);
+}
+
+void p4est_utils_init() {
+  p4est_utils_prepare({
+    dd_p4est_get_p4est(),
+#ifdef LB_ADAPTIVE
+    adapt_p4est,
+#endif
+  });
 }
 
 void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,

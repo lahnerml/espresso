@@ -18,9 +18,6 @@
 #include "p4est_utils.hpp"
 #include "repart.hpp"
 #include "utils/serialization/ParticleList.hpp"
-#ifdef LB_ADAPTIVE
-#include "lb-adaptive.hpp"
-#endif
 
 //#include <boost/mpi/nonblocking.hpp>
 
@@ -396,12 +393,7 @@ void dd_p4est_create_grid (bool isRepart) {
   // Fill internal communator lists
   dd_p4est_comm();
 
-  p4est_utils_prepare({
-    ds.p4est,
-#ifdef LB_ADAPTIVE
-    adapt_p4est,
-#endif
-  });
+  p4est_utils_init();
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {

@@ -170,12 +170,10 @@ struct p4est_utils_forest_info_t {
  */
 const p4est_utils_forest_info_t &p4est_utils_get_forest_info(forest_order fo);
 
-/** For algorithms like mapping a position to a quadrant to work we need a
- * synchronized version of the quadrant offsets of each tree.
- *
- * @param p4ests     List of all p4ests in the current simulation
+/** Prepares the use of p4est_utils with the short-range MD tree and
+ * possibly also the adapt_LB tree.
  */
-void p4est_utils_prepare(std::vector<p8est_t *> p4ests);
+void p4est_utils_init();
 
 /**
  * Destroy and rebuild forest_info, partition the forests, and recreate

@@ -294,12 +294,13 @@ cdef class CellSystem(object):
         def __set__(self, int _min_num_cells):
             global min_num_cells
             min = calc_processor_min_num_cells()
-            if _min_num_cells < min:
-                raise ValueError(
-                    "min_num_cells must be >= processor_min_num_cells (currently " + str(min) + ")")
-            if _min_num_cells > max_num_cells:
-                raise ValueError(
-                    "min_num_cells must be <= max_num_cells (currently " + str(max_num_cells) + ")")
+            if cell_structure.type != CELL_STRUCTURE_P4EST:
+                if _min_num_cells < min:
+                    raise ValueError(
+                        "min_num_cells must be >= processor_min_num_cells (currently " + str(min) + ")")
+                if _min_num_cells > max_num_cells:
+                    raise ValueError(
+                        "min_num_cells must be <= max_num_cells (currently " + str(max_num_cells) + ")")
             min_num_cells = _min_num_cells
             mpi_bcast_parameter(FIELD_MINNUMCELLS)
 

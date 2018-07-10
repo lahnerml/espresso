@@ -1,12 +1,11 @@
 #ifndef _P4EST_DD_H
 #define _P4EST_DD_H
 
-#include "utils.hpp"
 #include "cells.hpp"
 
 #ifdef DD_P4EST
 #include <p4est_to_p8est.h>
-#include <p8est_mesh.h>
+#include <p8est.h>
 
 #define P4EST_DD_GUARD(call) call
 #else

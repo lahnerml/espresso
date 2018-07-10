@@ -30,7 +30,6 @@
 #include "lbboundaries.hpp"
 #include "lb-d3q19.hpp"
 #include "lb.hpp"
-#include "p4est_dd.hpp"
 #include "p4est_utils.hpp"
 #include "random.hpp"
 #include "thermostat.hpp"

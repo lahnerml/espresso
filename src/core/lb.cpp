@@ -3723,7 +3723,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
 void calc_particle_lattice_ia() {
 
   if (transfer_momentum) {
-    double force[3];
+    double force[3] = {0., 0., 0.};
 
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST

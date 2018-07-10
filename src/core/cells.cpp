@@ -34,7 +34,6 @@
 #include "integrate.hpp"
 #include "interaction_data.hpp"
 #include "layered.hpp"
-#include "lees_edwards_domain_decomposition.hpp"
 #include "nsquare.hpp"
 #include "p4est_dd.hpp"
 #include "particle_data.hpp"

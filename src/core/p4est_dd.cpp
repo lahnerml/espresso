@@ -327,7 +327,7 @@ static void dd_p4est_initialize_grid() {
           PERIODIC(1), PERIODIC(2)));
   ds.p4est = std::unique_ptr<p4est_t>(
       p4est_new_ext(comm_cart, ds.p4est_conn, 0, grid_level, true,
-                    sizeof(quad_data_t), init_fn, NULL));
+                    sizeof(quad_data_t), init_fn, nullptr));
 }
 
 void dd_p4est_create_grid (bool isRepart) {
@@ -356,7 +356,7 @@ void dd_p4est_create_grid (bool isRepart) {
   // this case in lbmd_repart.[ch]pp.
 #if !defined(LB_ADAPTIVE)
     if (part_nquads.size() == 0)
-      p4est_partition(ds.p4est, 0, NULL);
+      p4est_partition(ds.p4est, 0, nullptr);
     else
       p4est_partition_given(ds.p4est, part_nquads.data());
 #endif
@@ -440,7 +440,7 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
     
     for (int n = 0; n < 26; ++n) {
       ds.p4est_shell[i].neighbor[n] = -1;
-      p4est_mesh_get_neighbors(ds.p4est, p4est_ghost, p4est_mesh, i, n, NULL, NULL, ni);
+      p4est_mesh_get_neighbors(ds.p4est, p4est_ghost, p4est_mesh, i, n, nullptr, nullptr, ni);
       if (ni->elem_count > 1) // more than 1 neighbor in this direction
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
       if (ni->elem_count > 0) {
@@ -630,7 +630,7 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
                                     it->coord[2]) == needle)
     return &cells[std::distance(std::begin(ds.p4est_shell), it)];
   else
-    return NULL;
+    return nullptr;
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_save_position_to_cell(double pos[3]) {
@@ -655,7 +655,7 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
     }
   }
 
-  return NULL;
+  return nullptr;
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_position_to_cell(double pos[3]) {
@@ -738,7 +738,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
               int pid = part->p.identity;
               //fold_position(part->r.p, part->l.i);
               move_indexed_particle(&sendbuf[li], cell, p);
-              local_particles[pid] = NULL;
+              local_particles[pid] = nullptr;
               if(p < cell->n) p -= 1;
             } else { // particle stays local, but since it went to a ghost it has to be folded
               fold_position(part->r.p, part->l.i);
@@ -810,7 +810,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
       memcpy(p->bl.e, &dynrecv[read], p->bl.n * sizeof(int));
       read += p->bl.n;
     } else {
-      p->bl.e = NULL;
+      p->bl.e = nullptr;
       p->bl.max = 0;
     }
 #ifdef EXCLUSIONS
@@ -823,7 +823,7 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
       read += p->el.n;
     }
     else {
-      p->el.e = NULL;
+      p->el.e = nullptr;
       p->el.max = 0;
     }
 #endif
@@ -917,7 +917,7 @@ void dd_p4est_local_exchange_and_sort_particles() {
   for (int i = 0; i < num_comm_proc; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = NULL;
+      local_particles[sendbuf[i].part[p].p.identity] = nullptr;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
@@ -970,7 +970,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
 #endif
         int pid = part->p.identity;
         move_indexed_particle(&sendbuf[rank], pl, p);
-        local_particles[pid] = NULL;
+        local_particles[pid] = nullptr;
         if (p < pl->n)
           p -= 1;
       }
@@ -1042,7 +1042,7 @@ void dd_p4est_global_exchange_part(ParticleList *pl)
   for (int i = 0; i < n_nodes; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = NULL;
+      local_particles[sendbuf[i].part[p].p.identity] = nullptr;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
@@ -1061,10 +1061,10 @@ void dd_p4est_exchange_and_sort_particles (int global_flag) {
       for (int p = 0; p < pl->n; p++) {
         //fold_position(pl->part[p].r.p, pl->part[p].l.i);
         Cell *nc = dd_p4est_save_position_to_cell(pl->part[p].r.p.data());
-        if (nc == NULL) { // Belongs to other node
+        if (nc == nullptr) { // Belongs to other node
           int pid = pl->part[p].p.identity;
           move_indexed_particle(&sendbuf, pl, p);
-          local_particles[pid] = NULL;
+          local_particles[pid] = nullptr;
           if(p < pl->n) p -= 1;
         } else if(nc != pl) { // Still on node but particle belongs to other cell
           move_indexed_particle(nc, pl, p);
@@ -1077,10 +1077,10 @@ void dd_p4est_exchange_and_sort_particles (int global_flag) {
     if (local_cells.n > 0)
       dd_p4est_global_exchange_part(&sendbuf);
     else // Still call it if there are no cells on this node
-      dd_p4est_global_exchange_part(NULL);
+      dd_p4est_global_exchange_part(nullptr);
     // Free remaining particles in sendbuf, but it should be empty already
     for (int p = 0; p < sendbuf.n; p++) {
-      local_particles[sendbuf.part[p].p.identity] = NULL;
+      local_particles[sendbuf.part[p].p.identity] = nullptr;
       free_particle(&sendbuf.part[p]);
     }
     realloc_particlelist(&sendbuf, 0);
@@ -1186,7 +1186,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
           int pid = part->p.identity;
           //memcpy(&sendbuf[p].part[i], part, sizeof(Particle));
           append_unindexed_particle(&sendbuf[p], std::move(*part));
-          local_particles[pid] = NULL;
+          local_particles[pid] = nullptr;
         } else { // Particle stays local
           //int pid = part->p.identity;
           //memcpy(&cells[recv_prefix[p] + c].part[i], part, sizeof(Particle));
@@ -1280,7 +1280,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
             memcpy(p->bl.e, &recvbuf_dyn[source][read], p->bl.n * sizeof(int));
             read += p->bl.n;
           } else {
-            p->bl.e = NULL;
+            p->bl.e = nullptr;
             p->bl.max = 0;
           }
 #ifdef EXCLUSIONS
@@ -1292,7 +1292,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
             memcpy(p->el.e, &recvbuf_dyn[source][read], p->el.n*sizeof(int));
             read += p->el.n;
           } else {
-            p->el.e = NULL;
+            p->el.e = nullptr;
             p->el.max = 0;
           }
 #endif
@@ -1312,7 +1312,7 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
   for (int i = 0; i < n_nodes; ++i) {
     // Remove particles from this nodes local list and free data
     for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = NULL;
+      local_particles[sendbuf[i].part[p].p.identity] = nullptr;
       free_particle(&sendbuf[i].part[p]);
     }
     realloc_particlelist(&sendbuf[i], 0);
@@ -1412,7 +1412,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
         fold_position(part[p].r.p, part[p].l.i);
 
         Cell *nc = dd_p4est_save_position_to_cell(part[p].r.p.data());
-        if (nc == NULL) { // Particle is on other process, move it to cell[0]
+        if (nc == nullptr) { // Particle is on other process, move it to cell[0]
           append_unindexed_particle(local_cells.cell[0], std::move(part[p]));
         } else { // It is on this node, move it to right local_cell
           append_unindexed_particle(nc, std::move(part[p]));
@@ -1427,7 +1427,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
     if (local_cells.n > 0)
       dd_p4est_global_exchange_part(local_cells.cell[0]);
     else // Call it anyway in case there are no cells on this node (happens during startup)
-      dd_p4est_global_exchange_part(NULL);
+      dd_p4est_global_exchange_part(nullptr);
   }
 }
 

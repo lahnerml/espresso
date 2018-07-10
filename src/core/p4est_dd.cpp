@@ -60,8 +60,8 @@ namespace {
 // Needs to be a class because "p4est" needs to be destructed before "p4est_conn"!
 // Destruction order for non-static members is guaranteed to be in the order of declaration.
 struct __DS {
-  castable_unique_ptr<p4est_t> p4est;
   castable_unique_ptr<p4est_connectivity_t> p4est_conn;
+  castable_unique_ptr<p4est_t> p4est;
   std::vector<local_shell_t> p4est_shell;
 };
 

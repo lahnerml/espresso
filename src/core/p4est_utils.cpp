@@ -813,8 +813,8 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
-template <typename T>
-int p4est_utils_end_pending_communication(std::vector<T> exc_status, int level) {
+int p4est_utils_end_pending_communication(
+    std::vector<p8est_virtual_ghost_exchange_t*> exc_status, int level) {
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
   if (-1 == level) {

@@ -496,8 +496,9 @@ void dd_p4est_comm () {
       // loop fullshell
       for (int n=0;n<26;++n) {
         int nidx = ds.p4est_shell[i].neighbor[n];
+        if (nidx < 0) continue; // invalid neighbor
         int nrank = ds.p4est_shell[nidx].rank;
-        if (nidx < 0 || nrank < 0) continue; // invalid neighbor
+        if (nrank < 0) continue; // invalid neighbor
         if (ds.p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
         // add once for each rank
         if (send_idx[nrank].empty() || send_idx[nrank].back() != i)

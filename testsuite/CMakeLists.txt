@@ -153,6 +153,7 @@ python_test(FILE drude.py MAX_NUM_PROC 2)
 python_test(FILE thermalized_bond.py MAX_NUM_PROC 4)
 python_test(FILE thole.py MAX_NUM_PROC 4)
 python_test(FILE lb_switch.py MAX_NUM_PROC 1)
+python_test(FILE lb_switch_adaptive.py MAX_NUM_PROC 1)
 python_test(FILE lb_boundary_velocity.py MAX_NUM_PROC 1)
 python_test(FILE lb_boundary_velocity_adaptive.py MAX_NUM_PROC 2)
 

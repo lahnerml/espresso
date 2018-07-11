@@ -7,7 +7,7 @@ import time
 import unittest as ut
 
 
-@ut.skipIf(not espressomd.has_features(["LB", "LB_ADAPTIVE", "LB_BOUNDARIES"]),
+@ut.skipIf(not espressomd.has_features(["LB_ADAPTIVE", "LB_BOUNDARIES"]),
            "Features not available, skipping test.")
 class LBBoundaryVelocityTest(ut.TestCase):
     """Test slip velocity of boundaries.

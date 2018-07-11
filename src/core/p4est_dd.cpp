@@ -412,9 +412,10 @@ static int boundary_bitmask(int coord[3])
 
   for (int d = 0; d < 3; ++d) {
     if (PERIODIC(d)) {
+      // Both cases can happen in case of only 1 cell per dimension
       if (coord[d] == 0)
         bitmask |= BNDRY_LEFT[d];
-      else if (coord[d] == grid_size[d] - 1)
+      if (coord[d] == grid_size[d] - 1)
         bitmask |= BNDRY_RIGHT[d];
     }
   }

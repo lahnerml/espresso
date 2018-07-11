@@ -1,4 +1,5 @@
 #include <array>
+#include <cstdint>
 
 // For intrinsics version of cell_morton_idx
 #ifdef __BMI2__
@@ -9,7 +10,7 @@ namespace Utils {
 #ifdef __BMI2__
 inline unsigned _d2x(unsigned d, unsigned mask)
 {
-  return _pext_u32(d, mask);
+  return _pext_u64(d, mask);
 }
 #endif
 
@@ -18,30 +19,30 @@ inline unsigned _d2x(unsigned d, unsigned mask)
  * @param idx   A Morton-index calculated by interleaving a cell count
  * @return      The de-interleaved coordinates
  */
-inline std::array<int64_t, 3> morton_idx_to_coords (int64_t idx) {
+inline std::array<uint64_t, 3> morton_idx_to_coords (uint64_t idx) {
 #ifdef __BMI2__
-  static const unsigned mask_x = 0x49249249;
-  static const unsigned mask_y = 0x92492492;
-  static const unsigned mask_z = 0x24924924;
+      static const uint64_t mask_x = 0x4924924924924924;
+      static const uint64_t mask_y = 0x9249249249249249;
+      static const uint64_t mask_z = 0x2492492492492492;
 
-  std::array<int64_t, 3> res = {{
-      _d2x(idx, mask_x),
-      _d2x(idx, mask_y),
-      _d2x(idx, mask_z)
+  std::array<uint64_t, 3> res = {{
+      _pext_u64(idx, mask_x),
+      _pext_u64(idx, mask_y),
+      _pext_u64(idx, mask_z)
   }};
 #else
-  int64_t x = 0;
-  int64_t y = 0;
-  int64_t z = 0;
-  for (int64_t i = 0; i < 21; ++i) {
+  uint64_t x = 0;
+  uint64_t y = 0;
+  uint64_t z = 0;
+  for (uint64_t i = 0; i < 21; ++i) {
     // When doing this by hand, i resembles the level. We inspect if the bit for
     // the respective direction is set on the current level and if it is, we
     // also set it in the result array.
-    x |= ((idx & (static_cast<int64_t>(1) << (3 * i + 0))) != 0 ? 1 : 0) << i;
-    y |= ((idx & (static_cast<int64_t>(1) << (3 * i + 1))) != 0 ? 1 : 0) << i;
-    z |= ((idx & (static_cast<int64_t>(1) << (3 * i + 2))) != 0 ? 1 : 0) << i;
+    x |= ((idx & (static_cast<uint64_t>(1) << (3 * i + 0))) != 0 ? 1 : 0) << i;
+    y |= ((idx & (static_cast<uint64_t>(1) << (3 * i + 1))) != 0 ? 1 : 0) << i;
+    z |= ((idx & (static_cast<uint64_t>(1) << (3 * i + 2))) != 0 ? 1 : 0) << i;
   }
-  std::array<int64_t, 3> res = {{x, y, z}};
+  std::array<uint64_t, 3> res = {{x, y, z}};
 #endif
   return res;
 }
@@ -54,13 +55,13 @@ inline std::array<int64_t, 3> morton_idx_to_coords (int64_t idx) {
 inline int64_t morton_coords_to_idx(int x, int y, int z) {
 #ifdef __BMI2__
   //#warning "Using BMI2 for cell_morton_idx"
-  static const unsigned mask_x = 0x49249249;
-  static const unsigned mask_y = 0x92492492;
-  static const unsigned mask_z = 0x24924924;
+  static const uint64_t mask_x = 0x4924924924924924;
+  static const uint64_t mask_y = 0x9249249249249249;
+  static const uint64_t mask_z = 0x2492492492492492;
 
-  return _pdep_u32(x, mask_x)
-           | _pdep_u32(y, mask_y)
-           | _pdep_u32(z, mask_z);
+  return _pdep_u64(x, mask_x)
+           | _pdep_u64(y, mask_y)
+           | _pdep_u64(z, mask_z);
 #else
 //#warning "BMI2 not detected: Using slow loop version for cell_morton_idx"
   int64_t idx = 0;

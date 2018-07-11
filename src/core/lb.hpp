@@ -27,6 +27,8 @@
 #ifndef LB_H
 #define LB_H
 
+#include "config.hpp"
+
 #include "lattice_inline.hpp"
 #include "utils.hpp"
 
@@ -125,7 +127,7 @@ struct LB_FluidNode {
 
   /** local force density */
   double force_density[3];
-#ifdef IMMERSED_BOUNDARY
+#ifdef VIRTUAL_SITES_INERTIALESS_TRACERS 
   // For particle update, we need the force on the nodes in LBM
   // Yet, Espresso resets the force immediately after the LBM update
   // Therefore we save it here
@@ -639,7 +641,7 @@ int lb_lbnode_set_pop(int *ind, double *pop);
  * lattice. Note that it can lead to undefined behaviour if the
  * position is not within the local lattice. This version of the function
  * can be called without the position needing to be on the local processor */
-int lb_lbfluid_get_interpolated_velocity_global(Vector<3, double> p, double* v);
+int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v);
 
 #ifdef LB_GPU
 void lb_lbfluid_get_interpolated_velocity_at_positions(double const *positions,

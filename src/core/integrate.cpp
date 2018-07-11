@@ -26,16 +26,17 @@
 */
 
 #include "integrate.hpp"
+#include "accumulators.hpp"
 #include "cells.hpp"
+#include "collision.hpp"
 #include "communication.hpp"
 #include "domain_decomposition.hpp"
 #include "electrokinetics.hpp"
 #include "errorhandling.hpp"
 #include "ghmc.hpp"
 #include "ghosts.hpp"
+#include "global.hpp"
 #include "grid.hpp"
-#include "immersed_boundary/ibm_main.hpp"
-#include "immersed_boundary/ibm_volume_conservation.hpp"
 #include "initialize.hpp"
 #include "interaction_data.hpp"
 #include "lattice.hpp"
@@ -43,17 +44,18 @@
 #include "maggs.hpp"
 #include "minimize_energy.hpp"
 #include "nemd.hpp"
-#include "accumulators.hpp"
+#include "npt.hpp"
 #include "p3m.hpp"
-#include "p4est_utils.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
 #include "rattle.hpp"
-#include "swimmer_reaction.hpp"
 #include "rotation.hpp"
+#include "swimmer_reaction.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
 #include "virtual_sites.hpp"
+
+#include "immersed_boundaries.hpp"
 #include "npt.hpp"
 #include "collision.hpp"
 #include "forces.hpp"
@@ -212,8 +214,9 @@ void integrate_vv(int n_steps, int reuse_forces) {
   // Here we initialize volume conservation
   // This function checks if the reference volumes have been set and if
   // necessary calculates them
-  IBM_InitVolumeConservation();
+  immersed_boundaries.init_volume_conservation();
 #endif
+
 
   /* if any method vetoes (P3M not initialized), immediately bail out */
   if (check_runtime_errors())
@@ -245,7 +248,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
                      "included in the particle force the first time step. This "
                      "only matters if it happens frequently during "
                      "sampling.\n");
-#endif // LB
+#endif
 #ifdef LB_GPU
     transfer_momentum_gpu = 0;
     if (lattice_switch & LATTICE_LB_GPU && this_node == 0)
@@ -255,6 +258,16 @@ void integrate_vv(int n_steps, int reuse_forces) {
                      "sampling.\n");
 #endif
 
+  // Communication step: distribute ghost positions
+  cells_update_ghosts();
+
+// VIRTUAL_SITES pos (and vel for DPD) update for security reason !!!
+#ifdef VIRTUAL_SITES
+  virtual_sites()->update();
+  if (virtual_sites()->need_ghost_comm_after_pos_update()) {
+    ghost_communicator(&cell_structure.update_ghost_pos_comm);
+  }
+#endif
     force_calc();
 
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
@@ -267,7 +280,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef COLLISION_DETECTION
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
-        handle_collisions();
+      handle_collisions();
     }
 #endif
   }
@@ -345,22 +358,25 @@ void integrate_vv(int n_steps, int reuse_forces) {
 
 #ifdef LB
     transfer_momentum = 1;
-#endif // LB
+#endif
 #ifdef LB_GPU
     transfer_momentum_gpu = 1;
-#endif // LB_GPU
+#endif
 
+  // Communication step: distribute ghost positions
+  cells_update_ghosts();
+
+// VIRTUAL_SITES pos (and vel for DPD) update for security reason !!!
+#ifdef VIRTUAL_SITES
+  virtual_sites()->update();
+  if (virtual_sites()->need_ghost_comm_after_pos_update()) {
+    ghost_communicator(&cell_structure.update_ghost_pos_comm);
+  }
+#endif
     force_calc();
 
-// IMMERSED_BOUNDARY
-#ifdef IMMERSED_BOUNDARY
-    // Now the forces are computed and need to go into the LB fluid
-    if (lattice_switch & LATTICE_LB)
-      IBM_ForcesIntoFluid_CPU();
-#ifdef LB_GPU
-    if (lattice_switch & LATTICE_LB_GPU)
-      IBM_ForcesIntoFluid_GPU(local_cells.particles());
-#endif
+#ifdef VIRTUAL_SITES
+    virtual_sites()->after_force_calc();
 #endif
 
 #ifdef SWIMMER_REACTIONS
@@ -382,63 +398,37 @@ void integrate_vv(int n_steps, int reuse_forces) {
       correct_vel_shake();
     }
 #endif
-// VIRTUAL_SITES update vel
-#ifdef VIRTUAL_SITES
-    if (virtual_sites()->need_ghost_comm_before_vel_update()) {
-      ghost_communicator(&cell_structure.update_ghost_pos_comm);
-    }
-    virtual_sites()->update(false); // Recalc positions = false
-#endif
 
-// progagate one-step functionalities
+    // progagate one-step functionalities
 
-if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
+    if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
 #ifdef LB
-    if (lattice_switch & LATTICE_LB)
-      lattice_boltzmann_update();
+      if (lattice_switch & LATTICE_LB)
+        lattice_boltzmann_update();
 
-    if (check_runtime_errors())
-      break;
+      if (check_runtime_errors())
+        break;
 #endif
 
 #ifdef LB_GPU
-    if (this_node == 0) {
+      if (this_node == 0) {
 #ifdef ELECTROKINETICS
-      if (ek_initialized) {
-        ek_integrate();
-      } else {
-#endif // ELECTROKINETICS
-        if (lattice_switch & LATTICE_LB_GPU)
-          lattice_boltzmann_update_gpu();
+        if (ek_initialized) {
+          ek_integrate();
+        } else {
+#endif
+          if (lattice_switch & LATTICE_LB_GPU)
+            lattice_boltzmann_update_gpu();
 #ifdef ELECTROKINETICS
+        }
+#endif
       }
-#endif // ELECTROKINETICS
-    }
 #endif // LB_GPU
 
-
-// IMMERSED_BOUNDARY
-#ifdef IMMERSED_BOUNDARY
-
-    IBM_UpdateParticlePositions(local_cells.particles());
-// We reset all since otherwise the halo nodes may not be reset
-// NB: the normal Espresso reset is also done after applying the forces
-//    if (lattice_switch & LATTICE_LB) IBM_ResetLBForces_CPU();
-#ifdef LB_GPU
-// if (lattice_switch & LATTICE_LB_GPU) IBM_ResetLBForces_GPU();
+#ifdef VIRTUAL_SITES
+      virtual_sites()->after_lb_propagation();
 #endif
-
-    if (check_runtime_errors())
-      break;
-
-    // Ghost positions are now out-of-date
-    // We should update.
-    // Actually we seem to get the same results whether we do this here or not,
-    // but it is safer to do it
-    ghost_communicator(&cell_structure.update_ghost_pos_comm);
-
-#endif // IMMERSED_BOUNDARY
-}
+    }
 
 #ifdef ELECTROSTATICS
     if (coulomb.method == COULOMB_MAGGS) {
@@ -461,13 +451,22 @@ if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
       /* Propagate time: t = t+dt */
       sim_time += time_step;
+
 #ifdef COLLISION_DETECTION
-    handle_collisions();
+      handle_collisions();
 #endif
     }
+
     if (check_runtime_errors())
       break;
   }
+// VIRTUAL_SITES update vel
+#ifdef VIRTUAL_SITES
+    if (virtual_sites()->need_ghost_comm_before_vel_update()) {
+      ghost_communicator(&cell_structure.update_ghost_pos_comm);
+    }
+    virtual_sites()->update(false); // Recalc positions = false
+#endif
 
 #ifdef VALGRIND_INSTRUMENTATION
   CALLGRIND_STOP_INSTRUMENTATION;
@@ -495,7 +494,7 @@ if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
   if (thermo_switch & THERMO_GHMC)
     ghmc_close();
 #endif
-} // integrate_vv
+}
 
 /************************************************************/
 
@@ -526,7 +525,7 @@ void propagate_vel_finalize_p_inst() {
         this_node, p.f.f[0], p.f.f[1], p.f.f[2], p.m.v[0], p.m.v[1], p.m.v[2]));
 #ifdef VIRTUAL_SITES
     // Virtual sites are not propagated during integration
-    if (p.p.isVirtual)
+    if (p.p.is_virtual)
       continue;
 #endif
     for (int j = 0; j < 3; j++) {
@@ -566,7 +565,7 @@ void finalize_p_inst_npt() {
     nptiso.p_inst = 0.0;
     for (i = 0; i < 3; i++) {
       if (nptiso.geometry & nptiso.nptgeom_dir[i]) {
-          nptiso.p_vel[i] /= Utils::sqr(time_step);
+        nptiso.p_vel[i] /= Utils::sqr(time_step);
         nptiso.p_inst += nptiso.p_vir[i] + nptiso.p_vel[i];
       }
     }
@@ -594,7 +593,7 @@ void propagate_press_box_pos_and_rescale_npt() {
      * vel-rescaling
      */
     if (this_node == 0) {
-        nptiso.volume += nptiso.inv_piston * nptiso.p_diff * 0.5 * time_step;
+      nptiso.volume += nptiso.inv_piston * nptiso.p_diff * 0.5 * time_step;
       scal[2] = Utils::sqr(box_l[nptiso.non_const_dim]) /
                 pow(nptiso.volume, 2.0 / nptiso.dimension);
       nptiso.volume += nptiso.inv_piston * nptiso.p_diff * 0.5 * time_step;
@@ -621,7 +620,7 @@ void propagate_press_box_pos_and_rescale_npt() {
     /* propagate positions while rescaling positions and velocities */
     for (auto &p : local_cells.particles()) {
 #ifdef VIRTUAL_SITES
-      if (p.p.isVirtual)
+      if (p.p.is_virtual)
         continue;
 #endif
       for (int j = 0; j < 3; j++) {
@@ -686,7 +685,7 @@ void propagate_vel() {
 
 // Don't propagate translational degrees of freedom of vs
 #ifdef VIRTUAL_SITES
-    if (p.p.isVirtual)
+    if (p.p.is_virtual)
       continue;
 #endif
     for (int j = 0; j < 3; j++) {
@@ -738,7 +737,7 @@ void propagate_pos() {
   else {
     for (auto &p : local_cells.particles()) {
 #ifdef VIRTUAL_SITES
-      if (p.p.isVirtual)
+      if (p.p.is_virtual)
         continue;
 #endif
       for (int j = 0; j < 3; j++) {
@@ -779,7 +778,7 @@ void propagate_vel_pos() {
 
 // Don't propagate translational degrees of freedom of vs
 #ifdef VIRTUAL_SITES
-    if (p.p.isVirtual)
+    if (p.p.is_virtual)
       continue;
 #endif
     for (int j = 0; j < 3; j++) {
@@ -804,7 +803,8 @@ void propagate_vel_pos() {
                               this_node, p.r.p[0], p.r.p[1], p.r.p[2]));
 
     /* Verlet criterion check*/
-    if (Utils::sqr(p.r.p[0] - p.l.p_old[0]) + Utils::sqr(p.r.p[1] - p.l.p_old[1]) +
+    if (Utils::sqr(p.r.p[0] - p.l.p_old[0]) +
+            Utils::sqr(p.r.p[1] - p.l.p_old[1]) +
             Utils::sqr(p.r.p[2] - p.l.p_old[2]) >
         skin2)
       set_resort_particles(Cells::RESORT_LOCAL);
@@ -863,43 +863,6 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  if (n_part && 0.0 == sim_time && adapt_p4est != nullptr) {
-    fprintf(stderr, "Dynamically refine grid around particles\n");
-    std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
-    std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,
-                2 * sizeof(double));
-    std::memcpy(thresh_vort_temp.data(), p4est_params.threshold_velocity,
-                2 * sizeof(double));
-
-    p4est_params.threshold_velocity[0] = 0.;
-    p4est_params.threshold_velocity[1] = 1.;
-    mpi_call(mpi_bcast_thresh_vel,-1, -1);
-    mpi_bcast_thresh_vel(0, 0);
-
-    p4est_params.threshold_vorticity[0] = 0.;
-    p4est_params.threshold_vorticity[1] = 1.;
-    mpi_call(mpi_bcast_thresh_vort,-1, -1);
-    mpi_bcast_thresh_vort(0, 0);
-
-    for(int i = p4est_params.min_ref_level;
-        i < p4est_params.max_ref_level; ++i) {
-      mpi_call(mpi_adapt_grid, -1, 0);
-      mpi_adapt_grid(0, 0);
-    }
-    std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
-                2 * sizeof(double));
-    mpi_call(mpi_bcast_thresh_vel,-1, -1);
-    mpi_bcast_thresh_vel(0, 0);
-
-    std::memcpy(p4est_params.threshold_vorticity, thresh_vort_temp.data(),
-                2 * sizeof(double));
-    mpi_call(mpi_bcast_thresh_vort,-1, -1);
-    mpi_bcast_thresh_vort(0, 0);
-    fprintf(stderr, "Done refinement around particles\n");
-  }
-#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-
   /* perform integration */
   if (!Accumulators::auto_update_enabled()) {
     if (mpi_integrate(n_steps, reuse_forces))
@@ -916,12 +879,6 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
         return ES_ERROR;
     }
   }
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-#ifdef COMM_HIDING
-  p4est_utils_end_pending_communication(exc_status_lb);
-#endif // COMM_HIDING
-#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-
   return ES_OK;
 }
 

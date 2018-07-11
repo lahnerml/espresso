@@ -26,7 +26,7 @@ class LBTest(ut.TestCase):
     n_nodes = system.cell_system.get_state()["n_nodes"]
     system.seed = range(n_nodes)
     params = {'int_steps': 25,
-              'int_times': 10,
+              'int_times': 16,
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
@@ -105,17 +105,21 @@ class LBTest(ut.TestCase):
 
         # Integration
         for i in range(self.params['int_times']):
+            self.lbf.print_vtk_velocity("vel_field_{:05d}".format(i))
+            self.system.part.write_par_vtk("part_{:05d}".format(i))
             self.system.integrator.run(self.params['int_steps'])
+            self.lbf.print_vtk_velocity("vel_field_{:05d}".format(i+1))
+            self.system.part.write_par_vtk("part_{:05d}".format(i+1))
             fluidmass_sim = 0.0
             fluid_temp_sim = 0.0
             node_v_list = []
             node_dens_list = []
             n_nodes = int(self.params['box_l'] / self.params['agrid'])
-            for i in range(n_nodes):
-                for j in range(n_nodes):
-                    for k in range(n_nodes):
-                        node_v_list.append(self.lbf[i, j, k].velocity)
-                        node_dens_list.append(self.lbf[i, j, k].density[0])
+            for j in range(n_nodes):
+                for k in range(n_nodes):
+                    for l in range(n_nodes):
+                        node_v_list.append(self.lbf[j, k, l].velocity)
+                        node_dens_list.append(self.lbf[j, k, l].density[0])
 
             # check mass conversation
             fluidmass_sim = sum(node_dens_list) / len(node_dens_list)
@@ -125,7 +129,9 @@ class LBTest(ut.TestCase):
                 self.max_dmass = dmass
             self.assertTrue(
                 self.max_dmass < self.params['mass_prec_per_node'],
-                msg="fluid mass deviation too high\ndeviation: {}   accepted deviation: {}".format(
+                msg=("Integration step {}: fluid mass deviation too high\n" +
+                     "deviation: {}   accepted deviation: {}").format(
+                    i,
                     self.max_dmass,
                     self.params['mass_prec_per_node']))
 
@@ -136,8 +142,12 @@ class LBTest(ut.TestCase):
                 if dm[j] > self.max_dm[j]:
                     self.max_dm[j] = dm[j]
             self.assertTrue(
-                self.max_dm[0] <= self.params['mom_prec'] and self.max_dm[1] <= self.params['mom_prec'] and self.max_dm[2] <= self.params['mom_prec'],
-                msg="momentum deviation too high\ndeviation: {}  accepted deviation: {}".format(
+                self.max_dm[0] <= self.params['mom_prec'] and
+                self.max_dm[1] <= self.params['mom_prec'] and
+                self.max_dm[2] <= self.params['mom_prec'],
+                msg=("Integration step {}: momentum deviation too high\n" +
+                     "deviation: {}  accepted deviation: {}").format(
+                    i,
                     self.max_dm,
                     self.params['mom_prec']))
 

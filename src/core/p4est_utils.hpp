@@ -681,7 +681,9 @@ int p4est_utils_end_pending_communication(
  * has changed and everything is set to perform the next integration step.
  */
 int p4est_utils_perform_adaptivity_step();
+#endif
 
+#if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 template <typename T>
 /** Flatten level-wise data, i.e. inverse operation of
  * \ref p4est_utils_post_gridadapt_insert_data
@@ -726,7 +728,9 @@ int p4est_utils_unflatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
   }
   return 0;
 }
+#endif
 
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 template <typename T>
 /** Skeleton for copying data.
  *

@@ -845,7 +845,7 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
 }
 
 int p4est_utils_end_pending_communication(
-    std::vector<p8est_virtual_ghost_exchange_t*> exc_status, int level) {
+    std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level) {
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
   if (-1 == level) {
@@ -856,8 +856,7 @@ int p4est_utils_end_pending_communication(
         exc_status[i] = nullptr;
       }
     }
-  }
-  else {
+  } else {
     if (nullptr != exc_status[level]) {
       p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
       exc_status[level] = nullptr;

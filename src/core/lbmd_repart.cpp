@@ -4,7 +4,6 @@
 #include <vector>
 #include <string>
 
-#include <p8est_extended.h>
 
 #include "cells.hpp"
 #include "lb-adaptive.hpp"
@@ -13,6 +12,7 @@
 
 #if ((defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)) && \
      (defined(DD_P4EST)))
+#include <p8est_extended.h>
 
 namespace __md_detail {
 

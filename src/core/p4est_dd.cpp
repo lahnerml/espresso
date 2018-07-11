@@ -1429,29 +1429,8 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
       dd_p4est_global_exchange_part(nullptr);
   }
 }
-#endif
 
-//--------------------------------------------------------------------------------------------------
-void dd_p4est_write_parallel_vtk(char *filename) {
-#ifdef DD_P4EST
-  /* strip file ending from filename (if given) */
-  char *pos_file_ending;
-  pos_file_ending = strrchr(filename, '.');
-  if (pos_file_ending != nullptr) {
-    *pos_file_ending = '\0';
-  }
-  int len = static_cast<int>(strlen(filename));
-  ++len;
 
-  /* call mpi printing routine on all slaves and communicate the filename */
-  mpi_call(mpi_dd_p4est_write_particle_vtk, -1, len);
-
-  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
-  dd_p4est_write_particle_vtk(filename);
-#endif
-}
-
-#ifdef DD_P4EST
 void dd_p4est_write_particle_vtk(char *filename) {
   char fname[1024];
   // node 0 writes the header file
@@ -1675,3 +1654,23 @@ p4est_dd_repartition(const std::string& desc, bool verbose)
 }
 
 #endif
+
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_write_parallel_vtk(char *filename) {
+#ifdef DD_P4EST
+  /* strip file ending from filename (if given) */
+  char *pos_file_ending;
+  pos_file_ending = strrchr(filename, '.');
+  if (pos_file_ending != nullptr) {
+    *pos_file_ending = '\0';
+  }
+  int len = static_cast<int>(strlen(filename));
+  ++len;
+
+  /* call mpi printing routine on all slaves and communicate the filename */
+  mpi_call(mpi_dd_p4est_write_particle_vtk, -1, len);
+
+  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  dd_p4est_write_particle_vtk(filename);
+#endif
+}

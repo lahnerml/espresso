@@ -36,7 +36,7 @@ class LBTest(ut.TestCase):
               'friction': 2.0,
               'temp': 1.5,
               'gamma': 1.5,
-              'skin': 0.2,
+              'skin': 0.0,
               'mom_prec': 1.e-11,
               'mass_prec_per_node': 4.e-8,
               'temp_confidence': 10}

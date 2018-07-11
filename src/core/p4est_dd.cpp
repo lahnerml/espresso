@@ -1584,7 +1584,8 @@ void dd_p4est_on_geometry_change(int flags) {
 #ifndef LB_ADAPTIVE
   // Reinit only if max_range or box_l changes such that the old cell system
   // is not valid anymore.
-  if (grid_size[0] != std::max<int>(box_l[0] / max_range, 1)
+  if (flags & CELL_FLAG_GRIDCHANGED
+      || grid_size[0] != std::max<int>(box_l[0] / max_range, 1)
       || grid_size[1] != std::max<int>(box_l[1] / max_range, 1)
       || grid_size[2] != std::max<int>(box_l[2] / max_range, 1)) {
     cells_re_init(CELL_STRUCTURE_CURRENT);

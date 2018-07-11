@@ -66,6 +66,9 @@
 #include "thermalized_bond.hpp"
 #include "utils.hpp"
 #include "global.hpp"
+#include "virtual_sites.hpp"
+#include "dpd.hpp"
+
 #include "utils/mpi/all_compare.hpp" 
 
 #ifdef DD_P4EST

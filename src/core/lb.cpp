@@ -27,36 +27,45 @@
  *
  */
 
+#include <mpi.h>
+#include <cassert>
+#include <cstdio>
+#include <cstring>
+#include <iostream>
+#include "config.hpp" 
+#include "utils.hpp"
 #include "lb.hpp"
+#include "interaction_data.hpp"
+#include "global.hpp"
+
+#ifdef LB
+
 #include "communication.hpp"
 #include "grid.hpp"
 #include "halo.hpp"
-#include "immersed_boundary/ibm_main.hpp"
-#include "interaction_data.hpp"
 #include "lb-d3q19.hpp"
 #include "lbboundaries.hpp"
-#include "thermostat.hpp"
-#include "utils.hpp"
-#include <cassert>
-#include <cstdio>
-#include <fstream>
-#include <iostream>
-#include <mpi.h>
-#include <stdlib.h>
-
-#ifdef LB_ADAPTIVE
-#include "lb-adaptive-gpu.hpp"
+#include "lb.hpp"
 #include "lb-adaptive.hpp"
 #include "p4est_utils.hpp"
-#include <sc.h>
-#endif // LB_ADAPTIVE
+#include "virtual_sites/lb_inertialess_tracers.hpp"
+#include "thermostat.hpp"
+#include "utils.hpp"
+#include "global.hpp"
+#include "cells.hpp"
+#include "global.hpp"
 
-// #define DUMP_GRID
+#include <cassert>
+#include <cstdio>
+#include <iostream>
+#include <mpi.h>
 
-#ifdef LB
+#include "cuda_interface.hpp"
+
 #ifndef LB_ADAPTIVE_GPU
-
-void lb_check_halo_regions();
+#ifdef ADDITIONAL_CHECKS
+static void lb_check_halo_regions();
+#endif // ADDITIONAL_CHECKS
 
 /** Flag indicating momentum exchange between particles and fluid */
 int transfer_momentum = 0;
@@ -87,18 +96,13 @@ LB_Parameters lbpar = {
     // gamma_even
     0.,
     // gamma_shear
-    {0.},
+    0.,
     // gamma_bulk
-    {0.},
+    0.,
     // is_TRT
     false,
     // resend_halo
-    0,
-    // fluct
-    0,
-    // phi
-    {0.},
-};
+    0};
 
 /** The DnQm model to be used. */
 LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
@@ -784,20 +788,20 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   return 0;
 }
 
-int lb_lbfluid_print_vtk_density(char *filename) {
+int lb_lbfluid_print_vtk_density(char **filename) {
 #ifdef LB_ADAPTIVE
   /* strip file ending from filename (if given) */
   char *pos_file_ending;
-  pos_file_ending = strrchr(filename, '.');
+  pos_file_ending = strrchr(*filename, '.');
   if (pos_file_ending != nullptr) {
     *pos_file_ending = '\0';
   }
-  int len = static_cast<int>(strlen(filename));
+  int len = static_cast<int>(strlen(*filename));
   ++len;
 
   /* call mpi printing routine on all slaves and communicate the filename */
   mpi_call(mpi_lbadapt_vtk_print_density, -1, len);
-  MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
+  MPI_Bcast(*filename, len, MPI_CHAR, 0, comm_cart);
 
   /* perform master IO routine here. */
   /* TODO: move this to communication? */
@@ -816,7 +820,7 @@ int lb_lbfluid_print_vtk_density(char *filename) {
 
 #ifndef LB_ADAPTIVE_GPU
   /* create VTK output context and set its parameters */
-  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, filename);
+  p8est_vtk_context_t *context = p8est_vtk_context_new(adapt_p4est, *filename);
   p8est_vtk_context_set_scale(context, 1); /* quadrant at full scale */
 
   /* begin writing the output files */
@@ -866,7 +870,7 @@ int lb_lbfluid_print_vtk_density(char *filename) {
   int ii;
 
   for (ii = 0; ii < LB_COMPONENTS; ++ii) {
-    FILE *fp = fopen(&filename[ii], "w");
+    FILE *fp = fopen(filename[ii], "w");
 
     if (fp == nullptr) {
       perror("lb_lbfluid_print_vtk_density");
@@ -1525,7 +1529,7 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
  * couple to MD beads when near a wall, see
  * lb_lbfluid_get_interpolated_velocity.
  */
-int lb_lbfluid_get_interpolated_velocity_global(Vector<3, double> p, double* v) {
+int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v) {
 #ifdef LB_ADAPTIVE
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(p, im);
@@ -2436,7 +2440,6 @@ void lb_reinit_parameters() {
 #endif // LB_ADAPTIVE
 }
 
-
 /** Resets the forces on the fluid nodes */
 void lb_reinit_force_densities() {
 #ifdef LB_ADAPTIVE
@@ -2744,7 +2747,6 @@ void lb_calc_modes(Lattice::index_t index, double *mode) {
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // !LB_ADAPTIVE
 }
-
 
 inline void lb_relax_modes(Lattice::index_t index, double *mode) {
 #ifndef LB_ADAPTIVE
@@ -3123,11 +3125,11 @@ inline void lb_collide_stream() {
   // particle update In the following loop the lbfields[XX].force are reset to
   // zero
   for (int i = 0; i < lblattice.halo_grid_volume; ++i) {
-    lbfields[i].force_buf[0] = lbfields[i].force[0];
-    lbfields[i].force_buf[1] = lbfields[i].force[1];
-    lbfields[i].force_buf[2] = lbfields[i].force[2];
+    lbfields[i].force_density_buf[0] = lbfields[i].force_density[0];
+    lbfields[i].force_density_buf[1] = lbfields[i].force_density[1];
+    lbfields[i].force_density_buf[2] = lbfields[i].force_density[2];
   }
-#endif // IMMERSED_BOUNDARY
+#endif
 
   index = lblattice.halo_offset;
   for (int z = 1; z <= lblattice.grid[2]; z++) {
@@ -3194,7 +3196,7 @@ inline void lb_collide_stream() {
  * monitor the time since the last lattice update.
  */
 void lattice_boltzmann_update() {
-  auto factor = (int)round(lbpar.tau / time_step);
+  int factor = (int)round(lbpar.tau / time_step);
 
   fluidstep += 1;
   if (fluidstep >= factor) {
@@ -3240,11 +3242,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
               p->f.f[1], p->f.f[2]);
     });
   }
-#endif // EXTERNAL_FORCES
+#endif
 
-/* determine elementary lattice cell surrounding the particle
-   and the relative position of the particle in this cell */
-#ifndef LB_ADAPTIVE
+  /* determine elementary lattice cell surrounding the particle
+     and the relative position of the particle in this cell */
+#ifndef LB_ADAPTIVE  
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
   double h = lbpar.agrid;
   double h_max = lbpar.agrid;
@@ -3434,7 +3436,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     }
 #endif // !LB_ADAPTIVE
   }
-#endif // ENGINE
+#endif
 #endif // !LB_ADAPTIVE_GPU
 }
 
@@ -3740,6 +3742,7 @@ void calc_particle_lattice_ia() {
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE
     if (lbpar.resend_halo) { /* first MD step after last LB update */
+
       /* exchange halo regions (for fluid-particle coupling) */
       halo_communication(&update_halo_comm, (char *)**lbfluid);
 
@@ -3779,14 +3782,11 @@ void calc_particle_lattice_ia() {
     ghost_communicator(&cell_structure.ghost_lbcoupling_comm);
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
-#endif // ENGINE
+#endif
 
     /* local cells */
     for (auto &p : local_cells.particles()) {
-#ifdef IMMERSED_BOUNDARY
-      // Virtual particles for IBM must not be coupled
-      if (!p.p.isVirtual)
-#endif
+      if (!p.p.is_virtual || thermo_virtual)
       {
         lb_viscous_coupling(&p, force);
 
@@ -3818,10 +3818,7 @@ void calc_particle_lattice_ia() {
           fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
                   this_node);
         });
-#ifdef IMMERSED_BOUNDARY
-        // Virtual particles for IBM must not be coupled
-        if (!p.p.isVirtual)
-#endif
+        if (!p.p.is_virtual || thermo_virtual)
         {
           lb_viscous_coupling(&p, force);
         }

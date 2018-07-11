@@ -502,14 +502,14 @@ p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost);
 
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular
  * grid on the finest level */
-std::array<int64_t, 3> p4est_utils_idx_to_pos (int64_t idx);
+std::array<uint64_t, 3> p4est_utils_idx_to_pos (uint64_t idx);
 
 /** Obtain a Morton-index by interleaving 3 integer coordinates.
  *
  * @param x, y, z  The coordinates
  * @return         Morton-index of given position.
  */
-int64_t p4est_utils_cell_morton_idx(int x, int y, int z);
+int64_t p4est_utils_cell_morton_idx(uint64_t x, uint64_t y, uint64_t z);
 
 /** Obtain a Morton-index from a quadrant and its treeid.
  *

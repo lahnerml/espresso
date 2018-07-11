@@ -53,6 +53,10 @@ class LBTest(ut.TestCase):
     system.time_step = params['time_step']
     system.cell_system.skin = params['skin']
 
+    system.non_bonded_inter[0, 0].lennard_jones.set_params(
+        epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
+    system.cell_system.set_p4est_dd(use_verlet_lists=False)
+
     def test_mass_momentum_thermostat(self):
         self.system.actors.clear()
         self.system.part.clear()

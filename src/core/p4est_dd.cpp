@@ -40,7 +40,7 @@ struct CellInfo {
   CellType type; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
   int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
                     // Might be "-1" if searching for neighbors over a non-periodic boundary.
-  int coord[3]; // cartesian coordinates of the cell
+  std::array<int, 3> coord; // cartesian coordinates of the cell
 };
 
 // Structure to store communications
@@ -410,16 +410,19 @@ void dd_p4est_create_grid(bool isRepart) {
   p4est_utils_init();
 }
 //--------------------------------------------------------------------------------------------------
-/* TODO:
+/** Returns the morton idx of a quadrant local to tree of index "treeidx".
+ */
+static std::array<int, 3> morton_idx_of_quadrant(p4est_quadrant_t *q, p4est_topidx_t treeidx) {
+  std::array<double, 3> xyz;
+  p4est_qcoord_to_vertex(ds.p4est_conn, treeidx, q->x, q->y, q->z, xyz.data());
+  int scal = 1 << p4est_tree_array_index(ds.p4est->trees, treeidx)->maxlevel;
 
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds.p4est, p4est_mesh, i);
-    double xyz[3];
-    p4est_qcoord_to_vertex(ds.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1 << p4est_tree_array_index(ds.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
-    uint64_t x = xyz[0] * ql;
-    uint64_t y = xyz[1] * ql;
-    uint64_t z = xyz[2] * ql;
-*/
+  std::array<int, 3> coord;
+  for (int d = 0; d < 3; ++d)
+    coord[d] = xyz[d] * scal;
+  return coord;
+}
+
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {
   num_local_cells = (size_t) ds.p4est->local_num_quadrants;
@@ -430,18 +433,9 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
   ds.p4est_cellinfo.resize(num_cells);
 
   for (int i = 0; i < num_local_cells; ++i) {
-    p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds.p4est, p4est_mesh, i);
-    double xyz[3];
-    p4est_qcoord_to_vertex(ds.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1 << p4est_tree_array_index(ds.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
-    uint64_t x = xyz[0] * ql;
-    uint64_t y = xyz[1] * ql;
-    uint64_t z = xyz[2] * ql;
     ds.p4est_cellinfo[i].idx = i;
     ds.p4est_cellinfo[i].rank = this_node;
-    ds.p4est_cellinfo[i].coord[0] = x;
-    ds.p4est_cellinfo[i].coord[1] = y;
-    ds.p4est_cellinfo[i].coord[2] = z;
+    ds.p4est_cellinfo[i].coord = morton_idx_of_quadrant(p4est_mesh_get_quadrant(ds.p4est, p4est_mesh, i), p4est_mesh->quad_to_tree[i]);
     ds.p4est_cellinfo[i].type = is_on_boundary(ds.p4est_cellinfo[i])? CellType::Boundary: CellType::Inner;
     
     for (int n = 0; n < 26; ++n) {
@@ -463,20 +457,11 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
   for (int g = 0; g < num_ghost_cells; ++g) {
     int i = num_local_cells + g;
     
-    p4est_quadrant_t *q = p4est_quadrant_array_index(&p4est_ghost->ghosts, g);
-    double xyz[3];
-    p4est_qcoord_to_vertex(ds.p4est_conn, q->p.piggy3.which_tree, q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(ds.p4est->trees, q->p.piggy3.which_tree)->maxlevel;
-    uint64_t x = xyz[0] * ql;
-    uint64_t y = xyz[1] * ql;
-    uint64_t z = xyz[2] * ql;
-    
     ds.p4est_cellinfo[i].idx = g;
     ds.p4est_cellinfo[i].rank = p4est_mesh->ghost_to_proc[g];
     ds.p4est_cellinfo[i].type = CellType::Ghost;
-    ds.p4est_cellinfo[i].coord[0] = x;
-    ds.p4est_cellinfo[i].coord[1] = y;
-    ds.p4est_cellinfo[i].coord[2] = z;
+    p4est_quadrant_t *q = p4est_quadrant_array_index(&p4est_ghost->ghosts, g);
+    ds.p4est_cellinfo[i].coord = morton_idx_of_quadrant(q, q->p.piggy3.which_tree);
     std::fill(std::begin(ds.p4est_cellinfo[i].neighbor), std::end(ds.p4est_cellinfo[i].neighbor), -1);
   }
 }

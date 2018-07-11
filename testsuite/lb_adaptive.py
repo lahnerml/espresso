@@ -36,7 +36,7 @@ class LBTest(ut.TestCase):
               'friction': 2.0,
               'temp': 1.5,
               'gamma': 1.5,
-              'skin': 0.2,
+              'skin': 0.0,
               'mom_prec': 1.e-11,
               'mass_prec_per_node': 4.e-8,
               'temp_confidence': 10}
@@ -52,6 +52,10 @@ class LBTest(ut.TestCase):
     system.periodicity = [1, 1, 1]
     system.time_step = params['time_step']
     system.cell_system.skin = params['skin']
+
+    system.non_bonded_inter[0, 0].lennard_jones.set_params(
+        epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
+    system.cell_system.set_p4est_dd(use_verlet_lists=False)
 
     def test_mass_momentum_thermostat(self):
         self.system.actors.clear()

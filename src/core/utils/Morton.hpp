@@ -21,9 +21,9 @@ inline unsigned _d2x(unsigned d, unsigned mask)
  */
 inline std::array<uint64_t, 3> morton_idx_to_coords (uint64_t idx) {
 #ifdef __BMI2__
-      static const uint64_t mask_x = 0x4924924924924924;
-      static const uint64_t mask_y = 0x9249249249249249;
-      static const uint64_t mask_z = 0x2492492492492492;
+  static const uint64_t mask_x = 0x1249249249249249;
+  static const uint64_t mask_y = 0x2492492492492492;
+  static const uint64_t mask_z = 0x4924924924924924;
 
   std::array<uint64_t, 3> res = {{
       _pext_u64(idx, mask_x),
@@ -55,9 +55,9 @@ inline std::array<uint64_t, 3> morton_idx_to_coords (uint64_t idx) {
 inline int64_t morton_coords_to_idx(int x, int y, int z) {
 #ifdef __BMI2__
   //#warning "Using BMI2 for cell_morton_idx"
-  static const uint64_t mask_x = 0x4924924924924924;
-  static const uint64_t mask_y = 0x9249249249249249;
-  static const uint64_t mask_z = 0x2492492492492492;
+  static const uint64_t mask_x = 0x1249249249249249;
+  static const uint64_t mask_y = 0x2492492492492492;
+  static const uint64_t mask_z = 0x4924924924924924;;
 
   return _pdep_u64(x, mask_x)
            | _pdep_u64(y, mask_y)

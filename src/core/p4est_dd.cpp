@@ -679,9 +679,9 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
   }
 }
 //--------------------------------------------------------------------------------------------------
-static bool is_out_of_box(Particle& p) {
+static bool is_out_of_box(Particle& p, const std::array<int, 3> &off) {
   for (int d = 0; d < 3; ++d)
-    if (p.r.p[d] < 0.0 || p.r.p[d] >= box_l[d])
+    if (off[d] != 1 && (p.r.p[d] < 0.0 || p.r.p[d] >= box_l[d]))
       return true;
   return false;
 }
@@ -692,56 +692,53 @@ static bool is_out_of_box(Particle& p) {
 // index pair of those particles in a vector and move them at the end.
 void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn)
 {
-  double cell_lc[3], cell_hc[3];
+  std::array<double, 3> cell_lc, cell_hc, ext_cell_lc, ext_cell_hc;
   // Loop over all cells and particles
   for (int i=0;i<num_local_cells;++i) {
     Cell* cell = local_cells.cell[i];
     CellInfo* shell = &ds.p4est_cellinfo[i];
 
-    for (int d=0;d<3;++d) {
-      cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
+    for (int d = 0; d < 3; ++d) {
+      cell_lc[d] = dd.cell_size[d] * static_cast<double>(shell->coord[d]);
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
+
+      ext_cell_lc[d] = cell_lc[d];
+      ext_cell_hc[d] = cell_hc[d];
       if (is_on_boundary(*shell, d, Direction::Left))
-        cell_lc[d] -= 0.5 * ROUND_ERROR_PREC*box_l[d];
+        ext_cell_lc[d] -= 0.5 * ROUND_ERROR_PREC*box_l[d];
       if (is_on_boundary(*shell, d, Direction::Right))
-        cell_hc[d] += 0.5 * ROUND_ERROR_PREC*box_l[d];
+        ext_cell_hc[d] += 0.5 * ROUND_ERROR_PREC*box_l[d];
     }
 
     for (int p=0;p<cell->n;++p) {
       Particle* part = &cell->part[p];
-      int x,y,z;
+      std::array<int, 3> off;
 
       // Check if particle has left the cell. (The local domain is extended by half round error)
-      if (part->r.p[0] < cell_lc[0]) x = 0;
-      else if (part->r.p[0] >= cell_hc[0]) x = 2;
-      else x = 1;
-      if (part->r.p[1] < cell_lc[1]) y = 0;
-      else if (part->r.p[1] >= cell_hc[1]) y = 2;
-      else y = 1;
-      if (part->r.p[2] < cell_lc[2]) z = 0;
-      else if (part->r.p[2] >= cell_hc[2]) z = 2;
-      else z = 1;
+      for (int d = 0; d < 3; ++d) {
+        if (part->r.p[d] < ext_cell_lc[d])
+          off[d] = 0;
+        else if (part->r.p[d] >= ext_cell_hc[d])
+          off[d] = 2;
+        else
+          off[d] = 1;
+      }
 
-      int nidx = neighbor_lut[z][y][x];
+      int nidx = neighbor_lut[off[2]][off[1]][off[0]];
       if (nidx != -1) { // Particle p outside of cell i
         // recalculate neighboring cell to prevent rounding errors
         // If particle left local domain, check for correct ghost cell, thus without ROUND_ERROR_PREC
-        for (int d=0;d<3;++d) {
-          cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
-          cell_hc[d] = cell_lc[d] + dd.cell_size[d];
+        for (int d = 0; d < 3; ++d) {
+          if (part->r.p[d] < cell_lc[d])
+            off[d] = 0;
+          else if (part->r.p[d] >= cell_hc[d])
+            off[d] = 2;
+          else
+            off[d] = 1;
         }
-        if (part->r.p[0] < cell_lc[0]) x = 0;
-        else if (part->r.p[0] >= cell_hc[0]) x = 2;
-        else x = 1;
-        if (part->r.p[1] < cell_lc[1]) y = 0;
-        else if (part->r.p[1] >= cell_hc[1]) y = 2;
-        else y = 1;
-        if (part->r.p[2] < cell_lc[2]) z = 0;
-        else if (part->r.p[2] >= cell_hc[2]) z = 2;
-        else z = 1;
 
         // get neighbor cell
-        nidx = shell->neighbor[neighbor_lut[z][y][x]];
+        nidx = shell->neighbor[neighbor_lut[off[2]][off[1]][off[0]]];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
           if (ds.p4est_cellinfo[nidx].rank >= 0) { // This ghost cell is linked to a process
             // With minimal ghost this condition is always true
@@ -767,7 +764,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
             fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
           }
         } else { // Local Cell, just move the partilce
-          if (is_out_of_box(*part)) { // Local periodic boundary
+          if (is_out_of_box(*part, off)) { // Local periodic boundary
             fold_position(part->r.p, part->l.i);
           }
           move_indexed_particle(&cells[nidx], cell, p);

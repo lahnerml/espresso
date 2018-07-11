@@ -621,9 +621,9 @@ Cell* responsible_collision_cell(Particle& p)
     errexit();
   }
   if (p.l.ghost)
-    return project_to_boundary(p.r.p);
+    return project_to_boundary(p.r.p.data());
   else
-    return cell_structure.position_to_cell(p.r.p);
+    return cell_structure.position_to_cell(p.r.p.data());
 }
 
 // Goes through the collision queue and for each pair in it

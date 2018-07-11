@@ -105,7 +105,7 @@ typedef struct {
   double (*coeff)[4];
 
   /** weights in the functional for the equilibrium distribution */
-  double(*w);
+  double *w;
 
   /** basis of moment space */
   double **e;

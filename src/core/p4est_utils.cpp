@@ -373,13 +373,13 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
 }
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
-std::array<int64_t, 3> p4est_utils_idx_to_pos(int64_t idx) {
+std::array<uint64_t, 3> p4est_utils_idx_to_pos(uint64_t idx) {
   return Utils::morton_idx_to_coords(idx);
 }
 
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
-int64_t p4est_utils_cell_morton_idx(int x, int y, int z) {
+int64_t p4est_utils_cell_morton_idx(uint64_t x, uint64_t y, uint64_t z) {
   return Utils::morton_coords_to_idx(x, y, z);
 }
 

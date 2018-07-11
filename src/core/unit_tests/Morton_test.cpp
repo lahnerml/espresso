@@ -27,14 +27,23 @@
 
 #include "utils/Morton.hpp"
 #include <array>
+#include <random>
 
 BOOST_AUTO_TEST_CASE(Morton_Index_Check) {
+  const int n_experiments = 10000;
+
   const int dim = 3;
-  const int lvl = 20;
-  const int64_t n_idx = INT64_C(1) << (dim * lvl);
-  std::array<int64_t, 3> tmp;
-  for (int64_t idx = 0; idx < n_idx; ++idx) {
-    tmp = Utils::morton_idx_to_coords(idx);
-    BOOST_CHECK(idx == Utils::morton_coords_to_idx(tmp[0], tmp[1], tmp[2]));
+  const int lvl = 21;
+  const int64_t n_idx = static_cast<uint64_t>(1) << (dim * lvl);
+
+  std::default_random_engine gen;
+  std::uniform_int_distribution<uint64_t> distribution(0, n_idx);
+
+  std::array<uint64_t, 3> tmp;
+  uint64_t sample;
+  for (int idx = 0; idx < n_experiments; ++idx) {
+    sample = distribution(gen);
+    tmp = Utils::morton_idx_to_coords(sample);
+    BOOST_CHECK(sample == Utils::morton_coords_to_idx(tmp[0], tmp[1], tmp[2]));
   }
 }

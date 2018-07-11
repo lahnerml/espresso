@@ -2656,7 +2656,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
   return qidx;
 }
 
-int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
+int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]) {
   static const int nidx[8][7] = {
       {0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
@@ -2672,6 +2672,11 @@ int lbadapt_interpolate_pos_adapt(double pos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
+
+  int fold[3] = {0, 0, 0};
+  double pos[3] = {opos[0], opos[1], opos[2]};
+  fold_position(pos,fold);
+
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
     int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);

@@ -269,7 +269,7 @@ static inline int count_trailing_zeros(int x)
 }
 
 // Compute the grid- and bricksize according to box_l and maxrange
-int dd_p4est_cellsize_optimal() {
+void dd_p4est_set_cellsize_optimal() {
   int ncells[3] = {1, 1, 1};
 
   // compute number of cells
@@ -284,24 +284,23 @@ int dd_p4est_cellsize_optimal() {
   grid_size[2] = ncells[2];
 
   // divide all dimensions by biggest common power of 2
-  int lvl = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
+  grid_level = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
 
-  brick_size[0] = ncells[0] >> lvl;
-  brick_size[1] = ncells[1] >> lvl;
-  brick_size[2] = ncells[2] >> lvl;
+  brick_size[0] = ncells[0] >> grid_level;
+  brick_size[1] = ncells[1] >> grid_level;
+  brick_size[2] = ncells[2] >> grid_level;
 
-  return lvl; // return the level of the grid
-}
-//--------------------------------------------------------------------------------------------------
-// Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
-static void dd_p4est_initialize_grid() {
-  // Set global variables
-  grid_level = dd_p4est_cellsize_optimal(); // Sets grid_size and brick_size
   for (int i = 0; i < 3; ++i) {
     dd.cell_size[i] = box_l[i] / static_cast<double>(grid_size[i]);
     dd.inv_cell_size[i] = 1.0 / dd.cell_size[i];
   }
   max_skin = std::min(std::min(dd.cell_size[0], dd.cell_size[1]), dd.cell_size[2]) - max_cut;
+}
+//--------------------------------------------------------------------------------------------------
+// Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
+static void dd_p4est_initialize_grid() {
+  // Set global variables
+  dd_p4est_set_cellsize_optimal(); // Sets grid_size and brick_size
 
   // Create p4est structs
   auto oldconn = std::move(ds.p4est_conn);

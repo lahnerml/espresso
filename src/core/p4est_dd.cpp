@@ -30,7 +30,7 @@
 
 // Structure that stores basic grid information
 typedef struct {
-  int64_t idx; // a unique index within all cells (as used by p4est for locals)
+  uint64_t idx; // a unique index within all cells (as used by p4est for locals)
   int rank; // the rank of this cell (equals this_node for locals)
   int shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
   int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
@@ -89,7 +89,7 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]);
 // Map a position to a global processor index
 static int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)
-static int64_t dd_p4est_pos_morton_idx(double pos[3]);
+static uint64_t dd_p4est_pos_morton_idx(double pos[3]);
 
 /** Revert the order of a communicator: After calling this the
     communicator is working in reverted order with exchanged
@@ -214,26 +214,33 @@ int dd_p4est_get_n_trees(int dir = 0) {
 
 // Returns the morton index for given cartesian coordinates.
 // Note: This is not the index of the p4est quadrants. But the ordering is the same.
-int64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
+uint64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
 #ifdef __BMI2__
-  static const unsigned mask_x = 0x49249249;
-  static const unsigned mask_y = 0x92492492;
-  static const unsigned mask_z = 0x24924924;
+  using pdep_uint = unsigned long long;
+  static constexpr pdep_uint mask_x = 0x1249249249249249;
+  static constexpr pdep_uint mask_y = 0x2492492492492492;
+  static constexpr pdep_uint mask_z = 0x4924924924924924;
 
-  return _pdep_u32(x, mask_x)
-           | _pdep_u32(y, mask_y)
-           | _pdep_u32(z, mask_z);
+  return _pdep_u64(static_cast<pdep_uint>(x), mask_x)
+           | _pdep_u64(static_cast<pdep_uint>(y), mask_y)
+           | _pdep_u64(static_cast<pdep_uint>(z), mask_z);
 #else
-  int64_t idx = 0;
-  int64_t pos = 1;
+  uint64_t idx = 0;
+  uint64_t bit = 1;
 
   for (int i = 0; i < 21; ++i) {
-    if ((x&1)) idx += pos;
-    x >>= 1; pos <<= 1;
-    if ((y&1)) idx += pos;
-    y >>= 1; pos <<= 1;
-    if ((z&1)) idx += pos;
-    z >>= 1; pos <<= 1;
+    if ((x & 1))
+      idx |= bit;
+    x >>= 1;
+    bit <<= 1;
+    if ((y & 1))
+      idx |= bit;
+    y >>= 1;
+    bit <<= 1;
+    if ((z & 1))
+      idx |= bit;
+    z >>= 1;
+    bit <<= 1;
   }
 
   return idx;
@@ -309,7 +316,29 @@ static void dd_p4est_initialize_grid() {
                     static_cast<size_t>(0), nullptr, nullptr));
 }
 
-void dd_p4est_create_grid (bool isRepart) {
+/** Returns the global morton idx of a quad. 
+ */
+static uint64_t dd_p4est_quad_global_morton_idx(p4est_quadrant_t &q)
+{
+  std::array<double, 3> xyz;
+  int scal = 1 << grid_level;
+  p4est_qcoord_to_vertex(ds.p4est_conn, q.p.which_tree, q.x, q.y, q.z, xyz.data());
+  return dd_p4est_cell_morton_idx(xyz[0] * scal, xyz[1] * scal, xyz[2] * scal);
+}
+
+/** Returns the maximum global(!) morton index for a grid of level
+ * grid_level.
+ */
+static uint64_t dd_p4est_grid_max_global_morton_idx()
+{
+  int i = 1 << grid_level;
+  while(i < grid_size[0] || i < grid_size[1] || i < grid_size[2])
+    i <<= 1;
+  auto ui = static_cast<uint64_t>(i);
+  return ui * ui * ui;
+}
+
+void dd_p4est_create_grid(bool isRepart) {
   // Note: In case of LB_ADAPTIVE (lb_adaptive_is_defined), calling
   // p4est_partition is handled by lbmd_repart.[ch]pp. This means that must not
   // do anything related torepartitioning in this case.
@@ -348,22 +377,10 @@ void dd_p4est_create_grid (bool isRepart) {
 
   // create space filling inforamtion about first quads per node from p4est
   p4est_space_idx.resize(n_nodes + 1);
-  for (int i=0;i<=n_nodes;++i) {
-    p4est_quadrant_t *q = &ds.p4est->global_first_position[i];
-    if (i < n_nodes) {
-      double xyz[3];
-      p4est_qcoord_to_vertex(ds.p4est_conn,q->p.which_tree,q->x,q->y,q->z,xyz);
-      p4est_space_idx[i] = dd_p4est_cell_morton_idx(xyz[0]*(1<<grid_level),
-                                                    xyz[1]*(1<<grid_level),
-                                                    xyz[2]*(1<<grid_level));
-    } else {
-      int64_t tmp = 1<<grid_level;
-      while(tmp < grid_size[0]) tmp <<= 1;
-      while(tmp < grid_size[1]) tmp <<= 1;
-      while(tmp < grid_size[2]) tmp <<= 1;
-      p4est_space_idx[i] = tmp*tmp*tmp;
-    }
-  }
+  for (int i = 0; i < n_nodes; ++i)
+    p4est_space_idx[i] = dd_p4est_quad_global_morton_idx(ds.p4est->global_first_position[i]);
+
+  p4est_space_idx[n_nodes] = dd_p4est_grid_max_global_morton_idx();
 
   dd_p4est_init_internal_minimal(p4est_ghost, p4est_mesh);
 
@@ -585,8 +602,8 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
   // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain
   // by the error bounds
 
-  auto shellidxcomp = [](const local_shell_t& s, int64_t idx) {
-    int64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
+  auto shellidxcomp = [](const CellInfo& s, uint64_t idx) {
+    uint64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
                                             s.coord[1],
                                             s.coord[2]);
     return sidx < idx;
@@ -1303,26 +1320,29 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 // coordinates.
 // Note: The global Morton index returned here is NOT equal to the local cell
 //       index!!!
-int64_t dd_p4est_pos_morton_idx(double pos[3]) {
+static uint64_t dd_p4est_pos_morton_idx(double pos[3]) {
   double pfold[3] = {pos[0], pos[1], pos[2]};
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(pfold, im);
-  for (int d=0;d<3;++d) {
-    double errmar = 0.5*ROUND_ERROR_PREC * box_l[d];
-    if (pos[d] < 0 && pos[d] > -errmar) pfold[d] = 0;
-    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar) pfold[d] = pos[d] - 0.5*dd.cell_size[d];
+  for (int d = 0; d < 3; ++d) {
+    double errmar = 0.5 * ROUND_ERROR_PREC * box_l[d];
+    if (pos[d] < 0 && pos[d] > -errmar)
+      pfold[d] = 0;
+    else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar)
+      pfold[d] = pos[d] - 0.5 * dd.cell_size[d];
     // In the other two cases ("pos[d] <= -errmar" and
     // "pos[d] >= box_l[d] + errmar") pfold is correct.
   }
   return dd_p4est_cell_morton_idx(pfold[0] * dd.inv_cell_size[0],
-    pfold[1] * dd.inv_cell_size[1], pfold[2] * dd.inv_cell_size[2]);
+                                  pfold[1] * dd.inv_cell_size[1],
+                                  pfold[2] * dd.inv_cell_size[2]);
 }
 //--------------------------------------------------------------------------------------------------
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
   auto it = std::upper_bound(
       std::begin(p4est_space_idx), std::end(p4est_space_idx) - 1,
-      dd_p4est_pos_morton_idx(pos), [](int i, int64_t idx) { return i < idx; });
+      dd_p4est_pos_morton_idx(pos), [](uint64_t i, uint64_t idx) { return i < idx; });
 
   return std::distance(std::begin(p4est_space_idx), it) - 1;
 }

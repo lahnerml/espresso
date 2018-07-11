@@ -132,14 +132,6 @@ static const int neighbor_mask[26] = { // bitmask MSB ... z_r,z_l,y_r,y_l,x_r,x_
   1, 2, 4, 8, 16, 32, 20, 24, 36, 40, 17, 18, 33, 34, 5, 6, 9, 10, 21, 22, 25, 26, 37, 38, 41, 42
 };
 //--------------------------------------------------------------------------------------------------
-// Internal p4est structure
-typedef struct {
-  int rank; // the node id
-  int lidx; // local index
-  int ishell[26]; // local or ghost index of fullshell in p4est
-  int rshell[26]; // rank of fullshell cells
-} quad_data_t;
-//--------------------------------------------------------------------------------------------------
 // Datastructure for partitioning holding the number of quads per process
 // Empty as long as tclcommand_repart has not been called.
 static std::vector<p4est_locidx_t> part_nquads;
@@ -261,16 +253,6 @@ int dd_p4est_full_shell_neigh(int cell, int neighidx)
     // Not reached.
     return 0;
 }
-//-----------------------------------------------------------------------------------------
-// Init Callback for internal structure
-static void init_fn (p4est_t* p4est, p4est_topidx_t tree, p4est_quadrant_t* q) {
-  ((quad_data_t*)(q->p.user_data))->rank = this_node;
-  ((quad_data_t*)(q->p.user_data))->lidx = -1;
-  for (int i=0;i<26;++i) {
-    ((quad_data_t*)(q->p.user_data))->ishell[i] = -1;
-    ((quad_data_t*)(q->p.user_data))->rshell[i] = -1;
-  }
-}
 //--------------------------------------------------------------------------------------------------
 static inline int count_trailing_zeros(int x)
 {
@@ -324,7 +306,7 @@ static void dd_p4est_initialize_grid() {
           PERIODIC(1), PERIODIC(2)));
   ds.p4est = std::unique_ptr<p4est_t>(
       p4est_new_ext(comm_cart, ds.p4est_conn, 0, grid_level, true,
-                    sizeof(quad_data_t), init_fn, nullptr));
+                    static_cast<size_t>(0), nullptr, nullptr));
 }
 
 void dd_p4est_create_grid (bool isRepart) {

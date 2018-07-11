@@ -38,10 +38,6 @@ struct CellInfo {
   uint64_t idx; // a unique index within all cells (as used by p4est for locals)
   int rank; // the rank of this cell (equals this_node for locals)
   CellType type; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
-  int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-                // Cells with type "inner" or those located within the domain are always 0
-                // Cells with type "boundary" store information about which face is a boundary
-                // Cells with type "ghost" are set if the are in the periodic halo
   int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
                     // Might be "-1" if searching for neighbors over a non-periodic boundary.
   int coord[3]; // cartesian coordinates of the cell
@@ -136,6 +132,28 @@ static const int neighbor_mask[26] = { // bitmask MSB ... z_r,z_l,y_r,y_l,x_r,x_
 // Empty as long as tclcommand_repart has not been called.
 static std::vector<p4est_locidx_t> part_nquads;
 //--------------------------------------------------------------------------------------------------
+
+enum class Direction {
+  Left,
+  Right
+};
+
+static bool is_on_boundary(const CellInfo& ci, int dim, Direction lr) {
+  if (lr == Direction::Left)
+    return ci.coord[dim] == 0;
+  else
+    return ci.coord[dim] == grid_size[dim] - 1;
+}
+
+static bool is_on_boundary(const CellInfo& ci) {
+  for (int d = 0; d < 3; ++d) {
+    if (is_on_boundary(ci, d, Direction::Left)
+        || is_on_boundary(ci, d, Direction::Right))
+      return true;
+  }
+  return false;
+}
+
 struct CommunicationStatus {
   enum class ReceiveStatus {
     RECV_NOTSTARTED,
@@ -391,36 +409,6 @@ void dd_p4est_create_grid(bool isRepart) {
 
   p4est_utils_init();
 }
-static int boundary_bitmask(int coord[3])
-{
-  static constexpr int BNDRY_X_LEFT = 1;
-  static constexpr int BNDRY_X_RIGHT = 2;
-  static constexpr int BNDRY_Y_LEFT = 4;
-  static constexpr int BNDRY_Y_RIGHT = 8;
-  static constexpr int BNDRY_Z_LEFT = 16;
-  static constexpr int BNDRY_Z_RIGHT = 32;
-
-  static constexpr int BNDRY_LEFT[] = {
-    BNDRY_X_LEFT, BNDRY_Y_LEFT, BNDRY_Z_LEFT
-  };
-  static constexpr int BNDRY_RIGHT[] = {
-    BNDRY_X_RIGHT, BNDRY_Y_RIGHT, BNDRY_Z_RIGHT
-  };
-
-  int bitmask = 0;
-
-  for (int d = 0; d < 3; ++d) {
-    if (PERIODIC(d)) {
-      // Both cases can happen in case of only 1 cell per dimension
-      if (coord[d] == 0)
-        bitmask |= BNDRY_LEFT[d];
-      if (coord[d] == grid_size[d] - 1)
-        bitmask |= BNDRY_RIGHT[d];
-    }
-  }
-
-  return bitmask;
-}
 //--------------------------------------------------------------------------------------------------
 /* TODO:
 
@@ -451,15 +439,10 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
     uint64_t z = xyz[2] * ql;
     ds.p4est_cellinfo[i].idx = i;
     ds.p4est_cellinfo[i].rank = this_node;
-    ds.p4est_cellinfo[i].type = CellType::Inner;
     ds.p4est_cellinfo[i].coord[0] = x;
     ds.p4est_cellinfo[i].coord[1] = y;
     ds.p4est_cellinfo[i].coord[2] = z;
-    
-    ds.p4est_cellinfo[i].boundary = boundary_bitmask(ds.p4est_cellinfo[i].coord);
-    
-    if (ds.p4est_cellinfo[i].boundary > 0)
-      ds.p4est_cellinfo[i].type = CellType::Boundary;
+    ds.p4est_cellinfo[i].type = is_on_boundary(ds.p4est_cellinfo[i])? CellType::Boundary: CellType::Inner;
     
     for (int n = 0; n < 26; ++n) {
       ds.p4est_cellinfo[i].neighbor[n] = -1;
@@ -696,6 +679,13 @@ Cell* dd_p4est_position_to_cell(double pos[3]) {
   }
 }
 //--------------------------------------------------------------------------------------------------
+static bool is_out_of_box(Particle& p) {
+  for (int d = 0; d < 3; ++d)
+    if (p.r.p[d] < 0.0 || p.r.p[d] >= box_l[d])
+      return true;
+  return false;
+}
+//--------------------------------------------------------------------------------------------------
 // Checks all particles and resorts them to local cells or sendbuffers
 // Note: Particle that stay local and are moved to a cell with higher index are touched twice.
 // This is not the most efficient way! It would be better to first remember the cell-particle
@@ -711,9 +701,9 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
     for (int d=0;d<3;++d) {
       cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
-      if ((shell->boundary & (1 << (2 * d))))
+      if (is_on_boundary(*shell, d, Direction::Left))
         cell_lc[d] -= 0.5 * ROUND_ERROR_PREC*box_l[d];
-      if ((shell->boundary & (2 << (2 * d))))
+      if (is_on_boundary(*shell, d, Direction::Right))
         cell_hc[d] += 0.5 * ROUND_ERROR_PREC*box_l[d];
     }
 
@@ -777,7 +767,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
             fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
           }
         } else { // Local Cell, just move the partilce
-          if ((shell->boundary & neighbor_mask[neighbor_lut[z][y][x]])) { // moved over local periodic boundary
+          if (is_out_of_box(*part)) { // Local periodic boundary
             fold_position(part->r.p, part->l.i);
           }
           move_indexed_particle(&cells[nidx], cell, p);

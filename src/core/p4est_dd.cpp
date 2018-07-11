@@ -269,7 +269,7 @@ static inline int count_trailing_zeros(int x)
 }
 
 // Compute the grid- and bricksize according to box_l and maxrange
-int dd_p4est_cellsize_optimal() {
+void dd_p4est_set_cellsize_optimal() {
   int ncells[3] = {1, 1, 1};
 
   // compute number of cells
@@ -284,24 +284,23 @@ int dd_p4est_cellsize_optimal() {
   grid_size[2] = ncells[2];
 
   // divide all dimensions by biggest common power of 2
-  int lvl = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
+  grid_level = count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
 
-  brick_size[0] = ncells[0] >> lvl;
-  brick_size[1] = ncells[1] >> lvl;
-  brick_size[2] = ncells[2] >> lvl;
+  brick_size[0] = ncells[0] >> grid_level;
+  brick_size[1] = ncells[1] >> grid_level;
+  brick_size[2] = ncells[2] >> grid_level;
 
-  return lvl; // return the level of the grid
-}
-//--------------------------------------------------------------------------------------------------
-// Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
-static void dd_p4est_initialize_grid() {
-  // Set global variables
-  grid_level = dd_p4est_cellsize_optimal(); // Sets grid_size and brick_size
   for (int i = 0; i < 3; ++i) {
     dd.cell_size[i] = box_l[i] / static_cast<double>(grid_size[i]);
     dd.inv_cell_size[i] = 1.0 / dd.cell_size[i];
   }
   max_skin = std::min(std::min(dd.cell_size[0], dd.cell_size[1]), dd.cell_size[2]) - max_cut;
+}
+//--------------------------------------------------------------------------------------------------
+// Reinitializes all grid parameters, i.e. grid sizes and p4est structs.
+static void dd_p4est_initialize_grid() {
+  // Set global variables
+  dd_p4est_set_cellsize_optimal(); // Sets grid_size and brick_size
 
   // Create p4est structs
   auto oldconn = std::move(ds.p4est_conn);
@@ -1584,7 +1583,8 @@ void dd_p4est_on_geometry_change(int flags) {
 #ifndef LB_ADAPTIVE
   // Reinit only if max_range or box_l changes such that the old cell system
   // is not valid anymore.
-  if (grid_size[0] != std::max<int>(box_l[0] / max_range, 1)
+  if (flags & CELL_FLAG_GRIDCHANGED
+      || grid_size[0] != std::max<int>(box_l[0] / max_range, 1)
       || grid_size[1] != std::max<int>(box_l[1] / max_range, 1)
       || grid_size[2] != std::max<int>(box_l[2] / max_range, 1)) {
     cells_re_init(CELL_STRUCTURE_CURRENT);

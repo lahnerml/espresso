@@ -27,30 +27,33 @@
 #include <x86intrin.h>
 #endif
 
+enum class CellType {
+  Inner,
+  Boundary,
+  Ghost,
+};
 
 // Structure that stores basic grid information
-typedef struct {
+struct CellInfo {
   uint64_t idx; // a unique index within all cells (as used by p4est for locals)
   int rank; // the rank of this cell (equals this_node for locals)
-  int shell; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
+  CellType type; // shell information (0: inner local cell, 1: boundary local cell, 2: ghost cell)
   int boundary; // Bit mask storing boundary info. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-                // Cells with shell-type 0 or those located within the domain are always 0
-                // Cells with shell-type 1 store information about which face is a boundary
-                // Cells with shell-type 2 are set if the are in the periodic halo
+                // Cells with type "inner" or those located within the domain are always 0
+                // Cells with type "boundary" store information about which face is a boundary
+                // Cells with type "ghost" are set if the are in the periodic halo
   int neighbor[26]; // unique index of the fullshell neighborhood cells (as in p4est)
                     // Might be "-1" if searching for neighbors over a non-periodic boundary.
   int coord[3]; // cartesian coordinates of the cell
-  int p_cnt; // periodic count of this cell, local cells are always 0, for each new periodic occurence
-             // the new occurence is increased by one
-} local_shell_t;
+};
 
 // Structure to store communications
-typedef struct {
+struct comm_t {
   int rank; // Rank of the communication partner
   int cnt;  // number of cells to communicate
   int dir;  // Bitmask for communication direction. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
   std::vector<int> idx; // List of cell indexes
-} comm_t;
+};
 
 
 namespace {
@@ -59,14 +62,13 @@ namespace {
 struct __DS {
   castable_unique_ptr<p4est_connectivity_t> p4est_conn;
   castable_unique_ptr<p4est_t> p4est;
-  std::vector<local_shell_t> p4est_shell;
+  std::vector<CellInfo> p4est_cellinfo;
 };
 
 static __DS ds;
 }
 
 //--------------------------------------------------------------------------------------------------
-
 // Creates the irregular DD using p4est
 static void dd_p4est_create_grid (bool isRepart = false);
 // Compute communication partners for this node and fill internal lists
@@ -98,11 +100,9 @@ static void dd_p4est_revert_comm_order (GhostCommunicator *comm);
 
 static void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
 //--------------------------------------------------------------------------------------------------
-#define CELLS_MAX_NEIGHBORS 14
-//--------------------------------------------------------------------------------------------------
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
-static std::vector<int> p4est_space_idx; // n_nodes + 1 elements, storing the first Morton index of local cell
+static std::vector<int> first_morton_idx_of_rank; // n_nodes + 1 elements, storing the first Morton index of local cell
 static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
 static std::vector<comm_t> comm_send;  // Internal send lists, idx maps to local cells
@@ -208,7 +208,7 @@ p4est_t* dd_p4est_get_p4est() {
   return ds.p4est;
 }
 
-int dd_p4est_get_n_trees(int dir = 0) {
+int dd_p4est_get_n_trees(int dir) {
   return brick_size[dir];
 }
 
@@ -250,7 +250,7 @@ uint64_t dd_p4est_cell_morton_idx(int x, int y, int z) {
 int dd_p4est_full_shell_neigh(int cell, int neighidx)
 {
     if (neighidx >= 0 && neighidx < 26)
-        return ds.p4est_shell[cell].neighbor[neighidx];
+        return ds.p4est_cellinfo[cell].neighbor[neighidx];
     else if (neighidx == 26)
         return cell;
     else {
@@ -297,13 +297,11 @@ int dd_p4est_cellsize_optimal() {
 static void dd_p4est_initialize_grid() {
   // Set global variables
   grid_level = dd_p4est_cellsize_optimal(); // Sets grid_size and brick_size
-  dd.cell_size[0] = box_l[0]/(double)grid_size[0];
-  dd.cell_size[1] = box_l[1]/(double)grid_size[1];
-  dd.cell_size[2] = box_l[2]/(double)grid_size[2];
-  dd.inv_cell_size[0] = 1.0/dd.cell_size[0];
-  dd.inv_cell_size[1] = 1.0/dd.cell_size[1];
-  dd.inv_cell_size[2] = 1.0/dd.cell_size[2];
-  max_skin = std::min(std::min(dd.cell_size[0],dd.cell_size[1]),dd.cell_size[2]) - max_cut;
+  for (int i = 0; i < 3; ++i) {
+    dd.cell_size[i] = box_l[i] / static_cast<double>(grid_size[i]);
+    dd.inv_cell_size[i] = 1.0 / dd.cell_size[i];
+  }
+  max_skin = std::min(std::min(dd.cell_size[0], dd.cell_size[1]), dd.cell_size[2]) - max_cut;
 
   // Create p4est structs
   auto oldconn = std::move(ds.p4est_conn);
@@ -348,8 +346,8 @@ void dd_p4est_create_grid(bool isRepart) {
   comm_proc.clear();
   comm_recv.clear();
   comm_send.clear();
-  p4est_space_idx.clear();
-  ds.p4est_shell.clear();
+  first_morton_idx_of_rank.clear();
+  ds.p4est_cellinfo.clear();
 
   if (!isRepart) 
     dd_p4est_initialize_grid();
@@ -376,11 +374,11 @@ void dd_p4est_create_grid(bool isRepart) {
 
 
   // create space filling inforamtion about first quads per node from p4est
-  p4est_space_idx.resize(n_nodes + 1);
+  first_morton_idx_of_rank.resize(n_nodes + 1);
   for (int i = 0; i < n_nodes; ++i)
-    p4est_space_idx[i] = dd_p4est_quad_global_morton_idx(ds.p4est->global_first_position[i]);
+    first_morton_idx_of_rank[i] = dd_p4est_quad_global_morton_idx(ds.p4est->global_first_position[i]);
 
-  p4est_space_idx[n_nodes] = dd_p4est_grid_max_global_morton_idx();
+  first_morton_idx_of_rank[n_nodes] = dd_p4est_grid_max_global_morton_idx();
 
   dd_p4est_init_internal_minimal(p4est_ghost, p4est_mesh);
 
@@ -394,6 +392,46 @@ void dd_p4est_create_grid(bool isRepart) {
 
   p4est_utils_init();
 }
+static int boundary_bitmask(int coord[3])
+{
+  static constexpr int BNDRY_X_LEFT = 1;
+  static constexpr int BNDRY_X_RIGHT = 2;
+  static constexpr int BNDRY_Y_LEFT = 4;
+  static constexpr int BNDRY_Y_RIGHT = 8;
+  static constexpr int BNDRY_Z_LEFT = 16;
+  static constexpr int BNDRY_Z_RIGHT = 32;
+
+  static constexpr int BNDRY_LEFT[] = {
+    BNDRY_X_LEFT, BNDRY_Y_LEFT, BNDRY_Z_LEFT
+  };
+  static constexpr int BNDRY_RIGHT[] = {
+    BNDRY_X_RIGHT, BNDRY_Y_RIGHT, BNDRY_Z_RIGHT
+  };
+
+  int bitmask = 0;
+
+  for (int d = 0; d < 3; ++d) {
+    if (PERIODIC(d)) {
+      if (coord[d] == 0)
+        bitmask |= BNDRY_LEFT[d];
+      else if (coord[d] == grid_size[d] - 1)
+        bitmask |= BNDRY_RIGHT[d];
+    }
+  }
+
+  return bitmask;
+}
+//--------------------------------------------------------------------------------------------------
+/* TODO:
+
+    p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds.p4est, p4est_mesh, i);
+    double xyz[3];
+    p4est_qcoord_to_vertex(ds.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
+    uint64_t ql = 1 << p4est_tree_array_index(ds.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
+    uint64_t x = xyz[0] * ql;
+    uint64_t y = xyz[1] * ql;
+    uint64_t z = xyz[2] * ql;
+*/
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {
   num_local_cells = (size_t) ds.p4est->local_num_quadrants;
@@ -401,44 +439,38 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
   num_cells = num_local_cells + num_ghost_cells;
   castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
 
-  ds.p4est_shell.resize(num_cells);
+  ds.p4est_cellinfo.resize(num_cells);
 
   for (int i = 0; i < num_local_cells; ++i) {
     p4est_quadrant_t *q = p4est_mesh_get_quadrant(ds.p4est, p4est_mesh, i);
     double xyz[3];
     p4est_qcoord_to_vertex(ds.p4est_conn, p4est_mesh->quad_to_tree[i], q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(ds.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
-    uint64_t x = xyz[0]*ql;
-    uint64_t y = xyz[1]*ql;
-    uint64_t z = xyz[2]*ql;
-    ds.p4est_shell[i].idx = i;
-    ds.p4est_shell[i].rank = this_node;
-    ds.p4est_shell[i].shell = 0;
-    ds.p4est_shell[i].boundary = 0;
-    ds.p4est_shell[i].coord[0] = x;
-    ds.p4est_shell[i].coord[1] = y;
-    ds.p4est_shell[i].coord[2] = z;
-    ds.p4est_shell[i].p_cnt = 0;
+    uint64_t ql = 1 << p4est_tree_array_index(ds.p4est->trees, p4est_mesh->quad_to_tree[i])->maxlevel;
+    uint64_t x = xyz[0] * ql;
+    uint64_t y = xyz[1] * ql;
+    uint64_t z = xyz[2] * ql;
+    ds.p4est_cellinfo[i].idx = i;
+    ds.p4est_cellinfo[i].rank = this_node;
+    ds.p4est_cellinfo[i].type = CellType::Inner;
+    ds.p4est_cellinfo[i].coord[0] = x;
+    ds.p4est_cellinfo[i].coord[1] = y;
+    ds.p4est_cellinfo[i].coord[2] = z;
     
-    if (PERIODIC(0) && x == 0) ds.p4est_shell[i].boundary |= 1;
-    if (PERIODIC(0) && x == grid_size[0] - 1) ds.p4est_shell[i].boundary |= 2;
-    if (PERIODIC(1) && y == 0) ds.p4est_shell[i].boundary |= 4;
-    if (PERIODIC(1) && y == grid_size[1] - 1) ds.p4est_shell[i].boundary |= 8;
-    if (PERIODIC(2) && z == 0) ds.p4est_shell[i].boundary |= 16;
-    if (PERIODIC(2) && z == grid_size[2] - 1) ds.p4est_shell[i].boundary |= 32;
+    ds.p4est_cellinfo[i].boundary = boundary_bitmask(ds.p4est_cellinfo[i].coord);
     
-    if (ds.p4est_shell[i].boundary) ds.p4est_shell[i].shell = 1;
+    if (ds.p4est_cellinfo[i].boundary > 0)
+      ds.p4est_cellinfo[i].type = CellType::Boundary;
     
     for (int n = 0; n < 26; ++n) {
-      ds.p4est_shell[i].neighbor[n] = -1;
+      ds.p4est_cellinfo[i].neighbor[n] = -1;
       p4est_mesh_get_neighbors(ds.p4est, p4est_ghost, p4est_mesh, i, n, nullptr, nullptr, ni);
       if (ni->elem_count > 1) // more than 1 neighbor in this direction
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
       if (ni->elem_count > 0) {
         int neighrank = *((int*)sc_array_index_int(ni,0));
-        ds.p4est_shell[i].neighbor[n] = neighrank;
+        ds.p4est_cellinfo[i].neighbor[n] = neighrank;
         if (neighrank >= ds.p4est->local_num_quadrants) { // Ghost cell
-          ds.p4est_shell[i].shell = 1;
+          ds.p4est_cellinfo[i].type = CellType::Boundary;
         }
       }
       sc_array_truncate(ni);
@@ -451,20 +483,18 @@ void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p
     p4est_quadrant_t *q = p4est_quadrant_array_index(&p4est_ghost->ghosts, g);
     double xyz[3];
     p4est_qcoord_to_vertex(ds.p4est_conn, q->p.piggy3.which_tree, q->x, q->y, q->z, xyz);
-    uint64_t ql = 1<<p4est_tree_array_index(ds.p4est->trees,q->p.piggy3.which_tree)->maxlevel;
-    uint64_t x = xyz[0]*ql;
-    uint64_t y = xyz[1]*ql;
-    uint64_t z = xyz[2]*ql;
+    uint64_t ql = 1<<p4est_tree_array_index(ds.p4est->trees, q->p.piggy3.which_tree)->maxlevel;
+    uint64_t x = xyz[0] * ql;
+    uint64_t y = xyz[1] * ql;
+    uint64_t z = xyz[2] * ql;
     
-    ds.p4est_shell[i].idx = g;
-    ds.p4est_shell[i].rank = p4est_mesh->ghost_to_proc[g];
-    ds.p4est_shell[i].shell = 2;
-    ds.p4est_shell[i].boundary = 0;
-    ds.p4est_shell[i].coord[0] = x;
-    ds.p4est_shell[i].coord[1] = y;
-    ds.p4est_shell[i].coord[2] = z;
-    ds.p4est_shell[i].p_cnt = 0;
-    std::fill(std::begin(ds.p4est_shell[i].neighbor), std::end(ds.p4est_shell[i].neighbor), -1);
+    ds.p4est_cellinfo[i].idx = g;
+    ds.p4est_cellinfo[i].rank = p4est_mesh->ghost_to_proc[g];
+    ds.p4est_cellinfo[i].type = CellType::Ghost;
+    ds.p4est_cellinfo[i].coord[0] = x;
+    ds.p4est_cellinfo[i].coord[1] = y;
+    ds.p4est_cellinfo[i].coord[2] = z;
+    std::fill(std::begin(ds.p4est_cellinfo[i].neighbor), std::end(ds.p4est_cellinfo[i].neighbor), -1);
   }
 }
 
@@ -477,20 +507,23 @@ void dd_p4est_comm () {
   comm_proc.resize(n_nodes);
   std::fill(std::begin(comm_proc), std::end(comm_proc), -1);
 
-  for (int i=0; i<num_cells; ++i) {
+  for (int i = 0; i < num_cells; ++i) {
     // is ghost cell -> add to recv lists
-    if (ds.p4est_shell[i].rank >= 0 && ds.p4est_shell[i].shell == 2) {
-      int nrank = ds.p4est_shell[i].rank;
+    if (ds.p4est_cellinfo[i].rank >= 0 && ds.p4est_cellinfo[i].type == CellType::Ghost) {
+      int nrank = ds.p4est_cellinfo[i].rank;
       recv_idx[nrank].push_back(i);
     }
-    if (ds.p4est_shell[i].shell == 1) { // is mirror cell -> add to send lists
+    if (ds.p4est_cellinfo[i].type == CellType::Boundary) { // is mirror cell -> add to send lists
       // loop fullshell
-      for (int n=0;n<26;++n) {
-        int nidx = ds.p4est_shell[i].neighbor[n];
-        if (nidx < 0) continue; // invalid neighbor
-        int nrank = ds.p4est_shell[nidx].rank;
-        if (nrank < 0) continue; // invalid neighbor
-        if (ds.p4est_shell[nidx].shell != 2) continue; // no need to send to local cell
+      for (int n = 0; n < 26; ++n) {
+        int nidx = ds.p4est_cellinfo[i].neighbor[n];
+        if (nidx < 0)
+          continue; // invalid neighbor
+        int nrank = ds.p4est_cellinfo[nidx].rank;
+        if (nrank < 0)
+          continue; // invalid neighbor
+        if (ds.p4est_cellinfo[nidx].type != CellType::Ghost)
+          continue; // no need to send to local cell
         // add once for each rank
         if (send_idx[nrank].empty() || send_idx[nrank].back() != i)
           send_idx[nrank].push_back(i);
@@ -577,7 +610,7 @@ void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_mark_cells () {
   // Take the memory map as they are. First local cells (along Morton curve).
-  // This also means cells has the same ordering as p4est_shell
+  // This also means cells has the same ordering as p4est_cellinfo
   for (int c=0;c<num_local_cells;++c)
     local_cells.cell[c] = &cells[c];
   // Ghost cells come after local cells
@@ -588,9 +621,9 @@ void dd_p4est_mark_cells () {
 void dd_p4est_init_cell_interactions() {
   for (int i = 0; i < local_cells.n; ++i) {
     cells[i].m_neighbors.clear();
-    cells[i].m_neighbors.reserve(CELLS_MAX_NEIGHBORS);
-    for (int n = 1; n < CELLS_MAX_NEIGHBORS; ++n) {
-      auto neighidx = ds.p4est_shell[i].neighbor[half_neighbor_idx[n]];
+    cells[i].m_neighbors.reserve(14);
+    for (int n = 1; n < 14; ++n) {
+      auto neighidx = ds.p4est_cellinfo[i].neighbor[half_neighbor_idx[n]];
       // Check for invalid cells
       if (neighidx >= 0 && neighidx < num_cells)
         local_cells.cell[i]->m_neighbors.emplace_back(&cells[neighidx]);
@@ -604,15 +637,15 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
 
   auto shellidxcomp = [](const CellInfo& s, uint64_t idx) {
     uint64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
-                                            s.coord[1],
-                                            s.coord[2]);
+                                             s.coord[1],
+                                             s.coord[2]);
     return sidx < idx;
   };
 
   const auto needle = dd_p4est_pos_morton_idx(pos);
 
-  auto local_end = std::begin(ds.p4est_shell) + num_local_cells;
-  auto it = std::lower_bound(std::begin(ds.p4est_shell),
+  auto local_end = std::begin(ds.p4est_cellinfo) + num_local_cells;
+  auto it = std::lower_bound(std::begin(ds.p4est_cellinfo),
                              local_end,
                              needle,
                              shellidxcomp);
@@ -620,7 +653,7 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
         && dd_p4est_cell_morton_idx(it->coord[0],
                                     it->coord[1],
                                     it->coord[2]) == needle)
-    return &cells[std::distance(std::begin(ds.p4est_shell), it)];
+    return &cells[std::distance(std::begin(ds.p4est_cellinfo), it)];
   else
     return nullptr;
 }
@@ -673,13 +706,15 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
   // Loop over all cells and particles
   for (int i=0;i<num_local_cells;++i) {
     Cell* cell = local_cells.cell[i];
-    local_shell_t* shell = &ds.p4est_shell[i];
+    CellInfo* shell = &ds.p4est_cellinfo[i];
 
     for (int d=0;d<3;++d) {
       cell_lc[d] = dd.cell_size[d]*(double)shell->coord[d];
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
-      if ((shell->boundary & (1<<(2*d)))) cell_lc[d] -= 0.5*ROUND_ERROR_PREC*box_l[d];
-      if ((shell->boundary & (2<<(2*d)))) cell_hc[d] += 0.5*ROUND_ERROR_PREC*box_l[d];
+      if ((shell->boundary & (1 << (2 * d))))
+        cell_lc[d] -= 0.5 * ROUND_ERROR_PREC*box_l[d];
+      if ((shell->boundary & (2 << (2 * d))))
+        cell_hc[d] += 0.5 * ROUND_ERROR_PREC*box_l[d];
     }
 
     for (int p=0;p<cell->n;++p) {
@@ -718,11 +753,11 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
         // get neighbor cell
         nidx = shell->neighbor[neighbor_lut[z][y][x]];
         if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
-          if (ds.p4est_shell[nidx].rank >= 0) { // This ghost cell is linked to a process
+          if (ds.p4est_cellinfo[nidx].rank >= 0) { // This ghost cell is linked to a process
             // With minimal ghost this condition is always true
-            if (ds.p4est_shell[nidx].rank != this_node) { // It is a remote process
+            if (ds.p4est_cellinfo[nidx].rank != this_node) { // It is a remote process
               // copy data to sendbuf according to rank
-              int li = comm_proc[ds.p4est_shell[nidx].rank];
+              int li = comm_proc[ds.p4est_cellinfo[nidx].rank];
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
 #ifdef EXCLUSIONS
               sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
@@ -734,7 +769,7 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
               if(p < cell->n) p -= 1;
             } else { // particle stays local, but since it went to a ghost it has to be folded
               fold_position(part->r.p, part->l.i);
-              move_indexed_particle(&cells[ds.p4est_shell[nidx].idx], cell, p);
+              move_indexed_particle(&cells[ds.p4est_cellinfo[nidx].idx], cell, p);
               if(p < cell->n) p -= 1;
             }
           } else { // Particle left global domain and is not tracked by any process anymore
@@ -1341,10 +1376,10 @@ static uint64_t dd_p4est_pos_morton_idx(double pos[3]) {
 // Find the process that handles the position
 int dd_p4est_pos_to_proc(double pos[3]) {
   auto it = std::upper_bound(
-      std::begin(p4est_space_idx), std::end(p4est_space_idx) - 1,
+      std::begin(first_morton_idx_of_rank), std::end(first_morton_idx_of_rank) - 1,
       dd_p4est_pos_morton_idx(pos), [](uint64_t i, uint64_t idx) { return i < idx; });
 
-  return std::distance(std::begin(p4est_space_idx), it) - 1;
+  return std::distance(std::begin(first_morton_idx_of_rank), it) - 1;
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_topology_init(CellPList *old, bool isRepart) {

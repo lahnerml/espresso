@@ -1460,9 +1460,11 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
       dd_p4est_global_exchange_part(nullptr);
   }
 }
+#endif
 
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_write_parallel_vtk(char *filename) {
+#ifdef DD_P4EST
   /* strip file ending from filename (if given) */
   char *pos_file_ending;
   pos_file_ending = strrchr(filename, '.');
@@ -1477,8 +1479,10 @@ void dd_p4est_write_parallel_vtk(char *filename) {
 
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
   dd_p4est_write_particle_vtk(filename);
+#endif
 }
 
+#ifdef DD_P4EST
 void dd_p4est_write_particle_vtk(char *filename) {
   char fname[1024];
   // node 0 writes the header file
@@ -1575,7 +1579,6 @@ void dd_p4est_write_particle_vtk(char *filename) {
   fprintf(h, "\t\t</Piece>\n\t</PolyData>\n</VTKFile>\n");
   fclose(h);
 }
-
 
 //--------------------------------------------------------------------------------------------------
 // This is basically a copy of the dd_on_geometry_change

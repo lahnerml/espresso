@@ -72,6 +72,8 @@ void dd_p4est_write_particle_vtk(char* filename);
  */
 void p4est_dd_repart_preprocessing();
 
+#ifdef DD_P4EST
 void p4est_dd_repartition(const std::string& desc, bool verbose);
+#endif
 
 #endif

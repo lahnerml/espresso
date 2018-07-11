@@ -33,7 +33,9 @@
 #include "rotation.hpp"
 #include "virtual_sites/VirtualSitesRelative.hpp"
 
+#ifdef DD_P4EST
 Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+#endif
 
 #ifdef COLLISION_DETECTION_DEBUG
 #define TRACE(a) a
@@ -607,8 +609,10 @@ Cell* project_to_boundary(const double pos[3])
     double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
                      , pos[1] + displ[1] * dd.cell_size[1]
                      , pos[2] + displ[2] * dd.cell_size[2] };
+#ifdef DD_P4EST
     if ((c = dd_p4est_position_to_cell_strict(spos)))
       return c;
+#endif
   }
 
   return nullptr;

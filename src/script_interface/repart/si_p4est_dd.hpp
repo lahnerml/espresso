@@ -51,6 +51,7 @@ public:
 
   Variant call_method(const std::string &name,
                       const VariantMap &parameters) override {
+#ifdef DD_P4EST
     if (name == "repart") {
       std::string m = boost::get<std::string>(parameters.at("metric"));
       bool verbose = boost::get<bool>(parameters.at("verbose"));
@@ -70,6 +71,7 @@ public:
       return false;
 #endif
     }
+#endif
     return {};
   }
 };

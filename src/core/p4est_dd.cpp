@@ -124,9 +124,6 @@ static const int neighbor_lut[3][3][3] = { // Mapping from [z][y][x] to p4est ne
 static const int half_neighbor_idx[14] = { // p4est neighbor index of halfshell [0] is cell itself
   -1, 1, 16, 3, 17, 22, 8, 23, 12, 5, 13, 24, 9, 25
 };
-static const int neighbor_mask[26] = { // bitmask MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB for p4est neighbor
-  1, 2, 4, 8, 16, 32, 20, 24, 36, 40, 17, 18, 33, 34, 5, 6, 9, 10, 21, 22, 25, 26, 37, 38, 41, 42
-};
 //--------------------------------------------------------------------------------------------------
 // Datastructure for partitioning holding the number of quads per process
 // Empty as long as tclcommand_repart has not been called.

@@ -24,6 +24,7 @@
 
 #include <boost/mpi.hpp>
 
+#if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #include <p8est.h>
 #include <p8est_extended.h>
 #include <p8est_connectivity.h>
@@ -34,6 +35,7 @@
 
 #include <iostream>
 #include <vector>
+#endif
 
 #define BOOST_TEST_NO_MAIN
 #define BOOST_TEST_MODULE move_data test
@@ -55,6 +57,7 @@ bool operator==(data_t a, data_t b) {
 using boost::mpi::communicator;
 
 BOOST_AUTO_TEST_CASE(move_data_check) {
+#if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
   communicator comm;
   const int level = 4;
 
@@ -119,6 +122,7 @@ BOOST_AUTO_TEST_CASE(move_data_check) {
   p8est_destroy(p4est);
   p8est_connectivity_destroy(conn);
   sc_finalize();
+#endif
 }
 
 int main(int argc, char **argv) {

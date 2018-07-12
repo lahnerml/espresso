@@ -77,11 +77,15 @@ class LBTest(ut.TestCase):
 
         self.system.thermostat.set_langevin(
             kT=self.params['temp'], gamma=self.params['gamma'])
+
+        self.system.part.write_par_vtk("part_init".format(0))
         self.system.integrator.run(50)
+        self.system.part.write_par_vtk("part_warmup_one".format(1))
         # kill particle motion
         for i in range(self.n_col_part):
             self.system.part[i].v = [0.0, 0.0, 0.0]
         self.system.thermostat.turn_off()
+        self.system.part.write_par_vtk("part_kill_motion".format(1))
 
         self.lbf = lb.LBFluid(
             visc=self.params['viscosity'],
@@ -94,13 +98,19 @@ class LBTest(ut.TestCase):
         # give particles a push
         for i in range(self.n_col_part):
             self.system.part[i].v = self.system.part[i].v + [0.1, 0.0, 0.0]
+        self.lbf.print_vtk_velocity("vel_field_init.vtk".format(1))
+        self.system.part.write_par_vtk("part_push".format(1))
 
         self.fluidmass = self.params['dens']
         self.tot_mom = [0.0, 0.0, 0.0]
         for i in range(self.n_col_part):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
+        self.lbf.print_vtk_velocity("vel_field_warmup_two.vtk".format(1))
+        self.system.part.write_par_vtk("part_warmup_two".format(1))
         self.system.integrator.run(50)
+        self.lbf.print_vtk_velocity("vel_field_warmup_three.vtk".format(1))
+        self.system.part.write_par_vtk("part_warmup_three".format(1))
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]

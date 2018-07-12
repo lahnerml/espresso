@@ -26,15 +26,15 @@ class LBTest(ut.TestCase):
     n_nodes = system.cell_system.get_state()["n_nodes"]
     system.seed = range(n_nodes)
     params = {'int_steps': 25,
-              'int_times': 10,
+              'int_times': 16,
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
-              'box_l': 12.0,
+              'box_l': 16.0,
               'dens': 0.85,
               'viscosity': 30.0,
               'friction': 2.0,
-              'temp': 1.5,
+              'temp': 0.0,
               'gamma': 1.5,
               'skin': 0.2,
               'mom_prec': 1.e-11,
@@ -52,6 +52,10 @@ class LBTest(ut.TestCase):
     system.periodicity = [1, 1, 1]
     system.time_step = params['time_step']
     system.cell_system.skin = params['skin']
+
+    system.non_bonded_inter[0, 0].lennard_jones.set_params(
+        epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
+    # system.cell_system.set_p4est_dd(use_verlet_lists=False)
 
     def test_mass_momentum_thermostat(self):
         self.system.actors.clear()
@@ -73,11 +77,15 @@ class LBTest(ut.TestCase):
 
         self.system.thermostat.set_langevin(
             kT=self.params['temp'], gamma=self.params['gamma'])
+
+        self.system.part.write_par_vtk("part_init".format(0))
         self.system.integrator.run(50)
+        self.system.part.write_par_vtk("part_warmup_one".format(1))
         # kill particle motion
         for i in range(self.n_col_part):
             self.system.part[i].v = [0.0, 0.0, 0.0]
         self.system.thermostat.turn_off()
+        self.system.part.write_par_vtk("part_kill_motion".format(1))
 
         self.lbf = lb.LBFluid(
             visc=self.params['viscosity'],
@@ -90,13 +98,19 @@ class LBTest(ut.TestCase):
         # give particles a push
         for i in range(self.n_col_part):
             self.system.part[i].v = self.system.part[i].v + [0.1, 0.0, 0.0]
+        self.lbf.print_vtk_velocity("vel_field_init.vtk".format(1))
+        self.system.part.write_par_vtk("part_push".format(1))
 
         self.fluidmass = self.params['dens']
         self.tot_mom = [0.0, 0.0, 0.0]
         for i in range(self.n_col_part):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
+        self.lbf.print_vtk_velocity("vel_field_warmup_two.vtk".format(1))
+        self.system.part.write_par_vtk("part_warmup_two".format(1))
         self.system.integrator.run(50)
+        self.lbf.print_vtk_velocity("vel_field_warmup_three.vtk".format(1))
+        self.system.part.write_par_vtk("part_warmup_three".format(1))
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]
@@ -105,17 +119,21 @@ class LBTest(ut.TestCase):
 
         # Integration
         for i in range(self.params['int_times']):
+            self.lbf.print_vtk_velocity("vel_field_{:05d}_pre.vtk".format(i))
+            self.system.part.write_par_vtk("part_{:05d}_pre".format(i))
             self.system.integrator.run(self.params['int_steps'])
+            self.lbf.print_vtk_velocity("vel_field_{:05d}_post.vtk".format(i))
+            self.system.part.write_par_vtk("part_{:05d}_post".format(i))
             fluidmass_sim = 0.0
             fluid_temp_sim = 0.0
             node_v_list = []
             node_dens_list = []
             n_nodes = int(self.params['box_l'] / self.params['agrid'])
-            for i in range(n_nodes):
-                for j in range(n_nodes):
-                    for k in range(n_nodes):
-                        node_v_list.append(self.lbf[i, j, k].velocity)
-                        node_dens_list.append(self.lbf[i, j, k].density[0])
+            for j in range(n_nodes):
+                for k in range(n_nodes):
+                    for l in range(n_nodes):
+                        node_v_list.append(self.lbf[j, k, l].velocity)
+                        node_dens_list.append(self.lbf[j, k, l].density[0])
 
             # check mass conversation
             fluidmass_sim = sum(node_dens_list) / len(node_dens_list)
@@ -125,7 +143,9 @@ class LBTest(ut.TestCase):
                 self.max_dmass = dmass
             self.assertTrue(
                 self.max_dmass < self.params['mass_prec_per_node'],
-                msg="fluid mass deviation too high\ndeviation: {}   accepted deviation: {}".format(
+                msg=("Integration step {}: fluid mass deviation too high\n" +
+                     "deviation: {}   accepted deviation: {}").format(
+                    i,
                     self.max_dmass,
                     self.params['mass_prec_per_node']))
 
@@ -136,8 +156,12 @@ class LBTest(ut.TestCase):
                 if dm[j] > self.max_dm[j]:
                     self.max_dm[j] = dm[j]
             self.assertTrue(
-                self.max_dm[0] <= self.params['mom_prec'] and self.max_dm[1] <= self.params['mom_prec'] and self.max_dm[2] <= self.params['mom_prec'],
-                msg="momentum deviation too high\ndeviation: {}  accepted deviation: {}".format(
+                self.max_dm[0] <= self.params['mom_prec'] and
+                self.max_dm[1] <= self.params['mom_prec'] and
+                self.max_dm[2] <= self.params['mom_prec'],
+                msg=("Integration step {}: momentum deviation too high\n" +
+                     "deviation: {}  accepted deviation: {}").format(
+                    i,
                     self.max_dm,
                     self.params['mom_prec']))
 

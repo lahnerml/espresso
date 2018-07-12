@@ -114,7 +114,6 @@ LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,
        // !defined(GAUSSRANDOM))
 
 #ifndef LB_ADAPTIVE
-// TODO: Move according to implementation of regular grid
 /** The underlying lattice structure */
 Lattice lblattice;
 

@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -1148,79 +1149,42 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 
 int lbadapt_thermalize_modes(lb_float *mode) {
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
+  const double rootrho = std::sqrt(
+      std::fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
 
-  lb_float fluct[6];
 #ifdef GAUSSRANDOM
-  lb_float rootrho_gauss =
-      sqrt(fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random());
-  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random());
-  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random());
-  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random());
-  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random());
-  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random());
-
-  /* ghost modes */
-  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random();
-  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random();
-  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random();
-  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random();
-  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random();
-  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random();
-  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random();
-  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random();
-  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random();
-
+  constexpr double variance = 1. / 12.;
+  auto rng = []() -> double { return gaussian_random(); };
 #elif defined(GAUSSRANDOMCUT)
-  lb_float rootrho_gauss =
-      sqrt(fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random_cut());
-  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random_cut());
-  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random_cut());
-  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random_cut());
-  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random_cut());
-  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random_cut());
-
-  /* ghost modes */
-  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random_cut();
-  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random_cut();
-  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random_cut();
-  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random_cut();
-  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random_cut();
-  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random_cut();
-  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random_cut();
-  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random_cut();
-  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random_cut();
-
+  constexpr double variance = 1.0;
+  auto rng = []() -> double { return gaussian_random_cut(); };
 #elif defined(FLATNOISE)
-  lb_float rootrho =
-      sqrt(fabs(12.0 * (mode[0] + lbpar.rho * h_max * h_max * h_max)));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho * lbpar.phi[4] * (d_random() - 0.5));
-  mode[5] += (fluct[1] = rootrho * lbpar.phi[5] * (d_random() - 0.5));
-  mode[6] += (fluct[2] = rootrho * lbpar.phi[6] * (d_random() - 0.5));
-  mode[7] += (fluct[3] = rootrho * lbpar.phi[7] * (d_random() - 0.5));
-  mode[8] += (fluct[4] = rootrho * lbpar.phi[8] * (d_random() - 0.5));
-  mode[9] += (fluct[5] = rootrho * lbpar.phi[9] * (d_random() - 0.5));
-
-  /* ghost modes */
-  mode[10] += rootrho * lbpar.phi[10] * (d_random() - 0.5);
-  mode[11] += rootrho * lbpar.phi[11] * (d_random() - 0.5);
-  mode[12] += rootrho * lbpar.phi[12] * (d_random() - 0.5);
-  mode[13] += rootrho * lbpar.phi[13] * (d_random() - 0.5);
-  mode[14] += rootrho * lbpar.phi[14] * (d_random() - 0.5);
-  mode[15] += rootrho * lbpar.phi[15] * (d_random() - 0.5);
-  mode[16] += rootrho * lbpar.phi[16] * (d_random() - 0.5);
-  mode[17] += rootrho * lbpar.phi[17] * (d_random() - 0.5);
-  mode[18] += rootrho * lbpar.phi[18] * (d_random() - 0.5);
+  constexpr double variance = 1. / 12.0;
+  auto rng = []() -> double { return d_random() - 0.5; };
 #else  // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM
+
+  auto const pref = std::sqrt(1. / variance) * rootrho;
+
+  /* stress modes */
+  mode[4] += pref * lbpar.phi[4] * rng();
+  mode[5] += pref * lbpar.phi[5] * rng();
+  mode[6] += pref * lbpar.phi[6] * rng();
+  mode[7] += pref * lbpar.phi[7] * rng();
+  mode[8] += pref * lbpar.phi[8] * rng();
+  mode[9] += pref * lbpar.phi[9] * rng();
+
+  /* ghost modes */
+  mode[10] += pref * lbpar.phi[10] * rng();
+  mode[11] += pref * lbpar.phi[11] * rng();
+  mode[12] += pref * lbpar.phi[12] * rng();
+  mode[13] += pref * lbpar.phi[13] * rng();
+  mode[14] += pref * lbpar.phi[14] * rng();
+  mode[15] += pref * lbpar.phi[15] * rng();
+  mode[16] += pref * lbpar.phi[16] * rng();
+  mode[17] += pref * lbpar.phi[17] * rng();
+  mode[18] += pref * lbpar.phi[18] * rng();
 
 #ifdef ADDITIONAL_CHECKS
   rancounter += 15;

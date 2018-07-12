@@ -96,13 +96,26 @@ LB_Parameters lbpar = {
     // gamma_even
     0.,
     // gamma_shear
+#ifdef LB_ADAPTIVE
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
+#else
     0.,
+#endif
     // gamma_bulk
+#ifdef LB_ADAPTIVE
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
+#else
     0.,
+#endif
     // is_TRT
     false,
     // resend_halo
-    0};
+    0,
+    // fluct
+    0,
+    // phi
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.}
+};
 
 /** The DnQm model to be used. */
 LB_Model lbmodel = {19,      d3q19_lattice, d3q19_coefficients,

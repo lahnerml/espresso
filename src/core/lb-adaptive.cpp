@@ -53,9 +53,6 @@
  * where the coefficients and the velocity vectors are hardcoded
  * explicitly. This saves a lot of multiplications with 1's and 0's
  * thus making the code more efficient. */
-#ifndef D3Q19
-#define D3Q19
-#endif // D3Q19
 
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE
@@ -826,7 +823,6 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
 
   trace = local_pi[0] + local_pi[2] + local_pi[5];
 
-#ifdef D3Q19
   lb_float rho_times_coeff;
   lb_float tmp1, tmp2;
 
@@ -899,25 +895,6 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   datafield[0][18] = rho_times_coeff -
                      1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-#else  // D3Q19
-  int i;
-  lb_float tmp = 0.0;
-  lb_float(*c)[3] = lbmodel.c;
-  lb_float(*coeff)[4] = lbmodel.coeff;
-
-  for (i = 0; i < lbmodel.n_veloc; i++) {
-    tmp = local_pi[0] * Utils::sqr(c[i][0]) +
-          (2.0 * local_pi[1] * c[i][0] + local_pi[2] * c[i][1]) * c[i][1] +
-          (2.0 * (local_pi[3] * c[i][0] + local_pi[4] * c[i][1]) +
-           local_pi[5] * c[i][2]) *
-              c[i][2];
-
-    datafield[0][i] = coeff[i][0] * (local_rho - avg_rho);
-    datafield[0][i] += coeff[i][1] * scalar(local_j, c[i]);
-    datafield[0][i] += coeff[i][2] * tmp;
-    datafield[0][i] += coeff[i][3] * trace;
-  }
-#endif // D3Q19
 
   return 0;
 }
@@ -1018,7 +995,6 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
 
 int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
 #ifndef LB_ADAPTIVE_GPU
-#ifdef D3Q19
   lb_float n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p,
       n7m, n8p, n8m, n9p, n9m;
 
@@ -1070,17 +1046,6 @@ int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
   mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2. * (n1p + n2p + n3p);
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
-
-#else  // D3Q19
-  int i, j;
-  for (i = 0; i < lbmodel.n_veloc; i++) {
-    mode[i] = 0.0;
-    for (j = 0; j < lbmodel.n_veloc; j++) {
-      mode[i] += lbmodel.e[i][j] * lbfluid[0][i][index];
-    }
-  }
-#endif // D3Q19
-
 #endif // LB_ADAPTIVE_GPU
 
   return 0;
@@ -1531,8 +1496,6 @@ void lbadapt_bounce_back(int level) {
       currCellData = &lbadapt_local_data[level].at(
           p8est_meshiter_get_current_storage_id(mesh_iter));
 
-#ifdef D3Q19
-#ifndef PULL
       lb_float population_shift;
 
       if (currCellData->lbfields.boundary) {
@@ -1668,12 +1631,6 @@ void lbadapt_bounce_back(int level) {
           }
         } // if (mesh_iter->neighbor_qid) != -1
       }   // for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR)
-#else     // !PULL
-#error Bounce back boundary conditions are only implemented for PUSH scheme!
-#endif // !PULL
-#else  // D3Q19
-#error Bounce back boundary conditions are only implemented for D3Q19!
-#endif // D3Q19
     }
   }
 #endif // LB_ADAPTIVE_GPU

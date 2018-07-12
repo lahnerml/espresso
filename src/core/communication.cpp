@@ -3013,10 +3013,8 @@ void mpi_resort_particles_slave(int global_flag, int) {
 }
 
 void mpi_dd_p4est_write_particle_vtk(int node, int len) {
-#ifdef DD_P4EST
   char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
   dd_p4est_write_particle_vtk(filename);
-#endif
 }

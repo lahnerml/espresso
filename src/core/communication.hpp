@@ -620,14 +620,12 @@ void mpi_recv_interpolated_velocity (int node, double *p, double *v);
 void mpi_set_refinement_area (int node, int param);
 #endif // LB_ADAPTIVE
 
-#ifdef DD_P4EST
 /** Call for parallel IO of particle
  *
  * @param [in] node the node on which this function is called
  * @param [in] len length of the filename to receive
  */
 void mpi_dd_p4est_write_particle_vtk(int node, int len);
-#endif
 
 /** Issue REQ_RESCALE_PART: rescales all particle positions in direction 'dir'
  * by a factor 'scale'. */

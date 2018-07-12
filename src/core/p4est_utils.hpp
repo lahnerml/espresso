@@ -367,7 +367,7 @@ inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
  *
  * @param x    Position that is transformed in place.
  */
-inline void tree_to_boxlcoords(double x[3]) {
+static inline void tree_to_boxlcoords(double x[3]) {
   for (int i = 0; i < P8EST_DIM; ++i) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     if (dd_p4est_get_p4est() != nullptr) {
@@ -393,7 +393,7 @@ inline void tree_to_boxlcoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in simulation domain
  */
-inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
+static inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   tree_to_boxlcoords(res.data());
   return res;
@@ -404,7 +404,7 @@ inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
  *
  * @param x    Position that is transformed in place.
  */
-inline void boxl_to_treecoords(double x[3]) {
+static inline void boxl_to_treecoords(double x[3]) {
   for (int i = 0; i < P8EST_DIM; ++i) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     if (dd_p4est_get_p4est() != nullptr) {
@@ -430,7 +430,7 @@ inline void boxl_to_treecoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in p4est tree-coordinates
  */
-inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
+static inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   boxl_to_treecoords(res.data());
   return res;
@@ -603,10 +603,9 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
-                                           p4est_mesh_t *mesh,
-                                           p4est_virtual_t *virtual_quads,
-                                           bool local_data) {
+static int p4est_utils_allocate_levelwise_storage(
+    std::vector<std::vector<T>> &data, p4est_mesh_t *mesh,
+    p4est_virtual_t *virtual_quads, bool local_data) {
   P4EST_ASSERT(data.empty());
 
   // allocate data for each level
@@ -638,7 +637,7 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-int p4est_utils_deallocate_levelwise_storage(
+static int p4est_utils_deallocate_levelwise_storage(
     std::vector<std::vector<T>> &data) {
   if (!data.empty()) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
@@ -651,10 +650,10 @@ int p4est_utils_deallocate_levelwise_storage(
 }
 
 template <typename T>
-int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
-                           std::vector<T *> &local_pointer,
-                           std::vector<std::vector<T>> &ghost_data,
-                           std::vector<T *> &ghost_pointer) {
+static int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
+                                  std::vector<T *> &local_pointer,
+                                  std::vector<std::vector<T>> &ghost_data,
+                                  std::vector<T *> &ghost_pointer) {
   P4EST_ASSERT(ghost_data.size() == 0 ||
                ghost_data.size() == local_data.size());
   for (unsigned int i = 0; i < local_data.size(); ++i) {

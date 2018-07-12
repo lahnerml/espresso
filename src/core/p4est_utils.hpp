@@ -5,7 +5,7 @@
 #include "p4est_dd.hpp"
 #include "utils.hpp"
 
-#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
+#if (defined(LB_ADAPTIVE) || defined (ES_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(DD_P4EST))
 
 #include <cstdint>
 #include <memory>

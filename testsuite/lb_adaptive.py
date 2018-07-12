@@ -34,7 +34,7 @@ class LBTest(ut.TestCase):
               'dens': 0.85,
               'viscosity': 30.0,
               'friction': 2.0,
-              'temp': 1.5,
+              'temp': 0.0,
               'gamma': 1.5,
               'skin': 0.0,
               'mom_prec': 1.e-11,
@@ -55,11 +55,11 @@ class LBTest(ut.TestCase):
 
     system.non_bonded_inter[0, 0].lennard_jones.set_params(
         epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
-    system.cell_system.set_p4est_dd(use_verlet_lists=False)
 
     def test_mass_momentum_thermostat(self):
         self.system.actors.clear()
         self.system.part.clear()
+        self.system.cell_system.set_p4est_dd(use_verlet_lists=False)
         # import particle data
         self.data = np.genfromtxt(abspath("data/lb_system.data"))
 
@@ -214,6 +214,7 @@ class LBTest(ut.TestCase):
         np.testing.assert_allclose(np.copy(self.lbf[0, 0, 0].velocity), v_fluid, atol=1e-4)
 
     def test_viscous_coupling(self):
+        self.system.cell_system.set_p4est_dd(use_verlet_lists=False)
         self.system.thermostat.turn_off()
         self.system.actors.clear()
         self.system.part.clear()

@@ -58,14 +58,6 @@ void dd_p4est_topology_init(CellPList *cl, bool isRepart = false);
 // Same as dd_topology_release.
 //void dd_p4est_topology_release();
 
-void dd_p4est_write_parallel_vtk(char* filename);
-
-/** Generate vtk files for particles.
- *
- * @param filename     Filename for output-files
- */
-void dd_p4est_write_particle_vtk(char* filename);
-
 /** Preprocessing before repart.
  * 
  * Enables the use of optimized resorting routine.

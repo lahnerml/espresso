@@ -415,46 +415,66 @@ static std::array<int, 3> morton_idx_of_quadrant(p4est_quadrant_t *q, p4est_topi
   return coord;
 }
 
+static CellInfo local_cell_from_quad(uint64_t idx, p4est_quadrant_t *q,
+                                     p4est_topidx_t treeidx) {
+  CellInfo c;
+  c.idx = idx;
+  c.rank = this_node;
+  c.coord = morton_idx_of_quadrant(q, treeidx);
+  c.type = is_on_boundary(c) ? CellType::Boundary : CellType::Inner;
+  std::fill(std::begin(c.neighbor), std::end(c.neighbor), -1);
+  return c;
+}
+
+static CellInfo ghost_cell_from_quad(uint64_t idx, int rank,
+                                     p4est_quadrant_t *q,
+                                     p4est_topidx_t treeidx) {
+  CellInfo c;
+  c.idx = idx;
+  c.rank = rank;
+  c.coord = morton_idx_of_quadrant(q, treeidx);
+  c.type = CellType::Ghost;
+  std::fill(std::begin(c.neighbor), std::end(c.neighbor), -1);
+  return c;
+}
+
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_init_internal_minimal (p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh) {
+void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost,
+                                    p4est_mesh_t *p4est_mesh) {
   num_local_cells = (size_t) ds::p4est->local_num_quadrants;
   num_ghost_cells = (size_t) p4est_ghost->ghosts.elem_count;
   num_cells = num_local_cells + num_ghost_cells;
   castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
 
-  ds::p4est_cellinfo.resize(num_cells);
+  ds::p4est_cellinfo.reserve(num_cells);
 
   for (int i = 0; i < num_local_cells; ++i) {
-    ds::p4est_cellinfo[i].idx = i;
-    ds::p4est_cellinfo[i].rank = this_node;
-    ds::p4est_cellinfo[i].coord = morton_idx_of_quadrant(p4est_mesh_get_quadrant(ds::p4est, p4est_mesh, i), p4est_mesh->quad_to_tree[i]);
-    ds::p4est_cellinfo[i].type = is_on_boundary(ds::p4est_cellinfo[i])? CellType::Boundary: CellType::Inner;
-    
+    ds::p4est_cellinfo.push_back(local_cell_from_quad(
+        i, p4est_mesh_get_quadrant(ds::p4est, p4est_mesh, i),
+        p4est_mesh->quad_to_tree[i]));
+
+    // Find cell neighbors
     for (int n = 0; n < 26; ++n) {
-      ds::p4est_cellinfo[i].neighbor[n] = -1;
-      p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n, nullptr, nullptr, ni);
+      p4est_mesh_get_neighbors(ds::p4est, p4est_ghost, p4est_mesh, i, n,
+                               nullptr, nullptr, ni);
       if (ni->elem_count > 1) // more than 1 neighbor in this direction
         printf("%i %i %li strange stuff\n",i,n,ni->elem_count);
-      if (ni->elem_count > 0) {
-        int neighrank = *((int*)sc_array_index_int(ni,0));
-        ds::p4est_cellinfo[i].neighbor[n] = neighrank;
-        if (neighrank >= ds::p4est->local_num_quadrants) { // Ghost cell
-          ds::p4est_cellinfo[i].type = CellType::Boundary;
-        }
+      if (ni->elem_count == 0)
+        continue;
+      
+      int neighcell = *((int*) sc_array_index_int(ni, 0));
+      ds::p4est_cellinfo[i].neighbor[n] = neighcell;
+      if (neighcell >= ds::p4est->local_num_quadrants) { // Ghost cell
+        ds::p4est_cellinfo[i].type = CellType::Boundary;
       }
       sc_array_truncate(ni);
     }
   }
-  
+
   for (int g = 0; g < num_ghost_cells; ++g) {
-    int i = num_local_cells + g;
-    
-    ds::p4est_cellinfo[i].idx = g;
-    ds::p4est_cellinfo[i].rank = p4est_mesh->ghost_to_proc[g];
-    ds::p4est_cellinfo[i].type = CellType::Ghost;
     p4est_quadrant_t *q = p4est_quadrant_array_index(&p4est_ghost->ghosts, g);
-    ds::p4est_cellinfo[i].coord = morton_idx_of_quadrant(q, q->p.piggy3.which_tree);
-    std::fill(std::begin(ds::p4est_cellinfo[i].neighbor), std::end(ds::p4est_cellinfo[i].neighbor), -1);
+    ds::p4est_cellinfo.push_back(ghost_cell_from_quad(
+        g, p4est_mesh->ghost_to_proc[g], q, q->p.piggy3.which_tree));
   }
 }
 
@@ -1551,4 +1571,3 @@ p4est_dd_repartition(const std::string& desc, bool verbose)
 }
 
 #endif
-

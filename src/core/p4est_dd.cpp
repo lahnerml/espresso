@@ -12,6 +12,7 @@
 #include <p8est_extended.h>
 #include <p8est_bits.h>
 #include <p8est_algorithms.h>
+#include <utility>
 #include "Cell.hpp"
 #include "domain_decomposition.hpp"
 #include "ghosts.hpp"
@@ -43,15 +44,6 @@ struct CellInfo {
   std::array<int, 3> coord; // cartesian coordinates of the cell
 };
 
-// Structure to store communications
-struct comm_t {
-  int rank; // Rank of the communication partner
-  int cnt;  // number of cells to communicate
-  int dir;  // Bitmask for communication direction. MSB ... z_r,z_l,y_r,y_l,x_r,x_l LSB
-  std::vector<int> idx; // List of cell indexes
-};
-
-
 namespace ds {
 // p4est_conn needs to be destructed before p4est.
 static castable_unique_ptr<p4est_connectivity_t> p4est_conn;
@@ -62,12 +54,9 @@ static std::vector<CellInfo> p4est_cellinfo;
 //--------------------------------------------------------------------------------------------------
 // Creates the irregular DD using p4est
 static void dd_p4est_create_grid (bool isRepart = false);
-// Compute communication partners for this node and fill internal lists
-static void dd_p4est_comm ();
 // Mark all cells either local or ghost. Local cells are arranged before ghost cells
 static void dd_p4est_mark_cells ();
-// Prepare a GhostCommunicator using the internal lists
-static void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part);
+static void dd_p4est_init_communication_structure();
 
 // Fill the IA_NeighborList and compute the half-shell for p4est based DD
 static void dd_p4est_init_cell_interactions();
@@ -91,24 +80,23 @@ static void dd_p4est_revert_comm_order (GhostCommunicator *comm);
 
 static void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
 //--------------------------------------------------------------------------------------------------
+// Data defining the grid
 static int brick_size[3]; // number of trees in each direction
 static int grid_size[3];  // number of quadrants/cells in each direction
 static std::vector<int> first_morton_idx_of_rank; // n_nodes + 1 elements, storing the first Morton index of local cell
 static int grid_level = 0;
 //--------------------------------------------------------------------------------------------------
-static std::vector<comm_t> comm_send;  // Internal send lists, idx maps to local cells
-static std::vector<comm_t> comm_recv;  // Internal recv lists, idx maps to ghost cells
-static int num_comm_send = 0;     // Number of send lists
-static int num_comm_recv = 0;     // Number of recc lists (should be euqal to send lists)
+static size_t num_cells = 0;
+static size_t num_local_cells = 0;
+static size_t num_ghost_cells = 0;
+//--------------------------------------------------------------------------------------------------
+// Data necessary for particle migration
 static std::vector<int> comm_proc;     // Number of communicators per Process
 static std::vector<int> comm_rank;     // Communication partner index for a certain communication
 static int num_comm_proc = 0;     // Total Number of bidirectional communications
 //--------------------------------------------------------------------------------------------------
+// Data for repartitioning
 static std::vector<p4est_gloidx_t> old_global_first_quadrant; // Old global_first_quadrants of the p4est before repartitioning.
-//--------------------------------------------------------------------------------------------------
-static size_t num_cells = 0;
-static size_t num_local_cells = 0;
-static size_t num_ghost_cells = 0;
 //--------------------------------------------------------------------------------------------------
 static const int neighbor_lut[3][3][3] = { // Mapping from [z][y][x] to p4est neighbor index
   {{18, 6,19},{10, 4,11},{20, 7,21}},
@@ -353,8 +341,6 @@ void dd_p4est_create_grid(bool isRepart) {
   // Clear data to prevent accidental use of old stuff
   comm_rank.clear();
   comm_proc.clear();
-  comm_recv.clear();
-  comm_send.clear();
   first_morton_idx_of_rank.clear();
   ds::p4est_cellinfo.clear();
 
@@ -395,9 +381,6 @@ void dd_p4est_create_grid(bool isRepart) {
   realloc_cells(num_cells);
   realloc_cellplist(&local_cells, local_cells.n = num_local_cells);
   realloc_cellplist(&ghost_cells, ghost_cells.n = num_ghost_cells);
-
-  // Fill internal communator lists
-  dd_p4est_comm();
 
   p4est_utils_init();
 }
@@ -478,104 +461,100 @@ void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost,
   }
 }
 
-// Compute communication partners and the cells that need to be communicated
-void dd_p4est_comm () {
-  // List of cell idx marked for send/recv for each process
-  std::vector<std::vector<int>> send_idx(n_nodes);
-  std::vector<std::vector<int>> recv_idx(n_nodes);
+using IndexVector = std::vector<int>;
+using RecvIndexVectors = std::vector<IndexVector>;
+using SendIndexVectors = std::vector<IndexVector>;
   
-  comm_proc.resize(n_nodes);
-  std::fill(std::begin(comm_proc), std::end(comm_proc), -1);
+/** Returns a pair of vector of vectors.
+ * 
+ * The first includes all ghost cells.
+ * A ghost cell is included in the vector that corresponds to
+ * its owner rank, i.e. in result[rank].
+ * 
+ * The second includes all boundary cells, possibly multiple times.
+ * A boundary cell is in all vectors that correspond to ranks
+ * which neighbor this particular cell.
+ */
+static std::pair<RecvIndexVectors, SendIndexVectors> get_recv_send_indices()
+{
+  std::vector<IndexVector> recv_idx(n_nodes), send_idx(n_nodes);
 
   for (int i = 0; i < num_cells; ++i) {
-    // is ghost cell -> add to recv lists
-    if (ds::p4est_cellinfo[i].rank >= 0 && ds::p4est_cellinfo[i].type == CellType::Ghost) {
+    if (ds::p4est_cellinfo[i].type == CellType::Ghost) {
       int nrank = ds::p4est_cellinfo[i].rank;
+      if (nrank < 0)
+        continue;
       recv_idx[nrank].push_back(i);
-    }
-    if (ds::p4est_cellinfo[i].type == CellType::Boundary) { // is mirror cell -> add to send lists
-      // loop fullshell
-      for (int n = 0; n < 26; ++n) {
-        int nidx = ds::p4est_cellinfo[i].neighbor[n];
+    } else if (ds::p4est_cellinfo[i].type == CellType::Boundary) {
+      // Find neighboring processes via neighbor ghost cells
+      for (const auto& nidx : ds::p4est_cellinfo[i].neighbor) {
         if (nidx < 0)
-          continue; // invalid neighbor
+          continue; // Invalid neighbor
+        if (ds::p4est_cellinfo[nidx].type != CellType::Ghost)
+          continue;
         int nrank = ds::p4est_cellinfo[nidx].rank;
         if (nrank < 0)
-          continue; // invalid neighbor
-        if (ds::p4est_cellinfo[nidx].type != CellType::Ghost)
-          continue; // no need to send to local cell
-        // add once for each rank
+          continue;
+        // Add once for each rank. If this cell has already been added to
+        // send_idx[nrank], it is the last element because of the loop
+        // structure (we check the addition to the send lists cell-by-cell).
         if (send_idx[nrank].empty() || send_idx[nrank].back() != i)
           send_idx[nrank].push_back(i);
       }
     }
   }
   
+  return std::make_pair(recv_idx, send_idx);
+}
+
+// Inits global communication data used for particle migration
+void dd_p4est_comm_init(const RecvIndexVectors& recv_idx, const SendIndexVectors& send_idx) {
+  comm_proc.resize(n_nodes);
+  std::fill(std::begin(comm_proc), std::end(comm_proc), -1);
+  
   num_comm_proc = 0;
-  for (int i=0; i<n_nodes; ++i) {
+  for (int i = 0; i < n_nodes; ++i) {
     if (send_idx[i].size() != 0 && recv_idx[i].size() != 0) {
       comm_proc[i] = num_comm_proc;
       num_comm_proc += 1;
-    } else if (!(send_idx[i].size() == 0 && recv_idx[i].size() == 0)) {
+    } else if (send_idx[i].size() != 0 || recv_idx[i].size() != 0) {
+      // Cannot have a send without a corresponding receive
       printf("[%i] : Unexpected mismatch in send and receive lists.\n", this_node);
       errexit();
     }
   }
   
-  num_comm_recv = num_comm_proc;
-  num_comm_send = num_comm_proc;
-  comm_recv.resize(num_comm_recv);
-  comm_send.resize(num_comm_send);
+  comm_rank.clear();
   comm_rank.resize(num_comm_proc, COMM_RANK_NONE);
-  
-  for (int n=0; n<n_nodes; ++n) {
-    if (comm_proc[n] >= 0) {
+  for (int n=0; n<n_nodes; ++n)
+    if (comm_proc[n] >= 0)
       comm_rank[comm_proc[n]] = n;
-      
-      comm_recv[comm_proc[n]].cnt = recv_idx[n].size();
-      comm_recv[comm_proc[n]].dir = 0;
-      comm_recv[comm_proc[n]].rank = n;
-      comm_recv[comm_proc[n]].idx = std::move(recv_idx[n]);
-
-      comm_send[comm_proc[n]].cnt = send_idx[n].size();
-      comm_send[comm_proc[n]].dir = 0;
-      comm_send[comm_proc[n]].rank = n;
-      comm_send[comm_proc[n]].idx = std::move(send_idx[n]);
-    }
-  }
 }
 //--------------------------------------------------------------------------------------------------
-void dd_p4est_prepare_comm (GhostCommunicator *comm, int data_part) {
-  prepare_comm(comm, data_part, num_comm_send + num_comm_recv, true);
-  int cnt = 0;
-  for (int i=0;i<num_comm_send;++i) {
-    comm->comm[cnt].type = GHOST_SEND;
-    comm->comm[cnt].node = comm_send[i].rank;
-    // The tag distinguishes communications to the same rank
-    comm->comm[cnt].tag = comm_send[i].dir;
-    comm->comm[cnt].part_lists = (Cell**)Utils::malloc(comm_send[i].cnt*sizeof(Cell*));
-    comm->comm[cnt].n_part_lists = comm_send[i].cnt;
-    for (int n=0;n<comm_send[i].cnt;++n) {
-      comm->comm[cnt].part_lists[n] = &cells[comm_send[i].idx[n]];
-    }
-    ++cnt;
-  }
-  for (int i=0;i<num_comm_recv;++i) {
-    comm->comm[cnt].type = GHOST_RECV;
-    comm->comm[cnt].node = comm_recv[i].rank;
-    comm->comm[cnt].tag = comm_recv[i].dir; // The tag is the same as above
-    // But invert x, y and z direction now. Direction from where the data came
-    if ((comm_recv[i].dir &  3)) comm->comm[cnt].tag ^=  3;
-    if ((comm_recv[i].dir & 12)) comm->comm[cnt].tag ^= 12;
-    if ((comm_recv[i].dir & 48)) comm->comm[cnt].tag ^= 48;
-    comm->comm[cnt].part_lists = (Cell**)Utils::malloc(comm_recv[i].cnt*sizeof(Cell*));
-    comm->comm[cnt].n_part_lists = comm_recv[i].cnt;
-    for (int n=0;n<comm_recv[i].cnt;++n) {
-      comm->comm[cnt].part_lists[n] = &cells[comm_recv[i].idx[n]];
-    }
-    ++cnt;
-  }
+static void assign_communication(GhostCommunication& gc, int type, int rank, const std::vector<int>& indices)
+{
+  auto index_to_cellptr = [](int idx){ return &cells[idx]; };
 
+  gc.type = type;
+  gc.node = rank;
+  gc.tag = 0;
+  gc.part_lists = static_cast<Cell**>(Utils::malloc(indices.size() * sizeof(Cell*)));
+  gc.n_part_lists = indices.size();
+  std::transform(std::begin(indices), std::end(indices), gc.part_lists, index_to_cellptr);
+}
+//--------------------------------------------------------------------------------------------------
+void dd_p4est_prepare_ghost_comm(GhostCommunicator *comm, int data_part,
+                                 const RecvIndexVectors &recv_idx,
+                                 const SendIndexVectors &send_idx) {
+
+  prepare_comm(comm, data_part, 2 * num_comm_proc, true);
+  int cnt = 0;
+  for (int i = 0; i < n_nodes; ++i) {
+    if (send_idx[i].size() > 0)
+      assign_communication(comm->comm[cnt++], GHOST_SEND, i, send_idx[i]);
+    if (recv_idx[i].size() > 0)
+      assign_communication(comm->comm[cnt++], GHOST_RECV, i, recv_idx[i]);
+  }
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
@@ -586,6 +565,43 @@ void dd_p4est_revert_comm_order (GhostCommunicator *comm) {
     else if (comm->comm[i].type == GHOST_RECV)
       comm->comm[i].type = GHOST_SEND;
   }
+}
+//--------------------------------------------------------------------------------------------------
+static void dd_p4est_init_communication_structure()
+{
+  std::vector<std::vector<int>> recv_idx, send_idx;
+  std::tie(recv_idx, send_idx) = get_recv_send_indices();
+
+  dd_p4est_comm_init(recv_idx, send_idx);
+
+  using namespace std::placeholders;
+  auto prep_ghost_comm = std::bind(dd_p4est_prepare_ghost_comm, _1, _2, recv_idx, send_idx);
+
+  prep_ghost_comm(&cell_structure.ghost_cells_comm, GHOSTTRANS_PARTNUM);
+
+  int exchange_data = (GHOSTTRANS_PROPRTS | GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+  int update_data   = (GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
+
+  prep_ghost_comm(&cell_structure.exchange_ghosts_comm,  exchange_data);
+  prep_ghost_comm(&cell_structure.update_ghost_pos_comm, update_data);
+  prep_ghost_comm(&cell_structure.collect_ghost_force_comm, GHOSTTRANS_FORCE);
+
+  /* collect forces has to be done in reverted order! */
+  dd_p4est_revert_comm_order(&cell_structure.collect_ghost_force_comm);
+#ifdef LB
+  prep_ghost_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING);
+#endif
+
+#ifdef IMMERSED_BOUNDARY
+  // Immersed boundary needs to communicate the forces from but also to the ghosts
+  // This is different than usual collect_ghost_force_comm (not in reverse order)
+  // Therefore we need our own communicator
+  prep_ghost_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
+#endif
+
+#ifdef ENGINE
+  prep_ghost_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING);
+#endif
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_mark_cells () {
@@ -1383,32 +1399,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   /* mark cells */
   dd_p4est_mark_cells();
 
-  /* create communicators */
-  dd_p4est_prepare_comm(&cell_structure.ghost_cells_comm, GHOSTTRANS_PARTNUM);
-
-  exchange_data = (GHOSTTRANS_PROPRTS | GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
-  update_data   = (GHOSTTRANS_POSITION | GHOSTTRANS_POSSHFTD);
-
-  dd_p4est_prepare_comm(&cell_structure.exchange_ghosts_comm,  exchange_data);
-  dd_p4est_prepare_comm(&cell_structure.update_ghost_pos_comm, update_data);
-  dd_p4est_prepare_comm(&cell_structure.collect_ghost_force_comm, GHOSTTRANS_FORCE);
-
-  /* collect forces has to be done in reverted order! */
-  dd_p4est_revert_comm_order(&cell_structure.collect_ghost_force_comm);
-#ifdef LB
-  dd_p4est_prepare_comm(&cell_structure.ghost_lbcoupling_comm, GHOSTTRANS_COUPLING);
-#endif
-
-#ifdef IMMERSED_BOUNDARY
-  // Immersed boundary needs to communicate the forces from but also to the ghosts
-  // This is different than usual collect_ghost_force_comm (not in reverse order)
-  // Therefore we need our own communicator
-  dd_p4est_prepare_comm(&cell_structure.ibm_ghost_force_comm, GHOSTTRANS_FORCE);
-#endif
-
-#ifdef ENGINE
-  dd_p4est_prepare_comm(&cell_structure.ghost_swimming_comm, GHOSTTRANS_SWIMMING);
-#endif
+  dd_p4est_init_communication_structure();
 
   /* initialize cell neighbor structures */
   dd_p4est_init_cell_interactions();

@@ -627,10 +627,7 @@ void dd_p4est_init_cell_interactions() {
   }
 }
 //--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
-  // Does the same as dd_p4est_save_position_to_cell but does not extend the local domain
-  // by the error bounds
-
+Cell* dd_p4est_save_position_to_cell(double pos[3]) {
   auto shellidxcomp = [](const CellInfo& s, uint64_t idx) {
     uint64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
                                              s.coord[1],
@@ -652,31 +649,6 @@ Cell* dd_p4est_position_to_cell_strict(double pos[3]) {
     return &cells[std::distance(std::begin(ds::p4est_cellinfo), it)];
   else
     return nullptr;
-}
-//--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_save_position_to_cell(double pos[3]) {
-  Cell *c;
-  // This function implicitly uses binary search by using
-  // dd_p4est_position_to_cell
-
-  if ((c = dd_p4est_position_to_cell_strict(pos)))
-    return c;
-
-  // If pos is outside of the local domain try the bounding box enlarged
-  // by ROUND_ERROR_PREC
-  for (int i = -1; i <= 1; i += 2) {
-    for (int j = -1; j <= 1; j += 2) {
-      for (int k = -1; k <= 1; k += 2) {
-        double spos[3] = { pos[0] + i * box_l[0] * ROUND_ERROR_PREC,
-                           pos[1] + j * box_l[1] * ROUND_ERROR_PREC,
-                           pos[2] + k * box_l[2] * ROUND_ERROR_PREC };
-        if ((c = dd_p4est_position_to_cell_strict(spos)))
-          return c;
-      }
-    }
-  }
-
-  return nullptr;
 }
 //--------------------------------------------------------------------------------------------------
 Cell* dd_p4est_position_to_cell(double pos[3]) {
@@ -705,84 +677,69 @@ static bool is_out_of_box(Particle& p, const std::array<int, 3> &off) {
 // index pair of those particles in a vector and move them at the end.
 void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn)
 {
-  std::array<double, 3> cell_lc, cell_hc, ext_cell_lc, ext_cell_hc;
+  std::array<double, 3> cell_lc, cell_hc;
   // Loop over all cells and particles
-  for (int i=0;i<num_local_cells;++i) {
+  for (int i = 0; i < num_local_cells; ++i) {
     Cell* cell = local_cells.cell[i];
     CellInfo* shell = &ds::p4est_cellinfo[i];
 
     for (int d = 0; d < 3; ++d) {
       cell_lc[d] = dd.cell_size[d] * static_cast<double>(shell->coord[d]);
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
-
-      ext_cell_lc[d] = cell_lc[d];
-      ext_cell_hc[d] = cell_hc[d];
-      if (is_on_boundary(*shell, d, Direction::Left))
-        ext_cell_lc[d] -= 0.5 * ROUND_ERROR_PREC*box_l[d];
-      if (is_on_boundary(*shell, d, Direction::Right))
-        ext_cell_hc[d] += 0.5 * ROUND_ERROR_PREC*box_l[d];
     }
 
-    for (int p=0;p<cell->n;++p) {
+    for (int p = 0; p < cell->n; ++p) {
       Particle* part = &cell->part[p];
       std::array<int, 3> off;
 
-      // Check if particle has left the cell. (The local domain is extended by half round error)
+      // recalculate neighboring cell to prevent rounding errors
+      // If particle left local domain, check for correct ghost cell, thus without ROUND_ERROR_PREC
       for (int d = 0; d < 3; ++d) {
-        if (part->r.p[d] < ext_cell_lc[d])
+        if (part->r.p[d] < cell_lc[d])
           off[d] = 0;
-        else if (part->r.p[d] >= ext_cell_hc[d])
+        else if (part->r.p[d] >= cell_hc[d])
           off[d] = 2;
         else
           off[d] = 1;
       }
 
-      int nidx = neighbor_lut[off[2]][off[1]][off[0]];
-      if (nidx != -1) { // Particle p outside of cell i
-        // recalculate neighboring cell to prevent rounding errors
-        // If particle left local domain, check for correct ghost cell, thus without ROUND_ERROR_PREC
-        for (int d = 0; d < 3; ++d) {
-          if (part->r.p[d] < cell_lc[d])
-            off[d] = 0;
-          else if (part->r.p[d] >= cell_hc[d])
-            off[d] = 2;
-          else
-            off[d] = 1;
-        }
+      int nl = neighbor_lut[off[2]][off[1]][off[0]];
+      // Particle did not move outside its cell (all offsets == 1)
+      if (nl == -1)
+        continue;
 
-        // get neighbor cell
-        nidx = shell->neighbor[neighbor_lut[off[2]][off[1]][off[0]]];
-        if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
-          if (ds::p4est_cellinfo[nidx].rank >= 0) { // This ghost cell is linked to a process
-            // With minimal ghost this condition is always true
-            if (ds::p4est_cellinfo[nidx].rank != this_node) { // It is a remote process
-              // copy data to sendbuf according to rank
-              int li = comm_proc[ds::p4est_cellinfo[nidx].rank];
-              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
+      // get neighbor cell
+      int nidx = shell->neighbor[nl];
+      if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
+        if (ds::p4est_cellinfo[nidx].rank >= 0) { // This ghost cell is linked to a process
+          // With minimal ghost this condition is always true
+          if (ds::p4est_cellinfo[nidx].rank != this_node) { // It is a remote process
+            // copy data to sendbuf according to rank
+            int li = comm_proc[ds::p4est_cellinfo[nidx].rank];
+            sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
 #ifdef EXCLUSIONS
-              sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
+            sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
 #endif
-              int pid = part->p.identity;
-              //fold_position(part->r.p, part->l.i);
-              move_indexed_particle(&sendbuf[li], cell, p);
-              local_particles[pid] = nullptr;
-              if(p < cell->n) p -= 1;
-            } else { // particle stays local, but since it went to a ghost it has to be folded
-              fold_position(part->r.p, part->l.i);
-              move_indexed_particle(&cells[ds::p4est_cellinfo[nidx].idx], cell, p);
-              if(p < cell->n) p -= 1;
-            }
-          } else { // Particle left global domain and is not tracked by any process anymore
-            runtimeErrorMsg() << "particle " << p << " on process " << this_node << " is OB";
-            fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
-          }
-        } else { // Local Cell, just move the partilce
-          if (is_out_of_box(*part, off)) { // Local periodic boundary
+            int pid = part->p.identity;
+            //fold_position(part->r.p, part->l.i);
+            move_indexed_particle(&sendbuf[li], cell, p);
+            local_particles[pid] = nullptr;
+            if(p < cell->n) p -= 1;
+          } else { // particle stays local, but since it went to a ghost it has to be folded
             fold_position(part->r.p, part->l.i);
+            move_indexed_particle(&cells[ds::p4est_cellinfo[nidx].idx], cell, p);
+            if(p < cell->n) p -= 1;
           }
-          move_indexed_particle(&cells[nidx], cell, p);
-          if(p < cell->n) p -= 1;
+        } else { // Particle left global domain and is not tracked by any process anymore
+          runtimeErrorMsg() << "particle " << p << " on process " << this_node << " is OB";
+          fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
         }
+      } else { // Local Cell, just move the partilce
+        if (is_out_of_box(*part, off)) { // Local periodic boundary
+          fold_position(part->r.p, part->l.i);
+        }
+        move_indexed_particle(&cells[nidx], cell, p);
+        if(p < cell->n) p -= 1;
       }
     }
   }
@@ -1361,6 +1318,8 @@ static uint64_t dd_p4est_pos_morton_idx(double pos[3]) {
   fold_position(pfold, im);
   for (int d = 0; d < 3; ++d) {
     double errmar = 0.5 * ROUND_ERROR_PREC * box_l[d];
+    // Correct for particles very slightly OOB for which folding
+    // will numerically eliminate its relative position to the boundary.
     if (pos[d] < 0 && pos[d] > -errmar)
       pfold[d] = 0;
     else if (pos[d] >= box_l[d] && pos[d] < box_l[d] + errmar)

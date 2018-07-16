@@ -18,6 +18,7 @@
 #include "ghosts.hpp"
 #include "p4est_utils.hpp"
 #include "repart.hpp"
+#include "utils/mpi/waitany.hpp"
 #include "utils/serialization/ParticleList.hpp"
 
 //#include <boost/mpi/nonblocking.hpp>
@@ -186,6 +187,29 @@ static inline void DIE_IF_TAG_MISMATCH(int act, int desired, const char *str) {
     errexit();
   }
 }
+
+struct ParticleListCleaner {
+  ParticleListCleaner(ParticleList *pl, size_t nlists = 1,
+                      bool free_particles = false)
+      : pl(pl), nlists(nlists), free_particles(free_particles) {}
+
+  ~ParticleListCleaner() {
+    for (size_t i = 0; i < nlists; ++i) {
+      if (free_particles) {
+        for (int p = 0; p < pl[i].n; p++) {
+          local_particles[pl[i].part[p].p.identity] = nullptr;
+          free_particle(&pl[i].part[p]);
+        }
+      }
+      realloc_particlelist(&pl[i], 0);
+    }
+  }
+
+private:
+  ParticleList *pl;
+  size_t nlists;
+  bool free_particles;
+};
 
 static const int LOC_EX_CNT_TAG  = 11011;
 static const int LOC_EX_PART_TAG = 11022;
@@ -673,7 +697,7 @@ static bool is_out_of_box(Particle& p, const std::array<int, 3> &off) {
 // Note: Particle that stay local and are moved to a cell with higher index are touched twice.
 // This is not the most efficient way! It would be better to first remember the cell-particle
 // index pair of those particles in a vector and move them at the end.
-void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn)
+void dd_p4est_fill_sendbuf(ParticleList sendbuf[])
 {
   std::array<double, 3> cell_lc, cell_hc;
   // Loop over all cells and particles
@@ -714,10 +738,6 @@ void dd_p4est_fill_sendbuf (ParticleList *sendbuf, std::vector<int> *sendbuf_dyn
           if (ds::p4est_cellinfo[nidx].rank != this_node) { // It is a remote process
             // copy data to sendbuf according to rank
             int li = comm_proc[ds::p4est_cellinfo[nidx].rank];
-            sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->bl.e, part->bl.e + part->bl.n);
-#ifdef EXCLUSIONS
-            sendbuf_dyn[li].insert(sendbuf_dyn[li].end(), part->el.e, part->el.e + part->el.n);
-#endif
             int pid = part->p.identity;
             //fold_position(part->r.p, part->l.i);
             move_indexed_particle(&sendbuf[li], cell, p);
@@ -811,102 +831,41 @@ static void dd_async_exchange_insert_dyndata(ParticleList *recvbuf, std::vector<
 #endif
   }
 }
+
 void dd_p4est_local_exchange_and_sort_particles() {
   // Prepare all send and recv buffers to all neighboring processes
   std::vector<ParticleList> sendbuf(num_comm_proc), recvbuf(num_comm_proc);
-  std::vector<std::vector<int>> sendbuf_dyn(num_comm_proc),
-      recvbuf_dyn(num_comm_proc);
-  std::vector<MPI_Request> sreq(3 * num_comm_proc, MPI_REQUEST_NULL);
-  std::vector<MPI_Request> rreq(num_comm_proc, MPI_REQUEST_NULL);
-  std::vector<int> nrecvpart(num_comm_proc, 0);
-
-  for (int i = 0; i < num_comm_proc; ++i) {
-    init_particlelist(&sendbuf[i]);
-    init_particlelist(&recvbuf[i]);
-    // Invoke receive for the number of particles to be received from
-    // all neighbors
-    MPI_Irecv(&nrecvpart[i], 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
-              comm_cart, &rreq[i]);
-  }
+  ParticleListCleaner cls(sendbuf.data(), num_comm_proc, true), clr(recvbuf.data(), num_comm_proc);
+  std::vector<boost::mpi::request> sreq, rreq;
 
   // Fill the send buffers with particles that leave the local domain
-  dd_p4est_fill_sendbuf(sendbuf.data(), sendbuf_dyn.data());
+  dd_p4est_fill_sendbuf(sendbuf.data());
 
-  // send number of particles, particles, and particle data
+  rreq.reserve(num_comm_proc);
+  sreq.reserve(num_comm_proc);
   for (int i = 0; i < num_comm_proc; ++i) {
-    MPI_Isend(&sendbuf[i].n, 1, MPI_INT, comm_rank[i], LOC_EX_CNT_TAG,
-              comm_cart, &sreq[i]);
-    if (sendbuf[i].n <= 0)
-      continue;
-    MPI_Isend(sendbuf[i].part, sendbuf[i].n * sizeof(Particle), MPI_BYTE,
-              comm_rank[i], LOC_EX_PART_TAG, comm_cart,
-              &sreq[i + num_comm_proc]);
-    if (sendbuf_dyn[i].size() <= 0)
-      continue;
-    MPI_Isend(sendbuf_dyn[i].data(), sendbuf_dyn[i].size(), MPI_INT,
-              comm_rank[i], LOC_EX_DYN_TAG, comm_cart,
-              &sreq[i + 2 * num_comm_proc]);
+    rreq.push_back(comm_cart.irecv(comm_rank[i], LOC_EX_CNT_TAG, recvbuf[i]));
+    sreq.push_back(comm_cart.isend(comm_rank[i], LOC_EX_CNT_TAG, sendbuf[i]));
   }
 
   // Receive all data
   MPI_Status status;
   CommunicationStatus commstat(num_comm_proc);
 
-  while (true) {
-    int recvidx;
-    MPI_Waitany(num_comm_proc, rreq.data(), &recvidx, &status);
-    if (recvidx == MPI_UNDEFINED)
-      break;
-    int dyndatasiz, source = status.MPI_SOURCE, tag = status.MPI_TAG;
-
-    switch (commstat.expected(recvidx)) {
-    case CommunicationStatus::ReceiveStatus::RECV_COUNT:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_CNT_TAG, "Local exchange count");
-      if (nrecvpart[recvidx] > 0) {
-        realloc_particlelist(&recvbuf[recvidx], nrecvpart[recvidx]);
-        MPI_Irecv(recvbuf[recvidx].part, nrecvpart[recvidx] * sizeof(Particle),
-                  MPI_BYTE, source, LOC_EX_PART_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_PARTICLES:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_PART_TAG, "Local exchange particles");
-      recvbuf[recvidx].n = nrecvpart[recvidx];
-      dyndatasiz =
-          dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, source);
-      if (dyndatasiz > 0) {
-        recvbuf_dyn[recvidx].resize(dyndatasiz);
-        MPI_Irecv(recvbuf_dyn[recvidx].data(), dyndatasiz, MPI_INT, source,
-                  LOC_EX_DYN_TAG, comm_cart, &rreq[recvidx]);
-        commstat.next(recvidx);
-      }
-      break;
-    case CommunicationStatus::ReceiveStatus::RECV_DYNDATA:
-      DIE_IF_TAG_MISMATCH(tag, LOC_EX_DYN_TAG, "Local exchange dyndata");
-      dd_async_exchange_insert_dyndata(&recvbuf[recvidx], recvbuf_dyn[recvidx]);
-      commstat.next(recvidx);
-      break;
-    default:
-      std::cerr << "[" << this_node << "]"
-                << "Unknown comm status for receive index " << recvidx
-                << std::endl;
-      break;
-    }
-  }
-  MPI_Waitall(3 * num_comm_proc, sreq.data(), MPI_STATUS_IGNORE);
-
-  // clear all buffers and free memory
   for (int i = 0; i < num_comm_proc; ++i) {
-    // Remove particles from this nodes local list and free data
-    for (int p = 0; p < sendbuf[i].n; p++) {
-      local_particles[sendbuf[i].part[p].p.identity] = nullptr;
-      free_particle(&sendbuf[i].part[p]);
-    }
-    realloc_particlelist(&sendbuf[i], 0);
-    realloc_particlelist(&recvbuf[i], 0);
-    sendbuf_dyn[i].clear();
-    recvbuf_dyn[i].clear();
+    std::vector<boost::mpi::request>::iterator it;
+    boost::mpi::status stat;
+    std::tie(stat, it) = Utils::Mpi::wait_any(std::begin(rreq), std::end(rreq));
+
+    if (it == std::end(rreq))
+      break;
+    
+    auto recvidx = std::distance(std::begin(rreq), it);
+
+    dd_async_exchange_insert_particles(&recvbuf[recvidx], 0, stat.source());
   }
+
+  boost::mpi::wait_all(std::begin(sreq), std::end(sreq));
 
 #ifdef ADDITIONAL_CHECKS
   check_particle_consistency();

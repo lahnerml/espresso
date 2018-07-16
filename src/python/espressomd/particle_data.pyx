@@ -2039,7 +2039,7 @@ Set quat and scalar dipole moment (dipm) instead.")
                         vtk.write("{} {} {}\n".format(*p.v))
 
     def write_par_vtk(self, filename):
-        dd_p4est_write_parallel_vtk(utils.to_char_pointer(filename))
+        write_parallel_particle_vtk(utils.to_char_pointer(filename))
 
     property highest_particle_id:
         """

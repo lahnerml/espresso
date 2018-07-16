@@ -69,7 +69,7 @@
 #include "npt.hpp"
 #include "p3m-dipolar.hpp"
 #include "p3m.hpp"
-#include "p4est_dd.hpp"
+#include "particle_vtk.hpp"
 #include "p4est_utils.hpp"
 #include "partCfg_global.hpp"
 #include "particle_data.hpp"
@@ -224,7 +224,7 @@ static int terminated = 0;
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_set_refinement_area)                                                  \
-  CB(mpi_dd_p4est_write_particle_vtk)                                          \
+  CB(mpi_write_particle_vtk)                                              \
   CB(mpi_lbadapt_grid_reset)                                                   \
   CB(mpi_recv_interpolated_velocity_slave)
 
@@ -3012,9 +3012,9 @@ void mpi_resort_particles_slave(int global_flag, int) {
   boost::mpi::gather(comm_cart, cells_get_n_particles(), 0);
 }
 
-void mpi_dd_p4est_write_particle_vtk(int node, int len) {
+void mpi_write_particle_vtk(int node, int len) {
   char filename[2048];
   MPI_Bcast(filename, len, MPI_CHAR, 0, comm_cart);
 
-  dd_p4est_write_particle_vtk(filename);
+  write_particle_vtk(filename);
 }

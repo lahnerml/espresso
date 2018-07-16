@@ -37,6 +37,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <cmath>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -52,9 +53,6 @@
  * where the coefficients and the velocity vectors are hardcoded
  * explicitly. This saves a lot of multiplications with 1's and 0's
  * thus making the code more efficient. */
-#ifndef D3Q19
-#define D3Q19
-#endif // D3Q19
 
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE
@@ -825,7 +823,6 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
 
   trace = local_pi[0] + local_pi[2] + local_pi[5];
 
-#ifdef D3Q19
   lb_float rho_times_coeff;
   lb_float tmp1, tmp2;
 
@@ -898,25 +895,6 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   datafield[0][18] = rho_times_coeff -
                      1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-#else  // D3Q19
-  int i;
-  lb_float tmp = 0.0;
-  lb_float(*c)[3] = lbmodel.c;
-  lb_float(*coeff)[4] = lbmodel.coeff;
-
-  for (i = 0; i < lbmodel.n_veloc; i++) {
-    tmp = local_pi[0] * Utils::sqr(c[i][0]) +
-          (2.0 * local_pi[1] * c[i][0] + local_pi[2] * c[i][1]) * c[i][1] +
-          (2.0 * (local_pi[3] * c[i][0] + local_pi[4] * c[i][1]) +
-           local_pi[5] * c[i][2]) *
-              c[i][2];
-
-    datafield[0][i] = coeff[i][0] * (local_rho - avg_rho);
-    datafield[0][i] += coeff[i][1] * scalar(local_j, c[i]);
-    datafield[0][i] += coeff[i][2] * tmp;
-    datafield[0][i] += coeff[i][3] * trace;
-  }
-#endif // D3Q19
 
   return 0;
 }
@@ -1017,7 +995,6 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
 
 int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
 #ifndef LB_ADAPTIVE_GPU
-#ifdef D3Q19
   lb_float n0, n1p, n1m, n2p, n2m, n3p, n3m, n4p, n4m, n5p, n5m, n6p, n6m, n7p,
       n7m, n8p, n8m, n9p, n9m;
 
@@ -1069,17 +1046,6 @@ int lbadapt_calc_modes(lb_float population[2][19], lb_float *mode) {
   mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2. * (n1p + n2p + n3p);
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
-
-#else  // D3Q19
-  int i, j;
-  for (i = 0; i < lbmodel.n_veloc; i++) {
-    mode[i] = 0.0;
-    for (j = 0; j < lbmodel.n_veloc; j++) {
-      mode[i] += lbmodel.e[i][j] * lbfluid[0][i][index];
-    }
-  }
-#endif // D3Q19
-
 #endif // LB_ADAPTIVE_GPU
 
   return 0;
@@ -1148,79 +1114,42 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 
 int lbadapt_thermalize_modes(lb_float *mode) {
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
+  const double rootrho = std::sqrt(
+      std::fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
 
-  lb_float fluct[6];
 #ifdef GAUSSRANDOM
-  lb_float rootrho_gauss =
-      sqrt(fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random());
-  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random());
-  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random());
-  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random());
-  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random());
-  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random());
-
-  /* ghost modes */
-  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random();
-  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random();
-  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random();
-  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random();
-  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random();
-  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random();
-  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random();
-  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random();
-  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random();
-
+  constexpr double variance = 1. / 12.;
+  auto rng = []() -> double { return gaussian_random(); };
 #elif defined(GAUSSRANDOMCUT)
-  lb_float rootrho_gauss =
-      sqrt(fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho_gauss * lb_phi[4] * gaussian_random_cut());
-  mode[5] += (fluct[1] = rootrho_gauss * lb_phi[5] * gaussian_random_cut());
-  mode[6] += (fluct[2] = rootrho_gauss * lb_phi[6] * gaussian_random_cut());
-  mode[7] += (fluct[3] = rootrho_gauss * lb_phi[7] * gaussian_random_cut());
-  mode[8] += (fluct[4] = rootrho_gauss * lb_phi[8] * gaussian_random_cut());
-  mode[9] += (fluct[5] = rootrho_gauss * lb_phi[9] * gaussian_random_cut());
-
-  /* ghost modes */
-  mode[10] += rootrho_gauss * lb_phi[10] * gaussian_random_cut();
-  mode[11] += rootrho_gauss * lb_phi[11] * gaussian_random_cut();
-  mode[12] += rootrho_gauss * lb_phi[12] * gaussian_random_cut();
-  mode[13] += rootrho_gauss * lb_phi[13] * gaussian_random_cut();
-  mode[14] += rootrho_gauss * lb_phi[14] * gaussian_random_cut();
-  mode[15] += rootrho_gauss * lb_phi[15] * gaussian_random_cut();
-  mode[16] += rootrho_gauss * lb_phi[16] * gaussian_random_cut();
-  mode[17] += rootrho_gauss * lb_phi[17] * gaussian_random_cut();
-  mode[18] += rootrho_gauss * lb_phi[18] * gaussian_random_cut();
-
+  constexpr double variance = 1.0;
+  auto rng = []() -> double { return gaussian_random_cut(); };
 #elif defined(FLATNOISE)
-  lb_float rootrho =
-      sqrt(fabs(12.0 * (mode[0] + lbpar.rho * h_max * h_max * h_max)));
-
-  /* stress modes */
-  mode[4] += (fluct[0] = rootrho * lbpar.phi[4] * (d_random() - 0.5));
-  mode[5] += (fluct[1] = rootrho * lbpar.phi[5] * (d_random() - 0.5));
-  mode[6] += (fluct[2] = rootrho * lbpar.phi[6] * (d_random() - 0.5));
-  mode[7] += (fluct[3] = rootrho * lbpar.phi[7] * (d_random() - 0.5));
-  mode[8] += (fluct[4] = rootrho * lbpar.phi[8] * (d_random() - 0.5));
-  mode[9] += (fluct[5] = rootrho * lbpar.phi[9] * (d_random() - 0.5));
-
-  /* ghost modes */
-  mode[10] += rootrho * lbpar.phi[10] * (d_random() - 0.5);
-  mode[11] += rootrho * lbpar.phi[11] * (d_random() - 0.5);
-  mode[12] += rootrho * lbpar.phi[12] * (d_random() - 0.5);
-  mode[13] += rootrho * lbpar.phi[13] * (d_random() - 0.5);
-  mode[14] += rootrho * lbpar.phi[14] * (d_random() - 0.5);
-  mode[15] += rootrho * lbpar.phi[15] * (d_random() - 0.5);
-  mode[16] += rootrho * lbpar.phi[16] * (d_random() - 0.5);
-  mode[17] += rootrho * lbpar.phi[17] * (d_random() - 0.5);
-  mode[18] += rootrho * lbpar.phi[18] * (d_random() - 0.5);
+  constexpr double variance = 1. / 12.0;
+  auto rng = []() -> double { return d_random() - 0.5; };
 #else  // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM
+
+  auto const pref = std::sqrt(1. / variance) * rootrho;
+
+  /* stress modes */
+  mode[4] += pref * lbpar.phi[4] * rng();
+  mode[5] += pref * lbpar.phi[5] * rng();
+  mode[6] += pref * lbpar.phi[6] * rng();
+  mode[7] += pref * lbpar.phi[7] * rng();
+  mode[8] += pref * lbpar.phi[8] * rng();
+  mode[9] += pref * lbpar.phi[9] * rng();
+
+  /* ghost modes */
+  mode[10] += pref * lbpar.phi[10] * rng();
+  mode[11] += pref * lbpar.phi[11] * rng();
+  mode[12] += pref * lbpar.phi[12] * rng();
+  mode[13] += pref * lbpar.phi[13] * rng();
+  mode[14] += pref * lbpar.phi[14] * rng();
+  mode[15] += pref * lbpar.phi[15] * rng();
+  mode[16] += pref * lbpar.phi[16] * rng();
+  mode[17] += pref * lbpar.phi[17] * rng();
+  mode[18] += pref * lbpar.phi[18] * rng();
 
 #ifdef ADDITIONAL_CHECKS
   rancounter += 15;
@@ -1567,8 +1496,6 @@ void lbadapt_bounce_back(int level) {
       currCellData = &lbadapt_local_data[level].at(
           p8est_meshiter_get_current_storage_id(mesh_iter));
 
-#ifdef D3Q19
-#ifndef PULL
       lb_float population_shift;
 
       if (currCellData->lbfields.boundary) {
@@ -1704,12 +1631,6 @@ void lbadapt_bounce_back(int level) {
           }
         } // if (mesh_iter->neighbor_qid) != -1
       }   // for (int dir_ESPR = 1; dir_ESPR < 19; ++dir_ESPR)
-#else     // !PULL
-#error Bounce back boundary conditions are only implemented for PUSH scheme!
-#endif // !PULL
-#else  // D3Q19
-#error Bounce back boundary conditions are only implemented for D3Q19!
-#endif // D3Q19
     }
   }
 #endif // LB_ADAPTIVE_GPU

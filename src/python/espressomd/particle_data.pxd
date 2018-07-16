@@ -249,8 +249,8 @@ cdef extern from "grid.hpp":
     cdef void fold_position(double *, int*)
     void unfold_position(double pos[3], int image_box[3])
 
-cdef extern from "p4est_dd.hpp":
-    void dd_p4est_write_parallel_vtk(char* filename);
+cdef extern from "particle_vtk.hpp":
+    void write_parallel_particle_vtk(char* filename);
 
 cdef make_array_locked(const Vector3d &v)
 

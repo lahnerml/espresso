@@ -34,7 +34,7 @@
 #include "virtual_sites/VirtualSitesRelative.hpp"
 
 #ifdef DD_P4EST
-Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+Cell* dd_p4est_save_position_to_cell(double pos[3]);
 #endif
 
 #ifdef COLLISION_DETECTION_DEBUG
@@ -610,7 +610,7 @@ Cell* project_to_boundary(const double pos[3])
                      , pos[1] + displ[1] * dd.cell_size[1]
                      , pos[2] + displ[2] * dd.cell_size[2] };
 #ifdef DD_P4EST
-    if ((c = dd_p4est_position_to_cell_strict(spos)))
+    if ((c = dd_p4est_save_position_to_cell(spos)))
       return c;
 #endif
   }

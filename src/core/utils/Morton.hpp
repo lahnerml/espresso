@@ -7,13 +7,6 @@
 #endif
 
 namespace Utils {
-#ifdef __BMI2__
-inline unsigned _d2x(unsigned d, unsigned mask)
-{
-  return _pext_u64(d, mask);
-}
-#endif
-
 /** Map a virtual Morton-index to a grid_count on a regular grid
  *
  * @param idx   A Morton-index calculated by interleaving a cell count

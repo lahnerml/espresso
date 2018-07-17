@@ -32,7 +32,7 @@
 #include <cstdio>
 #include <cstring>
 #include <iostream>
-#include "config.hpp" 
+#include "config.hpp"
 #include "utils.hpp"
 #include "lb.hpp"
 #include "interaction_data.hpp"
@@ -3258,7 +3258,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 
   /* determine elementary lattice cell surrounding the particle
      and the relative position of the particle in this cell */
-#ifndef LB_ADAPTIVE  
+#ifndef LB_ADAPTIVE
   lblattice.map_position_to_lattice(p->r.p, node_index, delta);
   double h = lbpar.agrid;
   double h_max = lbpar.agrid;
@@ -3268,8 +3268,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   } else {
     dcnt = lbadapt_interpolate_pos_adapt(p->r.p.data(), node_index, delta, level);
   }
-  if (dcnt <= 0)
-    return;
+  if (dcnt <= 0) { return; }
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
@@ -3361,20 +3360,24 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[1];
         local_f[2] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[2];
+        fprintf(stderr, "[%i, %i, %i] delta: [%lf, %lf, %lf] prod: %lf f: %lf %lf %lf\n",
+                x, y, z, delta[3*x + 0], delta[3*y + 1], delta[3*z+2],
+                delta[3*x + 0] * delta[3*y + 1] * delta[3*z+2],
+                local_f[0], local_f[1], local_f[2]);
       }
     }
   }
 #else  // !LB_ADAPTIVE
   for (int x = 0; x < dcnt; ++x) {
-    if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
-      local_f = node_index[x]->lbfields.force;
-      double level_fact = p4est_params.prefactors[level[x]] *
-          p4est_params.prefactors[level[x]];
+    //if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
+    local_f = node_index[x]->lbfields.force;
+    double level_fact = p4est_params.prefactors[level[x]] * p4est_params.prefactors[level[x]];
 
-      local_f[0] += delta[x] * delta_j[0] / level_fact;
-      local_f[1] += delta[x] * delta_j[1] / level_fact;
-      local_f[2] += delta[x] * delta_j[2] / level_fact;
-    }
+    local_f[0] += delta[x] * delta_j[0] / level_fact;
+    local_f[1] += delta[x] * delta_j[1] / level_fact;
+    local_f[2] += delta[x] * delta_j[2] / level_fact;
+    fprintf(stderr, "[%i] delta: %lf, f: %lf %lf %lf (level_fact: %lf)\n",
+            x, delta[x], local_f[0], local_f[1], local_f[2], level_fact);
   }
 #endif // !LB_ADAPTIVE
 

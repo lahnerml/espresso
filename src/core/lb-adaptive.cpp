@@ -2634,91 +2634,40 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   level[0] = lvl;
   int corner = 0;
   double delta_loc[6];
+  std::array<double, 3> quad_pos;
+  p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qidx], quad,
+                           quad_pos.data());
   for (int d = 0; d < 3; ++d) {
-    double dis = pos[d] * (double)(1 << lvl);
-    dis = dis - floor(dis) + 0.5;
-    if (dis > 1.0) { // right neighbor
+    static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    if (dis >= 0.0) { // right neighbor
       corner |= 1 << d;
-      dis = 2.0 - dis;
     }
     delta_loc[d] = dis;
     delta_loc[d + 3] = 1.0 - dis;
   }
-  delta[0] =
-      delta_loc[didx[0][0]] * delta_loc[didx[0][1]] * delta_loc[didx[0][2]];
+  delta[0] = delta_loc[didx[0][0]] *
+             delta_loc[didx[0][1]] *
+             delta_loc[didx[0][2]];
   int ncnt = 1;
-  int xidx = -1;
-  int yidx = -1;
-  int zidx = -1;
-  castable_unique_ptr<sc_array_t> ne = sc_array_new(sizeof(int));
-  castable_unique_ptr<sc_array_t> ni = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> nqid = sc_array_new(sizeof(int));
+  castable_unique_ptr<sc_array_t> nvid = sc_array_new(sizeof(int));
   p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
   p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;
+  int idx;
   for (int i = 0; i < 7; ++i) {
-    p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
-                             nidx[corner][i], nullptr, ne, ni);
-    if (ne->elem_count == 0) {
-      switch (i) {
-        case 2: // X-Y edge
-          if (xidx >= 0)
-            delta[xidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          else if (yidx >= 0)
-            delta[yidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          break;
-        case 4: // X-Z edge
-          if (xidx >= 0)
-            delta[xidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          else if (zidx >= 0)
-            delta[zidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          break;
-        case 5: // Y-Z edge
-          if (yidx >= 0)
-            delta[yidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          else if (zidx >= 0)
-            delta[zidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          break;
-        case 6: // X-Y-Z corner
-          if (xidx >= 0)
-            delta[xidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          else if (yidx >= 0)
-            delta[yidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          else if (zidx >= 0)
-            delta[zidx] +=
-                (delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                 delta_loc[didx[i + 1][2]]);
-          break;
-        default:
-          printf("A LB cell neighbor is missing over a face\n");
-          break;
-      };
+    p8est_virtual_get_neighbor(adapt_p4est, adapt_ghost, adapt_mesh,
+                               adapt_virtual, qidx, -1, nidx[corner][i],
+                               nenc, nqid, nvid);
+    // if neighbor is smaller we will not obtain any neighbors from virtual
+    // neighbor query
+    if (!nqid->elem_count) {
+      p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
+                               nidx[corner][i], nullptr, nullptr, nqid);
     }
-    for (size_t n = 0; n < ne->elem_count; ++n) {
-      int idx = *((int *)sc_array_index_int(ni, n));
-      int enc = *((int *)sc_array_index_int(ne, n));
-      if (24 <= enc && enc < 120) { // double size quad over face
-        if (i == 0)
-          xidx = ncnt;
-        if (i == 1)
-          yidx = ncnt;
-        if (i == 3)
-          zidx = ncnt;
-      }
+    for (size_t n = 0; n < nqid->elem_count; ++n) {
+      idx = *((int *)sc_array_index_int(nqid, n));
+
       if (0 <= idx && idx < lq) {                 // local quadrant
         quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
         lvl = quad->level;
@@ -2732,20 +2681,22 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       } else {
         SC_ABORT_NOT_REACHED();
       }
-      delta[ncnt] = delta_loc[didx[i + 1][0]] * delta_loc[didx[i + 1][1]] *
-                    delta_loc[didx[i + 1][2]];
-      delta[ncnt] = delta[ncnt] / (double)(ne->elem_count);
+      delta[ncnt] = delta_loc[didx[i + 1][0]]
+                  * delta_loc[didx[i + 1][1]]
+                  * delta_loc[didx[i + 1][2]];
+      delta[ncnt] = delta[ncnt] / (double)(nqid->elem_count);
       level[ncnt] = lvl;
-      ncnt += 1;
+      ++ncnt;
     }
-    sc_array_truncate(ne);
-    sc_array_truncate(ni);
+    sc_array_truncate(nenc);
+    sc_array_truncate(nqid);
+    sc_array_truncate(nvid);
   }
   double dsum = 1.0;
   for (int i = 0; i < ncnt; ++i)
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
-    printf("dsum larger round error precision: %le\n", dsum);
+    printf("Sum of interpolation weights deviates from 1 by %le\n", dsum);
   if (ncnt > 20)
     printf("too many neighbours\n");
   return ncnt;
@@ -2777,12 +2728,13 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
 
   int corner = 0;
   double delta_loc[6];
+  std::array<double, 3> quad_pos;
+  p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
+
   for (int d = 0; d < 3; ++d) {
-    double dis = pos[d] * (double)(1 << lvl);
-    dis = dis - floor(dis) + 0.5;
-    if (dis > 1.0) { // right neighbor
+    static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    if (dis >= 0.0) { // right neighbor
       corner |= 1 << d;
-      dis = 2.0 - dis;
     }
     delta_loc[d] = dis;
     delta_loc[d + 3] = 1.0 - dis;

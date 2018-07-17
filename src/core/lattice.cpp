@@ -98,6 +98,8 @@ void Lattice::map_position_to_lattice(const Vector3d& pos, index_t node_index[8]
         delta[dir]   = 1.0 - delta[3+dir];
     }
 
+    // this works, because node_index[0] is not necessarily the cell index that
+    // actually contains the particle.
     node_index[0] = get_linear_index(ind[0],ind[1],ind[2],this->halo_grid);
     node_index[1] = node_index[0] + 1;
     node_index[2] = node_index[0] + this->halo_grid[0];

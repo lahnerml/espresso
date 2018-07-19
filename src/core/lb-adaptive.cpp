@@ -2603,8 +2603,6 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
                                     // order: lower x, lower y, lower z,
                                     //        upper x, upper y, upper z
   static const int weight_indices[8][3] = { // indexes into interpolation_weights
-      //{3, 4, 5}, {0, 4, 5}, {3, 1, 5}, {0, 1, 5},
-      //{3, 4, 2}, {0, 4, 2}, {3, 1, 2}, {0, 1, 2},
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };

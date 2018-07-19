@@ -202,9 +202,6 @@ void lbadapt_init() {
   // reset p4est
   mpi_lbadapt_grid_init(0, p4est_params.min_ref_level);
 
-  fprintf(stderr, "Post grid init: min_level %i max_level %i\n",
-          p4est_params.min_ref_level, p4est_params.max_ref_level);
-
   // reset data
   lbadapt_local_data.clear();
   lbadapt_ghost_data.clear();

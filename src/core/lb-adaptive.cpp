@@ -2803,7 +2803,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
           if (dir == 3 || dir == 5 || dir == 6)
             delta[ncnt] *= 0.5;
         }
-        ncnt += 1;
+        ++ncnt;
         cnt_dir |= 1 << dir;
       }
     }
@@ -2824,7 +2824,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
           if (dir == 3 || dir == 5 || dir == 6)
             delta[ncnt] *= 0.5;
         }
-        ncnt += 1;
+        ++ncnt;
         cnt_dir |= 1 << dir;
       }
     }

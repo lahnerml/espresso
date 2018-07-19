@@ -2579,7 +2579,15 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
 
 int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]) {
-  static const int nidx[8][7] = {
+  int nearest_corner = 0;  // This value determines first index of
+                           // neighbor_directions and weight_indices.
+  // Order neighbor_directions as follows:
+  // face neighbor x, face neighbor y, edge neighbor xy plane,
+  // face neighbor z, edge neighbor xz plane, edge neighbor yz plane,
+  // corner neighbor.
+  // The reason why this order is chosen is that we can now XOR the
+  // nearest_corner index to determine the weight indices.
+  static const int neighbor_directions[8][7] = {
       {0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
       {1, 2, 15, 4, 11, 6, 19}, // right, front, bottom
       {0, 3, 16, 4, 10, 7, 20}, // left, back, bottom
@@ -2589,19 +2597,27 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       {0, 3, 16, 5, 12, 9, 24}, // left, back, top
       {1, 3, 17, 5, 13, 9, 25}, // right, back, top
   };
-  static const int didx[8][3] = {
+
+  double interpolation_weights[6];  // Stores normed distance from pos to center
+                                    // of cell containing pos in both directions.
+                                    // order: lower x, lower y, lower z,
+                                    //        upper x, upper y, upper z
+  static const int weight_indices[8][3] = { // indexes into interpolation_weights
+      //{3, 4, 5}, {0, 4, 5}, {3, 1, 5}, {0, 1, 5},
+      //{3, 4, 2}, {0, 4, 2}, {3, 1, 2}, {0, 1, 2},
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
+  int neighbor_count;
 
   int fold[3] = {0, 0, 0};
   double pos[3] = {opos[0], opos[1], opos[2]};
-  fold_position(pos,fold);
+  fold_position(pos, fold);
 
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    int ncnt = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
-    if (ncnt > 0) return ncnt;
+    neighbor_count = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
+    if (neighbor_count > 0) return neighbor_count;
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
             this_node, qidx, pos[0], pos[1], pos[2]);
@@ -2629,23 +2645,25 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   sid = adapt_virtual->quad_qreal_offset[qidx];
   nodes[0] = &lbadapt_local_data[lvl].at(sid);
   level[0] = lvl;
-  int corner = 0;
-  double delta_loc[6];
+  neighbor_count = 1;
   std::array<double, 3> quad_pos;
   p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qidx], quad,
                            quad_pos.data());
   for (int d = 0; d < 3; ++d) {
     static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
     if (dis >= 0.0) { // right neighbor
-      corner |= 1 << d;
+      nearest_corner |= 1 << d;
+      interpolation_weights[d] = dis;
+      interpolation_weights[d + 3] = 1.0 - dis;
+    } else {
+      interpolation_weights[d + 3] = abs(dis);
+      interpolation_weights[d] = 1.0 - interpolation_weights[d + 3];
     }
-    delta_loc[d] = dis;
-    delta_loc[d + 3] = 1.0 - dis;
   }
-  delta[0] = delta_loc[didx[0][0]] *
-             delta_loc[didx[0][1]] *
-             delta_loc[didx[0][2]];
-  int ncnt = 1;
+  delta[0] = interpolation_weights[weight_indices[nearest_corner][0]] *
+             interpolation_weights[weight_indices[nearest_corner][1]] *
+             interpolation_weights[weight_indices[nearest_corner][2]];
   castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nqid = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nvid = sc_array_new(sizeof(int));
@@ -2654,13 +2672,13 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   int idx;
   for (int i = 0; i < 7; ++i) {
     p8est_virtual_get_neighbor(adapt_p4est, adapt_ghost, adapt_mesh,
-                               adapt_virtual, qidx, -1, nidx[corner][i],
+                               adapt_virtual, qidx, -1, neighbor_directions[nearest_corner][i],
                                nenc, nqid, nvid);
     // if neighbor is smaller we will not obtain any neighbors from virtual
     // neighbor query
     if (!nqid->elem_count) {
       p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
-                               nidx[corner][i], nullptr, nullptr, nqid);
+                               neighbor_directions[nearest_corner][i], nullptr, nullptr, nqid);
     }
     for (size_t n = 0; n < nqid->elem_count; ++n) {
       idx = *((int *)sc_array_index_int(nqid, n));
@@ -2669,34 +2687,35 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
         quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
         lvl = quad->level;
         sid = adapt_virtual->quad_qreal_offset[idx];
-        nodes[ncnt] = &lbadapt_local_data[lvl].at(sid);
+        nodes[neighbor_count] = &lbadapt_local_data[lvl].at(sid);
       } else if (lq <= idx && idx < lq + gq) {
         quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx - lq);
         lvl = quad->level;
         sid = adapt_virtual->quad_greal_offset[idx - lq];
-        nodes[ncnt] = &lbadapt_ghost_data[lvl].at(sid);
+        nodes[neighbor_count] = &lbadapt_ghost_data[lvl].at(sid);
       } else {
         SC_ABORT_NOT_REACHED();
       }
-      delta[ncnt] = delta_loc[didx[i + 1][0]]
-                  * delta_loc[didx[i + 1][1]]
-                  * delta_loc[didx[i + 1][2]];
-      delta[ncnt] = delta[ncnt] / (double)(nqid->elem_count);
-      level[ncnt] = lvl;
-      ++ncnt;
+      delta[neighbor_count] =
+          interpolation_weights[weight_indices[nearest_corner % (i + 1)][0]] *
+          interpolation_weights[weight_indices[nearest_corner % (i + 1)][1]] *
+          interpolation_weights[weight_indices[nearest_corner % (i + 1)][2]];
+      delta[neighbor_count] = delta[neighbor_count] / (double)(nqid->elem_count);
+      level[neighbor_count] = lvl;
+      ++neighbor_count;
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
     sc_array_truncate(nvid);
   }
   double dsum = 1.0;
-  for (int i = 0; i < ncnt; ++i)
+  for (int i = 0; i < neighbor_count; ++i)
     dsum -= delta[i];
   if (abs(dsum) > ROUND_ERROR_PREC)
     printf("Sum of interpolation weights deviates from 1 by %le\n", dsum);
-  if (ncnt > 20)
+  if (neighbor_count > 20)
     printf("too many neighbours\n");
-  return ncnt;
+  return neighbor_count;
 }
 
 int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],

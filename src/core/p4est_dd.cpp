@@ -348,7 +348,7 @@ static uint64_t dd_p4est_grid_max_global_morton_idx()
 void dd_p4est_create_grid(bool isRepart) {
   // Note: In case of LB_ADAPTIVE (lb_adaptive_is_defined), calling
   // p4est_partition is handled by lbmd_repart.[ch]pp. This means that must not
-  // do anything related torepartitioning in this case.
+  // do anything related to repartitioning in this case.
 
   // Clear data to prevent accidental use of old stuff
   comm_rank.clear();
@@ -371,9 +371,9 @@ void dd_p4est_create_grid(bool isRepart) {
   // this case in lbmd_repart.[ch]pp.
 #if !defined(LB_ADAPTIVE)
     if (part_nquads.size() == 0)
-      p4est_partition(ds::p4est, 0, nullptr);
+      p8est_partition(ds::p4est, 0, nullptr);
     else
-      p4est_partition_given(ds::p4est, part_nquads.data());
+      p8est_partition_given(ds::p4est, part_nquads.data());
 #endif
 
   auto p4est_ghost = castable_unique_ptr<p4est_ghost_t>(

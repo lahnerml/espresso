@@ -74,8 +74,9 @@ double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 std::vector<int> *flags;
-std::vector<p4est_gloidx_t> old_partition_table;
+std::vector<p4est_gloidx_t> old_partition_table_adapt;
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+
 #ifdef LB_ADAPTIVE
 std::vector<lbadapt_payload_t> linear_payload_lbm;
 #endif // LB_ADAPTIVE
@@ -210,42 +211,25 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                  forest_order::adaptive_LB : forest_order::short_range;
       auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
                  forest_order::short_range : forest_order::adaptive_LB;
-      if (mod == forest_order::short_range)
-        p4est_dd_repart_preprocessing();
+      p4est_dd_repart_preprocessing();
       p4est_utils_partition_multiple_forests(ref, mod);
       p4est_utils_prepare(forests);
 
       // copied from lbmd_repart short-range MD postprocess
-      if (mod == forest_order::short_range)
-        cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
+      cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
     }
 
     // do the partitioning
-    if (n_part) {
-      std::vector<std::string> metrics;
-      std::vector<double> alpha = {1., 1.};
-      std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
-                                     1.0);
-      std::vector<double> weights_lb =
-          p4est_utils_get_adapt_weights(p4est_params.partitioning);
-      p4est_dd_repart_preprocessing();
-      p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
-                                     adapt_p4est, weights_lb, 1.0);
-      cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
-      p4est_utils_prepare(forests);
-    } else {
-      if (p4est_params.partitioning == "n_cells") {
-        p8est_partition_ext(adapt_p4est, 1,
-                            lbadapt_partition_weight_uniform);
-      }
-      else if (p4est_params.partitioning == "subcycling") {
-        p8est_partition_ext(adapt_p4est, 1,
-                            lbadapt_partition_weight_subcycling);
-      }
-      else {
-        SC_ABORT_NOT_REACHED();
-      }
-    }
+    p4est_dd_repart_preprocessing();
+    std::vector<std::string> metrics;
+    std::vector<double> alpha = {1., 1.};
+    std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
+                                   1.0);
+    std::vector<double> weights_lb =
+        p4est_utils_get_adapt_weights(p4est_params.partitioning);
+    p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
+                                   adapt_p4est, weights_lb, 1.0);
+    cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 #elif defined(LB_ADAPTIVE)
     if (p4est_params.partitioning == "n_cells") {
       p8est_partition_ext(p4est_partitioned, 1,
@@ -260,9 +244,10 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     }
 #elif defined(DD_P4EST)
     p4est_dd_repart_preprocessing();
-    p4est_partition(dd_p4est_get_p4est(), 1, nullptr);
+    p8est_partition(dd_p4est_get_p4est(), 1, nullptr);
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 #endif // DD_P4EST
+    p4est_utils_prepare(forests);
   }
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;
@@ -916,30 +901,19 @@ int p4est_utils_perform_adaptivity_step() {
   //           including all preparations for next time step
   adapt_p4est.reset(p4est_adapted);
 
+  std::vector<p8est_t *> forests;
+  forests.push_back(dd_p4est_get_p4est());
+  forests.push_back(adapt_p4est);
 #ifdef DD_P4EST
+  std::vector<std::string> metrics;
   if(n_part) {
-    std::vector<std::string> metrics;
     metrics = {"npart", p4est_params.partitioning};
-    std::vector<double> alpha = {1., 1.};
-    std::vector<p8est_t *> forests;
-    forests.push_back(dd_p4est_get_p4est());
-    forests.push_back(adapt_p4est);
-    p4est_utils_prepare(forests);
-
-    lbmd::repart_all(metrics, alpha);
   } else {
-    if (p4est_params.partitioning == "n_cells") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_uniform);
-    }
-    else if (p4est_params.partitioning == "subcycling") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_subcycling);
-    }
-    else {
-      SC_ABORT_NOT_REACHED();
-    }
+    metrics = {"ncells", p4est_params.partitioning};
   }
+  std::vector<double> alpha = {1., 1.};
+
+  lbmd::repart_all(metrics, alpha);
 #else
   if (p4est_params.partitioning == "n_cells") {
     p8est_partition_ext(p4est_partitioned, 1,
@@ -953,6 +927,7 @@ int p4est_utils_perform_adaptivity_step() {
     SC_ABORT_NOT_REACHED();
   }
 #endif
+  p4est_utils_prepare(forests);
 
   // free linear payload (i.e. send buffer)
   linear_payload_lbm.clear();
@@ -1082,9 +1057,9 @@ int p4est_utils_repart_preprocess() {
                              lbadapt_local_data, linear_payload_lbm);
   }
   // Save global_first_quadrants for migration
-  old_partition_table.clear();
+  old_partition_table_adapt.clear();
   std::copy_n(adapt_p4est->global_first_quadrant, n_nodes + 1,
-              std::back_inserter(old_partition_table));
+              std::back_inserter(old_partition_table_adapt));
   return 0;
 }
 
@@ -1095,12 +1070,12 @@ int p4est_utils_repart_postprocess() {
 
 #ifdef COMM_HIDING
   auto data_transfer_handle = p4est_transfer_fixed_begin(
-      adapt_p4est->global_first_quadrant, old_partition_table.data(), comm_cart,
+      adapt_p4est->global_first_quadrant, old_partition_table_adapt.data(), comm_cart,
       3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #else  // COMM_HIDING
   p4est_transfer_fixed(adapt_p4est->global_first_quadrant,
-                       old_partition_table.data(), comm_cart,
+                       old_partition_table_adapt.data(), comm_cart,
                        3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
                        linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #endif // COMM_HIDING
@@ -1366,8 +1341,8 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   MPI_Allreduce(MPI_IN_PLACE, t2_quads_per_proc.data(), fct->mpisize,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
-  p4est_partition_given(t1, t1_quads_per_proc.data());
-  p4est_partition_given(t2, t2_quads_per_proc.data());
+  p8est_partition_given(t1, t1_quads_per_proc.data());
+  p8est_partition_given(t2, t2_quads_per_proc.data());
 }
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

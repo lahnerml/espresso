@@ -3357,10 +3357,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[1];
         local_f[2] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[2];
+#if 0
         fprintf(stderr, "[%i, %i, %i] delta: [%lf, %lf, %lf] prod: %lf f: %lf %lf %lf\n",
                 x, y, z, delta[3*x + 0], delta[3*y + 1], delta[3*z+2],
                 delta[3*x + 0] * delta[3*y + 1] * delta[3*z+2],
                 local_f[0], local_f[1], local_f[2]);
+#endif
       }
     }
   }
@@ -3373,8 +3375,10 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     local_f[0] += delta[x] * delta_j[0] / level_fact;
     local_f[1] += delta[x] * delta_j[1] / level_fact;
     local_f[2] += delta[x] * delta_j[2] / level_fact;
+#if 0
     fprintf(stderr, "[%i] delta: %lf, f: %lf %lf %lf (level_fact: %lf)\n",
             x, delta[x], local_f[0], local_f[1], local_f[2], level_fact);
+#endif // 0
   }
 #endif // !LB_ADAPTIVE
 

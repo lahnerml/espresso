@@ -34,7 +34,7 @@
 #include "virtual_sites/VirtualSitesRelative.hpp"
 
 #ifdef DD_P4EST
-Cell* dd_p4est_position_to_cell_strict(double pos[3]);
+Cell* dd_p4est_save_position_to_cell(double pos[3]);
 #endif
 
 #ifdef COLLISION_DETECTION_DEBUG
@@ -118,14 +118,14 @@ bool validate_collision_parameters() {
   //
   // Check if bonded ia exist
   if ((collision_params.mode & COLLISION_MODE_BOND) &&
-      (collision_params.bond_centers >= n_bonded_ia)) {
+      (collision_params.bond_centers >= bonded_ia_params.size())) {
     runtimeErrorMsg() << "The bond type to be used for binding particle "
                          "centers does not exist";
     return false;
   }
 
   if ((collision_params.mode & COLLISION_MODE_VS) &&
-      (collision_params.bond_vs >= n_bonded_ia)) {
+      (collision_params.bond_vs >= bonded_ia_params.size())) {
     runtimeErrorMsg()
         << "The bond type to be used for binding virtual sites does not exist";
     return false;
@@ -160,7 +160,7 @@ bool validate_collision_parameters() {
   if (collision_params.mode & COLLISION_MODE_BIND_THREE_PARTICLES) {
     if (collision_params.bond_three_particles +
             collision_params.three_particle_angle_resolution >
-        n_bonded_ia) {
+        bonded_ia_params.size()) {
       runtimeErrorMsg()
           << "Insufficient bonds defined for three particle binding.";
       return false;
@@ -610,7 +610,7 @@ Cell* project_to_boundary(const double pos[3])
                      , pos[1] + displ[1] * dd.cell_size[1]
                      , pos[2] + displ[2] * dd.cell_size[2] };
 #ifdef DD_P4EST
-    if ((c = dd_p4est_position_to_cell_strict(spos)))
+    if ((c = dd_p4est_save_position_to_cell(spos)))
       return c;
 #endif
   }

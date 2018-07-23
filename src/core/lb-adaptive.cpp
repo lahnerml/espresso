@@ -2645,12 +2645,13 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   level[0] = lvl;
   neighbor_count = 1;
   std::array<double, 3> quad_pos;
+  double dis;
   p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qidx], quad,
                            quad_pos.data());
   for (int d = 0; d < 3; ++d) {
-    static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis >= 0.0) { // right neighbor
+    if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;
@@ -2754,10 +2755,11 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
 
   std::array<double, 3> quad_pos;
   p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
+  double dis;
   for (int d = 0; d < 3; ++d) {
-    static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis >= 0.0) { // right neighbor
+    if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;

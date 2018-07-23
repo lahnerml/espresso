@@ -2411,10 +2411,10 @@ void calc_local_j(lb_float populations[2][19], std::array<lb_float, 3> &res) {
            populations[0][18];
   // clang-format on
 }
-void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
+void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
+                                 void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  std::array<lb_float, 3> momentum;
-  memcpy (momentum.data(), user_data, 3 * sizeof(lb_float));
+  double *momentum= (double*) user_data;
 
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;

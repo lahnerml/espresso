@@ -76,8 +76,8 @@ void lb_calc_fluid_momentum(double *result) {
   double h_max;
 #ifdef LB_ADAPTIVE
   h_max = p4est_params.h[p4est_params.max_ref_level];
-  p8est_iterate(adapt_p4est, nullptr, (void *)momentum, lbadapt_calc_local_j,
-                nullptr, nullptr, nullptr);
+  p8est_iterate(adapt_p4est, nullptr, (void *)momentum,
+                lbadapt_calc_fluid_momentum, nullptr, nullptr, nullptr);
 #else  // LB_ADAPTIVE
   h_max = lbpar.agrid;
   for (x=1; x<=lblattice.grid[0]; x++) {

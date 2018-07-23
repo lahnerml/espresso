@@ -387,7 +387,8 @@ void lbadapt_set_recalc_fields(p8est_iter_volume_info_t *info, void *user_data);
 
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data);
 
-void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data);
+void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
+                                 void *user_data);
 
 void lbadapt_calc_local_pi(p8est_iter_volume_info_t *info, void *user_data);
 

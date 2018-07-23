@@ -2722,10 +2722,17 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
 
 int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]) {
-  static const int didx[8][3] = {
+  int nearest_corner = 0;
+
+  double interpolation_weights[6];  // Stores normed distance from pos to center
+  // of cell containing pos in both directions.
+  // order: lower x, lower y, lower z,
+  //        upper x, upper y, upper z
+  static const int weight_indices[8][3] = {
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
+  int neighbor_count;
 
   int fold[3] = {0, 0, 0};
   double pos[3] = {opos[0], opos[1], opos[2]};
@@ -2743,47 +2750,50 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   sid = adapt_virtual->quad_greal_offset[qidx];
   nodes[0] = &lbadapt_ghost_data[lvl].at(sid);
   level[0] = lvl;
+  neighbor_count = 1;
 
-  int corner = 0;
-  double delta_loc[6];
   std::array<double, 3> quad_pos;
   p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
-
   for (int d = 0; d < 3; ++d) {
     static double dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
+    P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
     if (dis >= 0.0) { // right neighbor
-      corner |= 1 << d;
+      nearest_corner |= 1 << d;
+      interpolation_weights[d] = dis;
+      interpolation_weights[d + 3] = 1.0 - dis;
+    } else {
+      interpolation_weights[d + 3] = abs(dis);
+      interpolation_weights[d] = 1.0 - interpolation_weights[d + 3];
     }
-    delta_loc[d] = dis;
-    delta_loc[d + 3] = 1.0 - dis;
   }
-  delta[0] = delta_loc[didx[0][0]] *
-             delta_loc[didx[0][1]] *
-             delta_loc[didx[0][2]];
+  delta[0] = interpolation_weights[weight_indices[nearest_corner][0]] *
+             interpolation_weights[weight_indices[nearest_corner][1]] *
+             interpolation_weights[weight_indices[nearest_corner][2]];
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
 
-  int ncnt = 1;
-
   // collect over all 7 direction wrt. to corner
-  int cnt_dir = 1;
+  int n_neighbors_per_dir; // Verify that we find neighbors in each direction
+  std::array<int, 3> displace;
+  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  p4est_locidx_t qid;
   for (int dir = 1; dir < 8; ++dir) {
-    std::array<int, 3> displace = {{0, 0, 0}};
+    n_neighbors_per_dir = 0;
+
+    displace = {{0, 0, 0}};
     if ((dir & 1)) {
-      if ((corner & 1)) displace[0] = zsize;
+      if ((nearest_corner & 1)) displace[0] = zsize;
       else displace[0] = -zsize;
     }
     if ((dir & 2)) {
-      if ((corner & 2)) displace[1] = zsize;
+      if ((nearest_corner & 2)) displace[1] = zsize;
       else displace[1] = -zsize;
     }
     if ((dir & 4)) {
-      if ((corner & 4)) displace[2] = zsize;
+      if ((nearest_corner & 4)) displace[2] = zsize;
       else displace[2] = -zsize;
     }
-    auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
     const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
-    p4est_locidx_t qid;
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qid = adapt_mesh->mirror_qid[i];
@@ -2792,21 +2802,21 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
           p4est_utils_quadrants_touching(quad, tree, q,
                                          adapt_mesh->quad_to_tree[qid])) {
         sid = adapt_virtual->quad_qreal_offset[qid];
-        P4EST_ASSERT(ncnt <= 20);
+        P4EST_ASSERT(neighbor_count <= 20);
         P4EST_ASSERT(0 <= q->level && q->level < P8EST_QMAXLEVEL);
-        nodes[ncnt] = &lbadapt_local_data[q->level].at(sid);
-        level[ncnt] = q->level;
-        delta[ncnt] = delta_loc[didx[dir][0]] *
-                      delta_loc[didx[dir][1]] *
-                      delta_loc[didx[dir][2]];
+        nodes[neighbor_count] = &lbadapt_local_data[q->level].at(sid);
+        level[neighbor_count] = q->level;
+        delta[neighbor_count] = interpolation_weights[weight_indices[dir][0]] *
+                      interpolation_weights[weight_indices[dir][1]] *
+                      interpolation_weights[weight_indices[dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
-            delta[ncnt] *= 0.25;
+            delta[neighbor_count] *= 0.25;
           if (dir == 3 || dir == 5 || dir == 6)
-            delta[ncnt] *= 0.5;
+            delta[neighbor_count] *= 0.5;
         }
-        ++ncnt;
-        cnt_dir |= 1 << dir;
+        ++neighbor_count;
+        ++n_neighbors_per_dir;
       }
     }
     for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
@@ -2815,27 +2825,27 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       if (qidx >= nidx && qidx < nidx + zarea &&
           p4est_utils_quadrants_touching(quad, tree, q, q->p.which_tree)) {
         sid = adapt_virtual->quad_greal_offset[i];
-        nodes[ncnt] = &lbadapt_ghost_data[q->level].at(sid);
-        level[ncnt] = q->level;
-        delta[ncnt] = delta_loc[didx[dir][0]]
-                    * delta_loc[didx[dir][1]]
-                    * delta_loc[didx[dir][2]];
+        nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);
+        level[neighbor_count] = q->level;
+        delta[neighbor_count] = interpolation_weights[weight_indices[dir][0]]
+                    * interpolation_weights[weight_indices[dir][1]]
+                    * interpolation_weights[weight_indices[dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
-            delta[ncnt] *= 0.25;
+            delta[neighbor_count] *= 0.25;
           if (dir == 3 || dir == 5 || dir == 6)
-            delta[ncnt] *= 0.5;
+            delta[neighbor_count] *= 0.5;
         }
-        ++ncnt;
-        cnt_dir |= 1 << dir;
+        ++neighbor_count;
+        ++n_neighbors_per_dir;
       }
     }
+    if (!n_neighbors_per_dir) {
+      // not all neighbors for all directions exist => position is in outer halo
+      return 0;
+    }
   }
-  if (cnt_dir != 255) {
-    // not all neighbors for all directions exist => in outside halo
-    return 0;
-  }
-  return ncnt;
+  return neighbor_count;
 }
 
 int lbadapt_sanity_check_parameters() {

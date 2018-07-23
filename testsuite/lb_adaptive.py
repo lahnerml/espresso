@@ -161,9 +161,9 @@ class LBTest(ut.TestCase):
                 self.max_dm[2] <= self.params['mom_prec'],
                 msg=("Integration step {}: momentum deviation too high\n" +
                      "deviation: {}  accepted deviation: {}").format(
-                    i,
-                    self.max_dm,
-                    self.params['mom_prec']))
+                     i,
+                     self.max_dm,
+                     self.params['mom_prec']))
 
             # check temp of particles
             e = self.system.analysis.energy()
@@ -239,10 +239,14 @@ class LBTest(ut.TestCase):
         self.system.actors.add(self.lbf)
         self.system.part.add(pos=[0.5 * self.params['agrid']] * 3, v=v_part, fix=[1, 1, 1])
         self.lbf[0, 0, 0].velocity = v_fluid
+        self.lbf.print_vtk_velocity("lb_coupling_pre.vtk".format(1))
+        self.system.part.write_par_vtk("lb_coupling_pre".format(1))
         self.system.integrator.run(1)
+        self.lbf.print_vtk_velocity("lb_coupling_post.vtk".format(1))
+        self.system.part.write_par_vtk("lb_coupling_post".format(1))
         np.testing.assert_allclose(np.copy(self.system.part[0].f), -self.params['friction'] * (v_part - v_fluid))
 
-    def testz_ext_force_density(self):
+    def test_ext_force_density(self):
         self.system.thermostat.turn_off()
         self.system.actors.clear()
         self.system.part.clear()

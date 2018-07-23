@@ -109,7 +109,7 @@ void IBM_ResetLBForces_CPU()
     lbfields[i].force_density[0] = 0.0;
     lbfields[i].force_density[1] = 0.0;
     lbfields[i].force_density[2] = 0.0;
-    lbfields[i].has_force = 0;
+    lbfields[i].has_force_density = 0;
 #endif
   }
 }

@@ -129,7 +129,7 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
 #ifndef LB_ADAPTIVE_GPU
   // ints
   data->lbfields.recalc_fields = 1;
-  data->lbfields.has_force = 0;
+  data->lbfields.has_force_density = 0;
 
   // 1D "array"
   data->lbfields.rho[0] = 0.;
@@ -137,7 +137,7 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
   // 3D arrays
   for (int i = 0; i < 3; i++) {
     data->lbfields.j[i] = 0;
-    data->lbfields.force[i] = 0;
+    data->lbfields.force_density[i] = 0;
 #ifdef IMMERSED_BOUNDARY
     data->lbfields.force_buf[i] = 0;
 #endif // IMMERSED_BOUNDARY
@@ -167,11 +167,11 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   data->force[2] =
       prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #else  // LB_ADAPTIVE_GPU
-  data->lbfields.force[0] =
+  data->lbfields.force_density[0] =
       p4est_params.prefactors[level] * lbpar.ext_force_density[0] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  data->lbfields.force[1] =
+  data->lbfields.force_density[1] =
       p4est_params.prefactors[level] * lbpar.ext_force_density[1] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  data->lbfields.force[2] =
+  data->lbfields.force_density[2] =
       p4est_params.prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #endif // LB_ADAPTIVE_GPU
 #else  // EXTERNAL_FORCES
@@ -183,7 +183,7 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
   data->lbfields.force[0] = 0.0;
   data->lbfields.force[1] = 0.0;
   data->lbfields.force[2] = 0.0;
-  data->lbfields.has_force = 0;
+  data->lbfields.has_force_density = 0;
 #endif // LB_ADAPTIVE_GPU
 #endif // EXTERNAL_FORCES
 }
@@ -451,7 +451,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   }
 
   // finally re-initialize local force
-  // TODO: Can this be optimized? E.g. by has_force flag?
+  // TODO: Can this be optimized? E.g. by has_force_density flag?
   lbadapt_set_force(data_new, quad_new->level);
 
 #endif // !LB_ADAPTIVE_GPU
@@ -935,7 +935,7 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
   j[2] = cpmode[3];
 
 #ifndef EXTERNAL_FORCES
-  if (has_force)
+  if (has_force_density)
 #endif // EXTERNAL_FORCES
   {
     j[0] += 0.5 * force[0];
@@ -1388,7 +1388,7 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
         lbadapt_calc_modes(data->lbfluid, modes);
 
         /* deterministic collisions */
-        lbadapt_relax_modes(modes, data->lbfields.force, h);
+        lbadapt_relax_modes(modes, data->lbfields.force_density, h);
 
         /* fluctuating hydrodynamics */
         if (lbpar.fluct) {
@@ -1397,10 +1397,10 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
 
 /* apply forces */
 #ifdef EXTERNAL_FORCES
-        lbadapt_apply_forces(modes, data->lbfields.force, h);
+        lbadapt_apply_forces(modes, data->lbfields.force_density, h);
 #else  // EXTERNAL_FORCES
         // forces from MD-Coupling
-        if (data->lbfields.has_force) {
+        if (data->lbfields.has_force_density) {
           lbadapt_apply_forces(modes, data->lbfields.force, h);
         }
 #endif // EXTERNAL_FORCES
@@ -1885,9 +1885,9 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
+        lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
                                   data->lbfields.boundary,
-                                  data->lbfields.has_force, p4est_params.h[level], &rho, j,
+                                  data->lbfields.has_force_density, p4est_params.h[level], &rho, j,
                                   nullptr);
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
@@ -1979,9 +1979,9 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
         for (int c = 0; c < P4EST_CHILDREN; ++c) {
           data = &lbadapt_local_data[level].at(
               p8est_meshiter_get_current_storage_id(m));
-          lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
+          lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
                                     data->lbfields.boundary,
-                                    data->lbfields.has_force, h, &rho, vels,
+                                    data->lbfields.has_force_density, h, &rho, vels,
                                     nullptr);
 
           if (!data->lbfields.boundary) {
@@ -2046,9 +2046,9 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
             } else {
               assert(false);
             }
-            lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
+            lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
                                       data->lbfields.boundary,
-                                      data->lbfields.has_force, h, &rho,
+                                      data->lbfields.has_force_density, h, &rho,
                                       &vels[P4EST_DIM * (idx + 1)], nullptr);
 
             if (!data->lbfields.boundary) {
@@ -2117,8 +2117,8 @@ void check_vel(int qid, double local_h, lbadapt_payload_t *data,
   if (vel[qid] == std::array<double, 3>{{std::numeric_limits<double>::min(),
                                          std::numeric_limits<double>::min(),
                                          std::numeric_limits<double>::min()}}) {
-    lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force,
-                              data->lbfields.boundary, data->lbfields.has_force,
+    lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
+                              data->lbfields.boundary, data->lbfields.has_force_density,
                               local_h, &rho, vel[qid].data(), 0);
 
     lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
@@ -2425,7 +2425,7 @@ void lbadapt_calc_local_j(p8est_iter_volume_info_t *info, void *user_data) {
   std::array<lb_float, 3> j;
   calc_local_j(data->lbfluid, j);
   for (int i = 0; i < P8EST_DIM; ++i)
-    momentum[i] += j[i] + data->lbfields.force[i];
+    momentum[i] += j[i] + data->lbfields.force_density[i];
 #endif // LB_ADAPTIVE_GPU
 }
 

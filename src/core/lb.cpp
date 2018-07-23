@@ -3360,7 +3360,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #else  // !LB_ADAPTIVE
   for (int x = 0; x < dcnt; ++x) {
     //if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
-    local_f = node_index[x]->lbfields.force;
+    local_f = node_index[x]->lbfields.force_density;
     double level_fact = p4est_params.prefactors[level[x]] * p4est_params.prefactors[level[x]];
 
     local_f[0] += delta[x] * delta_j[0] / level_fact;

@@ -204,8 +204,8 @@ typedef struct {
   lb_float rho[1];
   lb_float j[3];
   lb_float pi[6];
-  int has_force;
-  lb_float force[3];
+  int has_force_density;
+  lb_float force_density[3];
 #ifdef IMMERSED_BOUNDARY
   lb_float force_buf[3];
 #endif

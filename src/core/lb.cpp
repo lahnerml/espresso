@@ -1833,12 +1833,12 @@ int lb_lbnode_set_u(int *ind, double *u) {
 #endif // LB_GPU
   } else {
 #ifdef LB
-#ifndef LB_ADAPTIVE
-    Lattice::index_t index;
-    int node, grid[3], ind_shifted[3];
     double rho;
     double j[3];
     double pi[6];
+#ifndef LB_ADAPTIVE
+    Lattice::index_t index;
+    int node, grid[3], ind_shifted[3];
 
     ind_shifted[0] = ind[0];
     ind_shifted[1] = ind[1];
@@ -1855,9 +1855,6 @@ int lb_lbnode_set_u(int *ind, double *u) {
     j[2] = rho * u[2] * lbpar.tau / lbpar.agrid;
     mpi_send_fluid(node, index, rho, j, pi);
 #else
-    double rho;
-    double j[3];
-    double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
     int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
     lb_float h_max = p4est_params.h[p4est_params.max_ref_level];

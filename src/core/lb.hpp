@@ -93,27 +93,26 @@ typedef double lb_float;
 /** Description of the LB Model in terms of the unit vectors of the
  *  velocity sub-lattice and the corresponding coefficients
  *  of the pseudo-equilibrium distribution */
-typedef struct {
-
+template<size_t N_vel=19>
+struct LB_Model {
   /** number of velocities */
-  int n_veloc;
+  static const int n_veloc = static_cast<int>(N_vel);
 
   /** unit vectors of the velocity sublattice */
-  double (*c)[3];
+  std::array<std::array<double, 3>, N_vel> c;
 
   /** coefficients in the pseudo-equilibrium distribution */
-  double (*coeff)[4];
+  std::array<std::array<double, 4>, N_vel> coeff;
 
   /** weights in the functional for the equilibrium distribution */
-  double *w;
+  std::array<double, N_vel> w;
 
   /** basis of moment space */
-  double **e;
+  std::array<std::array<double, N_vel>, N_vel + 1> e;
 
   /** speed of sound squared */
   double c_sound_sq;
-
-} LB_Model;
+};
 
 /** Data structure for fluid on a local lattice site */
 struct LB_FluidNode {
@@ -190,14 +189,15 @@ typedef struct {
 #else // LB_ADAPTIVE
 // define the very same structs, only use typedef for floating point numbers and
 // do not duplicate documentation
-typedef struct {
-  int n_veloc;
-  lb_float (*c)[3];
-  lb_float (*coeff)[4];
-  lb_float *w;
-  lb_float **e;
+template<size_t N_vel=19>
+struct LB_Model {
+  static const int n_veloc = static_cast<int>(N_vel);
+  std::array<std::array<lb_float, 3>, N_vel> c;
+  std::array<std::array<lb_float, 4>, N_vel> coeff;
+  std::array<lb_float, N_vel> w;
+  std::array<std::array<lb_float, N_vel>, N_vel + 1> e;
   lb_float c_sound_sq;
-} LB_Model;
+};
 
 typedef struct {
   int recalc_fields;
@@ -236,7 +236,7 @@ typedef struct {
 #endif // LB_ADAPTIVE
 
 /** The DnQm model to be used. */
-extern LB_Model lbmodel;
+extern LB_Model<> lbmodel;
 
 /** Struct holding the Lattice Boltzmann parameters */
 extern LB_Parameters lbpar;
@@ -249,9 +249,8 @@ extern Lattice lblattice;
  * lbfluid[0] contains pre-collision populations, lbfluid[1]
  * contains post-collision populations*/
 extern double **lbfluid[2];
-
 /** Pointer to the hydrodynamic fields of the fluid */
-extern LB_FluidNode *lbfields;
+extern std::vector<LB_FluidNode> lbfields;
 #else  // LB_ADAPTIVE
 /** adaptive payload cpu */
 typedef struct lbadapt_payload {

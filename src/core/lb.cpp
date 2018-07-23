@@ -3369,7 +3369,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #if 0
     fprintf(stderr, "[%i] delta: %lf, f: %lf %lf %lf (level_fact: %lf)\n",
             x, delta[x], local_f[0], local_f[1], local_f[2], level_fact);
-#endif // 0
+#endif
   }
 #endif // !LB_ADAPTIVE
 
@@ -3464,7 +3464,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
 
   v[0] = v[1] = v[2] = 0.0;
 
-  for (x = 0; x < dcnt; x++) {
+  for (x = 0; x < dcnt; ++x) {
     data = node_index[x];
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;
@@ -3493,11 +3493,21 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
     for (int i = 0; i < P8EST_DIM; ++i) {
       v[i] += delta[x] * local_j[i] / (local_rho);
     }
+#if 0
+    fprintf(stderr, "[%i] delta: %lf, j: %lf %lf %lf, v: %lf %lf %lf\n",
+            x, delta[x], local_j[0], local_j[1], local_j[2], v[0], v[1], v[2]);
+#endif
   }
+#if 0
+  fprintf(stderr, "v: %lf %lf %lf\n", v[0], v[1], v[2]);
+#endif
 
   for (int i = 0; i < P8EST_DIM; ++i) {
     v[i] *= h_max / lbpar.tau;
   }
+#if 0
+  fprintf(stderr, "v: %lf %lf %lf\n", v[0], v[1], v[2]);
+#endif
 #endif // LB_ADAPTIVE
 #endif // !LB_ADAPTIVE_GPU
   return 0;
@@ -3632,7 +3642,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
     }
   }
 #else //LB_ADAPTIVE
-  for (x = 0; x < dcnt; x++) {
+  for (x = 0; x < dcnt; ++x) {
     data = node_index[x];
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;

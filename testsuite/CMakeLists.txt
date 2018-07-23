@@ -159,6 +159,7 @@ python_test(FILE lb_switch_adaptive.py MAX_NUM_PROC 1)
 python_test(FILE lb_boundary_velocity.py MAX_NUM_PROC 1)
 python_test(FILE lb_boundary_velocity_adaptive.py MAX_NUM_PROC 2)
 python_test(FILE lb_thermo_virtual.py MAX_NUM_PROC 2)
+python_test(FILE lb_get_u_at_pos_cpu.py MAX_NUM_PROC 4)
 
 if(PY_H5PY)
   python_test(FILE h5md.py MAX_NUM_PROC 2)

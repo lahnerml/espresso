@@ -2696,9 +2696,9 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
         SC_ABORT_NOT_REACHED();
       }
       delta[neighbor_count] =
-          interpolation_weights[weight_indices[nearest_corner % (i + 1)][0]] *
-          interpolation_weights[weight_indices[nearest_corner % (i + 1)][1]] *
-          interpolation_weights[weight_indices[nearest_corner % (i + 1)][2]];
+          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][0]] *
+          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][1]] *
+          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]];
       delta[neighbor_count] = delta[neighbor_count] / (double)(nqid->elem_count);
       level[neighbor_count] = lvl;
       ++neighbor_count;
@@ -2808,9 +2808,10 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         P4EST_ASSERT(0 <= q->level && q->level < P8EST_QMAXLEVEL);
         nodes[neighbor_count] = &lbadapt_local_data[q->level].at(sid);
         level[neighbor_count] = q->level;
-        delta[neighbor_count] = interpolation_weights[weight_indices[dir][0]] *
-                      interpolation_weights[weight_indices[dir][1]] *
-                      interpolation_weights[weight_indices[dir][2]];
+        delta[neighbor_count] =
+            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             delta[neighbor_count] *= 0.25;
@@ -2829,9 +2830,10 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);
         level[neighbor_count] = q->level;
-        delta[neighbor_count] = interpolation_weights[weight_indices[dir][0]]
-                    * interpolation_weights[weight_indices[dir][1]]
-                    * interpolation_weights[weight_indices[dir][2]];
+        delta[neighbor_count] =
+            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             delta[neighbor_count] *= 0.25;

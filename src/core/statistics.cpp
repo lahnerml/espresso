@@ -223,6 +223,7 @@ void predict_momentum_particles(double *result) {
 std::vector<double> calc_linear_momentum(int include_particles,
                                          int include_lbfluid) {
   double momentum_particles[3] = {0., 0., 0.};
+  double momentum_fluid[3] = {0., 0., 0.};
   std::vector<double> linear_momentum(3, 0.0);
   if (include_particles) {
     mpi_gather_stats(4, momentum_particles, nullptr, nullptr, nullptr);
@@ -231,7 +232,6 @@ std::vector<double> calc_linear_momentum(int include_particles,
     linear_momentum[2] += momentum_particles[2];
   }
   if (include_lbfluid) {
-    double momentum_fluid[3] = {0., 0., 0.};
 #ifdef LB
     if (lattice_switch & LATTICE_LB) {
       mpi_gather_stats(6, momentum_fluid, nullptr, nullptr, nullptr);
@@ -246,6 +246,13 @@ std::vector<double> calc_linear_momentum(int include_particles,
     linear_momentum[1] += momentum_fluid[1];
     linear_momentum[2] += momentum_fluid[2];
   }
+  fprintf(stderr,
+          "Time: %lf, momentum particles %lf %lf %lf, momentum "
+          "fluid %lf %lf %lf, total momentum %lf %lf %lf\n",
+          sim_time, momentum_particles[0], momentum_particles[1],
+          momentum_particles[2], momentum_fluid[0], momentum_fluid[1],
+          momentum_fluid[2], linear_momentum[0], linear_momentum[1],
+          linear_momentum[2]);
   return linear_momentum;
 }
 

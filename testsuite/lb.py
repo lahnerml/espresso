@@ -78,14 +78,11 @@ class LBTest(ut.TestCase):
         self.system.thermostat.set_langevin(
             kT=self.params['temp'], gamma=self.params['gamma'])
 
-        self.system.part.write_par_vtk("part_init".format(0))
         self.system.integrator.run(50)
-        self.system.part.write_par_vtk("part_warmup_one".format(1))
         # kill particle motion
         for i in range(self.n_col_part):
             self.system.part[i].v = [0.0, 0.0, 0.0]
         self.system.thermostat.turn_off()
-        self.system.part.write_par_vtk("part_kill_motion".format(1))
 
         self.lbf = lb.LBFluid(
             visc=self.params['viscosity'],
@@ -98,19 +95,13 @@ class LBTest(ut.TestCase):
         # give particles a push
         for i in range(self.n_col_part):
             self.system.part[i].v = self.system.part[i].v + [0.1, 0.0, 0.0]
-        self.lbf.print_vtk_velocity("vel_field_init.vtk".format(1))
-        self.system.part.write_par_vtk("part_push".format(1))
 
         self.fluidmass = self.params['dens']
         self.tot_mom = [0.0, 0.0, 0.0]
         for i in range(self.n_col_part):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
-        self.lbf.print_vtk_velocity("vel_field_warmup_two.vtk".format(1))
-        self.system.part.write_par_vtk("part_warmup_two".format(1))
         self.system.integrator.run(50)
-        self.lbf.print_vtk_velocity("vel_field_warmup_three.vtk".format(1))
-        self.system.part.write_par_vtk("part_warmup_three".format(1))
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]
@@ -119,11 +110,7 @@ class LBTest(ut.TestCase):
 
         # Integration
         for i in range(self.params['int_times']):
-            self.lbf.print_vtk_velocity("vel_field_{:05d}_pre.vtk".format(i))
-            self.system.part.write_par_vtk("part_{:05d}_pre".format(i))
             self.system.integrator.run(self.params['int_steps'])
-            self.lbf.print_vtk_velocity("vel_field_{:05d}_post.vtk".format(i))
-            self.system.part.write_par_vtk("part_{:05d}_post".format(i))
             fluidmass_sim = 0.0
             fluid_temp_sim = 0.0
             node_v_list = []
@@ -238,14 +225,12 @@ class LBTest(ut.TestCase):
         self.system.actors.add(self.lbf)
         self.system.part.add(pos=[0.5 * self.params['agrid']] * 3, v=v_part, fix=[1, 1, 1])
         self.lbf[0, 0, 0].velocity = v_fluid
-        self.lbf.print_vtk_velocity("lb_coupling_pre.vtk".format(1))
-        self.system.part.write_par_vtk("lb_coupling_pre".format(1))
         self.system.integrator.run(1)
-        self.lbf.print_vtk_velocity("lb_coupling_post.vtk".format(1))
-        self.system.part.write_par_vtk("lb_coupling_post".format(1))
         np.testing.assert_allclose(np.copy(self.system.part[0].f), -self.params['friction'] * (v_part - v_fluid))
 
-    def test_ext_force_density(self):
+    # this is not a typo but intentionally to ensure that this test is executed
+    # last
+    def testz_ext_force_density(self):
         self.system.thermostat.turn_off()
         self.system.actors.clear()
         self.system.part.clear()

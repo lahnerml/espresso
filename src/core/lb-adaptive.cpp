@@ -2706,11 +2706,15 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
     sc_array_truncate(nqid);
     sc_array_truncate(nvid);
   }
-  double dsum = 1.0;
-  for (int i = 0; i < neighbor_count; ++i)
-    dsum -= delta[i];
-  if (abs(dsum) > ROUND_ERROR_PREC)
-    printf("Sum of interpolation weights deviates from 1 by %le\n", dsum);
+  double dsum = std::accumulate(delta, delta + neighbor_count, 0.0);
+
+  if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
+    printf("Sum of interpolation weights deviates from 1 by %le\n", (1.0 - dsum));
+    for (int i = 0; i < neighbor_count; ++i) {
+      printf("%lf ", delta[i]);
+    }
+    printf("\n");
+  }
   if (neighbor_count > 20)
     printf("too many neighbours\n");
   return neighbor_count;

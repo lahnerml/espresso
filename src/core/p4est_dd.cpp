@@ -917,8 +917,6 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     c_cnt += ovlp;
   }
 
-  comm_cart.barrier();
-
   for (;;) {
     boost::mpi::status stat;
     decltype(rreq)::iterator it;

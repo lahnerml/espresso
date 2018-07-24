@@ -2732,16 +2732,17 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  int neighbor_count;
+  int neighbor_count = 0;
 
+  // Fold position.
   int fold[3] = {0, 0, 0};
   double pos[3] = {opos[0], opos[1], opos[2]};
   fold_position(pos,fold);
 
+  // Find quadrant containing position and store its payload.
   int64_t qidx = lbadapt_map_pos_to_ghost(pos);
-
-  if (qidx < 0 || adapt_ghost->ghosts.elem_count <= qidx) return 0;
-
+  if (qidx < 0 || adapt_ghost->ghosts.elem_count <= qidx)
+    return neighbor_count;
   int lvl, sid, tree, zarea, zsize;
   p8est_quadrant_t *quad =
       p8est_quadrant_array_index(&adapt_ghost->ghosts, qidx);
@@ -2752,6 +2753,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   level[0] = lvl;
   neighbor_count = 1;
 
+  // determine which neighbors to find
   std::array<double, 3> quad_pos;
   p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
   double dis;
@@ -2773,30 +2775,42 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
 
+
+
+
   // collect over all 7 direction wrt. to corner
   int n_neighbors_per_dir; // Verify that we find neighbors in each direction
   std::array<int, 3> displace;
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   p4est_locidx_t qid;
   for (int dir = 1; dir < 8; ++dir) {
+    // reset displace and counter
     n_neighbors_per_dir = 0;
-
     displace = {{0, 0, 0}};
-    if ((dir & 1)) {
-      if ((nearest_corner & 1)) displace[0] = zsize;
-      else displace[0] = -zsize;
+
+    // set offset
+    if (dir & 1) {
+      if (nearest_corner & 1)
+        displace[0] = zsize;
+      else
+        displace[0] = -zsize;
     }
-    if ((dir & 2)) {
-      if ((nearest_corner & 2)) displace[1] = zsize;
-      else displace[1] = -zsize;
+    if (dir & 2) {
+      if (nearest_corner & 2)
+        displace[1] = zsize;
+      else
+        displace[1] = -zsize;
     }
-    if ((dir & 4)) {
-      if ((nearest_corner & 4)) displace[2] = zsize;
-      else displace[2] = -zsize;
+    if (dir & 4) {
+      if (nearest_corner & 4)
+        displace[2] = zsize;
+      else
+        displace[2] = -zsize;
     }
     const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
-      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
+      p8est_quadrant_t *q =
+          p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qid = adapt_mesh->mirror_qid[i];
       qidx = p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
       if (qidx >= nidx && qidx < nidx + zarea &&

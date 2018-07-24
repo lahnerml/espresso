@@ -2716,6 +2716,7 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
     }
     printf("\n");
   }
+  P4EST_ASSERT(8 <= neighbor_count && neighbor_count < 20);
   return neighbor_count;
 }
 
@@ -2856,6 +2857,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     }
     printf("\n");
   }
+  P4EST_ASSERT(8 <= neighbor_count && neighbor_count < 20);
   return neighbor_count;
 }
 

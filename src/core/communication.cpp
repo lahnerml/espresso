@@ -224,7 +224,7 @@ static int terminated = 0;
   CB(mpi_inv_geometric_refinement)                                             \
   CB(mpi_exclude_boundary)                                                     \
   CB(mpi_set_refinement_area)                                                  \
-  CB(mpi_write_particle_vtk)                                              \
+  CB(mpi_write_particle_vtk)                                                   \
   CB(mpi_lbadapt_grid_reset)                                                   \
   CB(mpi_recv_interpolated_velocity_slave)
 

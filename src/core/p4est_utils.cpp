@@ -4,6 +4,7 @@
 
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
+#include "grid.hpp"
 #include "lb-adaptive.hpp"
 #include "lbmd_repart.hpp"
 #include "p4est_dd.hpp"
@@ -324,6 +325,7 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
   p4est_utils_get_front_lower_left(adapt_p4est, tree2, q2, pos2.data());
 
   bool touching = false;
+  int fold[3] = {0, 0, 0};
   for (int i = 0; !touching && i < P8EST_CHILDREN; ++i) {
     p1 = pos1;
     if (i & 1) {
@@ -335,6 +337,8 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
     if (i & 4) {
       p1[2] += h1;
     }
+    fold_position(p1, fold);
+
     for (int j = 0; j < P8EST_CHILDREN; ++j) {
       p2 = pos2;
       if (j & 1) {
@@ -346,6 +350,7 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
       if (j & 4) {
         p2[2] += h2;
       }
+      fold_position(p2, fold);
       touching = (p1 == p2);
       if (touching) break;
     }

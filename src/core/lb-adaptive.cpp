@@ -2722,6 +2722,7 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
 
 int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]) {
+  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
 
   double interpolation_weights[6];  // Stores normed distance from pos to center
@@ -2775,45 +2776,55 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
 
-
-
-
-  // collect over all 7 direction wrt. to corner
-  int n_neighbors_per_dir; // Verify that we find neighbors in each direction
+  // determine which neighbor indices need to be found
+  std::array<uint64_t, 7> neighbor_indices = {
+      {std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max(),
+       std::numeric_limits<uint64_t>::max()}};
   std::array<int, 3> displace;
-  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
-  p4est_locidx_t qid;
-  for (int dir = 1; dir < 8; ++dir) {
-    // reset displace and counter
-    n_neighbors_per_dir = 0;
+  for (int i = 0; i < 7; ++i) {
+    // reset displace
     displace = {{0, 0, 0}};
 
     // set offset
-    if (dir & 1) {
+    if (i & 1) {
       if (nearest_corner & 1)
         displace[0] = zsize;
       else
         displace[0] = -zsize;
     }
-    if (dir & 2) {
+    if (i & 2) {
       if (nearest_corner & 2)
         displace[1] = zsize;
       else
         displace[1] = -zsize;
     }
-    if (dir & 4) {
+    if (i & 4) {
       if (nearest_corner & 4)
         displace[2] = zsize;
       else
         displace[2] = -zsize;
     }
-    const int64_t nidx = p4est_utils_global_idx(forest, quad, tree, displace);
+    P4EST_ASSERT(neighbor_indices[i] == std::numeric_limits<uint64_t>::max());
+    neighbor_indices[i] = p4est_utils_global_idx(forest, quad, tree, displace);
+  }
+
+  // collect over all 7 direction wrt. to corner
+  int n_neighbors_per_dir; // Verify that we find neighbors in each direction
+  p4est_locidx_t qid;
+  for (int dir = 1; dir < 8; ++dir) {
+    n_neighbors_per_dir = 0;
     for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
       p8est_quadrant_t *q =
           p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
       qid = adapt_mesh->mirror_qid[i];
       qidx = p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
-      if (qidx >= nidx && qidx < nidx + zarea &&
+      if (qidx >= neighbor_indices[dir - 1] &&
+          qidx < neighbor_indices[dir - 1] + zarea &&
           p4est_utils_quadrants_touching(quad, tree, q,
                                          adapt_mesh->quad_to_tree[qid])) {
         sid = adapt_virtual->quad_qreal_offset[qid];
@@ -2838,7 +2849,8 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
       p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
       qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
-      if (qidx >= nidx && qidx < nidx + zarea &&
+      if (qidx >= neighbor_indices[dir - 1] &&
+          qidx < neighbor_indices[dir - 1] + zarea &&
           p4est_utils_quadrants_touching(quad, tree, q, q->p.which_tree)) {
         sid = adapt_virtual->quad_greal_offset[i];
         nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);

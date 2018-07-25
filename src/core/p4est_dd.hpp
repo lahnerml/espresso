@@ -9,6 +9,7 @@
 
 #define P4EST_DD_GUARD(call) call
 #else
+#include "errorhandling.hpp"
 #define P4EST_DD_GUARD(call) do { \
   fprintf(stderr, "Error: P4est cellsystem is not compiled into this ESPResSo.\n"); \
   errexit(); \
@@ -64,8 +65,6 @@ void dd_p4est_topology_init(CellPList *cl, bool isRepart = false);
  */
 void p4est_dd_repart_preprocessing();
 
-#ifdef DD_P4EST
 void p4est_dd_repartition(const std::string& desc, bool verbose);
-#endif
 
 #endif

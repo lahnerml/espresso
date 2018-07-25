@@ -51,7 +51,6 @@ public:
 
   Variant call_method(const std::string &name,
                       const VariantMap &parameters) override {
-#ifdef DD_P4EST
     if (name == "repart") {
       std::string m = boost::get<std::string>(parameters.at("metric"));
       bool verbose = boost::get<bool>(parameters.at("verbose"));
@@ -63,7 +62,7 @@ public:
         std::cerr << "Trying to repartition non-p4est cell system." << std::endl
                   << "Continuing without repart." << std::endl;
       }
-      p4est_dd_repartition(m, verbose);
+      P4EST_DD_GUARD(p4est_dd_repartition(m, verbose));
     } else if (name == "is_lb_adaptive_defined") {
 #ifdef LB_ADAPTIVE
       return true;
@@ -71,7 +70,6 @@ public:
       return false;
 #endif
     }
-#endif
     return {};
   }
 };

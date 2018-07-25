@@ -94,9 +94,6 @@ static std::vector<int> comm_proc;     // Number of communicators per Process
 static std::vector<int> comm_rank;     // Communication partner index for a certain communication
 static int num_comm_proc = 0;     // Total Number of bidirectional communications
 //--------------------------------------------------------------------------------------------------
-// Data for repartitioning
-static std::vector<p4est_gloidx_t> old_global_first_quadrant; // Old global_first_quadrants of the p4est before repartitioning.
-//--------------------------------------------------------------------------------------------------
 static const int neighbor_lut[3][3][3] = { // Mapping from [z][y][x] to p4est neighbor index
   {{18, 6,19},{10, 4,11},{20, 7,21}},
   {{14, 2,15},{ 0,-1, 1},{16, 3,17}},  //[1][1][1] is the cell itself
@@ -307,10 +304,6 @@ void dd_p4est_create_grid(bool isRepart) {
 
   if (!isRepart) 
     dd_p4est_initialize_grid();
-#if !defined(LB_ADAPTIVE)
-  else
-    p4est_dd_repart_preprocessing(); // In case of LB_ADAPTIVE, lbmd_repart does this
-#endif
 
   // Repartition uniformly if part_nquads is empty (because not repart has been
   // done yet). Else use part_nquads as given partitioning.
@@ -809,6 +802,44 @@ void dd_p4est_exchange_and_sort_particles(int global_flag) {
 #endif
 }
 //--------------------------------------------------------------------------------------------------
+
+struct RepartData {
+  // Data for repartitioning
+  // Both vectors are used for determining the communication volume after a repartitioning.
+  // Global_first_quadrant field of p4est is manually created for communication overlap with
+  // p4est creation.
+  std::vector<p4est_gloidx_t> global_first_quadrant, old_global_first_quadrant;
+
+  std::vector<std::vector<ParticleList>> send_particlelists, recv_particlelists;
+  std::vector<boost::mpi::request> sreq, rreq;
+
+  // Need to determine recv_prefixes in order to be able to copy received cells
+  // to correct new cells:
+  // Cells from process p go locally to:
+  // &cells[recv_prefix[p]] .. &cells[recv_prefix[p + 1]]
+  std::vector<p4est_gloidx_t> recv_count, recv_prefix;
+
+  p4est_gloidx_t my_old_start, my_ovlp;
+
+  void resize_comm_data() {
+    send_particlelists.resize(n_nodes);
+    recv_particlelists.resize(n_nodes);
+    recv_count.resize(n_nodes);
+    recv_prefix.resize(n_nodes + 1);
+  }
+
+  void clear_comm_data() {
+    send_particlelists.clear();
+    recv_particlelists.clear();
+    sreq.clear();
+    rreq.clear();
+    recv_count.clear();
+    recv_prefix.clear();
+  }
+};
+
+static RepartData repart_data;
+
 // Convenience type for determining the communication volume after
 // repartitioning
 template <typename Int>
@@ -826,15 +857,15 @@ static Int intersect(const LineSegment<Int>& s, const LineSegment<Int>& t) {
   return std::max(Int(0),
                   std::min(s.last(), t.last()) - std::max(s.first(), t.first()));
 }
-static LineSegment<decltype(old_global_first_quadrant)::value_type>
+static LineSegment<decltype(repart_data.old_global_first_quadrant)::value_type>
 old_line_segment(int rank) {
-  return {old_global_first_quadrant[rank], old_global_first_quadrant[rank + 1]};
+  return {repart_data.old_global_first_quadrant[rank],
+          repart_data.old_global_first_quadrant[rank + 1]};
 }
-static LineSegment<
-    std::remove_pointer<decltype(ds::p4est->global_first_quadrant)>::type>
+static LineSegment<decltype(repart_data.global_first_quadrant)::value_type>
 new_line_segment(int rank) {
-  return {ds::p4est->global_first_quadrant[rank],
-          ds::p4est->global_first_quadrant[rank + 1]};
+  return {repart_data.global_first_quadrant[rank],
+          repart_data.global_first_quadrant[rank + 1]};
 }
 //--------------------------------------------------------------------------------------------------
 
@@ -879,25 +910,21 @@ void move_particlelists(CellIt1 first, CellIt1 last, CellIt2 d_first) {
  * No particle are copies. Also received particles are not copies, but only their
  * corresponding ParticleList is shallowly copied.
  */
-void dd_p4est_repart_exchange_part (CellPList *old) {
+static void dd_p4est_repart_exchange_start (CellPList *old) {
   const auto old_local = old_line_segment(this_node);
   const auto new_local = new_line_segment(this_node);
 
-  std::vector<std::vector<ParticleList>> send_particlelists(n_nodes), recv_particlelists(n_nodes);
-  std::vector<boost::mpi::request> sreq, rreq;
+  repart_data.resize_comm_data();
 
-  // Need to determine recv_prefixes in order to be able to copy received cells
-  // to correct new cells:
-  // Cells from process p go locally to:
-  // &cells[recv_prefix[p]] .. &cells[recv_prefix[p + 1]]
-  std::vector<p4est_gloidx_t> recv_count(n_nodes), recv_prefix(n_nodes + 1);
   for (int p = 0; p < n_nodes; ++p) {
     const auto old_remote = old_line_segment(p);
-    recv_count[p] = intersect(old_remote, new_local);
-    recv_prefix[p + 1] = recv_prefix[p] + recv_count[p];
+    repart_data.recv_count[p] = intersect(old_remote, new_local);
+    repart_data.recv_prefix[p + 1] =
+        repart_data.recv_prefix[p] + repart_data.recv_count[p];
 
-    if (p != this_node && recv_count[p] > 0) {
-      rreq.push_back(comm_cart.irecv(p, REP_EX_TAG, recv_particlelists[p]));
+    if (p != this_node && repart_data.recv_count[p] > 0) {
+      repart_data.rreq.push_back(
+          comm_cart.irecv(p, REP_EX_TAG, repart_data.recv_particlelists[p]));
     }
   }
 
@@ -908,42 +935,67 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
 
     // Copy cells to send list
     if (p != this_node && ovlp > 0) {
-      send_particlelists[p].resize(ovlp);
-      detail::indirect_move_particlelists(&old->cell[c_cnt], &old->cell[c_cnt + ovlp], std::begin(send_particlelists[p]));
-      sreq.push_back(comm_cart.isend(p, REP_EX_TAG, send_particlelists[p]));
+      repart_data.send_particlelists[p].resize(ovlp);
+      detail::indirect_move_particlelists(
+          &old->cell[c_cnt], &old->cell[c_cnt + ovlp],
+          std::begin(repart_data.send_particlelists[p]));
+      repart_data.sreq.push_back(
+          comm_cart.isend(p, REP_EX_TAG, repart_data.send_particlelists[p]));
     } else if (p == this_node) {
-      detail::indirect_move_particlelists(&old->cell[c_cnt], &old->cell[c_cnt + ovlp], &cells[recv_prefix[p]]);
+      // Cannot move the data from the old cell system to the new one here
+      // because the new one does not yet exist.
+      // So, defer this do dd_p4est_repart_exchange_end.
+      repart_data.my_old_start = c_cnt;
+      repart_data.my_ovlp = ovlp;
     }
     c_cnt += ovlp;
   }
+}
+
+static void dd_p4est_repart_exchange_end(CellPList *old) {
+
+  // Move the own old cells to the new cell system
+  detail::indirect_move_particlelists(
+      &old->cell[repart_data.my_old_start],
+      &old->cell[repart_data.my_old_start + repart_data.my_ovlp],
+      &cells[repart_data.recv_prefix[this_node]]);
 
   for (;;) {
     boost::mpi::status stat;
-    decltype(rreq)::iterator it;
+    decltype(repart_data.rreq)::iterator it;
 
-    std::tie(stat, it) = Utils::Mpi::wait_any(std::begin(rreq), std::end(rreq));
-    if (it == std::end(rreq))
+    std::tie(stat, it) = Utils::Mpi::wait_any(std::begin(repart_data.rreq),
+                                              std::end(repart_data.rreq));
+    if (it == std::end(repart_data.rreq))
       break;
 
     auto i = stat.source();
 
     // Register received particles as local
-    for (auto& recvbuf: recv_particlelists[i])
+    for (auto &recvbuf : repart_data.recv_particlelists[i])
       update_local_particles(&recvbuf);
-    // Shallow copy cells (includes refs to particles), do not free the particles in
-    // recv_particlelists; we transfer the ownership to the local cellsystem, here.
-    if (recv_particlelists[i].size() != recv_count[i]) {
-      fprintf(stderr, "[%i] There is something wrong here: Received %zu cells, expected: %li\n", this_node, recv_particlelists[i].size(), recv_count[i]);
+    // Shallow copy cells (includes refs to particles), do not free the
+    // particles in recv_particlelists; we transfer the ownership to the local
+    // cellsystem, here.
+    if (repart_data.recv_particlelists[i].size() != repart_data.recv_count[i]) {
+      fprintf(stderr,
+              "[%i] There is something wrong here: Received %zu cells, "
+              "expected: %li\n",
+              this_node, repart_data.recv_particlelists[i].size(),
+              repart_data.recv_count[i]);
       errexit();
     }
-    detail::move_particlelists(std::begin(recv_particlelists[i]), std::end(recv_particlelists[i]), &cells[recv_prefix[i]]);
+    detail::move_particlelists(std::begin(repart_data.recv_particlelists[i]),
+                               std::end(repart_data.recv_particlelists[i]),
+                               &cells[repart_data.recv_prefix[i]]);
   }
 
-  boost::mpi::wait_all(std::begin(sreq), std::end(sreq));
+  boost::mpi::wait_all(std::begin(repart_data.sreq),
+                       std::end(repart_data.sreq));
 
   // Free all sent data
   for (int i = 0; i < n_nodes; ++i) {
-    for (auto& sendbuf : send_particlelists[i]) {
+    for (auto &sendbuf : repart_data.send_particlelists[i]) {
       // Remove particles from this nodes local list and free data
       for (int p = 0; p < sendbuf.n; p++) {
         local_particles[sendbuf.part[p].p.identity] = nullptr;
@@ -953,6 +1005,8 @@ void dd_p4est_repart_exchange_part (CellPList *old) {
     }
   }
   // Recv lists have been moved from in the above loop. Nothing to free here!
+
+  repart_data.clear_comm_data();
 }
 //--------------------------------------------------------------------------------------------------
 // Maps a position to the Cartesian grid and returns the Morton index of this
@@ -995,6 +1049,13 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   cell_structure.position_to_node = dd_p4est_pos_to_proc;
   cell_structure.position_to_cell = dd_p4est_position_to_cell;
   //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
+  if (isRepart) {
+#if !defined(LB_ADAPTIVE)
+    // Prepare old_global_first_quadrant
+    p4est_dd_repart_preprocessing(); // In case of LB_ADAPTIVE, lbmd_repart does this
+#endif
+    dd_p4est_repart_exchange_start(old);
+  }
 
   /* set up new domain decomposition cell structure */
   dd_p4est_create_grid(isRepart);
@@ -1007,7 +1068,7 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   dd_p4est_init_cell_interactions();
 
   if (isRepart) {
-    dd_p4est_repart_exchange_part(old);
+    dd_p4est_repart_exchange_end(old);
     for(int c = 0; c < local_cells.n; c++)
       update_local_particles(local_cells.cell[c]);
   } else {
@@ -1044,9 +1105,9 @@ void
 p4est_dd_repart_preprocessing()
 {
   // Save global_first_quadrants for migration
-  old_global_first_quadrant.clear();
+  repart_data.old_global_first_quadrant.clear();
   std::copy_n(ds::p4est->global_first_quadrant, n_nodes + 1,
-            std::back_inserter(old_global_first_quadrant));
+              std::back_inserter(repart_data.old_global_first_quadrant));
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1112,6 +1173,12 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
     fprintf(stderr, "[%i] Try changing the metric or reducing the number of processes\n", this_node);
     errexit();
   }
+
+  // Create prefixes of part_nquads, i.e. p4est->global_first_quadrant
+  repart_data.global_first_quadrant.resize(n_nodes + 1);
+  repart_data.global_first_quadrant[0] = 0;
+  std::partial_sum(std::begin(part_nquads), std::end(part_nquads),
+                   std::next(std::begin(repart_data.global_first_quadrant)));
 
   if (debug) {
     printf("[%i] Nquads: %i\n", this_node, part_nquads[this_node]);

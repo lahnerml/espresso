@@ -2614,7 +2614,7 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
 
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    neighbor_count = lbadapt_interpolate_pos_ghost(pos, nodes, delta, level);
+    neighbor_count = lbadapt_interpolate_pos_ghost(opos, nodes, delta, level);
     if (neighbor_count > 0) return neighbor_count;
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
@@ -2651,7 +2651,7 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis > 0.0) { // right neighbor
+    if (dis > 0.0 && opos[d] == pos[d]) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;
@@ -2761,7 +2761,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis > 0.0) { // right neighbor
+    if (dis > 0.0 && opos[d] == pos[d]) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;

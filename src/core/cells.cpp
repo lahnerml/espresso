@@ -218,22 +218,6 @@ void topology_init(int cs, CellPList *local, bool isRepart) {
   }
 }
 
-// Reinitializes ghosts, etc.
-// This saves setting "resort_particles = 1" after a repart
-// and therefore getting a global exchange from on_observables_calc
-static void cells_adapt_after_repart() {
-  invalidate_ghosts();
-  n_verlet_updates++;
-
-  ghost_communicator(&cell_structure.ghost_cells_comm);
-  ghost_communicator(&cell_structure.exchange_ghosts_comm);
-
-  resort_particles = 0;
-  rebuild_verletlist = 1;
-
-  on_resort_particles();
-}
-
 /*@}*/
 
 /************************************************************
@@ -272,12 +256,10 @@ void cells_re_init(int new_cs, bool isRepart, bool omitLBinit) {
   CELL_TRACE(fprintf(stderr, "%d: old cells deallocated\n", this_node));
 
   /* to enforce initialization of the ghost cells */
-  // topology_init for a repartitioning resorts all particles properly
-  // so we only need to update the ghosts
-  if (isRepart)
-    cells_adapt_after_repart();
-  else
-    resort_particles = Cells::RESORT_GLOBAL;
+  // topology_init for a repartitioning resorts all cells properly so we only
+  // need to update the ghosts. However, updating the Verlet lists without a
+  // proper resort may be wrong,soin the repart case we need at least localresort.
+  resort_particles = isRepart? Cells::RESORT_LOCAL: Cells::RESORT_GLOBAL;
 
   on_cell_structure_change(omitLBinit);
 }

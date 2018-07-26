@@ -865,10 +865,15 @@ old_line_segment(int rank) {
   return {repart_data.old_global_first_quadrant[rank],
           repart_data.old_global_first_quadrant[rank + 1]};
 }
-static LineSegment<decltype(repart_data.global_first_quadrant)::value_type>
+static LineSegment<p4est_gloidx_t>
 new_line_segment(int rank) {
+#ifdef LB_ADAPTIVE
+  return {ds::p4est->global_first_quadrant[rank],
+          ds::p4est->global_first_quadrant[rank + 1]};
+#else
   return {repart_data.global_first_quadrant[rank],
           repart_data.global_first_quadrant[rank + 1]};
+#endif
 }
 //--------------------------------------------------------------------------------------------------
 

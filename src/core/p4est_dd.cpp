@@ -625,6 +625,11 @@ static bool is_out_of_box(Particle& p, const std::array<int, 3> &off) {
   return false;
 }
 //--------------------------------------------------------------------------------------------------
+static bool is_local_cell_index(int index)
+{
+  return index >= 0 && index < num_local_cells;
+}
+//--------------------------------------------------------------------------------------------------
 // Checks all particles and resorts them to local cells or sendbuffers
 // Note: Particle that stay local and are moved to a cell with higher index are touched twice.
 // This is not the most efficient way! It would be better to first remember the cell-particle
@@ -635,10 +640,10 @@ static void resort_and_fill_sendbuf_local(ParticleList sendbuf[])
   // Loop over all cells and particles
   for (int i = 0; i < num_local_cells; ++i) {
     Cell* cell = local_cells.cell[i];
-    CellInfo* shell = &ds::p4est_cellinfo[i];
+    CellInfo &cellinfo = ds::p4est_cellinfo[i];
 
     for (int d = 0; d < 3; ++d) {
-      cell_lc[d] = dd.cell_size[d] * static_cast<double>(shell->coord[d]);
+      cell_lc[d] = dd.cell_size[d] * static_cast<double>(cellinfo.coord[d]);
       cell_hc[d] = cell_lc[d] + dd.cell_size[d];
     }
 
@@ -662,35 +667,33 @@ static void resort_and_fill_sendbuf_local(ParticleList sendbuf[])
       if (nl == -1)
         continue;
 
-      // get neighbor cell
-      int nidx = shell->neighbor[nl];
-      if (nidx >= num_local_cells) { // Remote Cell (0:num_local_cells-1) -> local, other: ghost
-        if (ds::p4est_cellinfo[nidx].rank >= 0) { // This ghost cell is linked to a process
-          // With minimal ghost this condition is always true
-          if (ds::p4est_cellinfo[nidx].rank != this_node) { // It is a remote process
-            // copy data to sendbuf according to rank
-            int li = comm_proc[ds::p4est_cellinfo[nidx].rank];
-            int pid = part->p.identity;
-            //fold_position(part->r.p, part->l.i);
-            move_indexed_particle(&sendbuf[li], cell, p);
-            local_particles[pid] = nullptr;
-            if(p < cell->n) p -= 1;
-          } else { // particle stays local, but since it went to a ghost it has to be folded
-            fold_position(part->r.p, part->l.i);
-            move_indexed_particle(&cells[ds::p4est_cellinfo[nidx].idx], cell, p);
-            if(p < cell->n) p -= 1;
-          }
-        } else { // Particle left global domain and is not tracked by any process anymore
-          runtimeErrorMsg() << "particle " << p << " on process " << this_node << " is OB";
-          fprintf(stderr, "%i : part %i cell %i is OB [%lf %lf %lf]\n", this_node, i, p, part->r.p[0], part->r.p[1], part->r.p[2]);
-        }
-      } else { // Local Cell, just move the partilce
+      // Particle moved to a different cell. Resort it or move it to a send
+      // buffer get neighbor cell
+      auto nidx = cellinfo.neighbor[nl];
+      if (is_local_cell_index(nidx)) {
         if (is_out_of_box(*part, off)) { // Local periodic boundary
           fold_position(part->r.p, part->l.i);
         }
         move_indexed_particle(&cells[nidx], cell, p);
-        if(p < cell->n) p -= 1;
+      } else {
+        int neighrank = ds::p4est_cellinfo[nidx].rank;
+        // Invalid neighbor rank or invalid ghost cell (we do not have ghost
+        // cells of local cells)
+        if (neighrank < 0 || neighrank >= n_nodes || neighrank == this_node) {
+          fprintf(stderr,
+                  "[%i]: Particle %i in local cell %i is OOB. New cell is %i "
+                  "and its rank (%i) is invalid.\n",
+                  this_node, part->p.identity, i, nidx, neighrank);
+          errexit();
+        }
+        // copy data to sendbuf according to rank
+        int li = comm_proc[ds::p4est_cellinfo[nidx].rank];
+        int pid = part->p.identity;
+        move_indexed_particle(&sendbuf[li], cell, p);
+        local_particles[pid] = nullptr;
       }
+      if(p < cell->n)
+        p -= 1;
     }
   }
 }

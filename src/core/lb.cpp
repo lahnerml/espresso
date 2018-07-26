@@ -3791,74 +3791,90 @@ void calc_particle_lattice_ia() {
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
 #endif
+    for (int foo = 0; foo < n_nodes; ++foo) {
+      MPI_Barrier(comm_cart);
+      if (this_node != foo) continue;
 
-    /* local cells */
-    for (auto &p : local_cells.particles()) {
-      if (!p.p.is_virtual || thermo_virtual)
-      {
-        lb_viscous_coupling(&p, force);
-
-        /* add force to the particle */
-        p.f.f[0] += force[0];
-        p.f.f[1] += force[1];
-        p.f.f[2] += force[2];
-
-        ONEPART_TRACE(if (p.p.identity == check_id) {
-          fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
-                  p.f.f[0], p.f.f[1], p.f.f[2]);
-        });
-      }
-    }
-
-#ifndef LB_ADAPTIVE
-    /* ghost cells */
-    for (auto &p : ghost_cells.particles()) {
-
-      /* for ghost particles we have to check if they lie
-       * in the range of the local lattice nodes */
-      if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&
-          p.r.p[0] < my_right[0] + 0.5 * lblattice.agrid[0] &&
-          p.r.p[1] >= my_left[1] - 0.5 * lblattice.agrid[1] &&
-          p.r.p[1] < my_right[1] + 0.5 * lblattice.agrid[1] &&
-          p.r.p[2] >= my_left[2] - 0.5 * lblattice.agrid[2] &&
-          p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2]) {
-        ONEPART_TRACE(if (p.p.identity == check_id) {
-          fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
-                  this_node);
-        });
-        if (!p.p.is_virtual || thermo_virtual)
-        {
+      fprintf(stderr, "[rank %i] local particles (%li particles, %i cells)\n",
+              this_node, local_cells.particles().size(), local_cells.n);
+      /* local cells */
+      for (auto &p : local_cells.particles()) {
+        if (!p.p.is_virtual || thermo_virtual) {
           lb_viscous_coupling(&p, force);
+
+          /* add force to the particle */
+          p.f.f[0] += force[0];
+          p.f.f[1] += force[1];
+          p.f.f[2] += force[2];
+
+          ONEPART_TRACE(if (p.p.identity == check_id) {
+            fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
+                    p.f.f[0], p.f.f[1], p.f.f[2]);
+          });
         }
+      }
 
-        /* ghosts must not have the force added! */
-        ONEPART_TRACE(if (p.p.identity == check_id) {
-          fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
-                  p.f.f[0], p.f.f[1], p.f.f[2]);
-        });
+      fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
+              this_node, ghost_cells.particles().size(), ghost_cells.n);
+      /* ghost cells */
+      for (auto &p : ghost_cells.particles()) {
+#ifndef DD_P4EST
+        /* for ghost particles we have to check if they lie
+         * in the range of the local lattice nodes */
+        if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&
+            p.r.p[0] < my_right[0] + 0.5 * lblattice.agrid[0] &&
+            p.r.p[1] >= my_left[1] - 0.5 * lblattice.agrid[1] &&
+            p.r.p[1] < my_right[1] + 0.5 * lblattice.agrid[1] &&
+            p.r.p[2] >= my_left[2] - 0.5 * lblattice.agrid[2] &&
+            p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2])
+#endif
+        {
+          ONEPART_TRACE(if (p.p.identity == check_id) {
+            fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
+                    this_node);
+          });
+#if 1
+          if (!p.p.is_virtual || thermo_virtual)
+#else
+          if(false)
+#endif
+          {
+#ifndef DD_P4EST
+            lb_viscous_coupling(&p, force);
+#else
+            lb_viscous_coupling(&p, force, true);
+#endif
+          }
+
+          /* ghosts must not have the force added! */
+          ONEPART_TRACE(if (p.p.identity == check_id) {
+            fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
+                    p.f.f[0], p.f.f[1], p.f.f[2]);
+          });
+        }
       }
     }
-#else // !LB_ADAPTIVE
 #ifdef DD_P4EST
-    /* ghost cells */
-    for (auto &p : ghost_cells.particles()) {
-
-#ifdef IMMERSED_BOUNDARY
-      // Virtual particles for IBM must not be coupled
-        if (!p.p.isVirtual)
-#endif // IMMERSED_BOUNDARY
-      {
-        lb_viscous_coupling(&p, force, true);
-      }
-
-      /* ghosts must not have the force added! */
-      ONEPART_TRACE(if (p->p.identity == check_id) {
-        fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
-                p->f.f[0], p->f.f[1], p->f.f[2]);
-      });
+    // ghost exchange
+    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                           lbadapt_ghost_data, ghost_pointer);
+    for (int level = 0; level <= P8EST_QMAXLEVEL; ++level) {
+#ifdef COMM_HIDING
+      exc_status_lb[level] =
+          p4est_virtual_ghost_exchange_data_level_begin(
+              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+              adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+              (void **) local_pointer.data(), (void **) ghost_pointer.data());
+#else
+      p4est_virtual_ghost_exchange_data_level(
+          adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+          adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+          (void**)local_pointer.data(), (void**)ghost_pointer.data());
+#endif
     }
-#endif // DD_P4EST
-#endif // LB_ADAPTIVE
+#endif
   }
 }
 

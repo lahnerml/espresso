@@ -204,13 +204,17 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
   if (partition) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     // create aligned trees
-    auto afi = forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
-    if (afi.coarsest_level_global == afi.finest_level_global) {
-      auto sfi = forest_info.at(
+    auto adapt_forest_info =
+        forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
+    if (adapt_forest_info.coarsest_level_global ==
+        adapt_forest_info.finest_level_global) {
+      auto short_range_forest_info = forest_info.at(
           static_cast<size_t>(forest_order::short_range));
-      auto mod = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+      auto mod = (short_range_forest_info.coarsest_level_global <=
+                  adapt_forest_info.coarsest_level_global) ?
                  forest_order::adaptive_LB : forest_order::short_range;
-      auto ref = (sfi.coarsest_level_global <= afi.coarsest_level_global) ?
+      auto ref = (short_range_forest_info.coarsest_level_global <=
+                  adapt_forest_info.coarsest_level_global) ?
                  forest_order::short_range : forest_order::adaptive_LB;
       p4est_dd_repart_preprocessing();
       p4est_utils_partition_multiple_forests(ref, mod);

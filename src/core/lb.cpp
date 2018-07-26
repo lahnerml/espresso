@@ -3745,29 +3745,22 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
 #ifdef COMM_HIDING
-    if (!ghost_cells.particles().empty()) {
-      // If there are no particles in the ghost layer, we do not have to end
-      // communication.
-      // If we do not want to overlap communication and computation we don't
-      // have to do anything here, as the ghost layer is collided redundantly.
-      // TODO: Do we really have to terminate all ghost communication here?
-      p4est_utils_end_pending_communication(exc_status_lb);
-    }
+    p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE
     if (lbpar.resend_halo) { /* first MD step after last LB update */
 
-      /* exchange halo regions (for fluid-particle coupling) */
-      halo_communication(&update_halo_comm, reinterpret_cast<char *>(**lbfluid));
+        /* exchange halo regions (for fluid-particle coupling) */
+        halo_communication(&update_halo_comm, reinterpret_cast<char *>(**lbfluid));
 
 #ifdef ADDITIONAL_CHECKS
-      lb_check_halo_regions();
+        lb_check_halo_regions();
 #endif
 
-      /* halo is valid now */
-      lbpar.resend_halo = 0;
-    }
+        /* halo is valid now */
+        lbpar.resend_halo = 0;
+      }
 #endif // LB ADAPTIVE
 
     /* draw random numbers for local particles */

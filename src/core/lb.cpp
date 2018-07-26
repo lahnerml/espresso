@@ -2360,10 +2360,10 @@ static void lb_prepare_communication() {
 
 /** (Re-)initializes the fluid. */
 void lb_reinit_parameters() {
-  int i;
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_parameters();
 #else  // LB_ADAPTIVE
+  int i;
   if (lbpar.viscosity > 0.0) {
     /* Eq. (80) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007). */
     // unit conversion: viscosity
@@ -3251,11 +3251,9 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   double h = lbpar.agrid;
   double h_max = lbpar.agrid;
 #else  // !LB_ADAPTIVE
-  if (ghost) {
-    dcnt = lbadapt_interpolate_pos_ghost(p->r.p.data(), node_index, delta, level);
-  } else {
-    dcnt = lbadapt_interpolate_pos_adapt(p->r.p.data(), node_index, delta, level);
-  }
+  dcnt = (ghost ? lbadapt_interpolate_pos_ghost
+                : lbadapt_interpolate_pos_adapt)(p->r.p.data(), node_index,
+                                                 delta, level);
   if (dcnt <= 0) { return; }
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE

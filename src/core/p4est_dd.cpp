@@ -307,10 +307,13 @@ void dd_p4est_create_grid(bool isRepart) {
 
   // create space filling inforamtion about first quads per node from p4est
   first_morton_idx_of_rank.resize(n_nodes + 1);
-  for (int i = 0; i < n_nodes; ++i)
-    first_morton_idx_of_rank[i] = dd_p4est_quad_global_morton_idx(ds::p4est->global_first_position[i]);
-
-  first_morton_idx_of_rank[n_nodes] = dd_p4est_grid_max_global_morton_idx();
+  for (int i = 0; i < n_nodes + 1; ++i) {
+    // Support empty subdomains at the end of the curve
+    if (ds::p4est->global_first_quadrant[i] >= ds::p4est->global_num_quadrants)
+      first_morton_idx_of_rank[i] = dd_p4est_grid_max_global_morton_idx();
+    else
+      first_morton_idx_of_rank[i] = dd_p4est_quad_global_morton_idx(ds::p4est->global_first_position[i]);
+  }
 
   dd_p4est_init_internal_minimal(p4est_ghost, p4est_mesh);
 

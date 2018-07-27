@@ -47,7 +47,29 @@ typedef struct coupling_helper {
   std::vector<std::array <uint64_t, 3> > pos;
   std::vector<std::array <double, 3> > force_fluid;
   std::array<double, 3> force_particle;
+
+  std::string print() {
+    std::string res =
+        "Particle " + std::to_string(particle_id) + ": f_part (" +
+        std::to_string(force_particle[0]) + ", " +
+        std::to_string(force_particle[1]) + ", " +
+        std::to_string(force_particle[2]) + ");\ninterpolation fluid:\n";
+    for (int i = 0; i < delta.size(); ++i) {
+      res.append("pos: " +
+                 std::to_string(pos[i][0]) + ", " +
+                 std::to_string(pos[i][1]) + ", " +
+                 std::to_string(pos[i][2]) + "; " +
+                 "delta: " +
+                 std::to_string(delta[i]) +
+                 "fluid force: (" +
+                 std::to_string(force_fluid[i][0]) + ", " +
+                 std::to_string(force_fluid[i][1]) + ", " +
+                 std::to_string(force_fluid[i][2]) + ")\n");
+    }
+    return res;
+  }
 } coupling_helper_t;
+
 
 extern std::vector <coupling_helper_t> coupling_local;
 extern std::vector <coupling_helper_t> coupling_ghost;

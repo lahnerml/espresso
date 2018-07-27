@@ -1158,8 +1158,10 @@ p4est_dd_repartition(const std::string& desc, bool verbose)
   auto part_nquads = p4est_dd_repart_calc_nquads(weights);
 
   if (verbose && this_node == 0) {
-    std::cout << "New partitioning: ";
-    std::copy(std::begin(part_nquads), std::end(part_nquads), std::ostream_iterator<double>(std::cout, " "));
+    std::cout << "New ncells per proc: ";
+    std::copy(std::begin(part_nquads), std::end(part_nquads),
+              std::ostream_iterator<decltype(part_nquads)::value_type>(
+                  std::cout, " "));
     std::cout << std::endl;
   }
 

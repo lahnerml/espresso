@@ -387,7 +387,8 @@ inline int get_linear_index(int a, int b, int c, int adim[3]) {
  * @param c       z position (return value)
  * @param adim    dimensions of the underlying grid
  */
-inline void get_grid_pos(int i, int *a, int *b, int *c, int adim[3]) {
+template <typename T>
+inline void get_grid_pos(int i, T *a, T *b, T *c, int adim[3]) {
   *a = i % adim[0];
   i /= adim[0];
   *b = i % adim[1];

@@ -3353,7 +3353,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
         local_f[2] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[2];
 #if 0
-        fprintf(stderr, "[%i, %i, %i] delta: [%lf, %lf, %lf] prod: %lf f: %lf %lf %lf\n",
+        fprintf(stderr,
+                "[%i, %i, %i] delta: [%lf, %lf, %lf] prod: %lf f: %lf %lf %lf\n",
                 x, y, z, delta[3*x + 0], delta[3*y + 1], delta[3*z+2],
                 delta[3*x + 0] * delta[3*y + 1] * delta[3*z+2],
                 local_f[0], local_f[1], local_f[2]);
@@ -3361,7 +3362,10 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
         current_coupling_element.delta.push_back(delta[3 * x + 0] *
                                                  delta[3 * y + 1] *
                                                  delta[3 * z + 2]);
-        current_coupling_element.pos.push_back()
+        std::array<uint64_t, 3> pos;
+        get_grid_pos(node_index[(z * 2 + y) + 2 + x], &pos[0], &pos[1], &pos[2],
+                     lblattice.halo_grid);
+        current_coupling_element.pos.push_back(pos);
         current_coupling_element.force_fluid.push_back(
             {{local_f[0], local_f[1], local_f[2]}});
       }
@@ -3369,7 +3373,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   }
 #else  // !LB_ADAPTIVE
   for (int x = 0; x < dcnt; ++x) {
-    //if (n_lbsteps % (1 << (p4est_params.max_ref_level - level[x])) == 0) {
     local_f = node_index[x]->lbfields.force_density;
     double level_fact = p4est_params.prefactors[level[x]] * p4est_params.prefactors[level[x]];
 
@@ -3831,6 +3834,13 @@ void calc_particle_lattice_ia() {
           });
         }
       }
+      // print coupling info
+      std::sort(coupling_local.begin(), coupling_local.end(),
+                [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
+                { return a.particle_id < b.particle_id; });
+      for (auto &coupling_element : coupling_local) {
+        coupling_element.print();
+      }
 
       fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
               this_node, ghost_cells.particles().size(), ghost_cells.n);
@@ -3871,6 +3881,14 @@ void calc_particle_lattice_ia() {
           });
         }
       }
+      // print coupling info
+      std::sort(coupling_ghost.begin(), coupling_ghost.end(),
+                [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
+                { return a.particle_id < b.particle_id; });
+      for (auto &coupling_element : coupling_ghost) {
+        coupling_element.print();
+      }
+
     }
 #ifdef DD_P4EST
     // ghost exchange

@@ -41,13 +41,18 @@
 #include <string>
 #include <vector>
 
+// TODO: Remove DEBUG
+inline int get_linear_index(int a, int b, int c, int adim[3]) {
+  return (a + adim[0] * (b + adim[1] * c));
+}
+
 typedef struct coupling_helper {
   int particle_id;
   std::array<double, 3> particle_position;
+  std::array<double, 3> particle_force;
   std::vector<double> delta;
   std::vector<std::array <uint64_t, 3> > cell_positions;
   std::vector<std::array <double, 3> > fluid_force;
-  std::array<double, 3> particle_force;
 
   void reset() {
     particle_id = -1;
@@ -59,6 +64,29 @@ typedef struct coupling_helper {
   }
 
   std::string print() {
+    std::vector<uint64_t> coupling_order(delta.size());
+    std::iota(coupling_order.begin(), coupling_order.end(), 0);
+    std::sort(coupling_order.begin(), coupling_order.end(),
+              [&](const int a, const int b) -> bool
+              {
+#ifdef LB_ADAPTIVE
+                int n_q[3] = {32, 32, 32};
+                return (get_linear_index(cell_positions[a][0],
+                                         cell_positions[a][1],
+                                         cell_positions[a][2], n_q) <
+                        get_linear_index(cell_positions[a][0],
+                                         cell_positions[a][1],
+                                         cell_positions[a][2], n_q));
+#else
+                int n_q[3] = {34, 34, 34};
+                return (get_linear_index(cell_positions[a][0],
+                                         cell_positions[a][1],
+                                         cell_positions[a][2], n_q) <
+                        get_linear_index(cell_positions[a][0],
+                                         cell_positions[a][1],
+                                         cell_positions[a][2], n_q));
+#endif
+              });
     std::string res =
         "Particle " + std::to_string(particle_id) + ": (" +
         std::to_string(particle_position[0]) + ", " +
@@ -78,7 +106,7 @@ typedef struct coupling_helper {
                  "fluid force: (" +
                  std::to_string(fluid_force[i][0]) + ", " +
                  std::to_string(fluid_force[i][1]) + ", " +
-                 std::to_string(fluid_force[i][2]) + ")\n");
+                 std::to_string(fluid_force[i][2]) + ")\n\n");
     }
     return res;
   }
@@ -388,9 +416,11 @@ inline ::Vector<3, double> vec_rotate(::Vector<3, double> axis, double alpha,
  * @param c       z position
  * @param adim    dimensions of the underlying grid
  */
+#if 0
 inline int get_linear_index(int a, int b, int c, int adim[3]) {
   return (a + adim[0] * (b + adim[1] * c));
 }
+#endif
 
 /** get the position a[] from the linear index in a 3D grid
  *  of dimensions adim[].

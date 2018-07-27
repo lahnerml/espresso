@@ -3839,7 +3839,7 @@ void calc_particle_lattice_ia() {
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_local) {
-        coupling_element.print();
+        fprintf(stderr, "%s", coupling_element.print().c_str());
       }
 
       fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
@@ -3886,7 +3886,7 @@ void calc_particle_lattice_ia() {
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_ghost) {
-        coupling_element.print();
+        fprintf(stderr, "%s", coupling_element.print().c_str());
       }
 
     }

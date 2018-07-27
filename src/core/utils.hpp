@@ -43,28 +43,42 @@
 
 typedef struct coupling_helper {
   int particle_id;
+  std::array<double, 3> particle_position;
   std::vector<double> delta;
-  std::vector<std::array <uint64_t, 3> > pos;
-  std::vector<std::array <double, 3> > force_fluid;
-  std::array<double, 3> force_particle;
+  std::vector<std::array <uint64_t, 3> > cell_positions;
+  std::vector<std::array <double, 3> > fluid_force;
+  std::array<double, 3> particle_force;
+
+  void reset() {
+    particle_id = -1;
+    particle_position = {{-1., -1., -1.}};
+    delta.clear();
+    cell_positions.clear();
+    fluid_force.clear();
+    particle_force = {{-1., -1., -1.}};
+  }
 
   std::string print() {
     std::string res =
-        "Particle " + std::to_string(particle_id) + ": f_part (" +
-        std::to_string(force_particle[0]) + ", " +
-        std::to_string(force_particle[1]) + ", " +
-        std::to_string(force_particle[2]) + ");\ninterpolation fluid:\n";
+        "Particle " + std::to_string(particle_id) + ": (" +
+        std::to_string(particle_position[0]) + ", " +
+        std::to_string(particle_position[1]) + ", " +
+        std::to_string(particle_position[2]) + ") " +
+        "f_part (" +
+        std::to_string(particle_force[0]) + ", " +
+        std::to_string(particle_force[1]) + ", " +
+        std::to_string(particle_force[2]) + ");\ninterpolation fluid:\n";
     for (int i = 0; i < delta.size(); ++i) {
       res.append("pos: " +
-                 std::to_string(pos[i][0]) + ", " +
-                 std::to_string(pos[i][1]) + ", " +
-                 std::to_string(pos[i][2]) + "; " +
+                 std::to_string(cell_positions[i][0]) + ", " +
+                 std::to_string(cell_positions[i][1]) + ", " +
+                 std::to_string(cell_positions[i][2]) + "; " +
                  "delta: " +
-                 std::to_string(delta[i]) +
+                 std::to_string(delta[i]) + "; " +
                  "fluid force: (" +
-                 std::to_string(force_fluid[i][0]) + ", " +
-                 std::to_string(force_fluid[i][1]) + ", " +
-                 std::to_string(force_fluid[i][2]) + ")\n");
+                 std::to_string(fluid_force[i][0]) + ", " +
+                 std::to_string(fluid_force[i][1]) + ", " +
+                 std::to_string(fluid_force[i][2]) + ")\n");
     }
     return res;
   }

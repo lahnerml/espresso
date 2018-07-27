@@ -2590,10 +2590,12 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
 }
 
 int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20]) {
+                                  double delta[20], int level[20],
+                                  bool safe_quads) {
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;  // This value determines first index of
                            // neighbor_directions and weight_indices.
+  uint64_t quad_index;
   // Order neighbor_directions as follows:
   // face neighbor x, face neighbor y, edge neighbor xy plane,
   // face neighbor z, edge neighbor xz plane, edge neighbor yz plane,
@@ -2677,11 +2679,13 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
              interpolation_weights[weight_indices[nearest_corner][1]] *
              interpolation_weights[weight_indices[nearest_corner][2]];
 
-  uint64_t quad_index =
-      p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
-  current_coupling_element.pos.push_back(
-      Utils::morton_idx_to_coords(quad_index));
-  current_coupling_element.delta.push_back(delta[0]);
+  if (safe_quads) {
+    quad_index =
+        p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
+    current_coupling_element.cell_positions.push_back(
+        Utils::morton_idx_to_coords(quad_index));
+    current_coupling_element.delta.push_back(delta[0]);
+  }
 
   castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nqid = sc_array_new(sizeof(int));
@@ -2711,12 +2715,14 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
         quad_index =
             p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[idx]);
       } else if (lq <= idx && idx < lq + gq) {
-        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx - lq);
+        idx -= lq;
+        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx);
         lvl = quad->level;
-        sid = adapt_virtual->quad_greal_offset[idx - lq];
+        sid = adapt_virtual->quad_greal_offset[idx];
         nodes[neighbor_count] = &lbadapt_ghost_data[lvl].at(sid);
         quad_index =
-            p4est_utils_global_idx(forest, quad, adapt_mesh->ghost_to_tree[idx]);
+            p4est_utils_global_idx(forest, quad,
+                                   adapt_mesh->ghost_to_tree[idx]);
       } else {
         SC_ABORT_NOT_REACHED();
       }
@@ -2726,11 +2732,14 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]];
       delta[neighbor_count] = delta[neighbor_count] / (double)(nqid->elem_count);
       level[neighbor_count] = lvl;
-      ++neighbor_count;
 
-      current_coupling_element.pos.push_back(
-          Utils::morton_idx_to_coords(quad_index));
-      current_coupling_element.delta.push_back(delta[neighbor_count]);
+      if (safe_quads) {
+        current_coupling_element.cell_positions.push_back(
+            Utils::morton_idx_to_coords(quad_index));
+        current_coupling_element.delta.push_back(delta[neighbor_count]);
+      }
+
+      ++neighbor_count;
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
@@ -2751,9 +2760,11 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
 }
 
 int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20]) {
+                                  double delta[20], int level[20],
+                                  bool safe_quads) {
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
+  uint64_t quad_index;
 
   double interpolation_weights[6];  // Stores normed distance from pos to center
   // of cell containing pos in both directions.
@@ -2806,11 +2817,13 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
 
-  uint64_t quad_index =
-      p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
-  current_coupling_element.pos.push_back(
-      Utils::morton_idx_to_coords(quad_index));
-  current_coupling_element.delta.push_back(delta[0]);
+  if (safe_quads) {
+    quad_index =
+        p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
+    current_coupling_element.cell_positions.push_back(
+        Utils::morton_idx_to_coords(quad_index));
+    current_coupling_element.delta.push_back(delta[0]);
+  }
 
   // determine which neighbor indices need to be found
   std::array<uint64_t, 7> neighbor_indices = {
@@ -2878,14 +2891,17 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
           if (dir == 3 || dir == 5 || dir == 6)
             delta[neighbor_count] *= 0.5;
         }
+
+        if (safe_quads) {
+          quad_index =
+              p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
+          current_coupling_element.cell_positions.push_back(
+              Utils::morton_idx_to_coords(quad_index));
+          current_coupling_element.delta.push_back(delta[neighbor_count]);
+        }
+
         ++neighbor_count;
         ++n_neighbors_per_dir;
-
-        quad_index =
-            p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
-        current_coupling_element.pos.push_back(
-            Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(delta[neighbor_count]);
       }
     }
     for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
@@ -2907,15 +2923,15 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
           if (dir == 3 || dir == 5 || dir == 6)
             delta[neighbor_count] *= 0.5;
         }
+        if (safe_quads) {
+          quad_index =
+              p4est_utils_global_idx(forest, q, adapt_mesh->ghost_to_tree[i]);
+          current_coupling_element.cell_positions.push_back(
+              Utils::morton_idx_to_coords(quad_index));
+          current_coupling_element.delta.push_back(delta[neighbor_count]);
+        }
         ++neighbor_count;
         ++n_neighbors_per_dir;
-
-        quad_index =
-            p4est_utils_global_idx(forest, q, adapt_mesh->ghost_to_tree[qid]);
-        current_coupling_element.pos.push_back(
-            Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(delta[neighbor_count]);
-;
       }
     }
     if (!n_neighbors_per_dir) {

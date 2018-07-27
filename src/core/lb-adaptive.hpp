@@ -376,9 +376,11 @@ int64_t lbadapt_map_pos_to_quad(double pos[3]);
 int64_t lbadapt_map_pos_to_quad(double pos[3], double offset[3]);
 
 int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20]);
+                                  double delta[20], int level[20],
+                                  bool safe_quads = false);
 int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20]);
+                                  double delta[20], int level[20],
+                                  bool safe_quads = false);
 
 void lbadapt_dump2file_synced(std::string &filename);
 

@@ -34,6 +34,7 @@
 #include "random.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
+#include "utils/coupling_helper.hpp"
 #include "utils/Morton.hpp"
 
 #include <algorithm>

@@ -34,6 +34,7 @@
 #include <iostream>
 #include "config.hpp"
 #include "utils.hpp"
+#include "utils/coupling_helper.hpp"
 #include "lb.hpp"
 #include "interaction_data.hpp"
 #include "global.hpp"

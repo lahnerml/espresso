@@ -200,7 +200,7 @@ namespace Utils {
   template <>
   inline double gcd<double>(double a, double b) {
     // allow at max 5 digits after .
-    int factor = 1e5;
+    int factor = 10000;
     int aa = factor * a;
     int bb = factor * b;
     if (!verify_prec(aa, a, factor)) {

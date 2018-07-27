@@ -3254,7 +3254,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   dcnt = (ghost ? lbadapt_interpolate_pos_ghost
                 : lbadapt_interpolate_pos_adapt)(p->r.p.data(), node_index,
                                                  delta, level);
-  if (dcnt <= 0) { return; }
+  if (dcnt <= 0) {
+    // clear coupling helper element
+    current_coupling_element.delta.clear();
+    current_coupling_element.pos.clear();
+    current_coupling_element.force_fluid.clear();
+    return;
+  }
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
@@ -3352,6 +3358,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
                 delta[3*x + 0] * delta[3*y + 1] * delta[3*z+2],
                 local_f[0], local_f[1], local_f[2]);
 #endif
+        current_coupling_element.delta.push_back(delta[3 * x + 0] *
+                                                 delta[3 * y + 1] *
+                                                 delta[3 * z + 2]);
+        current_coupling_element.pos.push_back()
+        current_coupling_element.force_fluid.push_back(
+            {{local_f[0], local_f[1], local_f[2]}});
       }
     }
   }
@@ -3368,6 +3380,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     fprintf(stderr, "[%i] delta: %lf, f: %lf %lf %lf (level_fact: %lf)\n",
             x, delta[x], local_f[0], local_f[1], local_f[2], level_fact);
 #endif
+    current_coupling_element.force_fluid.push_back(
+        {{local_f[0], local_f[1], local_f[2]}});
   }
 #endif // !LB_ADAPTIVE
 
@@ -3799,8 +3813,12 @@ void calc_particle_lattice_ia() {
               this_node, local_cells.particles().size(), local_cells.n);
       /* local cells */
       for (auto &p : local_cells.particles()) {
+        current_coupling_element.particle_id = p.identity();
         if (!p.p.is_virtual || thermo_virtual) {
           lb_viscous_coupling(&p, force);
+          current_coupling_element.force_particle =
+              {{force[0], force[1], force[2]}};
+          coupling_local.push_back(current_coupling_element);
 
           /* add force to the particle */
           p.f.f[0] += force[0];
@@ -3829,21 +3847,21 @@ void calc_particle_lattice_ia() {
             p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2])
 #endif
         {
+          current_coupling_element.particle_id = p.identity();
           ONEPART_TRACE(if (p.p.identity == check_id) {
             fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
                     this_node);
           });
-#if 1
           if (!p.p.is_virtual || thermo_virtual)
-#else
-          if(false)
-#endif
           {
 #ifndef DD_P4EST
             lb_viscous_coupling(&p, force);
 #else
             lb_viscous_coupling(&p, force, true);
 #endif
+            current_coupling_element.force_particle =
+                {{force[0], force[1], force[2]}};
+            coupling_ghost.push_back(current_coupling_element);
           }
 
           /* ghosts must not have the force added! */

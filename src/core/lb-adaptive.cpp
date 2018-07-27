@@ -34,6 +34,7 @@
 #include "random.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
+#include "utils/Morton.hpp"
 
 #include <algorithm>
 #include <assert.h>
@@ -2579,6 +2580,7 @@ int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
 
 int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20]) {
+  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;  // This value determines first index of
                            // neighbor_directions and weight_indices.
   // Order neighbor_directions as follows:
@@ -2663,6 +2665,13 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
   delta[0] = interpolation_weights[weight_indices[nearest_corner][0]] *
              interpolation_weights[weight_indices[nearest_corner][1]] *
              interpolation_weights[weight_indices[nearest_corner][2]];
+
+  uint64_t quad_index =
+      p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
+  current_coupling_element.pos.push_back(
+      Utils::morton_idx_to_coords(quad_index));
+  current_coupling_element.delta.push_back(delta[0]);
+
   castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nqid = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nvid = sc_array_new(sizeof(int));
@@ -2687,11 +2696,15 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
         lvl = quad->level;
         sid = adapt_virtual->quad_qreal_offset[idx];
         nodes[neighbor_count] = &lbadapt_local_data[lvl].at(sid);
+        quad_index =
+            p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[idx]);
       } else if (lq <= idx && idx < lq + gq) {
         quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx - lq);
         lvl = quad->level;
         sid = adapt_virtual->quad_greal_offset[idx - lq];
         nodes[neighbor_count] = &lbadapt_ghost_data[lvl].at(sid);
+        quad_index =
+            p4est_utils_global_idx(forest, quad, adapt_mesh->ghost_to_tree[idx]);
       } else {
         SC_ABORT_NOT_REACHED();
       }
@@ -2702,6 +2715,10 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       delta[neighbor_count] = delta[neighbor_count] / (double)(nqid->elem_count);
       level[neighbor_count] = lvl;
       ++neighbor_count;
+
+      current_coupling_element.pos.push_back(
+          Utils::morton_idx_to_coords(quad_index));
+      current_coupling_element.delta.push_back(delta[neighbor_count]);
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
@@ -2776,6 +2793,12 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   zsize = 1 << (p4est_params.max_ref_level - lvl);
   zarea = zsize * zsize * zsize;
 
+  uint64_t quad_index =
+      p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
+  current_coupling_element.pos.push_back(
+      Utils::morton_idx_to_coords(quad_index));
+  current_coupling_element.delta.push_back(delta[0]);
+
   // determine which neighbor indices need to be found
   std::array<uint64_t, 7> neighbor_indices = {
       {std::numeric_limits<uint64_t>::max(),
@@ -2844,6 +2867,12 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         }
         ++neighbor_count;
         ++n_neighbors_per_dir;
+
+        quad_index =
+            p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
+        current_coupling_element.pos.push_back(
+            Utils::morton_idx_to_coords(quad_index));
+        current_coupling_element.delta.push_back(delta[neighbor_count]);
       }
     }
     for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
@@ -2867,6 +2896,13 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
         }
         ++neighbor_count;
         ++n_neighbors_per_dir;
+
+        quad_index =
+            p4est_utils_global_idx(forest, q, adapt_mesh->ghost_to_tree[qid]);
+        current_coupling_element.pos.push_back(
+            Utils::morton_idx_to_coords(quad_index));
+        current_coupling_element.delta.push_back(delta[neighbor_count]);
+;
       }
     }
     if (!n_neighbors_per_dir) {

@@ -40,6 +40,18 @@
 #include <exception>
 #include <vector>
 
+typedef struct coupling_helper {
+  int particle_id;
+  std::vector<double> delta;
+  std::vector<std::array <uint64_t, 3> > pos;
+  std::vector<std::array <double, 3> > force_fluid;
+  std::array<double, 3> force_particle;
+} coupling_helper_t;
+
+extern std::vector <coupling_helper_t> coupling_local;
+extern std::vector <coupling_helper_t> coupling_ghost;
+extern coupling_helper_t current_coupling_element;
+
 namespace Utils {
 
 /**

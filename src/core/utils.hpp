@@ -30,7 +30,6 @@
 
 #include "Vector.hpp"
 #include "utils/constants.hpp"
-#include "utils/coupling_helper.hpp"
 #include "utils/math/sqr.hpp"
 #include "utils/memory.hpp"
 #include "config.hpp"
@@ -41,10 +40,6 @@
 #include <exception>
 #include <string>
 #include <vector>
-
-extern std::vector <coupling_helper_t> coupling_local;
-extern std::vector <coupling_helper_t> coupling_ghost;
-extern coupling_helper_t current_coupling_element;
 
 namespace Utils {
 

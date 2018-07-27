@@ -29,30 +29,7 @@ typedef struct coupling_helper {
     particle_force = {{-1., -1., -1.}};
   }
 
-  std::string print() {
-    std::vector<uint64_t> coupling_order(delta.size());
-    std::iota(coupling_order.begin(), coupling_order.end(), 0);
-    std::sort(coupling_order.begin(), coupling_order.end(),
-              [&](const int a, const int b) -> bool
-              {
-#ifdef LB_ADAPTIVE
-                int n_q[3] = {32, 32, 32};
-                return (get_linear_index(cell_positions[a][0],
-                                         cell_positions[a][1],
-                                         cell_positions[a][2], n_q) <
-                        get_linear_index(cell_positions[a][0],
-                                         cell_positions[a][1],
-                                         cell_positions[a][2], n_q));
-#else
-                int n_q[3] = {34, 34, 34};
-                return (get_linear_index(cell_positions[a][0],
-                                         cell_positions[a][1],
-                                         cell_positions[a][2], n_q) <
-                        get_linear_index(cell_positions[a][0],
-                                         cell_positions[a][1],
-                                         cell_positions[a][2], n_q));
-#endif
-              });
+  std::string print(std::vector<uint64_t> &coupling_order) {
     std::string res =
         "Particle " + std::to_string(particle_id) + ": (" +
         std::to_string(particle_position[0]) + ", " +
@@ -64,15 +41,15 @@ typedef struct coupling_helper {
         std::to_string(particle_force[2]) + ");\ninterpolation fluid:\n";
     for (int i = 0; i < delta.size(); ++i) {
       res.append("pos: " +
-                 std::to_string(cell_positions[i][0]) + ", " +
-                 std::to_string(cell_positions[i][1]) + ", " +
-                 std::to_string(cell_positions[i][2]) + "; " +
+                 std::to_string(cell_positions[coupling_order[i]][0]) + ", " +
+                 std::to_string(cell_positions[coupling_order[i]][1]) + ", " +
+                 std::to_string(cell_positions[coupling_order[i]][2]) + "; " +
                  "delta: " +
-                 std::to_string(delta[i]) + "; " +
+                 std::to_string(delta[coupling_order[i]]) + "; " +
                  "fluid force: (" +
-                 std::to_string(fluid_force[i][0]) + ", " +
-                 std::to_string(fluid_force[i][1]) + ", " +
-                 std::to_string(fluid_force[i][2]) + ")\n");
+                 std::to_string(fluid_force[coupling_order[i]][0]) + ", " +
+                 std::to_string(fluid_force[coupling_order[i]][1]) + ", " +
+                 std::to_string(fluid_force[coupling_order[i]][2]) + ")\n");
     }
     res += "\n";
     return res;

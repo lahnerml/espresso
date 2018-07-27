@@ -63,6 +63,10 @@
 
 #include "cuda_interface.hpp"
 
+std::vector <coupling_helper_t> coupling_local;
+std::vector <coupling_helper_t> coupling_ghost;
+coupling_helper_t current_coupling_element;
+
 #ifndef LB_ADAPTIVE_GPU
 #ifdef ADDITIONAL_CHECKS
 static void lb_check_halo_regions();
@@ -3842,7 +3846,34 @@ void calc_particle_lattice_ia() {
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_local) {
-        fprintf(stderr, "%s", coupling_element.print().c_str());
+        std::vector<uint64_t> coupling_order(coupling_element.delta.size());
+        std::iota(coupling_order.begin(), coupling_order.end(), 0);
+        std::sort(coupling_order.begin(), coupling_order.end(),
+                  [&coupling_element](const uint64_t a, const uint64_t b) -> bool
+                  {
+#ifdef LB_ADAPTIVE
+                    int n_q[3] = {32, 32, 32};
+                    return (get_linear_index(
+                                coupling_element.cell_positions[a][0],
+                                coupling_element.cell_positions[a][1],
+                                coupling_element.cell_positions[a][2], n_q) <
+                            get_linear_index(
+                                coupling_element.cell_positions[b][0],
+                                coupling_element.cell_positions[b][1],
+                                coupling_element.cell_positions[b][2], n_q));
+#else
+                    int n_q[3] = {34, 34, 34};
+                return (get_linear_index(
+                            coupling_element.cell_positions[a][0],
+                            coupling_element.cell_positions[a][1],
+                            coupling_element.cell_positions[a][2], n_q) <
+                        get_linear_index(
+                            coupling_element.cell_positions[b][0],
+                            coupling_element.cell_positions[b][1],
+                            coupling_element.cell_positions[b][2], n_q));
+#endif
+                  });
+        fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
 
       fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
@@ -3891,7 +3922,34 @@ void calc_particle_lattice_ia() {
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_ghost) {
-        fprintf(stderr, "%s", coupling_element.print().c_str());
+        std::vector<uint64_t> coupling_order(coupling_element.delta.size());
+        std::iota(coupling_order.begin(), coupling_order.end(), 0);
+        std::sort(coupling_order.begin(), coupling_order.end(),
+                  [&coupling_element](const uint64_t a, const uint64_t b) -> bool
+                  {
+#ifdef LB_ADAPTIVE
+                    int n_q[3] = {32, 32, 32};
+                    return (get_linear_index(
+                        coupling_element.cell_positions[a][0],
+                        coupling_element.cell_positions[a][1],
+                        coupling_element.cell_positions[a][2], n_q) <
+                            get_linear_index(
+                        coupling_element.cell_positions[b][0],
+                        coupling_element.cell_positions[b][1],
+                        coupling_element.cell_positions[b][2], n_q));
+#else
+                    int n_q[3] = {34, 34, 34};
+                return (get_linear_index(
+                        coupling_element.cell_positions[a][0],
+                        coupling_element.cell_positions[a][1],
+                        coupling_element.cell_positions[a][2], n_q) <
+                            get_linear_index(
+                        coupling_element.cell_positions[b][0],
+                        coupling_element.cell_positions[b][1],
+                        coupling_element.cell_positions[b][2], n_q));
+#endif
+                  });
+        fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
 
     }

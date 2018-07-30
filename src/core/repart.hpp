@@ -25,7 +25,7 @@ struct metric {
   /** Metric setter. Might throw a std::invalid_argument exception if desc is not understood.
    * Metric description strings are linear combinations of single metrics.
    * E.g. "2.0*ncells +1.7*nghostpart"
-   * The space after the metric name ("ncell") is mandatory.
+   * The space after the metric name ("ncells") is mandatory.
    * Factor, multiplication and addition sign are mandatory. Negative constants
    * are only allowed for the first factor. For further use subtraction instead
    * of addition, e.g. "-1.0*ncells -1.7*nghostpart".

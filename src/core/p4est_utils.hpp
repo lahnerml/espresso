@@ -162,6 +162,10 @@ struct p4est_utils_forest_info_t {
         finest_level_global(-1), finest_level_ghost(-1) {}
 };
 
+/** Returns true if the lb has been initialized.
+ */
+bool adaptive_lb_is_active();
+
 /** Returns a const reference to the forest_info of "fo".
  * Throws a std::out_of_range if the forest_info of "fo" has not been created
  * yet.

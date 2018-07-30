@@ -2,10 +2,6 @@
 //--------------------------------------------------------------------------------------------------
 #ifdef DD_P4EST
 //--------------------------------------------------------------------------------------------------
-#ifdef LEES_EDWARDS
-#error "p4est and Lees-Edwards are not compatible yet."
-#endif
-//--------------------------------------------------------------------------------------------------
 #include <p4est_to_p8est.h>
 #include <p8est_ghost.h>
 #include <p8est_mesh.h>
@@ -103,10 +99,6 @@ static const int neighbor_lut[3][3][3] = { // Mapping from [z][y][x] to p4est ne
 static const int half_neighbor_idx[14] = { // p4est neighbor index of halfshell [0] is cell itself
   -1, 1, 16, 3, 17, 22, 8, 23, 12, 5, 13, 24, 9, 25
 };
-//--------------------------------------------------------------------------------------------------
-// Datastructure for partitioning holding the number of quads per process
-// Empty as long as tclcommand_repart has not been called.
-static std::vector<p4est_locidx_t> part_nquads;
 //--------------------------------------------------------------------------------------------------
 
 enum class Direction {
@@ -302,19 +294,10 @@ void dd_p4est_create_grid(bool isRepart) {
   first_morton_idx_of_rank.clear();
   ds::p4est_cellinfo.clear();
 
+  // In case of repart, keep the old p4est which has been repartitioned already
+  // either by lbmd_repart or by dd_p4est_repartition.
   if (!isRepart) 
     dd_p4est_initialize_grid();
-
-  // Repartition uniformly if part_nquads is empty (because not repart has been
-  // done yet). Else use part_nquads as given partitioning.
-  // If LB_ADAPTIVE is defined, do not repartition here at all, since we handle
-  // this case in lbmd_repart.[ch]pp.
-#if !defined(LB_ADAPTIVE)
-    if (part_nquads.size() == 0)
-      p4est_partition(ds::p4est, 0, nullptr);
-    else
-      p4est_partition_given(ds::p4est, part_nquads.data());
-#endif
 
   auto p4est_ghost = castable_unique_ptr<p4est_ghost_t>(
       p4est_ghost_new(ds::p4est, P8EST_CONNECT_CORNER));
@@ -324,10 +307,13 @@ void dd_p4est_create_grid(bool isRepart) {
 
   // create space filling inforamtion about first quads per node from p4est
   first_morton_idx_of_rank.resize(n_nodes + 1);
-  for (int i = 0; i < n_nodes; ++i)
-    first_morton_idx_of_rank[i] = dd_p4est_quad_global_morton_idx(ds::p4est->global_first_position[i]);
-
-  first_morton_idx_of_rank[n_nodes] = dd_p4est_grid_max_global_morton_idx();
+  for (int i = 0; i < n_nodes + 1; ++i) {
+    // Support empty subdomains at the end of the curve
+    if (ds::p4est->global_first_quadrant[i] >= ds::p4est->global_num_quadrants)
+      first_morton_idx_of_rank[i] = dd_p4est_grid_max_global_morton_idx();
+    else
+      first_morton_idx_of_rank[i] = dd_p4est_quad_global_morton_idx(ds::p4est->global_first_position[i]);
+  }
 
   dd_p4est_init_internal_minimal(p4est_ghost, p4est_mesh);
 
@@ -811,7 +797,7 @@ struct RepartData {
   // Both vectors are used for determining the communication volume after a repartitioning.
   // Global_first_quadrant field of p4est is manually created for communication overlap with
   // p4est creation.
-  std::vector<p4est_gloidx_t> global_first_quadrant, old_global_first_quadrant;
+  std::vector<p4est_gloidx_t> old_global_first_quadrant;
 
   std::vector<std::vector<ParticleList>> send_particlelists, recv_particlelists;
   std::vector<boost::mpi::request> sreq, rreq;
@@ -867,13 +853,8 @@ old_line_segment(int rank) {
 }
 static LineSegment<p4est_gloidx_t>
 new_line_segment(int rank) {
-#ifdef LB_ADAPTIVE
   return {ds::p4est->global_first_quadrant[rank],
           ds::p4est->global_first_quadrant[rank + 1]};
-#else
-  return {repart_data.global_first_quadrant[rank],
-          repart_data.global_first_quadrant[rank + 1]};
-#endif
 }
 //--------------------------------------------------------------------------------------------------
 
@@ -1057,13 +1038,8 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
   cell_structure.position_to_node = dd_p4est_pos_to_proc;
   cell_structure.position_to_cell = dd_p4est_position_to_cell;
   //cell_structure.position_to_cell = dd_p4est_save_position_to_cell;
-  if (isRepart) {
-#if !defined(LB_ADAPTIVE)
-    // Prepare old_global_first_quadrant
-    p4est_dd_repart_preprocessing(); // In case of LB_ADAPTIVE, lbmd_repart does this
-#endif
+  if (isRepart)
     dd_p4est_repart_exchange_start(old);
-  }
 
   /* set up new domain decomposition cell structure */
   dd_p4est_create_grid(isRepart);
@@ -1121,50 +1097,33 @@ p4est_dd_repart_preprocessing()
 //--------------------------------------------------------------------------------------------------
 // Purely MD Repartitioning functions follow now.
 //-------------------------------------------------------------------------------------------------
-// Metric has to hold num_local_cells many elements.
-// Fills the global std::vector repart_nquads to be used by the next
-// cellsystem re-init in conjunction with p4est_partition_given.
-static void
-p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
+// Precondition: Metric has to hold num_local_cells many elements.
+// Calculate the number of cells per process based on weights per cell ("metric").
+// Throws a std::runtime_error on invalid (e.g. all-zero) metric.
+static std::vector<p4est_locidx_t>
+p4est_dd_repart_calc_nquads(const std::vector<double>& metric)
 {
-  if (metric.size() != num_local_cells) {
-    std::cerr << "Error in provided metric: too few elements." << std::endl;
-    part_nquads.clear();
-    return;
-  }
-
+  MPI_Request req;
   // Determine prefix and target load
   double localsum = std::accumulate(metric.begin(), metric.end(), 0.0);
-  double sum, prefix = 0; // Initialization is necessary on rank 0!
+  double sum, prefix = 0.0; // Initialization is necessary on rank 0
+  MPI_Iexscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart, &req);
   MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
-  MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / n_nodes;
 
-  if (target == 0.0) {
-    if (this_node == 0)
-      std::cerr << "p4est_dd_repart: Metric all-zero. Aborting repart." << std::endl;
-    // Leave part_nquads as it is and exit.
-    return;
-  }
+  if (!isnormal(target))
+    throw std::runtime_error("Repart with all-zero weights impossible.");
 
-  if (debug) {
-    printf("[%i] NCells: %zu\n", this_node, num_local_cells);
-    printf("[%i] Local : %lf\n", this_node, localsum);
-    printf("[%i] Global: %lf\n", this_node, sum);
-    printf("[%i] Target: %lf\n", this_node, target);
-    printf("[%i] Prefix: %lf\n", this_node, prefix);
-  }
+  std::vector<p4est_locidx_t> part_nquads(n_nodes, static_cast<p4est_locidx_t>(0));
 
-  part_nquads.resize(n_nodes);
-  std::fill(part_nquads.begin(), part_nquads.end(),
-            static_cast<p4est_locidx_t>(0));
-
+  MPI_Wait(&req, MPI_STATUS_IGNORE);
   // Determine new process boundaries in local subdomain
   // Evaluated for its side effect of setting part_nquads.
-  std::accumulate(metric.begin(), metric.end(),
-                  prefix,
-                  [target](double cellpref, double met_i) {
-                    int proc = std::min<int>(cellpref / target, n_nodes - 1);
+  std::accumulate(metric.begin(), metric.end(), prefix,
+                  [target, &part_nquads](double cellpref, double met_i) {
+                    // USe mean of old and new prefix as basis for assignment
+                    int proc = std::min<int>((cellpref + 0.5 * met_i) / target,
+                                             n_nodes - 1);
                     part_nquads[proc]++;
                     return cellpref + met_i;
                   });
@@ -1182,27 +1141,7 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
     errexit();
   }
 
-  // Create prefixes of part_nquads, i.e. p4est->global_first_quadrant
-  repart_data.global_first_quadrant.resize(n_nodes + 1);
-  repart_data.global_first_quadrant[0] = 0;
-  std::partial_sum(std::begin(part_nquads), std::end(part_nquads),
-                   std::next(std::begin(repart_data.global_first_quadrant)));
-
-  if (debug) {
-    printf("[%i] Nquads: %i\n", this_node, part_nquads[this_node]);
-
-    if (this_node == 0) {
-      p4est_gloidx_t totnquads = std::accumulate(part_nquads.begin(),
-                                                 part_nquads.end(),
-                                                 static_cast<p4est_gloidx_t>(0));
-      if (ds::p4est->global_num_quadrants != totnquads) {
-        fprintf(stderr,
-                "[%i] ERROR: totnquads = %li but global_num_quadrants = %li\n",
-                this_node, totnquads, ds::p4est->global_num_quadrants);
-        errexit();
-      }
-    }
-  }
+  return part_nquads;
 }
 //--------------------------------------------------------------------------------------------------
 // Repartition the MD grd:
@@ -1211,15 +1150,25 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric, bool debug)
 void
 p4est_dd_repartition(const std::string& desc, bool verbose)
 {
+  p4est_dd_repart_preprocessing();
+
   std::vector<double> weights = repart::metric{desc}();
-  p4est_dd_repart_calc_nquads(weights, false && verbose);
-  
+  if (weights.size() != num_local_cells) {
+    fprintf(stderr, "Metric error in repart: Provided too few elements.");
+    errexit();
+  }
+
+  auto part_nquads = p4est_dd_repart_calc_nquads(weights);
+
   if (verbose && this_node == 0) {
-    std::cout << " New ncells per proc: ";
-    std::copy(std::begin(part_nquads), std::end(part_nquads), std::ostream_iterator<int>(std::cout, " "));
+    std::cout << "New ncells per proc: ";
+    std::copy(std::begin(part_nquads), std::end(part_nquads),
+              std::ostream_iterator<decltype(part_nquads)::value_type>(
+                  std::cout, " "));
     std::cout << std::endl;
   }
 
+  p4est_partition_given(ds::p4est, part_nquads.data());
   cells_re_init(CELL_STRUCTURE_CURRENT, true);
 }
 

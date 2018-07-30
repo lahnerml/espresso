@@ -221,31 +221,17 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     }
 
     // do the partitioning
-    if (n_part) {
-      std::vector<std::string> metrics;
-      std::vector<double> alpha = {1., 1.};
-      std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
-                                     1.0);
-      std::vector<double> weights_lb =
-          p4est_utils_get_adapt_weights(p4est_params.partitioning);
-      p4est_dd_repart_preprocessing();
-      p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
-                                     adapt_p4est, weights_lb, 1.0);
-      cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
-      p4est_utils_prepare(forests);
-    } else {
-      if (p4est_params.partitioning == "n_cells") {
-        p8est_partition_ext(adapt_p4est, 1,
-                            lbadapt_partition_weight_uniform);
-      }
-      else if (p4est_params.partitioning == "subcycling") {
-        p8est_partition_ext(adapt_p4est, 1,
-                            lbadapt_partition_weight_subcycling);
-      }
-      else {
-        SC_ABORT_NOT_REACHED();
-      }
-    }
+    std::vector<std::string> metrics;
+    std::vector<double> alpha = {1., 1.};
+    std::vector<double> weights_md(dd_p4est_get_p4est()->local_num_quadrants,
+                                   1.0);
+    std::vector<double> weights_lb =
+        p4est_utils_get_adapt_weights(p4est_params.partitioning);
+    p4est_dd_repart_preprocessing();
+    p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
+                                   adapt_p4est, weights_lb, 1.0);
+    cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
+    p4est_utils_prepare(forests);
 #elif defined(LB_ADAPTIVE)
     if (p4est_params.partitioning == "n_cells") {
       p8est_partition_ext(p4est_partitioned, 1,
@@ -921,29 +907,15 @@ int p4est_utils_perform_adaptivity_step() {
   adapt_p4est.reset(p4est_adapted);
 
 #ifdef DD_P4EST
-  if(n_part) {
-    std::vector<std::string> metrics;
-    metrics = {"npart", p4est_params.partitioning};
-    std::vector<double> alpha = {1., 1.};
-    std::vector<p8est_t *> forests;
-    forests.push_back(dd_p4est_get_p4est());
-    forests.push_back(adapt_p4est);
-    p4est_utils_prepare(forests);
+  std::vector<std::string> metrics;
+  metrics = {"ncells", p4est_params.partitioning};
+  std::vector<double> alpha = {1., 1.};
+  std::vector<p8est_t *> forests;
+  forests.push_back(dd_p4est_get_p4est());
+  forests.push_back(adapt_p4est);
+  p4est_utils_prepare(forests);
 
-    lbmd::repart_all(metrics, alpha);
-  } else {
-    if (p4est_params.partitioning == "n_cells") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_uniform);
-    }
-    else if (p4est_params.partitioning == "subcycling") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_subcycling);
-    }
-    else {
-      SC_ABORT_NOT_REACHED();
-    }
-  }
+  lbmd::repart_all(metrics, alpha);
 #else
   if (p4est_params.partitioning == "n_cells") {
     p8est_partition_ext(p4est_partitioned, 1,

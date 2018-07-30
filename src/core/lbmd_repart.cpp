@@ -105,24 +105,10 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
         return ri.weights(m);
     });
 
-    if (n_part) {
-        p4est_utils_weighted_partition(tree_of(repart_infos[0]),
-                                       ws[0], alphas[0],
-                                       tree_of(repart_infos[1]),
-                                       ws[1], alphas[1]);
-    } else {
-        if (p4est_params.partitioning == "n_cells") {
-            p8est_partition_ext(adapt_p4est, 1,
-                                lbadapt_partition_weight_uniform);
-        }
-        else if (p4est_params.partitioning == "subcycling") {
-            p8est_partition_ext(adapt_p4est, 1,
-                                lbadapt_partition_weight_subcycling);
-        }
-        else {
-            SC_ABORT_NOT_REACHED();
-        }
-    }
+   p4est_utils_weighted_partition(tree_of(repart_infos[0]),
+                                  ws[0], alphas[0],
+                                  tree_of(repart_infos[1]),
+                                  ws[1], alphas[1]);
 
     for (const auto& ri: repart_infos)
         ri.postprocess();

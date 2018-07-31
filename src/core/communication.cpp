@@ -54,7 +54,6 @@
 #include "lb-adaptive-gpu.hpp"
 #include "lb-adaptive.hpp"
 #include "lbboundaries.hpp"
-#include "lbboundaries/LBBoundary.hpp"
 #include "lj.hpp"
 #include "ljcos.hpp"
 #include "ljcos2.hpp"

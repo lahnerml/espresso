@@ -74,6 +74,9 @@ static uint64_t dd_p4est_pos_morton_idx(double pos[3]);
 static void dd_p4est_revert_comm_order (GhostCommunicator *comm);
 
 static void dd_p4est_init_internal_minimal(p4est_ghost_t *p4est_ghost, p4est_mesh_t *p4est_mesh);
+
+static std::vector<p4est_locidx_t>
+p4est_dd_repart_calc_nquads(const std::vector<double>& metric);
 //--------------------------------------------------------------------------------------------------
 // Data defining the grid
 static int brick_size[3]; // number of trees in each direction
@@ -259,6 +262,13 @@ static void dd_p4est_initialize_grid() {
   ds::p4est = std::unique_ptr<p4est_t>(
       p4est_new_ext(comm_cart, ds::p4est_conn, 0, grid_level, true,
                     static_cast<size_t>(0), nullptr, nullptr));
+  
+#ifdef LB_ADAPTIVE
+  // Initial partitioning that fits p4est_utils_weighted_partition
+  std::vector<double> weights(ds::p4est->local_num_quadrants, 1.0);
+  auto part_nquads = p4est_dd_repart_calc_nquads(weights);
+  p4est_partition_given(ds::p4est, part_nquads.data());
+#endif
 }
 
 /** Returns the global morton idx of a quad. 
@@ -1059,9 +1069,21 @@ void dd_p4est_topology_init(CellPList *old, bool isRepart) {
     // Go through all old particles and find owner & cell Insert oob particle
     // into any cell (0 in this case) for the moment. The following global
     // exchange will fetch it up and transfer it.
+
+    auto old_npart =
+        std::accumulate(old->cell, old->cell + old->n, 0,
+                        [](int acc, Cell *c) { return acc + c->n; });
+    if (local_cells.n == 0 && old_npart > 0) {
+      // Could support this by not relying on local_cells.cell[0] but manually
+      // collecting oob parts and exchanging them here.
+      fprintf(stderr,
+              "Setting particles after initializing the LBM is not supported.");
+      errexit();
+    }
+
     for (int c = 0; c < old->n; c++)
       dd_p4est_insert_particles(old->cell[c], 0, 1, local_cells.cell[0]);
-
+    
     for (int c = 0; c < local_cells.n; c++)
       update_local_particles(local_cells.cell[c]);
     // Global exchange will automatically be called
@@ -1081,6 +1103,18 @@ void dd_p4est_on_geometry_change(int flags) {
     cells_re_init(CELL_STRUCTURE_CURRENT);
   }
 #else
+  if (cells_get_n_particles() > 0 &&
+      adaptive_lb_is_active() &&
+      (flags & CELL_FLAG_GRIDCHANGED ||
+       grid_size[0] != std::max<int>(box_l[0] / max_range, 1) ||
+       grid_size[1] != std::max<int>(box_l[1] / max_range, 1) ||
+       grid_size[2] != std::max<int>(box_l[2] / max_range, 1))) {
+    if (this_node == 0) {
+      fprintf(stderr, "Error: Changing the grid with LB_ADAPTIVE and an active "
+                      "LBM p4est is not supported.\n");
+      errexit();
+    }
+  }
   cells_re_init(CELL_STRUCTURE_CURRENT);
 #endif
 }
@@ -1131,11 +1165,14 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric)
   MPI_Allreduce(MPI_IN_PLACE, part_nquads.data(), n_nodes,
                 P4EST_MPI_LOCIDX, MPI_SUM, comm_cart);
 
+  auto totnquads =
+      std::accumulate(std::begin(part_nquads), std::end(part_nquads),
+                      static_cast<decltype(part_nquads)::value_type>(0));
   // Could try to steal quads from neighbors.
   // Global reshifting (i.e. stealing from someone else than the direct
   // neighbors) is not a good idea since it globally changes the metric.
   // Anyways, this is most likely due to a bad quad/proc quotient.
-  if (part_nquads[this_node] == 0) {
+  if (part_nquads[this_node] == 0 && totnquads >= n_nodes) {
     fprintf(stderr, "[%i] No quads assigned to me. Cannot guarantee to work. Exiting\n", this_node);
     fprintf(stderr, "[%i] Try changing the metric or reducing the number of processes\n", this_node);
     errexit();

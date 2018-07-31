@@ -1377,4 +1377,13 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   p4est_partition_given(t2, t2_quads_per_proc.data());
 }
 
+bool adaptive_lb_is_active()
+{
+#ifdef LB_ADAPTIVE
+  return adapt_p4est != nullptr;
+#else
+  return false;
+#endif
+}
+
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

@@ -1696,20 +1696,7 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     double j[3];
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
-    int proc = 0;
-    for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
-      double xyz[3];
-      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx = p4est_utils_cell_morton_idx(
-          xyz[0] * (1 << p4est_params.max_ref_level),
-          xyz[1] * (1 << p4est_params.max_ref_level),
-          xyz[2] * (1 << p4est_params.max_ref_level));
-      if (qidx > index) {
-        break;
-      }
-    }
-    proc -= 1;
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
     double h_max = 1.0 / double(1 << p4est_params.max_ref_level);
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion

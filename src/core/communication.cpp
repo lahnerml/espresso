@@ -2088,17 +2088,23 @@ void mpi_lbadapt_grid_init(int node, int level) {
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
   /* create connectivity and octree */
 #ifdef DD_P4EST
-  if (dd_p4est_get_p4est() != NULL) {
+  if (dd_p4est_get_p4est() != nullptr) {
     for (int i = 0; i < P4EST_DIM; ++i) {
       lb_conn_brick[i] = dd_p4est_get_n_trees(i);
     }
   } else
 #endif // DD_P4EST
   {
-    int gcd = Utils::gcd(box_l[0], box_l[1], box_l[2]);
-    lb_conn_brick[0] = box_l[0] / gcd;
-    lb_conn_brick[1] = box_l[1] / gcd;
-    lb_conn_brick[2] = box_l[2] / gcd;
+    p4est_utils_set_cellsize_optimal(lbpar.agrid);
+  }
+
+  std::array<int, 3> ncells = {{1, 1, 1}};
+  if (p4est_params.min_ref_level <= 0) {
+    p4est_params.min_ref_level =
+        p4est_utils_determine_grid_level(lbpar.agrid, ncells);
+  }
+  if (p4est_params.max_ref_level <= 0) {
+    p4est_params.max_ref_level = p4est_params.min_ref_level;
   }
 
   // Hack to satisfy p4est:  Calling p4est_destroy requires the corresponding
@@ -2112,8 +2118,9 @@ void mpi_lbadapt_grid_init(int node, int level) {
         lb_conn_brick[0], lb_conn_brick[1], lb_conn_brick[2], periodic & 1,
         periodic & 2, periodic & 4));
     // substitute and delete old p4est
-    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0, level, 1, 0,
-                                    NULL, NULL));
+    adapt_p4est.reset(p4est_new_ext(comm_cart, adapt_conn, 0,
+                                    p4est_params.min_ref_level, 1, 0, nullptr,
+                                    nullptr));
   }
   p4est_utils_rebuild_p4est_structs(btype);
 #endif // LB_ADAPTIVE

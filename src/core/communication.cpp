@@ -1936,6 +1936,7 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 #else  // !LB_ADAPTIVE
     p4est_locidx_t quad =
         p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
+    P4EST_ASSERT(0 <= quad && quad < adapt_p4est->local_num_quadrants);
     p8est_quadrant_t *q =
         p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad);
     int lvl = q->level;

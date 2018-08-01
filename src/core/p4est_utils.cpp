@@ -942,9 +942,6 @@ int p4est_utils_perform_adaptivity_step() {
   //           including all preparations for next time step
   adapt_p4est.reset(p4est_adapted);
 
-  std::vector<p8est_t *> forests;
-  forests.push_back(dd_p4est_get_p4est());
-  forests.push_back(adapt_p4est);
 #ifdef DD_P4EST
   std::vector<std::string> metrics;
   metrics = {"ncells", p4est_params.partitioning};

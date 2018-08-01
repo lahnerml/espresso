@@ -162,6 +162,10 @@ struct p4est_utils_forest_info_t {
         finest_level_global(-1), finest_level_ghost(-1) {}
 };
 
+/** Returns true if the lb has been initialized.
+ */
+bool adaptive_lb_is_active();
+
 /** Returns a const reference to the forest_info of "fo".
  * Throws a std::out_of_range if the forest_info of "fo" has not been created
  * yet.
@@ -362,6 +366,21 @@ inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
 /** \name Geometric helper functions                                         */
 /*****************************************************************************/
 /*@{*/
+//--------------------------------------------------------------------------------------------------
+
+// Compute the grid- and bricksize according to box_l and maxrange
+
+/** Determine the level that is needed to discretize ncells with per direction
+ * with a given mesh width.
+ */
+int p4est_utils_determine_grid_level(double mesh_width,
+                                     std::array<int, 3> &ncells);
+
+/** Determine the optimal number of trees to discretize the domain with a given
+ * mesh_width.
+ */
+void p4est_utils_set_cellsize_optimal(double mesh_width);
+
 /** Transform coordinates in-place from p4est-tree coordinates (a tree is a
  * unit-cube) to simulation domain.
  *

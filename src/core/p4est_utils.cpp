@@ -232,9 +232,11 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                                    1.0);
     std::vector<double> weights_lb =
         p4est_utils_get_adapt_weights(p4est_params.partitioning);
+    p4est_dd_repart_preprocessing();
     p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
                                    adapt_p4est, weights_lb, 1.0);
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
+    p4est_utils_prepare(forests);
 #elif defined(LB_ADAPTIVE)
     if (p4est_params.partitioning == "n_cells") {
       p8est_partition_ext(p4est_partitioned, 1,
@@ -268,6 +270,36 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                                                     adapt_mesh, adapt_virtual,
                                                     btype));
 #endif // defined(LB_ADAPTIVE)
+}
+
+static inline int count_trailing_zeros(int x)
+{
+  int z = 0;
+  for (; (x & 1) == 0; x >>= 1) z++;
+  return z;
+}
+
+int p4est_utils_determine_grid_level(double mesh_width,
+                                     std::array<int, 3> &ncells) {
+  // compute number of cells
+  if (mesh_width > ROUND_ERROR_PREC * box_l[0]) {
+    ncells[0] = std::max<int>(box_l[0] / mesh_width, 1);
+    ncells[1] = std::max<int>(box_l[1] / mesh_width, 1);
+    ncells[2] = std::max<int>(box_l[2] / mesh_width, 1);
+  }
+
+  // divide all dimensions by biggest common power of 2
+  return count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
+}
+
+void p4est_utils_set_cellsize_optimal(double mesh_width) {
+  std::array<int, 3> ncells = {{1, 1, 1}};
+
+  int grid_level = p4est_utils_determine_grid_level(mesh_width, ncells);
+
+  lb_conn_brick[0] = ncells[0] >> grid_level;
+  lb_conn_brick[1] = ncells[1] >> grid_level;
+  lb_conn_brick[2] = ncells[2] >> grid_level;
 }
 
 void p4est_utils_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
@@ -915,12 +947,12 @@ int p4est_utils_perform_adaptivity_step() {
   forests.push_back(adapt_p4est);
 #ifdef DD_P4EST
   std::vector<std::string> metrics;
-  if(n_part) {
-    metrics = {"npart", p4est_params.partitioning};
-  } else {
-    metrics = {"ncells", p4est_params.partitioning};
-  }
+  metrics = {"ncells", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
+  std::vector<p8est_t *> forests;
+  forests.push_back(dd_p4est_get_p4est());
+  forests.push_back(adapt_p4est);
+  p4est_utils_prepare(forests);
 
   lbmd::repart_all(metrics, alpha);
 #else
@@ -1353,6 +1385,15 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
 
   p8est_partition_given(t1, t1_quads_per_proc.data());
   p8est_partition_given(t2, t2_quads_per_proc.data());
+}
+
+bool adaptive_lb_is_active()
+{
+#ifdef LB_ADAPTIVE
+  return adapt_p4est != nullptr;
+#else
+  return false;
+#endif
 }
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

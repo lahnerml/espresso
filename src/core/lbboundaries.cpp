@@ -40,6 +40,9 @@
 #include "lbboundaries/LBBoundary.hpp"
 #include "lbgpu.hpp"
 #include "utils.hpp"
+#include "initialize.hpp"
+
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -51,7 +54,21 @@ std::vector<int> exclude_in_geom_ref = std::vector<int>();
 #endif // LB_ADAPTIVE
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 
-void lbboundary_mindist_position(const Vector3d& pos, double *mindist,
+void add(const std::shared_ptr<LBBoundary> &b) {
+  lbboundaries.emplace_back(b);
+
+  on_lbboundary_change();
+}
+
+void remove(const std::shared_ptr<LBBoundary> &b) {
+  auto &lbb = lbboundaries;
+
+  lbboundaries.erase(std::remove(lbb.begin(), lbb.end(), b), lbb.end());
+
+  on_lbboundary_change();
+}
+
+void lbboundary_mindist_position(const Vector3d &pos, double *mindist,
                                  double distvec[3], int *no) {
 
   double vec[3] = {std::numeric_limits<double>::infinity(),
@@ -249,11 +266,10 @@ void lb_init_boundaries() {
     boundary_velocity[3 * lbboundaries.size() + 1] = 0.0f;
     boundary_velocity[3 * lbboundaries.size() + 2] = 0.0f;
 
-    if (lbboundaries.size() || pdb_boundary_lattice) {
-      lb_init_boundaries_GPU(lbboundaries.size(), number_of_boundnodes,
+    lb_init_boundaries_GPU(lbboundaries.size(), number_of_boundnodes,
                              host_boundary_node_list, host_boundary_index_list,
                              boundary_velocity);
-    }
+
     free(boundary_velocity);
     free(host_boundary_node_list);
     free(host_boundary_index_list);
@@ -337,7 +353,7 @@ int lbboundary_get_force(void *lbb, double *f) {
                              "lbboundary that was not added to "
                              "system.lbboundaries.");
 
-  std::vector<double> forces(3*lbboundaries.size());
+  std::vector<double> forces(3 * lbboundaries.size());
 
   if (lattice_switch & LATTICE_LB_GPU) {
 #if defined(LB_BOUNDARIES_GPU) && defined(LB_GPU)

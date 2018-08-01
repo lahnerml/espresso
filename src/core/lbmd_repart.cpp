@@ -105,10 +105,10 @@ void repart_all(const std::vector<std::string>& metrics, const std::vector<doubl
         return ri.weights(m);
     });
 
-    p4est_utils_weighted_partition(tree_of(repart_infos[0]),
-                                   ws[0], alphas[0],
-                                   tree_of(repart_infos[1]),
-                                   ws[1], alphas[1]);
+   p4est_utils_weighted_partition(tree_of(repart_infos[0]),
+                                  ws[0], alphas[0],
+                                  tree_of(repart_infos[1]),
+                                  ws[1], alphas[1]);
 
     for (const auto& ri: repart_infos)
         ri.postprocess();

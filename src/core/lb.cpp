@@ -528,8 +528,14 @@ int lb_lbfluid_set_ext_force_density(int component, double p_fx, double p_fy,
     lbpar_gpu.ext_force_density[3 * component + 0] = (float)p_fx;
     lbpar_gpu.ext_force_density[3 * component + 1] = (float)p_fy;
     lbpar_gpu.ext_force_density[3 * component + 2] = (float)p_fz;
-    lbpar_gpu.external_force_density = 1;
+    if (p_fx != 0 || p_fy !=0 || p_fz != 0) {
+      lbpar_gpu.external_force_density = 1;
+    }
+    else {
+      lbpar_gpu.external_force_density = 0;
+    }
     lb_reinit_extern_nodeforce_GPU(&lbpar_gpu);
+
 #endif // LB_GPU
   } else {
 #ifdef LB
@@ -1695,20 +1701,7 @@ int lb_lbnode_get_pi_neq(int *ind, double *p_pi) {
     double j[3];
     double pi[6];
     int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
-    int proc = 0;
-    for (; proc < n_nodes; ++proc) {
-      p8est_quadrant_t *q = &adapt_p4est->global_first_position[proc];
-      double xyz[3];
-      p8est_qcoord_to_vertex(adapt_conn, q->p.which_tree, q->x, q->y, q->z, xyz);
-      int64_t qidx = p4est_utils_cell_morton_idx(
-          xyz[0] * (1 << p4est_params.max_ref_level),
-          xyz[1] * (1 << p4est_params.max_ref_level),
-          xyz[2] * (1 << p4est_params.max_ref_level));
-      if (qidx > index) {
-        break;
-      }
-    }
-    proc -= 1;
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
     double h_max = 1.0 / double(1 << p4est_params.max_ref_level);
     mpi_recv_fluid(proc, index, &rho, j, pi);
     // unit conversion
@@ -1752,6 +1745,7 @@ int lb_lbnode_get_boundary(int *ind, int *p_boundary) {
   }
   return 0;
 }
+
 #endif // defined (LB) || defined (LB_GPU)
 
 int lb_lbnode_get_pop(int *ind, double *p_pop) {
@@ -2409,6 +2403,7 @@ void lb_reinit_parameters() {
     double mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
          (lbpar.agrid * lbpar.agrid);
     // mu *= agrid*agrid*agrid;  // Marcello's conjecture
+
     for (i = 0; i < 4; i++)
       lbpar.phi[i] = 0.0;
 
@@ -2482,6 +2477,7 @@ void lb_reinit_fluid() {
 #ifdef LB_ADAPTIVE
   lbadapt_reinit_fluid_per_cell();
 #else // LB_ADAPTIVE
+  std::fill(lbfields.begin(), lbfields.end(), LB_FluidNode());
   /* default values for fields in lattice units */
   /* here the conversion to lb units is performed */
   double rho = lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
@@ -2554,8 +2550,6 @@ void lb_init() {
   /* setup the initial particle velocity distribution */
   lb_reinit_fluid();
 
-  /* setup the external forces */
-  lb_reinit_force_densities();
 
   LB_TRACE(printf("Initialzing fluid on CPU successful\n"));
 }
@@ -3125,7 +3119,9 @@ inline void lb_collide_stream() {
 #endif // LB_ADAPTIVE_GPU
 #else  // LB_ADAPTIVE
 
-#ifdef IMMERSED_BOUNDARY
+#ifdef VIRTUAL_SITES_INERTIALESS_TRACERS
+// Safeguard the node forces so that we can later use them for the IBM particle update
+// In the following loop the lbfields[XX].force are reset to zero
   // Safeguard the node forces so that we can later use them for the IBM
   // particle update In the following loop the lbfields[XX].force are reset to
   // zero
@@ -3787,18 +3783,22 @@ void calc_particle_lattice_ia() {
 
     /* draw random numbers for local particles */
     for (auto &p : local_cells.particles()) {
+      if (lb_coupl_pref2 > 0.0) {
 #ifdef GAUSSRANDOM
-      p.lc.f_random[0] = lb_coupl_pref2 * gaussian_random();
-      p.lc.f_random[1] = lb_coupl_pref2 * gaussian_random();
-      p.lc.f_random[2] = lb_coupl_pref2 * gaussian_random();
+        p.lc.f_random[0] = lb_coupl_pref2 * gaussian_random();
+        p.lc.f_random[1] = lb_coupl_pref2 * gaussian_random();
+        p.lc.f_random[2] = lb_coupl_pref2 * gaussian_random();
 #elif defined(GAUSSRANDOMCUT)
-      p.lc.f_random[0] = lb_coupl_pref2 * gaussian_random_cut();
-      p.lc.f_random[1] = lb_coupl_pref2 * gaussian_random_cut();
-      p.lc.f_random[2] = lb_coupl_pref2 * gaussian_random_cut();
+        p.lc.f_random[0] = lb_coupl_pref2 * gaussian_random_cut();
+        p.lc.f_random[1] = lb_coupl_pref2 * gaussian_random_cut();
+        p.lc.f_random[2] = lb_coupl_pref2 * gaussian_random_cut();
 #elif defined(FLATNOISE)
-      p.lc.f_random[0] = lb_coupl_pref * (d_random() - 0.5);
-      p.lc.f_random[1] = lb_coupl_pref * (d_random() - 0.5);
-      p.lc.f_random[2] = lb_coupl_pref * (d_random() - 0.5);
+        p.lc.f_random[0] = lb_coupl_pref * (d_random() - 0.5);
+        p.lc.f_random[1] = lb_coupl_pref * (d_random() - 0.5);
+        p.lc.f_random[2] = lb_coupl_pref * (d_random() - 0.5);
+      } else {
+        p.lc.f_random = {0.0, 0.0, 0.0};
+      }
 #else // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM

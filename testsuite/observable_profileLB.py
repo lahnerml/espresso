@@ -47,6 +47,11 @@ class ObservableProfileLBCommon(object):
     system = espressomd.System(box_l=[12.0, 12.0, 12.0])
     system.time_step = TIME_STEP
     system.cell_system.skin = 0.4 * AGRID
+    # if we use p4est we have to set a dummy interaction to obtain a meaningful
+    # discretization
+    if espressomd.has_features("LB_ADAPTIVE"):
+        system.non_bonded_inter[0, 0].lennard_jones.set_params(
+            epsilon=1.0, sigma=1.0, cutoff=0.3, shift="auto")
 
     def set_fluid_velocities(self):
         """Set an x dependent fluid velocity."""

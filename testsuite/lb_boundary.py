@@ -85,6 +85,9 @@ class LBBoundariesCPU(ut.TestCase, LBBoundariesBase):
     lbf = None
 
     def setUp(self):
+        if espressomd.has_features("LB_ADAPTIVE"):
+            self.system.non_bonded_inter[0, 0].lennard_jones.set_params(
+                epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
         if not self.lbf:
             self.lbf = espressomd.lb.LBFluid(
                 visc=1.0,

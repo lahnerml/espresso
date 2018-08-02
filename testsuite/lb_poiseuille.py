@@ -112,6 +112,9 @@ class LBPoiseuilleCommon(object):
 class LBCPUPoiseuille(ut.TestCase, LBPoiseuilleCommon):
     """Test for the CPU implementation of the LB."""
     def setUp(self):
+        if espressomd.has_features("LB_ADAPTIVE"):
+            self.system.non_bonded_inter[0, 0].lennard_jones.set_params(
+                epsilon=1.0, sigma=1.0, cutoff=0.3, shift="auto")
         self.lbf = espressomd.lb.LBFluid(**LB_PARAMS)
 
 

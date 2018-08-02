@@ -3833,8 +3833,10 @@ void calc_particle_lattice_ia() {
       MPI_Barrier(comm_cart);
       if (this_node != foo) continue;
 
+#if 0
       fprintf(stderr, "[rank %i] local particles (%li particles, %i cells)\n",
               this_node, local_cells.particles().size(), local_cells.n);
+#endif
       /* local cells */
       for (auto &p : local_cells.particles()) {
         current_coupling_element.reset();
@@ -3857,6 +3859,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
+#if 0
       // print coupling info
       std::sort(coupling_local.begin(), coupling_local.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
@@ -3894,6 +3897,7 @@ void calc_particle_lattice_ia() {
 
       fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
               this_node, ghost_cells.particles().size(), ghost_cells.n);
+#endif
       /* ghost cells */
       for (auto &p : ghost_cells.particles()) {
 #ifndef DD_P4EST
@@ -3933,6 +3937,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
+#if 0
       // print coupling info
       std::sort(coupling_ghost.begin(), coupling_ghost.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
@@ -3967,7 +3972,7 @@ void calc_particle_lattice_ia() {
                   });
         fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
-
+#endif
     }
 #ifdef DD_P4EST
     // ghost exchange

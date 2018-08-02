@@ -30,7 +30,7 @@ class TestLB(ut.TestCase):
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
-              'box_l': 16.0,
+              'box_l': 12.0,
               'dens': 0.85,
               'viscosity': 30.0,
               'friction': 2.0,
@@ -55,8 +55,7 @@ class TestLB(ut.TestCase):
     system.cell_system.skin = params['skin']
 
     system.non_bonded_inter[0, 0].lennard_jones.set_params(
-        epsilon=1.0, sigma=1.0, cutoff=0.5, shift="auto")
-    # system.cell_system.set_p4est_dd(use_verlet_lists=False)
+        epsilon=1.0, sigma=1.0, cutoff=0.3, shift="auto")
 
     def test_mass_momentum_thermostat(self):
         self.system.actors.clear()

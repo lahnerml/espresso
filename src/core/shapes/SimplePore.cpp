@@ -59,7 +59,15 @@ int SimplePore::calculate_dist(const double *ppos, double *dist,
     dz *= -1;
   }
 
+  bool inside;
+  if (dz == 0.) {      // cylinder section
+    inside = (dr < 0);
+  } else {             // smoothing area
+    inside = (dr < 0 && std::abs(dz) < 0);
+  }
+  //bool inside = std::abs(dz) <= m_smoothing_rad;
   *dist = std::sqrt(dr * dr + dz * dz);
+  if (inside) *dist *= -1;
   for (int i = 0; i < 3; i++) {
     vec[i] = -dr * e_r[i] + -dz * e_z[i];
   }

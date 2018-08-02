@@ -553,6 +553,7 @@ inline void lb_local_fields_get_boundary_flag(Lattice::index_t index,
   }
 
   *boundary = lbfields[index].boundary;
+}
 #else
 void lb_local_fields_get_boundary_flag(uint64_t index, int *boundary);
 #endif // LB_ADAPTIVE

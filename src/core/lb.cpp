@@ -1740,11 +1740,27 @@ int lb_lbnode_get_boundary(int *ind, int *p_boundary) {
                              lblattice.halo_grid);
 
     mpi_recv_fluid_boundary_flag(node, index, p_boundary);
+#else
+    int64_t index = p4est_utils_cell_morton_idx(ind[0], ind[1], ind[2]);
+    int proc = p4est_utils_idx_to_proc(forest_order::adaptive_LB, index);
+
+    mpi_recv_fluid_boundary_flag(proc, index, p_boundary);
 #endif // LB_ADAPTIVE
 #endif // LB
   }
   return 0;
 }
+
+#ifdef LB_ADAPTIVE
+void lb_local_fields_get_boundary_flag(uint64_t index, int *boundary) {
+  p4est_locidx_t qid = p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
+  P4EST_ASSERT(0 <= qid && qid < adapt_p4est->local_num_quadrants);
+
+  auto quad = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+  auto sid = adapt_virtual->quad_qreal_offset[qid];
+  *boundary = lbadapt_local_data[quad->level][sid].lbfields.boundary;
+}
+#endif
 
 #endif // defined (LB) || defined (LB_GPU)
 

@@ -541,9 +541,9 @@ inline void lb_calc_local_fields(Lattice::index_t index, double *rho, double *j,
 }
 
 #ifdef LB_BOUNDARIES
+#ifndef LB_ADAPTIVE
 inline void lb_local_fields_get_boundary_flag(Lattice::index_t index,
                                               int *boundary) {
-#ifndef LB_ADAPTIVE
 
   if (!(lattice_switch & LATTICE_LB)) {
     runtimeErrorMsg() << "Error in lb_local_fields_get_boundary_flag in "
@@ -553,8 +553,9 @@ inline void lb_local_fields_get_boundary_flag(Lattice::index_t index,
   }
 
   *boundary = lbfields[index].boundary;
+#else
+void lb_local_fields_get_boundary_flag(uint64_t index, int *boundary);
 #endif // LB_ADAPTIVE
-}
 #endif
 
 /** Calculate the local fluid momentum.

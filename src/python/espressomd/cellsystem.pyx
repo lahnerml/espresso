@@ -82,7 +82,7 @@ class P4estDD:
         if md_metric == "" or lb_metric == "":
             raise ValueError("Supply md_metric and lb_metric parameters.")
         # Same ordering as forest_order!
-        self.__lbmd_instance.call_method("repart", md_alpha=md_alpha, lb_alpha=lb_alpha, md_metirc=md_metric, lb_metric=lb_metric)
+        self.__lbmd_instance.call_method("repart", md_alpha=md_alpha, lb_alpha=lb_alpha, md_metric=md_metric, lb_metric=lb_metric)
 
 
 cdef class CellSystem(object):

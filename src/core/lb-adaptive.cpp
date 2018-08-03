@@ -2787,7 +2787,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   neighbor_count = 1;
 
   // determine which neighbors to find
-  std::array<double, 3> quad_pos;
+  std::array<double, 3> quad_pos, neighbor_quad_pos;
   p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
   double dis;
   for (int d = 0; d < 3; ++d) {
@@ -2890,6 +2890,11 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
               Utils::morton_idx_to_coords(quad_index));
           current_coupling_element.delta.push_back(delta[neighbor_count]);
         }
+        // make sure that the quadrants are not too far apart
+        p4est_utils_get_midpoint(adapt_p4est, tree, q,
+                                 neighbor_quad_pos.data());
+        P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
+                                                    neighbor_quad_pos, q->level));
 
         ++neighbor_count;
         ++n_neighbors_per_dir;
@@ -2921,6 +2926,12 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
               Utils::morton_idx_to_coords(quad_index));
           current_coupling_element.delta.push_back(delta[neighbor_count]);
         }
+        // make sure that the quadrants are not too far apart
+        p4est_utils_get_midpoint(adapt_p4est, tree, q,
+                                 neighbor_quad_pos.data());
+        P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
+                     neighbor_quad_pos, q->level));
+
         ++neighbor_count;
         ++n_neighbors_per_dir;
       }

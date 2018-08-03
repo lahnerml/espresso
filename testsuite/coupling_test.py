@@ -3,18 +3,16 @@ import unittest as ut
 import numpy as np
 import numpy.testing
 import espressomd
-from espressomd import lb
+from espressomd import lb, cellsystem
 from itertools import product
 
 
-@ut.skipIf(not espressomd.has_features("LB_ADAPTIVE") or
-           not espressomd.has_features("LB"),
+@ut.skipIf(not espressomd.has_features("LB_ADAPTIVE"),
            "Features not available, skipping test!")
-class TestLBGetUAtPos(ut.TestCase):
+class TestCoupling(ut.TestCase):
     """
-    Check velocities at particle positions are sorted by ``id`` and
-    quantitatively correct (only LB GPU).
-
+    Check velocities at particle positions are interpolated correctly in a very
+    synthetic scenario where we interpolate between 0 and 1.
     """
     @classmethod
     def setUpClass(self):
@@ -33,6 +31,7 @@ class TestLBGetUAtPos(ut.TestCase):
         self.system = espressomd.System(box_l=[1.0, 1.0, 1.0])
         self.system.box_l = self.params['box_l']
         self.system.cell_system.skin = 0.2
+        self.p4est_dd = self.system.cell_system.set_p4est_dd()
         self.system.time_step = 0.01
 
         # setup dummy md grid
@@ -54,6 +53,9 @@ class TestLBGetUAtPos(ut.TestCase):
             self.lb_fluid[n].velocity = [0., 0., 0.]
         for n in product(range(2), range(2), range(1, 2)):
             self.lb_fluid[n].velocity = [0., 0., 1.]
+
+        # trigger repart to force a ghost exchange
+        self.p4est_dd.repart_lbmd(1.0, "ncells", 1.0, "n_cells")
 
         # calculate positions (as well as expected velocity)
         self.pos = np.linspace(0, 1, num=self.n_pos_to_check, dtype=float)
@@ -84,6 +86,6 @@ class TestLBGetUAtPos(ut.TestCase):
 
 if __name__ == "__main__":
     suite = ut.TestSuite()
-    suite.addTests(ut.TestLoader().loadTestsFromTestCase(TestLBGetUAtPos))
+    suite.addTests(ut.TestLoader().loadTestsFromTestCase(TestCoupling))
     result = ut.TextTestRunner(verbosity=4).run(suite)
     sys.exit(not result.wasSuccessful())

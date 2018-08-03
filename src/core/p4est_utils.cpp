@@ -266,6 +266,36 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
 #endif // defined(LB_ADAPTIVE)
 }
 
+static inline int count_trailing_zeros(int x)
+{
+  int z = 0;
+  for (; (x & 1) == 0; x >>= 1) z++;
+  return z;
+}
+
+int p4est_utils_determine_grid_level(double mesh_width,
+                                     std::array<int, 3> &ncells) {
+  // compute number of cells
+  if (mesh_width > ROUND_ERROR_PREC * box_l[0]) {
+    ncells[0] = std::max<int>(box_l[0] / mesh_width, 1);
+    ncells[1] = std::max<int>(box_l[1] / mesh_width, 1);
+    ncells[2] = std::max<int>(box_l[2] / mesh_width, 1);
+  }
+
+  // divide all dimensions by biggest common power of 2
+  return count_trailing_zeros(ncells[0] | ncells[1] | ncells[2]);
+}
+
+void p4est_utils_set_cellsize_optimal(double mesh_width) {
+  std::array<int, 3> ncells = {{1, 1, 1}};
+
+  int grid_level = p4est_utils_determine_grid_level(mesh_width, ncells);
+
+  lb_conn_brick[0] = ncells[0] >> grid_level;
+  lb_conn_brick[1] = ncells[1] >> grid_level;
+  lb_conn_brick[2] = ncells[2] >> grid_level;
+}
+
 void p4est_utils_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
                                       p8est_quadrant_t *q, double *xyz) {
   p8est_qcoord_to_vertex(p8est->connectivity, which_tree, q->x, q->y, q->z,
@@ -1345,6 +1375,15 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
 
   p4est_partition_given(t1, t1_quads_per_proc.data());
   p4est_partition_given(t2, t2_quads_per_proc.data());
+}
+
+bool adaptive_lb_is_active()
+{
+#ifdef LB_ADAPTIVE
+  return adapt_p4est != nullptr;
+#else
+  return false;
+#endif
 }
 
 #endif // defined (LB_ADAPTIVE) || defined (DD_P4EST)

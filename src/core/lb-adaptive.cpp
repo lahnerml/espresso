@@ -189,18 +189,8 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 }
 
 void lbadapt_init() {
-  // set levels to a regular grid if nothing else is specified
-  if (p4est_params.min_ref_level <= 0) {
-    p4est_params.min_ref_level =
-        Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
-  }
-  if (p4est_params.max_ref_level <= 0) {
-    p4est_params.max_ref_level =
-        Utils::nat_log2_floor((int) (box_l[0] / lbpar.agrid));
-  }
-
   // reset p4est
-  mpi_lbadapt_grid_init(0, p4est_params.min_ref_level);
+  mpi_lbadapt_grid_init(0, 0);
 
   // reset data
   lbadapt_local_data.clear();

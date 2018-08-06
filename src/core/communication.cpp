@@ -297,7 +297,13 @@ void mpi_init() {
   MPI_Comm_size(MPI_COMM_WORLD, &n_nodes);
 
   int reorder = 1;
-  MPI_Dims_create(n_nodes, 3, node_grid);
+  if (n_nodes != 2)
+    MPI_Dims_create(n_nodes, 3, node_grid);
+  else {
+    node_grid[0] = 1;
+    node_grid[1] = 1;
+    node_grid[2] = 2;
+  }
 
   mpi_reshape_communicator({{node_grid[0], node_grid[1], node_grid[2]}},
                            /* periodicity */ {{1, 1, 1}});

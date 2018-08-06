@@ -30,7 +30,7 @@ class TestLB(ut.TestCase):
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
-              'box_l': 12.0,
+              'box_l': 16.0,
               'dens': 0.85,
               'viscosity': 30.0,
               'friction': 2.0,

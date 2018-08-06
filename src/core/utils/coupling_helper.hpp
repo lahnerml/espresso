@@ -17,6 +17,11 @@ typedef struct coupling_helper {
   std::array<double, 3> particle_position;
   std::array<double, 3> particle_force;
   std::vector<double> delta;
+#ifdef LB_ADAPTIVE
+  bool cell_positions_wrapped = true;
+#else
+  bool cell_positions_wrapped = false;
+#endif
   std::vector<std::array <uint64_t, 3> > cell_positions;
   std::vector<std::array <double, 3> > fluid_force;
 
@@ -24,12 +29,35 @@ typedef struct coupling_helper {
     particle_id = -1;
     particle_position = {{-1., -1., -1.}};
     delta.clear();
+#ifdef LB_ADAPTIVE
+    cell_positions_wrapped = true;
+#else
+    cell_positions_wrapped = false;
+#endif
     cell_positions.clear();
     fluid_force.clear();
     particle_force = {{-1., -1., -1.}};
   }
 
+  void preprocess_position() {
+    if (!cell_positions_wrapped) {
+      for (auto &p : cell_positions) {
+        for (int i = 0; i < 3; ++i) {
+          if (p[i] == 0) {
+            p[i] = 31;
+          } else if (p[i] == 33) {
+            p[i] = 0;
+          } else {
+            --p[i];
+          }
+        }
+      }
+      cell_positions_wrapped = true;
+    }
+  }
+
   std::string print(std::vector<uint64_t> &coupling_order) {
+    preprocess_position();
     std::string res =
         "Particle " + std::to_string(particle_id) + ": (" +
         std::to_string(particle_position[0]) + ", " +

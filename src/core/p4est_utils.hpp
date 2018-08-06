@@ -635,7 +635,9 @@ template <typename T>
 static int p4est_utils_allocate_levelwise_storage(
     std::vector<std::vector<T>> &data, p4est_mesh_t *mesh,
     p4est_virtual_t *virtual_quads, bool local_data) {
-  P4EST_ASSERT(data.empty());
+  if (!data.empty()) {
+    p4est_utils_deallocate_levelwise_storage(data);
+  }
 
   // allocate data for each level
   data = std::vector<std::vector<T>>(P8EST_QMAXLEVEL, std::vector<T>());

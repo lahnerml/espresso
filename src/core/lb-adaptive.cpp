@@ -372,7 +372,7 @@ void lbadapt_reinit_fluid_per_cell() {
         lb_float rho = lbpar.rho * h_max * h_max * h_max;
         // start with fluid at rest and no stress
         lb_float j[3] = {0., 0., 0.};
-        lb_float pi[6] = {0., 0., 0., 0., 0., 0.};
+        std::array<lb_float, 6> pi = {{0., 0., 0., 0., 0., 0.}};
 #ifndef LB_ADAPTIVE_GPU
         lbadapt_calc_n_from_rho_j_pi(data->lbfluid, rho, j, pi,
                                      p4est_params.h[level]);
@@ -803,7 +803,9 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
 /*** HELPER FUNCTIONS ***/
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
-                                 lb_float *j, lb_float *pi, lb_float local_h) {
+                                 lb_float *j,
+                                 const std::array<lb_float, 6> &pi,
+                                 lb_float local_h) {
   int i;
   lb_float local_rho, local_j[3], local_pi[6], trace;
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];

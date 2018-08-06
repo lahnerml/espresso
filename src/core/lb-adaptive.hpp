@@ -221,7 +221,9 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
  * \param [in]      h          The local mesh-width.
  */
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
-                                 lb_float *j, lb_float *pi, lb_float h);
+                                 lb_float *j,
+                                 const std::array<lb_float, 6> &pi,
+                                 lb_float h);
 
 /** Calculate modes for MRT scheme
  *

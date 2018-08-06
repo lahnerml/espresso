@@ -1898,7 +1898,7 @@ void mpi_send_exclusion_slave(int part1, int part2) {
 }
 
 /************** REQ_SET_FLUID **************/
-void mpi_send_fluid(int node, int index, double rho, double *j, double *pi) {
+void mpi_send_fluid(int node, int index, double rho, const std::array<double, 3> &j, const std::array<double, 6> &pi) {
 #ifdef LB
 #ifndef LB_ADAPTIVE_GPU
   if (node == this_node) {
@@ -1919,8 +1919,9 @@ void mpi_send_fluid_slave(int node, int index) {
   if (node == this_node) {
     double data[10];
     MPI_Recv(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart, MPI_STATUS_IGNORE);
-
-    lb_calc_n_from_rho_j_pi(index, data[0], &data[1], &data[4]);
+    std::array<double, 3> j = {{data[1], data[2], data[3]}};
+    std::array<double, 6> pi = {{data[4], data[5], data[6], data[7], data[8], data[9]}};
+    lb_calc_n_from_rho_j_pi(index, data[0], j, pi);
   }
 #endif // !LB_ADAPTIVE_GPU
 #endif // LB
@@ -2692,6 +2693,7 @@ void mpi_send_fluid_populations(int node, int index, double *pop) {
     MPI_Send(pop, 19 * LB_COMPONENTS, MPI_DOUBLE, node, SOME_TAG, comm_cart);
   }
 #endif // LB_ADAPTIVE_GPU
+  lbpar.resend_halo = 1;
 #endif // LB
 }
 
@@ -2705,6 +2707,7 @@ void mpi_send_fluid_populations_slave(int node, int index) {
     lb_set_populations(index, data);
   }
 #endif // LB_ADAPTIVE_GPU
+  lbpar.resend_halo = 1;
 #endif // LB
 }
 

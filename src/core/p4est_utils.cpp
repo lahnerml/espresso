@@ -421,18 +421,25 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
                                     int level_q2) {
   bool touching = true;
   for (int i = 0; i < 3; ++i) {
-    if (level_q1 == level_q2)
-      touching &= ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
-                    p4est_params.h[level_q1]) ||
-                   (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
-                    p4est_params.h[level_q1]));
-    else
-      touching &= ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
-                    0.5 * (p4est_params.h[level_q1] +
-                           p4est_params.h[level_q2])) ||
-                   (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
-                    0.5 * (p4est_params.h[level_q1] +
-                           p4est_params.h[level_q2])));
+    if (level_q1 == level_q2) {
+      touching &=
+          (((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             p4est_params.h[level_q1]) ||
+            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             p4est_params.h[level_q1])) ||
+           ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0 ||
+            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0))));
+    } else {
+      touching &=
+          (((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             0.5 * (p4est_params.h[level_q1] +
+                    p4est_params.h[level_q2])) ||
+            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             0.5 * (p4est_params.h[level_q1] +
+                    p4est_params.h[level_q2]))) ||
+           ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0. ||
+            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0.))));
+    }
   }
   return touching;
 }

@@ -123,8 +123,8 @@ LB_Parameters lbpar = {
 };
 
 /** The DnQm model to be used. */
-LB_Model<> lbmodel = {d3q19_lattice, d3q19_coefficients,
-                      d3q19_w, d3q19_modebase, 1. / 3.};
+LB_Model<> lbmodel = {d3q19_lattice, d3q19_coefficients, d3q19_w,
+                      d3q19_modebase, 1. / 3.};
 
 #if (!defined(FLATNOISE) && !defined(GAUSSRANDOMCUT) && !defined(GAUSSRANDOM))
 #define FLATNOISE
@@ -143,13 +143,11 @@ std::vector<LB_FluidNode> lbfields;
 
 /** Communicator for halo exchange between processors */
 HaloCommunicator update_halo_comm = {0, nullptr};
+#else
+int n_lbsteps = 0;
 #endif // !LB_ADAPTIVE
 
 /*@{*/
-
-#ifdef LB_ADAPTIVE
-int n_lbsteps = 0;
-#endif // LB_ADAPTIVE
 
 /** amplitude of the fluctuations in the viscous coupling */
 static double lb_coupl_pref = 0.0;
@@ -515,7 +513,7 @@ int lb_lbfluid_set_remove_momentum(void) {
 #endif // SHANCHEN
 
 int lb_lbfluid_set_ext_force_density(int component, double p_fx, double p_fy,
-                             double p_fz) {
+                                     double p_fz) {
   if (lattice_switch & LATTICE_LB_GPU) {
 #ifdef LB_GPU
     if (lbpar_gpu.tau < 0.0)
@@ -528,10 +526,9 @@ int lb_lbfluid_set_ext_force_density(int component, double p_fx, double p_fy,
     lbpar_gpu.ext_force_density[3 * component + 0] = (float)p_fx;
     lbpar_gpu.ext_force_density[3 * component + 1] = (float)p_fy;
     lbpar_gpu.ext_force_density[3 * component + 2] = (float)p_fz;
-    if (p_fx != 0 || p_fy !=0 || p_fz != 0) {
+    if (p_fx != 0 || p_fy != 0 || p_fz != 0) {
       lbpar_gpu.external_force_density = 1;
-    }
-    else {
+    } else {
       lbpar_gpu.external_force_density = 0;
     }
     lb_reinit_extern_nodeforce_GPU(&lbpar_gpu);
@@ -1552,7 +1549,7 @@ int lb_lbnode_get_u(int *ind, double *p_u) {
  * couple to MD beads when near a wall, see
  * lb_lbfluid_get_interpolated_velocity.
  */
-int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v) {
+int lb_lbfluid_get_interpolated_velocity_global(Vector3d &p, double *v) {
 #ifdef LB_ADAPTIVE
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(p, im);
@@ -1628,6 +1625,7 @@ int lb_lbfluid_get_interpolated_velocity_global(Vector3d& p, double* v) {
     }
   }
 #endif // LB_ADAPTIVE
+
   return 0;
 }
 
@@ -2272,10 +2270,6 @@ int lb_sanity_checks() {
                          "lattice-Boltzmann grid spacing";
     ret = -1;
   }
-  if (thermo_switch & ~THERMO_LB) {
-    runtimeErrorMsg() << "LB must not be used with other thermostats";
-    ret = 1;
-  }
   return ret;
 }
 
@@ -2417,7 +2411,7 @@ void lb_reinit_parameters() {
     /* Eq. (51) Duenweg, Schiller, Ladd, PRE 76(3):036704 (2007).
      * Note that the modes are not normalized as in the paper here! */
     double mu = temperature / lbmodel.c_sound_sq * lbpar.tau * lbpar.tau /
-         (lbpar.agrid * lbpar.agrid);
+                (lbpar.agrid * lbpar.agrid);
     // mu *= agrid*agrid*agrid;  // Marcello's conjecture
 
     for (i = 0; i < 4; i++)
@@ -2427,11 +2421,14 @@ void lb_reinit_parameters() {
         sqrt(mu * lbmodel.e[19][4] *
              (1. - Utils::sqr(lbpar.gamma_bulk))); // Utils::sqr(x) == x*x
     for (i = 5; i < 10; i++)
-      lbpar.phi[i] = sqrt(mu * lbmodel.e[19][i] * (1. - Utils::sqr(lbpar.gamma_shear)));
+      lbpar.phi[i] =
+          sqrt(mu * lbmodel.e[19][i] * (1. - Utils::sqr(lbpar.gamma_shear)));
     for (i = 10; i < 16; i++)
-      lbpar.phi[i] = sqrt(mu * lbmodel.e[19][i] * (1 - Utils::sqr(lbpar.gamma_odd)));
+      lbpar.phi[i] =
+          sqrt(mu * lbmodel.e[19][i] * (1 - Utils::sqr(lbpar.gamma_odd)));
     for (i = 16; i < 19; i++)
-      lbpar.phi[i] = sqrt(mu * lbmodel.e[19][i] * (1 - Utils::sqr(lbpar.gamma_even)));
+      lbpar.phi[i] =
+          sqrt(mu * lbmodel.e[19][i] * (1 - Utils::sqr(lbpar.gamma_even)));
 
     /* lb_coupl_pref is stored in MD units (force)
      * Eq. (16) Ahlrichs and Duenweg, JCP 111(17):8225 (1999).
@@ -2455,37 +2452,6 @@ void lb_reinit_parameters() {
     lb_coupl_pref2 = 0.0;
   }
 #endif // LB_ADAPTIVE
-}
-
-/** Resets the forces on the fluid nodes */
-void lb_reinit_force_densities() {
-#ifdef LB_ADAPTIVE
-  lbadapt_reinit_force_per_cell();
-#else // LB_ADAPTIVE
-  for (Lattice::index_t index = 0; index < lblattice.halo_grid_volume;
-       index++) {
-#ifdef EXTERNAL_FORCES
-    // unit conversion: force density
-    lbfields[index].force_density[0] =
-        lbpar.ext_force_density[0] * pow(lbpar.agrid, 2) * lbpar.tau * lbpar.tau;
-    lbfields[index].force_density[1] =
-        lbpar.ext_force_density[1] * pow(lbpar.agrid, 2) * lbpar.tau * lbpar.tau;
-    lbfields[index].force_density[2] =
-        lbpar.ext_force_density[2] * pow(lbpar.agrid, 2) * lbpar.tau * lbpar.tau;
-#else  // EXTERNAL_FORCES
-    lbfields[index].force_density[0] = 0.0;
-    lbfields[index].force_density[1] = 0.0;
-    lbfields[index].force_density[2] = 0.0;
-    lbfields[index].has_force_density = 0;
-#endif // EXTERNAL_FORCES
-  }
-#endif // LB_ADAPTIVE
-#ifdef LB_BOUNDARIES
-  for (auto it = LBBoundaries::lbboundaries.begin();
-       it != LBBoundaries::lbboundaries.end(); ++it) {
-    (**it).reset_force();
-  }
-#endif // LB_BOUNDARIES
 }
 
 /** (Re-)initializes the fluid according to the given value of rho. */
@@ -2565,7 +2531,6 @@ void lb_init() {
 
   /* setup the initial particle velocity distribution */
   lb_reinit_fluid();
-
 
   LB_TRACE(printf("Initialzing fluid on CPU successful\n"));
 }
@@ -2772,21 +2737,12 @@ inline void lb_relax_modes(Lattice::index_t index, double *mode) {
    * equilibrium value */
   rho = mode[0] + lbpar.rho * lbpar.agrid * lbpar.agrid * lbpar.agrid;
 
-  j[0] = mode[1];
-  j[1] = mode[2];
-  j[2] = mode[3];
-
-/* if forces are present, the momentum density is redefined to
- * include one half-step of the force action.  See the
- * Chapman-Enskog expansion in [Ladd & Verberg]. */
-#ifndef EXTERNAL_FORCES
-  if (lbfields[index].has_force_density || local_cells.particles().size())
-#endif // !EXTERNAL_FORCES
-  {
-    j[0] += 0.5 * lbfields[index].force_density[0];
-    j[1] += 0.5 * lbfields[index].force_density[1];
-    j[2] += 0.5 * lbfields[index].force_density[2];
-  }
+  /* if forces are present, the momentum density is redefined to
+   * include one half-step of the force action.  See the
+   * Chapman-Enskog expansion in [Ladd & Verberg]. */
+  j[0] = mode[1] + 0.5 * lbfields[index].force_density[0];
+  j[1] = mode[2] + 0.5 * lbfields[index].force_density[1];
+  j[2] = mode[3] + 0.5 * lbfields[index].force_density[2];
 
   /* equilibrium part of the stress modes */
   pi_eq[0] = scalar(j, j) / rho;
@@ -2897,24 +2853,39 @@ inline void lb_apply_forces(Lattice::index_t index, double *mode) {
   mode[7] += C[1];
   mode[8] += C[3];
   mode[9] += C[4];
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
+#endif // LB_ADAPTIVE
 }
 
 inline void lb_reset_force_densities(Lattice::index_t index) {
-/* reset force */
-#ifdef EXTERNAL_FORCES
+#ifndef LB_ADAPTIVE
+  /* reset force */
   // unit conversion: force density
-  lbfields[index].force_density[0] =
-      lbpar.ext_force_density[0] * lbpar.agrid * lbpar.agrid * lbpar.tau * lbpar.tau;
-  lbfields[index].force_density[1] =
-      lbpar.ext_force_density[1] * lbpar.agrid * lbpar.agrid * lbpar.tau * lbpar.tau;
-  lbfields[index].force_density[2] =
-      lbpar.ext_force_density[2] * lbpar.agrid * lbpar.agrid * lbpar.tau * lbpar.tau;
-#else  // EXTERNAL_FORCES
-  lbfields[index].force_density[0] = 0.0;
-  lbfields[index].force_density[1] = 0.0;
-  lbfields[index].force_density[2] = 0.0;
-  lbfields[index].has_force_density = 0;
-#endif // EXTERNAL_FORCES
+  lbfields[index].force_density[0] = lbpar.ext_force_density[0] * lbpar.agrid *
+                                     lbpar.agrid * lbpar.tau * lbpar.tau;
+  lbfields[index].force_density[1] = lbpar.ext_force_density[1] * lbpar.agrid *
+                                     lbpar.agrid * lbpar.tau * lbpar.tau;
+  lbfields[index].force_density[2] = lbpar.ext_force_density[2] * lbpar.agrid *
+                                     lbpar.agrid * lbpar.tau * lbpar.tau;
+#else
+  runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
+#endif // LB_ADAPTIVE
+}
+
+/** Resets the forces on the fluid nodes */
+void lb_reinit_force_densities() {
+#ifndef LB_ADAPTIVE
+  for (Lattice::index_t index = 0; index < lblattice.halo_grid_volume;
+       index++) {
+    lb_reset_force_densities(index);
+  }
+#ifdef LB_BOUNDARIES
+  for (auto it = LBBoundaries::lbboundaries.begin();
+       it != LBBoundaries::lbboundaries.end(); ++it) {
+    (**it).reset_force();
+  }
+#endif // LB_BOUNDARIES
 #else
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // LB_ADAPTIVE
@@ -3136,8 +3107,9 @@ inline void lb_collide_stream() {
 #else  // LB_ADAPTIVE
 
 #ifdef VIRTUAL_SITES_INERTIALESS_TRACERS
-// Safeguard the node forces so that we can later use them for the IBM particle update
-// In the following loop the lbfields[XX].force are reset to zero
+  // Safeguard the node forces so that we can later use them for the IBM
+  // particle update
+  // In the following loop the lbfields[XX].force are reset to zero
   // Safeguard the node forces so that we can later use them for the IBM
   // particle update In the following loop the lbfields[XX].force are reset to
   // zero
@@ -3251,16 +3223,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #endif // !LB_ADAPTIVE
   double *local_f, interpolated_u[3], delta_j[3];
 
-#ifdef EXTERNAL_FORCES
-  if (!(p->p.ext_flag & COORD_FIXED(0)) && !(p->p.ext_flag & COORD_FIXED(1)) &&
-      !(p->p.ext_flag & COORD_FIXED(2))) {
-    ONEPART_TRACE(if (p->p.identity == check_id) {
-      fprintf(stderr, "%d: OPT: f = (%.3e,%.3e,%.3e)\n", this_node, p->f.f[0],
-              p->f.f[1], p->f.f[2]);
-    });
-  }
-#endif
-
   /* determine elementary lattice cell surrounding the particle
      and the relative position of the particle in this cell */
 #ifndef LB_ADAPTIVE
@@ -3319,12 +3281,9 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #endif
 
 #ifdef LB_ELECTROHYDRODYNAMICS
-  force[0] = -lbpar.friction *
-             (velocity[0] - interpolated_u[0] - p->p.mu_E[0]);
-  force[1] = -lbpar.friction *
-             (velocity[1] - interpolated_u[1] - p->p.mu_E[1]);
-  force[2] = -lbpar.friction *
-             (velocity[2] - interpolated_u[2] - p->p.mu_E[2]);
+  force[0] = -lbpar.friction * (velocity[0] - interpolated_u[0] - p->p.mu_E[0]);
+  force[1] = -lbpar.friction * (velocity[1] - interpolated_u[1] - p->p.mu_E[1]);
+  force[2] = -lbpar.friction * (velocity[2] - interpolated_u[2] - p->p.mu_E[2]);
 #else
   force[0] = -lbpar.friction * (velocity[0] - interpolated_u[0]);
   force[1] = -lbpar.friction * (velocity[1] - interpolated_u[1]);
@@ -3396,10 +3355,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     local_f[0] += delta[x] * delta_j[0] / level_fact;
     local_f[1] += delta[x] * delta_j[1] / level_fact;
     local_f[2] += delta[x] * delta_j[2] / level_fact;
-#if 0
-    fprintf(stderr, "[%i] delta: %lf, f: %lf %lf %lf (level_fact: %lf)\n",
-            x, delta[x], local_f[0], local_f[1], local_f[2], level_fact);
-#endif
+
     current_coupling_element.fluid_force.push_back(
         {{local_f[0], local_f[1], local_f[2]}});
   }
@@ -3432,12 +3388,14 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     // get lattice cell corresponding to source position and interpolate
     // velocity
 #ifndef LB_ADAPTIVE
-    lblattice.map_position_to_lattice(Vector3d(source_position), node_index, delta);
+    lblattice.map_position_to_lattice(Vector3d(source_position), node_index,
+                                      delta);
 #else  // !LB_ADAPTIVE
     dcnt = lbadapt_interpolate_pos_adapt(source_position, node_index, delta,
                                          level);
 #endif // !LB_ADAPTIVE
-    lb_lbfluid_get_interpolated_velocity(Vector3d(source_position), p->swim.v_source.data());
+    lb_lbfluid_get_interpolated_velocity(Vector3d(source_position),
+                                         p->swim.v_source.data());
 
     // calculate and set force at source position
     delta_j[0] =
@@ -3496,7 +3454,7 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
 
   v[0] = v[1] = v[2] = 0.0;
 
-  for (x = 0; x < dcnt; ++x) {
+  for (x = 0; x < dcnt; x++) {
     data = node_index[x];
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;
@@ -3525,21 +3483,11 @@ int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
     for (int i = 0; i < P8EST_DIM; ++i) {
       v[i] += delta[x] * local_j[i] / (local_rho);
     }
-#if 0
-    fprintf(stderr, "[%i] delta: %lf, j: %lf %lf %lf, v: %lf %lf %lf\n",
-            x, delta[x], local_j[0], local_j[1], local_j[2], v[0], v[1], v[2]);
-#endif
   }
-#if 0
-  fprintf(stderr, "v: %lf %lf %lf\n", v[0], v[1], v[2]);
-#endif
 
   for (int i = 0; i < P8EST_DIM; ++i) {
     v[i] *= h_max / lbpar.tau;
   }
-#if 0
-  fprintf(stderr, "v: %lf %lf %lf\n", v[0], v[1], v[2]);
-#endif
 #endif // LB_ADAPTIVE
 #endif // !LB_ADAPTIVE_GPU
   return 0;
@@ -3674,7 +3622,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
     }
   }
 #else //LB_ADAPTIVE
-  for (x = 0; x < dcnt; ++x) {
+  for (x = 0; x < dcnt; x++) {
     data = node_index[x];
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;
@@ -3733,8 +3681,8 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
   v[0] *= h_max / lbpar.tau;
   v[1] *= h_max / lbpar.tau;
   v[2] *= h_max / lbpar.tau;
-
 #endif // !LB_ADAPTIVE_GPU
+
   return;
 }
 
@@ -3774,7 +3722,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
 void calc_particle_lattice_ia() {
 
   if (transfer_momentum) {
-    double force[3] = {0., 0., 0.};
+    double force[3];
 
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
@@ -3785,16 +3733,17 @@ void calc_particle_lattice_ia() {
 #else  // LB_ADAPTIVE
     if (lbpar.resend_halo) { /* first MD step after last LB update */
 
-        /* exchange halo regions (for fluid-particle coupling) */
-        halo_communication(&update_halo_comm, reinterpret_cast<char *>(**lbfluid));
+      /* exchange halo regions (for fluid-particle coupling) */
+      halo_communication(&update_halo_comm,
+                         reinterpret_cast<char *>(**lbfluid));
 
 #ifdef ADDITIONAL_CHECKS
-        lb_check_halo_regions();
+      lb_check_halo_regions();
 #endif
 
-        /* halo is valid now */
-        lbpar.resend_halo = 0;
-      }
+      /* halo is valid now */
+      lbpar.resend_halo = 0;
+    }
 #endif // LB ADAPTIVE
 
     /* draw random numbers for local particles */
@@ -3848,10 +3797,10 @@ void calc_particle_lattice_ia() {
               {{force[0], force[1], force[2]}};
           coupling_local.push_back(current_coupling_element);
 
-          /* add force to the particle */
-          p.f.f[0] += force[0];
-          p.f.f[1] += force[1];
-          p.f.f[2] += force[2];
+        /* add force to the particle */
+        p.f.f[0] += force[0];
+        p.f.f[1] += force[1];
+        p.f.f[2] += force[2];
 
           ONEPART_TRACE(if (p.p.identity == check_id) {
             fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
@@ -4004,14 +3953,13 @@ void calc_particle_lattice_ia() {
  * This function has to be called after changing the density of
  * a local lattice site in order to set lbpar.rho consistently. */
 void lb_calc_average_rho() {
-  double rho, sum_rho;
+  double local_rho, sum_rho;
 #ifdef LB_ADAPTIVE
-  rho = 0.0;
-  p8est_iterate(adapt_p4est, nullptr, (void *)&rho, lbadapt_calc_local_rho, nullptr,
-                nullptr, nullptr);
-  MPI_Allreduce(&rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
+  local_rho = 0.0;
+  p8est_iterate(adapt_p4est, nullptr, (void *)&local_rho,
+                lbadapt_calc_local_rho, nullptr, nullptr, nullptr);
 #else  // LB_ADAPTIVE
-  double local_rho = 0.0;
+  double rho = 0.0;
   Lattice::index_t index;
   int x, y, z;
 
@@ -4032,8 +3980,8 @@ void lb_calc_average_rho() {
     // skip halo region
     index += 2 * lblattice.halo_grid[0];
   }
+#endif
   MPI_Allreduce(&local_rho, &sum_rho, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
-#endif // LB_ADAPTIVE
 
   /* calculate average density in MD units */
   // TODO!!!

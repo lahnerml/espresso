@@ -3758,32 +3758,6 @@ void calc_particle_lattice_ia() {
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_local) {
         std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        std::iota(coupling_order.begin(), coupling_order.end(), 0);
-        std::sort(coupling_order.begin(), coupling_order.end(),
-                  [&coupling_element](const uint64_t a, const uint64_t b) -> bool
-                  {
-#ifdef LB_ADAPTIVE
-                    int n_q[3] = {32, 32, 32};
-                    return (get_linear_index(
-                                coupling_element.cell_positions[a][0],
-                                coupling_element.cell_positions[a][1],
-                                coupling_element.cell_positions[a][2], n_q) <
-                            get_linear_index(
-                                coupling_element.cell_positions[b][0],
-                                coupling_element.cell_positions[b][1],
-                                coupling_element.cell_positions[b][2], n_q));
-#else
-                    int n_q[3] = {34, 34, 34};
-                return (get_linear_index(
-                            coupling_element.cell_positions[a][0],
-                            coupling_element.cell_positions[a][1],
-                            coupling_element.cell_positions[a][2], n_q) <
-                        get_linear_index(
-                            coupling_element.cell_positions[b][0],
-                            coupling_element.cell_positions[b][1],
-                            coupling_element.cell_positions[b][2], n_q));
-#endif
-                  });
         fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
 
@@ -3836,32 +3810,6 @@ void calc_particle_lattice_ia() {
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_ghost) {
         std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        std::iota(coupling_order.begin(), coupling_order.end(), 0);
-        std::sort(coupling_order.begin(), coupling_order.end(),
-                  [&coupling_element](const uint64_t a, const uint64_t b) -> bool
-                  {
-#ifdef LB_ADAPTIVE
-                    int n_q[3] = {32, 32, 32};
-                    return (get_linear_index(
-                        coupling_element.cell_positions[a][0],
-                        coupling_element.cell_positions[a][1],
-                        coupling_element.cell_positions[a][2], n_q) <
-                            get_linear_index(
-                        coupling_element.cell_positions[b][0],
-                        coupling_element.cell_positions[b][1],
-                        coupling_element.cell_positions[b][2], n_q));
-#else
-                    int n_q[3] = {34, 34, 34};
-                return (get_linear_index(
-                        coupling_element.cell_positions[a][0],
-                        coupling_element.cell_positions[a][1],
-                        coupling_element.cell_positions[a][2], n_q) <
-                            get_linear_index(
-                        coupling_element.cell_positions[b][0],
-                        coupling_element.cell_positions[b][1],
-                        coupling_element.cell_positions[b][2], n_q));
-#endif
-                  });
         fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
 #endif

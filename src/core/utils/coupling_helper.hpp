@@ -64,6 +64,27 @@ typedef struct coupling_helper {
 
   std::string print(std::vector<uint64_t> &coupling_order) {
     preprocess_position();
+    std::iota(coupling_order.begin(), coupling_order.end(), 0);
+    std::sort(coupling_order.begin(), coupling_order.end(),
+              [&](const uint64_t a, const uint64_t b) -> bool {
+#ifdef LB_ADAPTIVE
+              int n_q[3] = {32, 32, 32};
+              return (get_linear_index(
+                          cell_positions[a][0], cell_positions[a][1],
+                          cell_positions[a][2], n_q) <
+                      get_linear_index(
+                          cell_positions[b][0], cell_positions[b][1],
+                          cell_positions[b][2], n_q));
+#else
+              int n_q[3] = {34, 34, 34};
+              return (get_linear_index(
+                          cell_positions[a][0], cell_positions[a][1],
+                          cell_positions[a][2], n_q) <
+                      get_linear_index(
+                          cell_positions[b][0], cell_positions[b][1],
+                          cell_positions[b][2], n_q));
+#endif
+              });
     std::string res =
         "Particle " + std::to_string(particle_id) + ": (" +
         std::to_string(particle_position[0]) + ", " +

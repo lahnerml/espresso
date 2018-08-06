@@ -414,6 +414,23 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
       (qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
        pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC));
 }
+
+bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
+                                    int level_q1,
+                                    std::array<double, 3> pos_mp_q2,
+                                    int level_q2) {
+  bool touching = true;
+  for (int i = 0; i < 3; ++i) {
+    if (level_q1 == level_q2)
+      touching &= std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
+                  p4est_params.h[level_q1];
+    else
+      touching &= std::abs(pos_mp_q1[i] - pos_mp_q2[i]) <
+                  0.5 * (p4est_params.h[level_q1] +
+                         p4est_params.h[level_q2]);
+  }
+  return touching;
+}
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
 std::array<uint64_t, 3> p4est_utils_idx_to_pos(uint64_t idx) {

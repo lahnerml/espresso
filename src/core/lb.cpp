@@ -3328,13 +3328,7 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[1];
         local_f[2] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[2];
-#if 0
-        fprintf(stderr,
-                "[%i, %i, %i] delta: [%lf, %lf, %lf] prod: %lf f: %lf %lf %lf\n",
-                x, y, z, delta[3*x + 0], delta[3*y + 1], delta[3*z+2],
-                delta[3*x + 0] * delta[3*y + 1] * delta[3*z+2],
-                local_f[0], local_f[1], local_f[2]);
-#endif
+
         current_coupling_element.delta.push_back(delta[3 * x + 0] *
                                                  delta[3 * y + 1] *
                                                  delta[3 * z + 2]);
@@ -3782,7 +3776,7 @@ void calc_particle_lattice_ia() {
       MPI_Barrier(comm_cart);
       if (this_node != foo) continue;
 
-#if 0
+#if 1
       fprintf(stderr, "[rank %i] local particles (%li particles, %i cells)\n",
               this_node, local_cells.particles().size(), local_cells.n);
 #endif
@@ -3808,7 +3802,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
-#if 0
+#if 1
       // print coupling info
       std::sort(coupling_local.begin(), coupling_local.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
@@ -3886,7 +3880,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
-#if 0
+#if 1
       // print coupling info
       std::sort(coupling_ghost.begin(), coupling_ghost.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
@@ -4497,7 +4491,12 @@ static int lb_check_negative_n(Lattice::index_t index)
         if (lbfluid[1][i][index]+lbmodel.coeff[i][0]*lbpar.rho < 0.0) {
             ++localfails;
             ++failcounter;
-            fprintf(stderr,"%d: Negative population n[%d]=%le (failcounter=%d, rancounter=%d).\n   Check your parameters if this occurs too often!\n",this_node,i,lbmodel.coeff[i][0]*lbpar.rho+lbfluid[1][i][index],failcounter,rancounter);
+            fprintf(stderr,"%d: Negative population n[%d]=%le (failcounter=%d,"
+                           " rancounter=%d).\n   Check your parameters if this"
+                           "occurs too often!\n",
+                           this_node,i,
+                           lbmodel.coeff[i][0]*lbpar.rho+lbfluid[1][i][index],
+                           failcounter,rancounter);
             break;
         }
     }

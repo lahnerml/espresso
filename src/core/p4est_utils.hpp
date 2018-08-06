@@ -514,6 +514,16 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
 bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3],
                                   bool ghost = false);
 
+/** Verify that quadrants are actually touching
+ *
+ * @param pos_mp_q1, pos_mp_q2       Position of midpoint of quadrants
+ * @param level_q1, level_q2   Level of quadrants
+ */
+bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
+                                    int level_q1,
+                                    std::array<double, 3> pos_mp_q2,
+                                    int level_q2);
+
 #if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 /** Binary search for a quadrant within the adaptive p4est */
 p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost);

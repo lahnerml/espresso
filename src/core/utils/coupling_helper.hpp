@@ -23,6 +23,7 @@ typedef struct coupling_helper {
   bool cell_positions_wrapped = false;
 #endif
   std::vector<std::array <uint64_t, 3> > cell_positions;
+  std::vector<std::array <uint64_t, 3> > wrapped_cell_positions;
   std::vector<std::array <double, 3> > fluid_force;
 
   void reset() {
@@ -41,18 +42,23 @@ typedef struct coupling_helper {
 
   void preprocess_position() {
     if (!cell_positions_wrapped) {
-      for (auto &p : cell_positions) {
-        for (int i = 0; i < 3; ++i) {
-          if (p[i] == 0) {
-            p[i] = 31;
-          } else if (p[i] == 33) {
-            p[i] = 0;
+      std::array<uint64_t , 3> wrapped_pos;
+      for (int i = 0; i < cell_positions.size(); ++i) {
+        wrapped_pos = {{0L, 0L, 0L}};
+        for (int j = 0; j < 3; ++j) {
+          if (cell_positions[i][j] == 0) {
+            wrapped_pos[j] = 31;
+          } else if (cell_positions[i][j] == 33) {
+            wrapped_pos[j] = 0;
           } else {
-            --p[i];
+            wrapped_pos[j] = cell_positions[i][j] - 1;
           }
         }
+        wrapped_cell_positions.push_back(wrapped_pos);
       }
       cell_positions_wrapped = true;
+    } else if(wrapped_cell_positions.empty()) {
+      wrapped_cell_positions = cell_positions;
     }
   }
 
@@ -72,6 +78,10 @@ typedef struct coupling_helper {
                  std::to_string(cell_positions[coupling_order[i]][0]) + ", " +
                  std::to_string(cell_positions[coupling_order[i]][1]) + ", " +
                  std::to_string(cell_positions[coupling_order[i]][2]) + "; " +
+                 "wrapped pos: " +
+                 std::to_string(wrapped_cell_positions[coupling_order[i]][0]) + ", " +
+                 std::to_string(wrapped_cell_positions[coupling_order[i]][1]) + ", " +
+                 std::to_string(wrapped_cell_positions[coupling_order[i]][2]) + "; " +
                  "delta: " +
                  std::to_string(delta[coupling_order[i]]) + "; " +
                  "fluid force: (" +

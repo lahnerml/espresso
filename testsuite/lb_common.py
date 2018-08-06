@@ -8,6 +8,7 @@ import espressomd
 import espressomd.lb
 from espressomd import *
 from tests_common import abspath
+import os
 
 
 class TestLB(ut.TestCase):
@@ -101,7 +102,12 @@ class TestLB(ut.TestCase):
         for i in range(self.n_col_part):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
-        self.system.integrator.run(50)
+        #self.system.integrator.run(50)
+        for i in range(50):
+            self.system.analysis.analyze_linear_momentum()
+            self.system.integrator.run(1)
+            self.system.analysis.analyze_linear_momentum()
+            os._exit(0)
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]

@@ -456,9 +456,9 @@ int64_t p4est_utils_cell_morton_idx(uint64_t x, uint64_t y, uint64_t z) {
 }
 
 int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
-                               p8est_quadrant_t *q,
-                               p4est_topidx_t which_tree,
-                               std::array<int, 3> displace) {
+                               const p8est_quadrant_t *q,
+                               const p4est_topidx_t which_tree,
+                               const std::array<int, 3> displace) {
   int x, y, z;
   double xyz[3];
   p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z, xyz);
@@ -504,7 +504,7 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
 }
 
 
-int64_t p4est_utils_global_idx(forest_order forest, p8est_quadrant_t *q,
+int64_t p4est_utils_global_idx(forest_order forest, const p8est_quadrant_t *q,
                                p4est_topidx_t tree) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
   return p4est_utils_global_idx(fi, q, tree);

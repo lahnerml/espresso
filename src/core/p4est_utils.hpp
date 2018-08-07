@@ -549,9 +549,9 @@ int64_t p4est_utils_cell_morton_idx(uint64_t x, uint64_t y, uint64_t z);
  * @return         Morton-index of given quadrant.
  */
 int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
-                               p8est_quadrant_t *q,
-                               p4est_topidx_t tree,
-                               std::array<int, 3> displace = {{0, 0, 0}});
+                               const p8est_quadrant_t *q,
+                               const p4est_topidx_t tree,
+                               const std::array<int, 3> displace = {{0, 0, 0}});
 
 /** Calculate a Morton-index from a position in Cartesian coordinates
  *
@@ -716,7 +716,7 @@ int p4est_utils_perform_adaptivity_step();
 #if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 template <typename T>
 /** Flatten level-wise data, i.e. inverse operation of
- * \ref p4est_utils_post_gridadapt_insert_data
+ * \ref p4est_utils_unflatten_data
  *
  * @tparam T                 Data type of numerical payload.
  * @param p4est              The forest whose numerical payload is to be
@@ -744,6 +744,18 @@ int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
 }
 
 template <typename T>
+/** Unflatten flat data into level-wise datastructure, i.e. inverse operation of
+ * \ref p4est_utils_flatten_data
+ *
+ * @tparam T                 Data type of numerical payload.
+ * @param p4est              The forest whose numerical payload is to be
+ *                           unflattened.
+ * @param mesh               Mesh structure of current p4est.
+ * @param virtual_quads      Virtual quadrants containing the mapping between
+ *                           quadrant id and its storage id.
+ * @param data_flat          Flat data-structure containing original data
+ * @param data_levelwise     Level-wise data-structure to be populated
+ */
 int p4est_utils_unflatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
                                p8est_virtual_t *virtual_quads,
                                std::vector<T> &data_flat,

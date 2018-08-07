@@ -3751,7 +3751,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
-#if 1
+#if 0
       // print coupling info
       std::sort(coupling_local.begin(), coupling_local.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
@@ -3803,7 +3803,7 @@ void calc_particle_lattice_ia() {
           });
         }
       }
-#if 1
+#if 0
       // print coupling info
       std::sort(coupling_ghost.begin(), coupling_ghost.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool

@@ -561,38 +561,6 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   }
 }
 
-p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
-  p4est_gloidx_t cmp_idx = -1;
-  p4est_locidx_t count, step, index, first;
-  p4est_quadrant_t *q;
-  p4est_locidx_t zlvlfill = 0;
-  first = 0;
-  count = adapt_ghost->ghosts.elem_count;
-  while (0 < count) {
-    step = 0.5 * count;
-    index = first + step;
-    q = p4est_quadrant_array_index(&adapt_ghost->ghosts, index);
-    p4est_topidx_t tid = q->p.piggy1.which_tree;
-    cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
-    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
-    if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
-      return index;
-    } else if (cmp_idx < idx) {
-      // if we found something smaller: move to latter part of search space
-      first = index + 1;
-      count -= step + 1;
-    } else {
-      // else limit search space to half the array
-      count = step;
-    }
-  }
-  if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
-    return first;
-  } else {
-    return -1;
-  }
-}
-
 p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index) {
   return bin_search_loc_quads(index);
 }

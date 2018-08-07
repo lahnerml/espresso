@@ -2757,18 +2757,24 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   fold_position(pos,fold);
 
   // Find quadrant containing position and store its payload.
-  int64_t qidx = lbadapt_map_pos_to_ghost(pos);
-  if (qidx < 0 || adapt_ghost->ghosts.elem_count <= qidx)
+  uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
+  std::vector<p4est_locidx_t> quad_indices;
+  p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->ghosts,
+                                       quad_indices);
+  if(quad_indices.empty() ||
+     !p4est_utils_pos_sanity_check(quad_indices[0], pos, true)) {
     return neighbor_count;
-  int lvl, sid, tree, zarea, zsize;
+  }
+
+  int lvl, sid, tree, zsize;
   p8est_quadrant_t *quad =
-      p8est_quadrant_array_index(&adapt_ghost->ghosts, qidx);
+      p8est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[0]);
   tree = quad->p.piggy3.which_tree;
   lvl = quad->level;
-  sid = adapt_virtual->quad_greal_offset[qidx];
+  sid = adapt_virtual->quad_greal_offset[quad_indices[0]];
   nodes[0] = &lbadapt_ghost_data[lvl].at(sid);
   level[0] = lvl;
-  neighbor_count = 1;
+  ++neighbor_count;
 
   // determine which neighbors to find
   std::array<double, 3> quad_pos, neighbor_quad_pos;
@@ -2790,11 +2796,11 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
              interpolation_weights[weight_indices[nearest_corner][1]] *
              interpolation_weights[weight_indices[nearest_corner][2]];
   zsize = 1 << (p4est_params.max_ref_level - lvl);
-  zarea = zsize * zsize * zsize;
 
   if (safe_quads) {
     quad_index =
-        p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
+        p4est_utils_global_idx(forest, quad,
+                               adapt_mesh->ghost_to_tree[quad_indices[0]]);
     current_coupling_element.cell_positions.push_back(
         Utils::morton_idx_to_coords(quad_index));
     current_coupling_element.delta.push_back(delta[0]);
@@ -2810,7 +2816,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
        std::numeric_limits<uint64_t>::max(),
        std::numeric_limits<uint64_t>::max()}};
   std::array<int, 3> displace;
-  for (int i = 0; i < 7; ++i) {
+  for (int i = 1; i < 8; ++i) {
     // reset displace
     displace = {{0, 0, 0}};
 
@@ -2833,93 +2839,100 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       else
         displace[2] = -zsize;
     }
-    P4EST_ASSERT(neighbor_indices[i] == std::numeric_limits<uint64_t>::max());
-    neighbor_indices[i] = p4est_utils_global_idx(forest, quad, tree, displace);
+    P4EST_ASSERT(neighbor_indices[i - 1] == std::numeric_limits<uint64_t>::max());
+    neighbor_indices[i - 1] = p4est_utils_global_idx(forest, quad, tree, displace);
   }
 
   // collect over all 7 direction wrt. to corner
-  int n_neighbors_per_dir; // Verify that we find neighbors in each direction
-  p4est_locidx_t qid;
+  p8est_quadrant_t *q;
+  int n_neighbors_per_dir;
+  p4est_locidx_t mirror_qid;
   for (int dir = 1; dir < 8; ++dir) {
     n_neighbors_per_dir = 0;
-    for (int64_t i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
-      p8est_quadrant_t *q =
-          p8est_quadrant_array_index(&adapt_ghost->mirrors, i);
-      qid = adapt_mesh->mirror_qid[i];
-      qidx = p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
-      if (qidx >= neighbor_indices[dir - 1] &&
-          qidx < neighbor_indices[dir - 1] + zarea &&
-          p4est_utils_quadrants_touching(quad, tree, q,
-                                         adapt_mesh->quad_to_tree[qid])) {
-        sid = adapt_virtual->quad_qreal_offset[qid];
-        P4EST_ASSERT(neighbor_count <= 20);
-        P4EST_ASSERT(0 <= q->level && q->level < P8EST_QMAXLEVEL);
-        nodes[neighbor_count] = &lbadapt_local_data[q->level].at(sid);
-        level[neighbor_count] = q->level;
-        delta[neighbor_count] =
-            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
-            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-            interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
-        if (q->level > lvl) {
-          if (dir == 1 || dir == 2 || dir == 4)
-            delta[neighbor_count] *= 0.25;
-          if (dir == 3 || dir == 5 || dir == 6)
-            delta[neighbor_count] *= 0.5;
-        }
-
-        if (safe_quads) {
-          quad_index =
-              p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[qid]);
-          current_coupling_element.cell_positions.push_back(
-              Utils::morton_idx_to_coords(quad_index));
-          current_coupling_element.delta.push_back(delta[neighbor_count]);
-        }
-        // make sure that the quadrants are not too far apart
-        p4est_utils_get_midpoint(adapt_p4est, tree, q,
-                                 neighbor_quad_pos.data());
-        P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
-                                                    neighbor_quad_pos, q->level));
-
-        ++neighbor_count;
-        ++n_neighbors_per_dir;
+    // search for neighbor in mirrors
+    quad_indices.clear();
+    p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
+                                         &adapt_ghost->mirrors,
+                                         quad_indices, quad->level);
+    n_neighbors_per_dir += quad_indices.size();
+    for (int i = 0; i < quad_indices.size(); ++i) {
+      mirror_qid = adapt_mesh->mirror_qid[quad_indices[i]];
+      sid = adapt_virtual->quad_qreal_offset[mirror_qid];
+      q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, mirror_qid);
+      P4EST_ASSERT(neighbor_count <= 20);
+      P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
+      nodes[neighbor_count] = &lbadapt_local_data[q->level].at(sid);
+      level[neighbor_count] = q->level;
+      delta[neighbor_count] =
+          interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+          interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+          interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
+      if (q->level > lvl) {
+        if (dir == 1 || dir == 2 || dir == 4)
+          delta[neighbor_count] *= 0.25;
+        if (dir == 3 || dir == 5 || dir == 6)
+          delta[neighbor_count] *= 0.5;
       }
-    }
-    for (int64_t i = 0; i < adapt_ghost->ghosts.elem_count; ++i) {
-      p8est_quadrant_t *q = p8est_quadrant_array_index(&adapt_ghost->ghosts, i);
-      qidx = p4est_utils_global_idx(forest, q, q->p.piggy3.which_tree);
-      if (qidx >= neighbor_indices[dir - 1] &&
-          qidx < neighbor_indices[dir - 1] + zarea &&
-          p4est_utils_quadrants_touching(quad, tree, q, q->p.which_tree)) {
-        sid = adapt_virtual->quad_greal_offset[i];
-        nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);
-        level[neighbor_count] = q->level;
-        delta[neighbor_count] =
-            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
-            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-            interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
-        if (q->level > lvl) {
-          if (dir == 1 || dir == 2 || dir == 4)
-            delta[neighbor_count] *= 0.25;
-          if (dir == 3 || dir == 5 || dir == 6)
-            delta[neighbor_count] *= 0.5;
-        }
-        if (safe_quads) {
-          quad_index =
-              p4est_utils_global_idx(forest, q, adapt_mesh->ghost_to_tree[i]);
-          current_coupling_element.cell_positions.push_back(
-              Utils::morton_idx_to_coords(quad_index));
-          current_coupling_element.delta.push_back(delta[neighbor_count]);
-        }
-        // make sure that the quadrants are not too far apart
-        p4est_utils_get_midpoint(adapt_p4est, tree, q,
-                                 neighbor_quad_pos.data());
-        P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
-                     neighbor_quad_pos, q->level));
-
-        ++neighbor_count;
-        ++n_neighbors_per_dir;
+      if (safe_quads) {
+        quad_index =
+            p4est_utils_global_idx(forest, q,
+                                   adapt_mesh->quad_to_tree[mirror_qid]);
+        current_coupling_element.cell_positions.push_back(
+            Utils::morton_idx_to_coords(quad_index));
+        current_coupling_element.delta.push_back(delta[neighbor_count]);
       }
+
+      p4est_utils_get_midpoint(adapt_p4est, tree, q,
+                               neighbor_quad_pos.data());
+      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, lvl,
+                                                  neighbor_quad_pos, q->level));
+
+      ++neighbor_count;
+      ++n_neighbors_per_dir;
     }
+
+    // search for neighbor in ghosts
+    quad_indices.clear();
+    p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
+                                         &adapt_ghost->ghosts,
+                                         quad_indices, quad->level);
+    n_neighbors_per_dir += quad_indices.size();
+    for (int i = 0; i < quad_indices.size(); ++i) {
+      sid = adapt_virtual->quad_greal_offset[quad_indices[i]];
+      q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[i]);
+      P4EST_ASSERT(neighbor_count <= 20);
+      P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
+      nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);
+      level[neighbor_count] = q->level;
+      delta[neighbor_count] =
+          interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+          interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+          interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
+      if (q->level > lvl) {
+        if (dir == 1 || dir == 2 || dir == 4)
+          delta[neighbor_count] *= 0.25;
+        if (dir == 3 || dir == 5 || dir == 6)
+          delta[neighbor_count] *= 0.5;
+      }
+      if (safe_quads) {
+        quad_index =
+            p4est_utils_global_idx(forest, q,
+                                   adapt_mesh->ghost_to_tree[quad_indices[i]]);
+        current_coupling_element.cell_positions.push_back(
+            Utils::morton_idx_to_coords(quad_index));
+        current_coupling_element.delta.push_back(delta[neighbor_count]);
+      }
+
+      p4est_utils_get_midpoint(adapt_p4est, tree, q,
+                               neighbor_quad_pos.data());
+      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, lvl,
+                                                  neighbor_quad_pos, q->level));
+
+      ++neighbor_count;
+      ++n_neighbors_per_dir;
+    }
+    P4EST_ASSERT(n_neighbors_per_dir == 0 || n_neighbors_per_dir == 1 ||
+                 n_neighbors_per_dir == 2 || n_neighbors_per_dir == 4);
     if (!n_neighbors_per_dir) {
       // not all neighbors for all directions exist => position is in outer halo
       return 0;

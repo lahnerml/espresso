@@ -2564,24 +2564,6 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   q->p.user_long = info->quadid;
 }
 
-int64_t lbadapt_map_pos_to_ghost(double pos[3]) {
-  p8est_quadrant_t *q;
-
-  for (int d = 0; d < 3; ++d) {
-    if (pos[d] > (box_l[d] + box_l[d] * ROUND_ERROR_PREC))
-      return -1;
-    if (pos[d] < -box_l[d] * ROUND_ERROR_PREC)
-      return -1;
-  }
-  int64_t pidx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
-  int64_t qidx = p4est_utils_bin_search_quad(pidx, true);
-
-  if (0 <= qidx && qidx < adapt_ghost->ghosts.elem_count) {
-    P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos, true));
-  }
-  return qidx;
-}
-
 int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
                                   double delta[20], int level[20],
                                   bool safe_quads) {

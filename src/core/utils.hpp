@@ -42,6 +42,17 @@
 #include <vector>
 
 namespace Utils {
+  template<typename ForwardIterator, typename T>
+  inline void iota_n(ForwardIterator first, size_t count, T value) {
+    for (size_t i = 0; i < count; ++i) {
+      *first = value + i;
+      ++first;
+    }
+  }
+}
+
+
+namespace Utils {
 
 /**
  * \brief Calculate integer powers.

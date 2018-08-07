@@ -78,6 +78,21 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator void *() const { return this->get(); }
 };
 
+/** Allow using std::lower_bound with sc_arrays by stubbing begin and end
+ */
+template <typename T>
+T* sc_wrap_begin(const sc_array_t *a) {
+  assert(sizeof(T) == a->elem_size);
+  return reinterpret_cast<T*>(a->array);
+}
+
+template <typename T>
+T* sc_wrap_end(const sc_array_t *a) {
+  return sc_wrap_begin<T>(a) + a->elem_count;
+}
+
+
+
 /* "global variables" */
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 extern castable_unique_ptr<p4est_t> adapt_p4est;
@@ -525,8 +540,20 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
                                     int level_q2);
 
 #if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
-/** Binary search for a quadrant within the adaptive p4est */
-p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost);
+/** Binary search for a local quadrant within the adaptive p4est */
+p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index);
+
+/** Binary search for a quadrant within mirrors or ghosts.
+ *
+ * @param search_index  Quadrant index that we search
+ * @param level         Level of quadrant we search
+ * @param search_space  Array of quadrants on which we conduct binary search
+ * @param result        Initially empty array containing all matching quadrants
+ */
+void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
+                                          sc_array_t * search_space,
+                                          std::vector<p4est_locidx_t> &result,
+                                          int level = -1);
 #endif
 
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular

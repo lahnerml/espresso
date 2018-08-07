@@ -593,11 +593,59 @@ p4est_locidx_t bin_search_ghost_quads(p4est_gloidx_t idx) {
   }
 }
 
-p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index, bool ghost) {
-  if (ghost)
-    return bin_search_ghost_quads(index);
-  else
-    return bin_search_loc_quads(index);
+p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index) {
+  return bin_search_loc_quads(index);
+}
+
+void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
+                                          sc_array_t * search_space,
+                                          std::vector<p4est_locidx_t> &result,
+                                          int level) {
+  const auto fo = forest_order::adaptive_LB;
+  const auto begin = sc_wrap_begin<p8est_quadrant_t>(search_space);
+  const auto end = sc_wrap_end<p8est_quadrant_t>(search_space);
+  auto p = std::upper_bound(
+      begin, end, search_index,
+      [&](const uint64_t index, const p8est_quadrant_t a) {
+        return (index < p4est_utils_global_idx(fo, &a, a.p.which_tree));
+      });
+  // no level is specified if we search a quadrant containing a specific
+  // position
+  if (level == -1) {
+    if (p != end) {
+      p = (p == begin ? p : p - 1);
+      result.push_back(std::distance(begin, p));
+    }
+  } else {
+    if (p != end) {
+      p = (p == begin ? p : p - 1);
+      // here we search for neighboring quadrants that fall within the region
+      // spanned by the shifted anchor point and the quadrant size.
+      // From 2:1 balancing there are three different cases.
+      // 2 of which are trivial: A same size quadrant and a double sized quadrant
+      // will always be the quadrant before p.
+      // smaller quadrants will need to be copied from p - 1 to the upper bound q
+      // which is the first quadrant larger than search_index + zarea
+      int zsize = 1 << (p4est_params.max_ref_level - level);
+      int zarea = zsize * zsize * zsize;
+      p8est_quadrant_t *quad = p;
+      auto idx = p4est_utils_global_idx(fo, quad, quad->p.which_tree);
+      if (search_index <= idx && idx < (search_index + zarea)) {
+        if (quad->level == level + 1) {
+          auto q = std::upper_bound(
+              begin, end, search_index + zarea,
+              [&](const uint64_t index, const p8est_quadrant_t a) {
+                  return (index <
+                          p4est_utils_global_idx(fo, &a, a.p.which_tree));
+              });
+          Utils::iota_n(std::back_inserter(result), std::distance(p, q),
+                        std::distance(begin, p));
+        } else {
+          result.push_back(std::distance(begin, p));
+        }
+      }
+    }
+  }
 }
 #endif // defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 
@@ -755,8 +803,16 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         sc_array_new(sizeof(p4est_locidx_t));
     std::vector<p4est_locidx_t> ghost_ids;
     ghost_ids.reserve(adapt_ghost->ghosts.elem_count);
+    std::vector<p4est_locidx_t> quad_indices;
     for (auto p: ghost_cells.particles()) {
-      ghost_ids.push_back(lbadapt_map_pos_to_ghost(p.r.p.data()));
+      quad_indices.clear();
+      uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB,
+                                                  p.r.p.data());
+      p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->ghosts,
+                                           quad_indices);
+      P4EST_ASSERT(p4est_utils_pos_sanity_check(quad_indices[0], p.r.p.data(),
+                                                true));
+      ghost_ids.push_back(quad_indices[0]);
     }
     p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
     p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;

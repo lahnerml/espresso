@@ -107,7 +107,7 @@ class TestLB(ut.TestCase):
             self.system.analysis.analyze_linear_momentum()
             self.system.integrator.run(1)
             self.system.analysis.analyze_linear_momentum()
-            os._exit(0)
+            #os._exit(0)
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]

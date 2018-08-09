@@ -3380,62 +3380,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #endif // !LB_ADAPTIVE_GPU
 }
 
-int lb_lbfluid_get_interpolated_velocity_cells_only(double *pos, double *v) {
-#ifndef LB_ADAPTIVE_GPU
-// FIXME Port to gpu
-#ifdef LB_ADAPTIVE
-  lbadapt_payload_t *node_index[20], *data;
-  double delta[20];
-  int dcnt;
-  int level[20];
-  double local_rho, local_j[3];
-  double modes[19];
-  int x, y, z;
-
-  dcnt = lbadapt_interpolate_pos_adapt(pos, node_index, delta, level);
-  double h_max = p4est_params.h[p4est_params.max_ref_level];
-
-  v[0] = v[1] = v[2] = 0.0;
-
-  for (x = 0; x < dcnt; x++) {
-    data = node_index[x];
-#ifdef LB_BOUNDARIES
-    int bnd = data->lbfields.boundary;
-    if (bnd) {
-      local_rho = lbpar.rho * h_max * h_max * h_max;
-      for (int i = 0; i < P8EST_DIM; ++i) {
-        local_j[i] =
-            local_rho *
-            LBBoundaries::lbboundaries[data->lbfields.boundary - 1].get()
-                ->velocity()[i];
-      }
-    } else {
-      lbadapt_calc_modes(data->lbfluid, modes);
-      local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
-      for (int i = 0; i < P8EST_DIM; ++i) {
-        local_j[i] = modes[i+1];
-      }
-    }
-#else  // LB_BOUNDARIES
-    lbadapt_calc_modes(data->lbfluid, modes);
-    local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
-    local_j[0] = modes[1];
-    local_j[1] = modes[2];
-    local_j[2] = modes[3];
-#endif // LB_BOUNDARIES
-    for (int i = 0; i < P8EST_DIM; ++i) {
-      v[i] += delta[x] * local_j[i] / (local_rho);
-    }
-  }
-
-  for (int i = 0; i < P8EST_DIM; ++i) {
-    v[i] *= h_max / lbpar.tau;
-  }
-#endif // LB_ADAPTIVE
-#endif // !LB_ADAPTIVE_GPU
-  return 0;
-}
-
 void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v) {
 #ifndef LB_ADAPTIVE_GPU
   // FIXME Port to GPU

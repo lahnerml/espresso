@@ -3155,10 +3155,9 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   Lattice::index_t node_index[8];
   double delta[6];
 #else  // !LB_ADAPTIVE
-  lbadapt_payload_t *node_index[20];
-  double delta[20];
-  double dcnt = 0;
-  int level[20];
+  std::vector<lbadapt_payload_t *> payloads;
+  std::vector<double> interpolation_weights;
+  std::vector<int> quad_levels;
 #endif // !LB_ADAPTIVE
   double *local_f, interpolated_u[3], delta_j[3];
 
@@ -3179,10 +3178,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   double h = lbpar.agrid;
   double h_max = lbpar.agrid;
 #else  // !LB_ADAPTIVE
-  dcnt = (ghost ? lbadapt_interpolate_pos_ghost
-                : lbadapt_interpolate_pos_adapt)(p->r.p.data(), node_index,
-                                                 delta, level, true);
-  if (dcnt <= 0) {
+  (ghost ? lbadapt_interpolate_pos_ghost
+         : lbadapt_interpolate_pos_adapt)(p->r.p, payloads,
+                                          interpolation_weights, quad_levels,
+                                          true);
+  if (payloads.empty()) {
     // clear coupling helper element
     current_coupling_element.delta.clear();
     current_coupling_element.cell_positions.clear();
@@ -3291,13 +3291,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     }
   }
 #else  // !LB_ADAPTIVE
-  for (int x = 0; x < dcnt; ++x) {
-    local_f = node_index[x]->lbfields.force_density;
-    double level_fact = Utils::sqr(p4est_params.prefactors[level[x]]);
+  for (int x = 0; x < payloads.size(); ++x) {
+    local_f = payloads[x]->lbfields.force_density;
+    double level_fact = Utils::sqr(p4est_params.prefactors[quad_levels[x]]);
 
-    local_f[0] += delta[x] * delta_j[0] / level_fact;
-    local_f[1] += delta[x] * delta_j[1] / level_fact;
-    local_f[2] += delta[x] * delta_j[2] / level_fact;
+    local_f[0] += interpolation_weights[x] * delta_j[0] / level_fact;
+    local_f[1] += interpolation_weights[x] * delta_j[1] / level_fact;
+    local_f[2] += interpolation_weights[x] * delta_j[2] / level_fact;
 
     current_coupling_element.fluid_force.push_back(
         {{local_f[0], local_f[1], local_f[2]}});
@@ -3334,8 +3334,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     lblattice.map_position_to_lattice(Vector3d(source_position), node_index,
                                       delta);
 #else  // !LB_ADAPTIVE
-    dcnt = lbadapt_interpolate_pos_adapt(source_position, node_index, delta,
-                                         level);
+    lbadapt_interpolate_pos_adapt(source_position, payloads,
+                                  interpolation_weights, quad_levels);
 #endif // !LB_ADAPTIVE
     lb_lbfluid_get_interpolated_velocity(Vector3d(source_position),
                                          p->swim.v_source.data());
@@ -3364,15 +3364,13 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
       }
     }
 #else  // !LB_ADAPTIVE
-    for (x = 0; x < dcnt; ++x) {
-      if (n_lbsteps % (1 << (max_refinement_level - level[x])) == 0) {
-        local_f = node_index[x]->lbfields.force;
-        double level_fact = prefactors[level[x]] * prefactors[level[x]];
+    for (x = 0; x < payloads.size(); ++x) {
+      local_f = payloads[x]->lbfields.force;
+      double level_fact = Utils::sqr(prefactors[quad_levels[x]]);
 
-        local_f[0] += delta[x] * delta_j[0] / level_fact;
-        local_f[1] += delta[x] * delta_j[1] / level_fact;
-        local_f[2] += delta[x] * delta_j[2] / level_fact;
-      }
+      local_f[0] += interpolation_weights[x] * delta_j[0] / level_fact;
+      local_f[1] += interpolation_weights[x] * delta_j[1] / level_fact;
+      local_f[2] += interpolation_weights[x] * delta_j[2] / level_fact;
     }
 #endif // !LB_ADAPTIVE
   }

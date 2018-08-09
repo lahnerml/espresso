@@ -427,7 +427,7 @@ static inline void tree_to_boxlcoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in simulation domain
  */
-static inline std::array<double, 3> tree_to_boxlcoords_copy(double x[3]) {
+static inline std::array<double, 3> tree_to_boxlcoords_copy(const double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   tree_to_boxlcoords(res.data());
   return res;
@@ -464,7 +464,7 @@ static inline void boxl_to_treecoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in p4est tree-coordinates
  */
-static inline std::array<double, 3> boxl_to_treecoords_copy(double x[3]) {
+static inline std::array<double, 3> boxl_to_treecoords_copy(const double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   boxl_to_treecoords(res.data());
   return res;
@@ -599,7 +599,7 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
  * @param xyz      The position to map.
  * @return         Morton index of position in given p4est.
  */
-int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]);
+int64_t p4est_utils_pos_to_index(forest_order forest, const double xyz[3]);
 
 /** Map a geometric position to the respective processor.
  *
@@ -609,7 +609,7 @@ int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]);
  * @return         The MPI rank which holds a quadrant at the given position for
  *                 the current p4est.
  */
-p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz);
+p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, const double xyz[3]);
 
 /** Map a process-local Morton-index obtained from
  * \ref p4est_utils_cell_morton_idx to a local qid.
@@ -620,7 +620,7 @@ p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz);
  *                 \ref p4est_utils_cell_morton_idx
  * @return         The quadrant index at the given index.
  */
-p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx);
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t idx);
 
 /** Map a geometric position to the respective processor.
  *
@@ -630,7 +630,7 @@ p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx);
  * @return         The MPI rank which holds a quadrant at the given position for
  *                 the current p4est.
  */
-int p4est_utils_pos_to_proc(forest_order forest, double* xyz);
+int p4est_utils_pos_to_proc(forest_order forest, const double xyz[3]);
 
 /** Map an index to the respective processor.
  *
@@ -640,7 +640,7 @@ int p4est_utils_pos_to_proc(forest_order forest, double* xyz);
  * @return         The MPI rank which holds a quadrant at the given position for
  *                 the current p4est.
  */
-int p4est_utils_idx_to_proc(forest_order forest, p4est_gloidx_t idx);
+int p4est_utils_idx_to_proc(forest_order forest, const p4est_gloidx_t idx);
 /*@}*/
 
 /*****************************************************************************/

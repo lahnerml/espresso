@@ -543,7 +543,7 @@ int64_t p4est_utils_global_idx(forest_order forest, const p8est_quadrant_t *q,
   return p4est_utils_global_idx(fi, q, tree);
 }
 
-int64_t p4est_utils_pos_to_index(forest_order forest, double xyz[3]) {
+int64_t p4est_utils_pos_to_index(forest_order forest, const double xyz[3]) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
   std::array<double, 3> pos = boxl_to_treecoords_copy(xyz);
   int xyz_mod[3];
@@ -650,21 +650,21 @@ void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
 }
 #endif // defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 
-p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, double *xyz) {
+p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, const double xyz[3]) {
   return p4est_utils_idx_to_qid(forest, p4est_utils_pos_to_index(forest, xyz));
 }
 
-p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, p4est_gloidx_t idx) {
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t idx) {
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
 }
 
 // Find the process that handles the position
-int p4est_utils_pos_to_proc(forest_order forest, double* xyz) {
+int p4est_utils_pos_to_proc(forest_order forest, const double xyz[3]) {
   return p4est_utils_idx_to_proc(forest, p4est_utils_pos_to_index(forest, xyz));
 }
 
-int p4est_utils_idx_to_proc(forest_order forest, p4est_gloidx_t idx) {
+int p4est_utils_idx_to_proc(forest_order forest, const p4est_gloidx_t idx) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
   auto it = std::upper_bound(
       std::begin(fi.p4est_space_idx), std::end(fi.p4est_space_idx) - 1, idx,

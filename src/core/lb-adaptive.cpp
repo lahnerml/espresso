@@ -2564,9 +2564,13 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   q->p.user_long = info->quadid;
 }
 
-int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20],
-                                  bool safe_quads) {
+void lbadapt_interpolate_pos_adapt(Vector3d &opos,
+                                   std::vector<lbadapt_payload_t *> &payloads,
+                                   std::vector<double> &interpol_weights,
+                                   std::vector<int> &levels,
+                                   bool safe_quads) {
+  P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
+
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;  // This value determines first index of
                            // neighbor_directions and weight_indices.
@@ -2596,7 +2600,6 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  int neighbor_count;
 
   int fold[3] = {0, 0, 0};
   double pos[3] = {opos[0], opos[1], opos[2]};
@@ -2604,8 +2607,8 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
 
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    neighbor_count = lbadapt_interpolate_pos_ghost(opos, nodes, delta, level);
-    if (neighbor_count > 0) return neighbor_count;
+    lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
+    if (!payloads.empty()) return;
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
             this_node, qidx, pos[0], pos[1], pos[2]);
@@ -2618,24 +2621,24 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
     fprintf(stderr, "belongs to MD process %i\n",
             cell_structure.position_to_node(pos));
 #else
-  fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
 #endif
     errexit();
-    return -1;
   } else {
     P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos));
   }
 
   int lvl, sid;
-  p8est_quadrant_t *quad;
+  p8est_quadrant_t *quad, *q;
   quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qidx);
   lvl = quad->level;
   sid = adapt_virtual->quad_qreal_offset[qidx];
-  nodes[0] = &lbadapt_local_data[lvl].at(sid);
-  level[0] = lvl;
-  neighbor_count = 1;
-  std::array<double, 3> quad_pos;
+  payloads.push_back(&lbadapt_local_data[lvl].at(sid));
+  levels.push_back(lvl);
+
+  std::array<double, 3> quad_pos, neighbor_quad_pos;
   double dis;
+  p4est_topidx_t tree;
   p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qidx], quad,
                            quad_pos.data());
   for (int d = 0; d < 3; ++d) {
@@ -2650,16 +2653,17 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       interpolation_weights[d] = 1.0 - interpolation_weights[d + 3];
     }
   }
-  delta[0] = interpolation_weights[weight_indices[nearest_corner][0]] *
-             interpolation_weights[weight_indices[nearest_corner][1]] *
-             interpolation_weights[weight_indices[nearest_corner][2]];
+  interpol_weights.push_back(
+      interpolation_weights[weight_indices[nearest_corner][0]] *
+      interpolation_weights[weight_indices[nearest_corner][1]] *
+      interpolation_weights[weight_indices[nearest_corner][2]]);
 
   if (safe_quads) {
     quad_index =
         p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
     current_coupling_element.cell_positions.push_back(
         Utils::morton_idx_to_coords(quad_index));
-    current_coupling_element.delta.push_back(delta[0]);
+    current_coupling_element.delta.push_back(interpolation_weights[0]);
   }
 
   castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
@@ -2683,60 +2687,72 @@ int lbadapt_interpolate_pos_adapt(double opos[3], lbadapt_payload_t *nodes[20],
       idx = *((int *)sc_array_index_int(nqid, n));
 
       if (0 <= idx && idx < lq) {                 // local quadrant
-        quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
-        lvl = quad->level;
+        q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
+        tree = adapt_mesh->quad_to_tree[idx];
+        lvl = q->level;
         sid = adapt_virtual->quad_qreal_offset[idx];
-        nodes[neighbor_count] = &lbadapt_local_data[lvl].at(sid);
+        payloads.push_back(&lbadapt_local_data[lvl].at(sid));
         quad_index =
-            p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[idx]);
+            p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[idx]);
       } else if (lq <= idx && idx < lq + gq) {
         idx -= lq;
-        quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx);
-        lvl = quad->level;
+        q = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx);
+        tree = adapt_mesh->ghost_to_tree[idx];
+        lvl = q->level;
         sid = adapt_virtual->quad_greal_offset[idx];
-        nodes[neighbor_count] = &lbadapt_ghost_data[lvl].at(sid);
+        payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
         quad_index =
-            p4est_utils_global_idx(forest, quad,
+            p4est_utils_global_idx(forest, q,
                                    adapt_mesh->ghost_to_tree[idx]);
       } else {
         SC_ABORT_NOT_REACHED();
       }
-      delta[neighbor_count] =
+
+      p4est_utils_get_midpoint(adapt_p4est, tree, q,
+                               neighbor_quad_pos.data());
+      std::array<double, 6> check_weights;
+      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
+                                                  neighbor_quad_pos, q->level));
+      P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
+                                                   neighbor_quad_pos, q->level,
+                                                   pos, check_weights));
+      interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]];
-      delta[neighbor_count] = delta[neighbor_count] / (double)(nqid->elem_count);
-      level[neighbor_count] = lvl;
+          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]]);
+      auto last_element = interpol_weights.back();
+      last_element /= (double)(nqid->elem_count);
+      levels.push_back(lvl);
 
       if (safe_quads) {
         current_coupling_element.cell_positions.push_back(
             Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(delta[neighbor_count]);
+        current_coupling_element.delta.push_back(last_element);
       }
-
-      ++neighbor_count;
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
     sc_array_truncate(nvid);
   }
 
-  double dsum = std::accumulate(delta, delta + neighbor_count, 0.0);
+  double dsum = std::accumulate(interpol_weights.begin(),
+                                interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("Sum of interpolation weights deviates from 1 by %le\n",
+    printf("[Local interpol.] Sum of interpol. weights deviates from 1 by %a\n",
            (1.0 - dsum));
-    for (int i = 0; i < neighbor_count; ++i) {
-      printf("%lf ", delta[i]);
+    for (auto &w : interpol_weights) {
+      printf("%a ", w);
     }
     printf("\n");
   }
-  P4EST_ASSERT(8 <= neighbor_count && neighbor_count < 20);
-  return neighbor_count;
 }
 
-int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
-                                  double delta[20], int level[20],
-                                  bool safe_quads) {
+void lbadapt_interpolate_pos_ghost(Vector3d &opos,
+                                   std::vector<lbadapt_payload_t *> &payloads,
+                                   std::vector<double> &interpol_weights,
+                                   std::vector<int> &levels,
+                                   bool safe_quads) {
+  P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
   uint64_t quad_index;
@@ -2749,7 +2765,6 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
       {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
   };
-  int neighbor_count = 0;
 
   // Fold position.
   int fold[3] = {0, 0, 0};
@@ -2763,7 +2778,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                        quad_indices);
   if(quad_indices.empty() ||
      !p4est_utils_pos_sanity_check(quad_indices[0], pos, true)) {
-    return neighbor_count;
+    return;
   }
 
   int lvl, sid, tree, zsize;
@@ -2772,9 +2787,8 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
   tree = quad->p.piggy3.which_tree;
   lvl = quad->level;
   sid = adapt_virtual->quad_greal_offset[quad_indices[0]];
-  nodes[0] = &lbadapt_ghost_data[lvl].at(sid);
-  level[0] = lvl;
-  ++neighbor_count;
+  payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
+  levels.push_back(lvl);
 
   // determine which neighbors to find
   std::array<double, 3> quad_pos, neighbor_quad_pos;
@@ -2792,9 +2806,10 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       interpolation_weights[d] = 1.0 - interpolation_weights[d + 3];
     }
   }
-  delta[0] = interpolation_weights[weight_indices[nearest_corner][0]] *
-             interpolation_weights[weight_indices[nearest_corner][1]] *
-             interpolation_weights[weight_indices[nearest_corner][2]];
+  interpol_weights.push_back(
+      interpolation_weights[weight_indices[nearest_corner][0]] *
+      interpolation_weights[weight_indices[nearest_corner][1]] *
+      interpolation_weights[weight_indices[nearest_corner][2]]);
   zsize = 1 << (p4est_params.max_ref_level - lvl);
 
   if (safe_quads) {
@@ -2803,7 +2818,7 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                adapt_mesh->ghost_to_tree[quad_indices[0]]);
     current_coupling_element.cell_positions.push_back(
         Utils::morton_idx_to_coords(quad_index));
-    current_coupling_element.delta.push_back(delta[0]);
+    current_coupling_element.delta.push_back(interpol_weights[0]);
   }
 
   // determine which neighbor indices need to be found
@@ -2859,19 +2874,20 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
       mirror_qid = adapt_mesh->mirror_qid[quad_indices[i]];
       sid = adapt_virtual->quad_qreal_offset[mirror_qid];
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, mirror_qid);
-      P4EST_ASSERT(neighbor_count <= 20);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      nodes[neighbor_count] = &lbadapt_local_data[q->level].at(sid);
-      level[neighbor_count] = q->level;
-      delta[neighbor_count] =
+      payloads.push_back(&lbadapt_local_data[q->level].at(sid));
+      levels.push_back(q->level);
+      interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
+          interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
+      auto last_element = interpol_weights.back();
       if (q->level > lvl) {
+        //auto last_element = interpol_weights.back();
         if (dir == 1 || dir == 2 || dir == 4)
-          delta[neighbor_count] *= 0.25;
+          last_element *= 0.25;
         if (dir == 3 || dir == 5 || dir == 6)
-          delta[neighbor_count] *= 0.5;
+          last_element *= 0.5;
       }
       if (safe_quads) {
         quad_index =
@@ -2879,15 +2895,18 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                    adapt_mesh->quad_to_tree[mirror_qid]);
         current_coupling_element.cell_positions.push_back(
             Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(delta[neighbor_count]);
+        current_coupling_element.delta.push_back(last_element);
       }
 
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
-      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, lvl,
+      std::array<double, 6> check_weights;
+      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                                   neighbor_quad_pos, q->level));
+      P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
+                                                   neighbor_quad_pos, q->level,
+                                                   pos, check_weights));
 
-      ++neighbor_count;
       ++n_neighbors_per_dir;
     }
 
@@ -2900,19 +2919,20 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
     for (int i = 0; i < quad_indices.size(); ++i) {
       sid = adapt_virtual->quad_greal_offset[quad_indices[i]];
       q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[i]);
-      P4EST_ASSERT(neighbor_count <= 20);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      nodes[neighbor_count] = &lbadapt_ghost_data[q->level].at(sid);
-      level[neighbor_count] = q->level;
-      delta[neighbor_count] =
+      payloads.push_back(&lbadapt_local_data[q->level].at(sid));
+      levels.push_back(q->level);
+      interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][2]];
+          interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
+      auto last_element = interpol_weights.back();
       if (q->level > lvl) {
+        //auto last_element = interpol_weights.back();
         if (dir == 1 || dir == 2 || dir == 4)
-          delta[neighbor_count] *= 0.25;
+          last_element *= 0.25;
         if (dir == 3 || dir == 5 || dir == 6)
-          delta[neighbor_count] *= 0.5;
+          last_element *= 0.5;
       }
       if (safe_quads) {
         quad_index =
@@ -2920,35 +2940,42 @@ int lbadapt_interpolate_pos_ghost(double opos[3], lbadapt_payload_t *nodes[20],
                                    adapt_mesh->ghost_to_tree[quad_indices[i]]);
         current_coupling_element.cell_positions.push_back(
             Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(delta[neighbor_count]);
+        current_coupling_element.delta.push_back(last_element);
       }
 
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
-      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, lvl,
+      std::array<double, 6> check_weights;
+      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                                   neighbor_quad_pos, q->level));
+      P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
+                                                   neighbor_quad_pos, q->level,
+                                                   pos, check_weights));
 
-      ++neighbor_count;
       ++n_neighbors_per_dir;
     }
+    P4EST_ASSERT(payloads.size() <= 20);
     P4EST_ASSERT(n_neighbors_per_dir == 0 || n_neighbors_per_dir == 1 ||
                  n_neighbors_per_dir == 2 || n_neighbors_per_dir == 4);
     if (!n_neighbors_per_dir) {
       // not all neighbors for all directions exist => position is in outer halo
-      return 0;
+      payloads.clear();
+      interpol_weights.clear();
+      levels.clear();
+      return;
     }
   }
 
-  double dsum = std::accumulate(delta, delta + neighbor_count, 0.0);
+  double dsum = std::accumulate(interpol_weights.begin(),
+                                interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("Sum of interpolation weights deviates from 1 by %le\n", (1.0 - dsum));
-    for (int i = 0; i < neighbor_count; ++i) {
-      printf("%lf ", delta[i]);
+    printf("[Ghost interpol.] Sum of interpol. weights deviates from 1 by %a\n",
+           (1.0 - dsum));
+    for (auto &w : interpol_weights) {
+      printf("%a ", w);
     }
     printf("\n");
   }
-  P4EST_ASSERT(8 <= neighbor_count && neighbor_count < 20);
-  return neighbor_count;
 }
 
 int lbadapt_sanity_check_parameters() {

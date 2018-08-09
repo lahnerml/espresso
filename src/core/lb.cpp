@@ -3397,10 +3397,10 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
   Lattice::index_t node_index[8], index;
   double delta[6];
 #else  // !LB_ADAPTIVE
-  lbadapt_payload_t *node_index[20], *data;
-  double delta[20];
-  int dcnt;
-  int level[20];
+  lbadapt_payload_t *data;
+  std::vector<lbadapt_payload_t *> payloads;
+  std::vector<double> interpolation_weights;
+  std::vector<int> quad_levels;
 #endif // !LB_ADAPTIVE
   double local_rho, local_j[3], interpolated_u[3];
   double modes[19];
@@ -3452,11 +3452,13 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
   double h_max = h;
 #else  // !LB_ADAPTIVE
   if (ghost) {
-    dcnt = lbadapt_interpolate_pos_ghost(pos.data(), node_index, delta, level);
+    lbadapt_interpolate_pos_ghost(pos, payloads, interpolation_weights,
+                                  quad_levels);
   } else {
-    dcnt = lbadapt_interpolate_pos_adapt(pos.data(), node_index, delta, level);
+    lbadapt_interpolate_pos_adapt(pos, payloads, interpolation_weights,
+                                  quad_levels);
   }
-  double h_local = p4est_params.h[level[0]];
+  double h_local = p4est_params.h[quad_levels[0]];
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
@@ -3510,8 +3512,8 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
     }
   }
 #else //LB_ADAPTIVE
-  for (x = 0; x < dcnt; x++) {
-    data = node_index[x];
+  for (x = 0; x < payloads.size(); x++) {
+    data = payloads[x];
 #ifdef LB_BOUNDARIES
     int bnd = data->lbfields.boundary;
     if (bnd) {
@@ -3539,9 +3541,9 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
     local_j[1] = modes[2];
     local_j[2] = modes[3];
 #endif // LB_BOUNDARIES
-    interpolated_u[0] += delta[x] * local_j[0] / (local_rho);
-    interpolated_u[1] += delta[x] * local_j[1] / (local_rho);
-    interpolated_u[2] += delta[x] * local_j[2] / (local_rho);
+    interpolated_u[0] += interpolation_weights[x] * local_j[0] / (local_rho);
+    interpolated_u[1] += interpolation_weights[x] * local_j[1] / (local_rho);
+    interpolated_u[2] += interpolation_weights[x] * local_j[2] / (local_rho);
   }
 #endif //LB_ADAPTIVE
 

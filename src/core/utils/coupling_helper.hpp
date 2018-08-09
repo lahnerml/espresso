@@ -3,7 +3,9 @@
 
 #include <algorithm>
 #include <array>
+#include <iomanip>
 #include <numeric>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -85,33 +87,35 @@ typedef struct coupling_helper {
                           cell_positions[b][2], n_q));
 #endif
               });
-    std::string res =
-        "Particle " + std::to_string(particle_id) + ": (" +
-        std::to_string(particle_position[0]) + ", " +
-        std::to_string(particle_position[1]) + ", " +
-        std::to_string(particle_position[2]) + ") " +
-        "f_part (" +
-        std::to_string(particle_force[0]) + ", " +
-        std::to_string(particle_force[1]) + ", " +
-        std::to_string(particle_force[2]) + ");\ninterpolation fluid:\n";
+    std::stringstream str;
+    str << std::defaultfloat << std::setprecision(7);
+    str << "Particle " << particle_id << ": ("
+        << particle_position[0] << ", "
+        << particle_position[1] << ", "
+        << particle_position[2] << ") "
+        << "f_part ("
+        << particle_force[0] << ", "
+        << particle_force[1] << ", "
+        << particle_force[2] << ");\ninterpolation fluid:\n";
+    str << std::scientific << std::setprecision(16);
     for (int i = 0; i < delta.size(); ++i) {
-      res.append("pos: " +
-                 std::to_string(cell_positions[coupling_order[i]][0]) + ", " +
-                 std::to_string(cell_positions[coupling_order[i]][1]) + ", " +
-                 std::to_string(cell_positions[coupling_order[i]][2]) + "; " +
-                 "wrapped pos: " +
-                 std::to_string(wrapped_cell_positions[coupling_order[i]][0]) + ", " +
-                 std::to_string(wrapped_cell_positions[coupling_order[i]][1]) + ", " +
-                 std::to_string(wrapped_cell_positions[coupling_order[i]][2]) + "; " +
-                 "delta: " +
-                 std::to_string(delta[coupling_order[i]]) + "; " +
-                 "fluid force: (" +
-                 std::to_string(fluid_force[coupling_order[i]][0]) + ", " +
-                 std::to_string(fluid_force[coupling_order[i]][1]) + ", " +
-                 std::to_string(fluid_force[coupling_order[i]][2]) + ")\n");
+      str << "pos: "
+          << cell_positions[coupling_order[i]][0] << ", "
+          << cell_positions[coupling_order[i]][1] << ", "
+          << cell_positions[coupling_order[i]][2] << "; "
+          << "wrapped pos: "
+          << wrapped_cell_positions[coupling_order[i]][0] << ", "
+          << wrapped_cell_positions[coupling_order[i]][1] << ", "
+          << wrapped_cell_positions[coupling_order[i]][2] << "; "
+          << "delta: "
+          << delta[coupling_order[i]] << "; "
+          << "fluid force: ("
+          << fluid_force[coupling_order[i]][0] << ", "
+          << fluid_force[coupling_order[i]][1] << ", "
+          << fluid_force[coupling_order[i]][2] << ")\n";
     }
-    res += "\n";
-    return res;
+    str << "\n";
+    return str.str();
   }
 } coupling_helper_t;
 

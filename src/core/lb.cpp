@@ -3872,7 +3872,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
       for (y = 0; y < lblattice.halo_grid[1]; ++y) {
         index = get_linear_index(0, y, z, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[1];
         r_node = node_neighbors[0];
@@ -3912,7 +3912,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
         index =
             get_linear_index(lblattice.grid[0] + 1, y, z, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[0];
         r_node = node_neighbors[1];
@@ -3953,7 +3953,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
       for (x = 0; x < lblattice.halo_grid[0]; ++x) {
         index = get_linear_index(x, 0, z, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[3];
         r_node = node_neighbors[2];
@@ -3993,7 +3993,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
         index =
             get_linear_index(x, lblattice.grid[1] + 1, z, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[2];
         r_node = node_neighbors[3];
@@ -4034,7 +4034,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
       for (x = 0; x < lblattice.halo_grid[0]; ++x) {
         index = get_linear_index(x, y, 0, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[5];
         r_node = node_neighbors[4];
@@ -4077,7 +4077,7 @@ static int compare_buffers(double *buf1, double *buf2, int size) {
         index =
             get_linear_index(x, y, lblattice.grid[2] + 1, lblattice.halo_grid);
         for (i = 0; i < lbmodel.n_veloc; i++)
-          s_buffer[i] = lbfluid[1][i][index];
+          s_buffer[i] = lbfluid[i][index];
 
         s_node = node_neighbors[4];
         r_node = node_neighbors[5];

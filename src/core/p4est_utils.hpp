@@ -539,6 +539,18 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
                                     std::array<double, 3> pos_mp_q2,
                                     int level_q2);
 
+/** Verify that position is in fact between those two found quadrants
+ *
+ * @param pos_mp_q1, pos_mp_q2  Midpoints of involved quadrants
+ * @param pos                   Position that we are interested in
+ */
+bool p4est_utils_pos_enclosing_check(const std::array<double, 3> &pos_mp_q1,
+                                     const int level_q1,
+                                     const std::array<double, 3> &pos_mp_q2,
+                                     const int level_q2,
+                                     const double pos[3],
+                                     std::array<double, 6> &interpol_weights);
+
 #if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 /** Binary search for a local quadrant within the adaptive p4est */
 p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index);

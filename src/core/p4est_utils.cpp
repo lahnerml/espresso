@@ -443,6 +443,39 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
   }
   return touching;
 }
+
+bool p4est_utils_pos_enclosing_check(const std::array<double, 3> &pos_mp_q1,
+                                     const int level_q1,
+                                     const std::array<double, 3> &pos_mp_q2,
+                                     const int level_q2,
+                                     const double pos[3],
+                                     std::array<double, 6> &interpol_weights) {
+  double smaller, larger;
+  bool inbetween = true;
+  if (level_q1 == level_q2) {
+    for (int i = 0; i < 3; ++i) {
+      smaller = (pos_mp_q1[i] <= pos_mp_q2[i]) ? pos_mp_q1[i] : pos_mp_q2[i];
+      larger = (smaller == pos_mp_q2[i]) ? pos_mp_q1[i] : pos_mp_q2[i];
+      if (pos[i] <= 0.5 * p4est_params.h[level_q1]) {
+        double temp = larger;
+        larger = smaller;
+        smaller = temp - box_l[i];
+      } else if (box_l[i] - pos[i] < 0.5 * p4est_params.h[level_q1]) {
+        double temp = smaller;
+        smaller = larger;
+        larger = box_l[i] + temp;
+      }
+      if (smaller != larger) {
+        inbetween &= (smaller <= pos[i] && pos[i] <= larger);
+      }
+      interpol_weights[i] = (pos[i] - smaller) / (larger - smaller);
+      interpol_weights[i + 3] = 1.0 - interpol_weights[i];
+    }
+  } else {
+
+  }
+  return inbetween;
+}
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
 std::array<uint64_t, 3> p4est_utils_idx_to_pos(uint64_t idx) {

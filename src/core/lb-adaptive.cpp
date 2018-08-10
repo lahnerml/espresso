@@ -2581,25 +2581,25 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   // corner neighbor.
   // The reason why this order is chosen is that we can now XOR the
   // nearest_corner index to determine the weight indices.
-  static const int neighbor_directions[8][7] = {
-      {0, 2, 14, 4, 10, 6, 18}, // left, front, bottom
-      {1, 2, 15, 4, 11, 6, 19}, // right, front, bottom
-      {0, 3, 16, 4, 10, 7, 20}, // left, back, bottom
-      {1, 3, 17, 4, 11, 7, 21}, // right, back, bottom
-      {0, 2, 14, 5, 12, 8, 22}, // left, front, top
-      {1, 2, 15, 5, 13, 8, 23}, // right, front, top
-      {0, 3, 16, 5, 12, 9, 24}, // left, back, top
-      {1, 3, 17, 5, 13, 9, 25}, // right, back, top
-  };
+  const std::array< std::array<int, 7>, 8> neighbor_directions = {{
+      {{0, 2, 14, 4, 10, 6, 18}}, // left, front, bottom
+      {{1, 2, 15, 4, 11, 6, 19}}, // right, front, bottom
+      {{0, 3, 16, 4, 10, 7, 20}}, // left, back, bottom
+      {{1, 3, 17, 4, 11, 7, 21}}, // right, back, bottom
+      {{0, 2, 14, 5, 12, 8, 22}}, // left, front, top
+      {{1, 2, 15, 5, 13, 8, 23}}, // right, front, top
+      {{0, 3, 16, 5, 12, 9, 24}}, // left, back, top
+      {{1, 3, 17, 5, 13, 9, 25}}, // right, back, top
+  }};
 
-  double interpolation_weights[6];  // Stores normed distance from pos to center
+  std::array<double, 6> interpolation_weights;  // Stores normed distance from pos to center
                                     // of cell containing pos in both directions.
                                     // order: lower x, lower y, lower z,
                                     //        upper x, upper y, upper z
-  static const int weight_indices[8][3] = { // indexes into interpolation_weights
-      {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
-      {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
-  };
+  const std::array< std::array<int, 3>, 8> weight_indices = {{ // indexes into interpolation_weights
+    {{0, 1, 2}}, {{3, 1, 2}}, {{0, 4, 2}}, {{3, 4, 2}},
+    {{0, 1, 5}}, {{3, 1, 5}}, {{0, 4, 5}}, {{3, 4, 5}},
+  }};
 
   int fold[3] = {0, 0, 0};
   double pos[3] = {opos[0], opos[1], opos[2]};
@@ -2716,6 +2716,14 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                    neighbor_quad_pos, q->level,
                                                    pos, check_weights));
+      P4EST_ASSERT(i != 7 ||
+                   ((std::abs(check_weights[0] - interpolation_weights[0]) <
+                     ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[1] - interpolation_weights[1]) <
+                     ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[2] - interpolation_weights[2]) <
+                     ROUND_ERROR_PREC)));
+
       interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][1]] *
@@ -2757,14 +2765,14 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   int nearest_corner = 0;
   uint64_t quad_index;
 
-  double interpolation_weights[6];  // Stores normed distance from pos to center
+  std::array<double, 6> interpolation_weights;  // Stores normed distance from pos to center
   // of cell containing pos in both directions.
   // order: lower x, lower y, lower z,
   //        upper x, upper y, upper z
-  static const int weight_indices[8][3] = {
-      {0, 1, 2}, {3, 1, 2}, {0, 4, 2}, {3, 4, 2},
-      {0, 1, 5}, {3, 1, 5}, {0, 4, 5}, {3, 4, 5},
-  };
+  const std::array< std::array<int, 3>, 8> weight_indices = {{
+      {{0, 1, 2}}, {{3, 1, 2}}, {{0, 4, 2}}, {{3, 4, 2}},
+      {{0, 1, 5}}, {{3, 1, 5}}, {{0, 4, 5}}, {{3, 4, 5}},
+  }};
 
   // Fold position.
   int fold[3] = {0, 0, 0};
@@ -2906,6 +2914,13 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                    neighbor_quad_pos, q->level,
                                                    pos, check_weights));
+      P4EST_ASSERT(dir != 7 ||
+                   ((std::abs(check_weights[0] - interpolation_weights[0]) <
+                     ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[1] - interpolation_weights[1]) <
+                     ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[2] - interpolation_weights[2]) <
+                     ROUND_ERROR_PREC)));
 
       ++n_neighbors_per_dir;
     }
@@ -2920,7 +2935,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       sid = adapt_virtual->quad_greal_offset[quad_indices[i]];
       q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[i]);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      payloads.push_back(&lbadapt_local_data[q->level].at(sid));
+      payloads.push_back(&lbadapt_ghost_data[q->level].at(sid));
       levels.push_back(q->level);
       interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
@@ -2951,6 +2966,13 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                    neighbor_quad_pos, q->level,
                                                    pos, check_weights));
+      P4EST_ASSERT(dir != 7 ||
+                   ((std::abs(check_weights[0] - interpolation_weights[0]) <
+                     ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[1] - interpolation_weights[1]) <
+                       ROUND_ERROR_PREC) &&
+                    (std::abs(check_weights[2] - interpolation_weights[2]) <
+                       ROUND_ERROR_PREC)));
 
       ++n_neighbors_per_dir;
     }

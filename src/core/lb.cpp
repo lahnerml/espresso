@@ -3189,6 +3189,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     current_coupling_element.fluid_force.clear();
     return;
   }
+  P4EST_ASSERT(payloads.empty() ||
+               (8 <= payloads.size() && payloads.size() <= 21));
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #endif // !LB_ADAPTIVE
 
@@ -3202,7 +3204,11 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   /* calculate fluid velocity at particle's position
      this is done by linear interpolation
      (Eq. (11) Ahlrichs and Duenweg, JCP 111(17):8225 (1999)) */
+#ifndef LB_ADAPTIVE
   lb_lbfluid_get_interpolated_velocity(p->r.p, interpolated_u);
+#else
+  lb_lbfluid_get_interpolated_velocity(p->r.p, interpolated_u, ghost);
+#endif
 
   ONEPART_TRACE(if (p->p.identity == check_id) {
     fprintf(stderr, "%d: OPT: LB u = (%.16e,%.3e,%.3e) v = (%.16e,%.3e,%.3e)\n",

@@ -2781,22 +2781,47 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   fold_position(pos, fold);
 
   // Find quadrant containing position and store its payload.
-  uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);
+  // Begin by search in ghost layer.  If there is no quadrant containing the
+  // given position search mirror quadrants.
+  bool found_in_ghost = true;
+  uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB,
+                                              pos.data());
   std::vector<p4est_locidx_t> quad_indices;
   p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->ghosts,
                                        quad_indices);
   if(quad_indices.empty() ||
-     !p4est_utils_pos_sanity_check(quad_indices[0], pos, true)) {
+     !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
+                                   found_in_ghost)) {
+    quad_indices.clear();
+    p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->mirrors,
+                                         quad_indices);
+    if(!quad_indices.empty()) {
+      found_in_ghost = false;
+      quad_indices[0] = adapt_mesh->mirror_qid[quad_indices[0]];
+    }
+  }
+
+  if(quad_indices.empty() ||
+     !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
+                                   found_in_ghost)) {
     return;
   }
 
   int lvl, sid, tree, zsize;
-  p8est_quadrant_t *quad =
-      p8est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[0]);
-  tree = quad->p.piggy3.which_tree;
-  lvl = quad->level;
-  sid = adapt_virtual->quad_greal_offset[quad_indices[0]];
-  payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
+  p8est_quadrant_t *quad;
+  if (found_in_ghost) {
+    quad = p8est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[0]);
+    lvl = quad->level;
+    tree = adapt_mesh->ghost_to_tree[quad_indices[0]];
+    sid = adapt_virtual->quad_greal_offset[quad_indices[0]];
+    payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
+  } else {
+    quad = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad_indices[0]);
+    lvl = quad->level;
+    tree = adapt_mesh->quad_to_tree[quad_indices[0]];
+    sid =adapt_virtual->quad_qreal_offset[quad_indices[0]];
+    payloads.push_back(&lbadapt_local_data[lvl].at(sid));
+  }
   levels.push_back(lvl);
 
   // determine which neighbors to find
@@ -2823,8 +2848,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
 
   if (safe_quads) {
     quad_index =
-        p4est_utils_global_idx(forest, quad,
-                               adapt_mesh->ghost_to_tree[quad_indices[0]]);
+        p4est_utils_global_idx(forest, quad, tree);
     current_coupling_element.cell_positions.push_back(
         Utils::morton_idx_to_coords(quad_index));
     current_coupling_element.delta.push_back(interpol_weights[0]);

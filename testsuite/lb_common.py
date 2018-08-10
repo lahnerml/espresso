@@ -27,7 +27,7 @@ class TestLB(ut.TestCase):
     n_nodes = system.cell_system.get_state()["n_nodes"]
     system.seed = range(n_nodes)
     params = {'int_steps': 25,
-              'int_times': 16,
+              'int_times': 13,
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
@@ -55,7 +55,7 @@ class TestLB(ut.TestCase):
     system.time_step = params['time_step']
     system.cell_system.skin = params['skin']
 
-    system.non_bonded_inter[0, 0].lennard_jones.set_params(
+    system.non_bonded_inter[734, 645].lennard_jones.set_params(
         epsilon=1.0, sigma=1.0, cutoff=0.3, shift="auto")
 
     def test_mass_momentum_thermostat(self):
@@ -93,6 +93,7 @@ class TestLB(ut.TestCase):
             fric=self.params['friction'], ext_force_density=[0, 0, 0])
         self.system.actors.add(self.lbf)
         self.system.thermostat.set_lb(kT=self.params['temp'])
+
         # give particles a push
         for i in range(self.n_col_part):
             self.system.part[i].v = self.system.part[i].v + [0.1, 0.0, 0.0]
@@ -103,11 +104,13 @@ class TestLB(ut.TestCase):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
         #self.system.integrator.run(50)
+        exitpoint = 50
         for i in range(50):
             self.system.analysis.analyze_linear_momentum()
             self.system.integrator.run(1)
             self.system.analysis.analyze_linear_momentum()
-            #os._exit(0)
+            if i == exitpoint:
+                os._exit(0)
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]
@@ -154,9 +157,7 @@ class TestLB(ut.TestCase):
                 self.max_dm[2] <= self.params['mom_prec'],
                 msg=("Integration step {}: momentum deviation too high\n" +
                      "deviation: {}  accepted deviation: {}").format(
-                    i,
-                    self.max_dm,
-                    self.params['mom_prec']))
+                     i, self.max_dm, self.params['mom_prec']))
 
             # check temp of particles
             e = self.system.analysis.energy()
@@ -170,6 +171,11 @@ class TestLB(ut.TestCase):
                                                          node_v_list[j][2]**2.0) * node_dens_list[j] * (self.params['box_l'])**3 / len(node_dens_list)**2
             self.avg_fluid_temp = self.avg_fluid_temp + \
                 fluid_temp / self.params['int_times']
+        for j in range (3):
+            for i in range(25):
+                self.system.analysis.analyze_linear_momentum()
+                self.system.integrator.run(1)
+                self.system.analysis.analyze_linear_momentum()
 
         temp_dev = (2.0 / (self.n_col_part * 3.0))**0.5
         temp_prec = self.params['temp_confidence'] * \
@@ -185,23 +191,15 @@ class TestLB(ut.TestCase):
         print("maximally accepted deviation: {}".format(temp_prec))
 
         self.assertTrue(
-            abs(
-                self.avg_temp -
-                self.params['temp']) < temp_prec,
-            msg="particle temperature deviation too high\ndeviation: {}  accepted deviation: {}".format(
-                abs(
-                    self.avg_temp -
-                    self.params['temp']),
-                temp_prec))
+            abs(self.avg_temp - self.params['temp']) < temp_prec,
+                msg="particle temperature deviation too high\n" +
+                    "deviation: {} accepted deviation: {}".format(
+                    abs(self.avg_temp - self.params['temp']), temp_prec))
         self.assertTrue(
-            abs(
-                self.avg_fluid_temp -
-                self.params['temp']) < temp_prec,
-            msg="fluid temperature deviation too high\ndeviation: {}  accepted deviation: {}".format(
-                abs(
-                    self.avg_fluid_temp -
-                    self.params['temp']),
-                temp_prec))
+            abs(self.avg_fluid_temp - self.params['temp']) < temp_prec,
+                msg="fluid temperature deviation too high\n" +
+                    "deviation: {} accepted deviation: {}".format(
+                    abs(self.avg_fluid_temp - self.params['temp']), temp_prec))
 
     def test_set_get_u(self):
         self.system.actors.clear()

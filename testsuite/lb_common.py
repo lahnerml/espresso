@@ -27,7 +27,7 @@ class TestLB(ut.TestCase):
     n_nodes = system.cell_system.get_state()["n_nodes"]
     system.seed = range(n_nodes)
     params = {'int_steps': 25,
-              'int_times': 13,
+              'int_times': 16,
               'time_step': 0.01,
               'tau': 0.02,
               'agrid': 0.5,
@@ -103,14 +103,14 @@ class TestLB(ut.TestCase):
         for i in range(self.n_col_part):
             self.tot_mom = self.tot_mom + self.system.part[i].v
 
-        #self.system.integrator.run(50)
-        exitpoint = 50
-        for i in range(50):
-            self.system.analysis.analyze_linear_momentum()
-            self.system.integrator.run(1)
-            self.system.analysis.analyze_linear_momentum()
-            if i == exitpoint:
-                os._exit(0)
+        self.system.integrator.run(50)
+        # exitpoint = 425
+        # self.system.analysis.analyze_linear_momentum()
+        # for i in range(50):
+        #     self.system.integrator.run(1)
+        #     self.system.analysis.analyze_linear_momentum()
+        #     if i == exitpoint:
+        #         os._exit(0)
 
         self.max_dmass = 0.0
         self.max_dm = [0, 0, 0]
@@ -171,11 +171,10 @@ class TestLB(ut.TestCase):
                                                          node_v_list[j][2]**2.0) * node_dens_list[j] * (self.params['box_l'])**3 / len(node_dens_list)**2
             self.avg_fluid_temp = self.avg_fluid_temp + \
                 fluid_temp / self.params['int_times']
-        for j in range (3):
-            for i in range(25):
-                self.system.analysis.analyze_linear_momentum()
-                self.system.integrator.run(1)
-                self.system.analysis.analyze_linear_momentum()
+        # for j in range(16 - self.params['int_times']):
+        #     for i in range(self.params['int_steps']):
+        #         self.system.integrator.run(1)
+        #         self.system.analysis.analyze_linear_momentum()
 
         temp_dev = (2.0 / (self.n_col_part * 3.0))**0.5
         temp_prec = self.params['temp_confidence'] * \

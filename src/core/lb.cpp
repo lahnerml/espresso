@@ -50,6 +50,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <mpi.h>
 
@@ -3705,15 +3706,23 @@ void calc_particle_lattice_ia() {
         }
       }
 #if 0
+      std::string filename = "p4est_" + std::to_string(sim_time) + "_" +
+                             std::to_string(this_node) + ".txt";
+      std::fstream fs(filename, fs.trunc | fs.out);
       // print coupling info
       std::sort(coupling_local.begin(), coupling_local.end(),
                 [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
                 { return a.particle_id < b.particle_id; });
       for (auto &coupling_element : coupling_local) {
         std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
+        fs << coupling_element.print(coupling_order);
+        //fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
+      fs.close();
+      coupling_local.clear();
+#endif
 
+#if 0
       fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
               this_node, ghost_cells.particles().size(), ghost_cells.n);
 #endif
@@ -3758,13 +3767,21 @@ void calc_particle_lattice_ia() {
       }
 #if 0
       // print coupling info
+      filename = "p4est_" + std::to_string(sim_time) + "_" +
+                 std::to_string(this_node) + ".txt";
+      std::fstream fs2(filename, fs.app | fs.out);
       std::sort(coupling_ghost.begin(), coupling_ghost.end(),
-                [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
-                { return a.particle_id < b.particle_id; });
+                [](const coupling_helper_t &a,
+                   const coupling_helper_t &b) -> bool {
+                    return a.particle_id < b.particle_id;
+                });
       for (auto &coupling_element : coupling_ghost) {
         std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
+        fs2 << coupling_element.print(coupling_order);
+        //fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
       }
+      fs2.close();
+      coupling_ghost.clear();
 #endif
     }
 #ifdef DD_P4EST

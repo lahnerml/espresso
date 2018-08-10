@@ -400,19 +400,22 @@ bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost)
   p8est_quadrant_t *quad;
   if (ghost) {
     quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, qid);
+    p4est_utils_get_front_lower_left(adapt_p4est,
+                                     adapt_mesh->ghost_to_tree[qid], quad,
+                                     qpos.data());
   }
   else {
     quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+    p4est_utils_get_front_lower_left(adapt_p4est, adapt_mesh->quad_to_tree[qid],
+                                     quad, qpos.data());
   }
-  p4est_utils_get_front_lower_left(adapt_p4est, adapt_mesh->quad_to_tree[qid],
-                                   quad, qpos.data());
   return (
-      (qpos[0] <= pos[0] + ROUND_ERROR_PREC &&
-       pos[0] < qpos[0] + p4est_params.h[quad->level] + ROUND_ERROR_PREC) &&
-      (qpos[1] <= pos[1] + ROUND_ERROR_PREC &&
-       pos[1] < qpos[1] + p4est_params.h[quad->level] + ROUND_ERROR_PREC) &&
-      (qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
-       pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC));
+      qpos[0] <= pos[0] + ROUND_ERROR_PREC &&
+      pos[0] < qpos[0] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
+      qpos[1] <= pos[1] + ROUND_ERROR_PREC &&
+      pos[1] < qpos[1] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
+      qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
+      pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC);
 }
 
 bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,

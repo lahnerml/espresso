@@ -3790,7 +3790,8 @@ void calc_particle_lattice_ia() {
     std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
-    for (int level = 0; level <= P8EST_QMAXLEVEL; ++level) {
+    for (int level = p4est_params.min_ref_level;
+         level <= p4est_params.max_ref_level; ++level) {
 #ifdef COMM_HIDING
       exc_status_lb[level] =
           p4est_virtual_ghost_exchange_data_level_begin(

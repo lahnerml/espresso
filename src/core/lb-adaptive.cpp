@@ -2601,13 +2601,14 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
     {{0, 1, 5}}, {{3, 1, 5}}, {{0, 4, 5}}, {{3, 4, 5}},
   }};
 
-  int fold[3] = {0, 0, 0};
-  double pos[3] = {opos[0], opos[1], opos[2]};
+  std::array<int, 3> fold = {{0, 0, 0}};
+  std::array<double, 3> pos = {{opos[0], opos[1], opos[2]}};
   fold_position(pos, fold);
 
-  int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos);
+  int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos.data());
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
+    lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels,
+                                  safe_quads);
     if (!payloads.empty()) return;
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
@@ -2619,13 +2620,13 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
     }
 #ifdef DD_P4EST
     fprintf(stderr, "belongs to MD process %i\n",
-            cell_structure.position_to_node(pos));
+            cell_structure.position_to_node(pos.data()));
 #else
     fprintf(stderr, "\n");
 #endif
     errexit();
   } else {
-    P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos));
+    P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos.data()));
   }
 
   int lvl, sid;
@@ -2775,9 +2776,9 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   }};
 
   // Fold position.
-  int fold[3] = {0, 0, 0};
-  double pos[3] = {opos[0], opos[1], opos[2]};
-  fold_position(pos,fold);
+  std::array<int, 3> fold = {{0, 0, 0}};
+  std::array<double, 3> pos = {{opos[0], opos[1], opos[2]}};
+  fold_position(pos, fold);
 
   // Find quadrant containing position and store its payload.
   uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB, pos);

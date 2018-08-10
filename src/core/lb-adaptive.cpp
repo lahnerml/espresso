@@ -2645,7 +2645,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis > 0.0 && opos[d] == pos[d]) { // right neighbor
+    if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;
@@ -2806,7 +2806,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
     P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
-    if (dis > 0.0 && opos[d] == pos[d]) { // right neighbor
+    if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
       interpolation_weights[d + 3] = 1.0 - dis;

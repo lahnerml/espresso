@@ -212,8 +212,10 @@ void predict_momentum_particles(double *result) {
     momentum[2] += mass * (p.m.v[2] + p.f.f[2] * 0.5 * time_step / p.p.mass);
   }
 
+#if 0
   fprintf(stderr, "[p4est %i] particle momentum: %.17g, %.17g, %.17g\n", this_node,
           momentum[0], momentum[1], momentum[2]);
+#endif
   MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 }
 

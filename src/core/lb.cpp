@@ -3679,7 +3679,7 @@ void calc_particle_lattice_ia() {
       MPI_Barrier(comm_cart);
       if (this_node != foo) continue;
 
-#if 1
+#if 0
       fprintf(stderr, "[rank %i] local particles (%li particles, %i cells)\n",
               this_node, local_cells.particles().size(), local_cells.n);
 #endif

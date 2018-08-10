@@ -99,6 +99,8 @@ void lb_calc_fluid_momentum(double *result) {
   momentum[1] *= h_max/lbpar.tau;
   momentum[2] *= h_max/lbpar.tau;
 
+  fprintf(stderr, "[p4est %i] fluid momentum: %.17g, %.17g, %.17g\n", this_node,
+          momentum[0], momentum[1], momentum[2]);
   MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 }
 

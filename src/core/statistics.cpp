@@ -212,6 +212,8 @@ void predict_momentum_particles(double *result) {
     momentum[2] += mass * (p.m.v[2] + p.f.f[2] * 0.5 * time_step / p.p.mass);
   }
 
+  fprintf(stderr, "[p4est %i] particle momentum: %.17g, %.17g, %.17g\n", this_node,
+          momentum[0], momentum[1], momentum[2]);
   MPI_Reduce(momentum, result, 3, MPI_DOUBLE, MPI_SUM, 0, comm_cart);
 }
 
@@ -246,13 +248,24 @@ std::vector<double> calc_linear_momentum(int include_particles,
     linear_momentum[1] += momentum_fluid[1];
     linear_momentum[2] += momentum_fluid[2];
   }
+#if 0
   fprintf(stderr,
-          "Time: %lf, momentum particles %lf %lf %lf, momentum "
-          "fluid %lf %lf %lf, total momentum %lf %lf %lf\n",
+          "Time: %.17g, momentum particles %.17g %.17g %.17g, momentum "
+          "fluid %.17g %.17g %.17g, total momentum %.17g %.17g %.17g\n",
           sim_time, momentum_particles[0], momentum_particles[1],
           momentum_particles[2], momentum_fluid[0], momentum_fluid[1],
           momentum_fluid[2], linear_momentum[0], linear_momentum[1],
           linear_momentum[2]);
+#else
+  fprintf(stderr,
+          "Time: %.17g momentum particles %.17g %.17g %.17g\n"
+          "Time: %.17g momentum fluid %.17g %.17g %.17g\n"
+          "Time: %.17g total momentum %.17g %.17g %.17g\n\n",
+          sim_time, momentum_particles[0], momentum_particles[1],
+          momentum_particles[2],
+          sim_time, momentum_fluid[0], momentum_fluid[1], momentum_fluid[2],
+          sim_time, linear_momentum[0], linear_momentum[1], linear_momentum[2]);
+#endif
   return linear_momentum;
 }
 

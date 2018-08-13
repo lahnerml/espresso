@@ -2693,9 +2693,8 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       interpol_weights.push_back(
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]]);
-      auto last_element = interpol_weights.back();
-      last_element /= (double)(nqid->elem_count);
+          interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]] /
+              (double)(nqid->elem_count));
       levels.push_back(lvl);
 
     }
@@ -2707,10 +2706,10 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   double dsum = std::accumulate(interpol_weights.begin(),
                                 interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("[Local interpol.] Sum of interpol. weights deviates from 1 by %a\n",
+    printf("[Local interpol.] Sum of interpol. weights deviates from 1 by %lf\n",
            (1.0 - dsum));
     for (auto &w : interpol_weights) {
-      printf("%a ", w);
+      printf("%lf ", w);
     }
     printf("\n");
   }
@@ -2951,10 +2950,10 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   double dsum = std::accumulate(interpol_weights.begin(),
                                 interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("[Ghost interpol.] Sum of interpol. weights deviates from 1 by %a\n",
+    printf("[Ghost interpol.] Sum of interpol. weights deviates from 1 by %lf\n",
            (1.0 - dsum));
     for (auto &w : interpol_weights) {
-      printf("%a ", w);
+      printf("%lf ", w);
     }
     printf("\n");
   }

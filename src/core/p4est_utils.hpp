@@ -145,9 +145,8 @@ extern p4est_parameters p4est_params;
 extern int lb_conn_brick[3];
 #endif // LB_ADAPTIVE
 
-extern double coords_for_regional_refinement[6]; // order: x_min, x_max,
-                                                 //        y_min, y_max,
-                                                 //        z_min, z_max
+extern std::array<double, 6> coords_for_regional_refinement;
+// order: x_min, x_max, y_min, y_max, z_min, z_max
 extern double vel_reg_ref[3];
 
 enum class forest_order {
@@ -309,7 +308,7 @@ inline int p4est_utils_random_refinement(int ref_steps) {
 
 /** Perform regional coarsening within given bounding box coordinates */
 inline int p4est_utils_regional_coarsening(double *bb_coords) {
-  memcpy(coords_for_regional_refinement, bb_coords, 6 * sizeof(double));
+  memcpy(coords_for_regional_refinement.data(), bb_coords, 6 * sizeof(double));
   mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
   mpi_bcast_parameters_for_regional_refinement(0, 0);
   mpi_call(mpi_reg_coarsening, -1, 0);
@@ -319,7 +318,7 @@ inline int p4est_utils_regional_coarsening(double *bb_coords) {
 
 /** Perform regional refinement within given bounding box coordinates */
 inline int p4est_utils_regional_refinement(double *bb_coords) {
-  memcpy(coords_for_regional_refinement, bb_coords, 6 * sizeof(double));
+  memcpy(coords_for_regional_refinement.data(), bb_coords, 6 * sizeof(double));
   mpi_call(mpi_bcast_parameters_for_regional_refinement, -1, 0);
   mpi_bcast_parameters_for_regional_refinement(0, 0);
   mpi_call(mpi_reg_refinement, -1, 0);
@@ -363,7 +362,7 @@ inline int p4est_utils_adapt_grid() {
 
 /** Set an area of refinement and prepare initial grid */
 inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
-  std::memcpy(coords_for_regional_refinement, bb_coords, 6 * sizeof(double));
+  std::memcpy(coords_for_regional_refinement.data(), bb_coords, 6 * sizeof(double));
   std::memcpy(vel_reg_ref, vel, 3 * sizeof(double));
   mpi_call(mpi_set_refinement_area, -1, 0);
   mpi_set_refinement_area(0, 0);

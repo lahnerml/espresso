@@ -2478,7 +2478,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
 
 void mpi_bcast_parameters_for_regional_refinement(int node, int unused_param) {
 #ifdef LB_ADAPTIVE
-  MPI_Bcast(coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
+  MPI_Bcast(coords_for_regional_refinement.data(), 6, MPI_DOUBLE, 0, comm_cart);
 #endif // LB_ADAPTIVE
 }
 
@@ -2594,7 +2594,7 @@ void mpi_exclude_boundary(int node, int param) {
 
 void mpi_set_refinement_area(int node, int param) {
 #ifdef LB_ADAPTIVE
-  MPI_Bcast(coords_for_regional_refinement, 6, MPI_DOUBLE, 0, comm_cart);
+  MPI_Bcast(coords_for_regional_refinement.data(), 6, MPI_DOUBLE, 0, comm_cart);
   MPI_Bcast(vel_reg_ref, 3, MPI_DOUBLE, 0, comm_cart);
 #endif // LB_ADAPTIVE
 }

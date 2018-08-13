@@ -2597,8 +2597,9 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
                   forest_order::adaptive_LB).p4est_space_idx[i]);
     }
 #ifdef DD_P4EST
-    fprintf(stderr, "belongs to MD process %i\n",
-            cell_structure.position_to_node(pos.data()));
+    fprintf(stderr, "belongs to MD process %i, (%i in forest info)\n",
+            cell_structure.position_to_node(pos.data()),
+            p4est_utils_pos_to_proc(forest_order::short_range, pos.data()));
 #else
     fprintf(stderr, "\n");
 #endif

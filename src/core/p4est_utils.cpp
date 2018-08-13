@@ -644,8 +644,10 @@ void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
                   return (index <
                           p4est_utils_global_idx(fo, &a, a.p.which_tree));
               });
-          Utils::iota_n(std::back_inserter(result), std::distance(p, q),
-                        std::distance(begin, p));
+          if (q != end) {
+            Utils::iota_n(std::back_inserter(result), std::distance(p, q - 1),
+                          std::distance(begin, p));
+          }
         } else {
           result.push_back(std::distance(begin, p));
         }

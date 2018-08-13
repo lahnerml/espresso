@@ -74,7 +74,7 @@ double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-std::vector<int> *flags;
+std::vector<int> flags;
 std::vector<p4est_gloidx_t> old_partition_table_adapt;
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 
@@ -695,7 +695,7 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     // do not coarsen quadrants at the boundary
     coarsen &= !refine_geometric(p8est, which_tree, quads[i]) &&
-               ((*flags)[qid + i] == 2);
+               (flags[qid + i] == 2);
   }
   return coarsen;
 #else // LB_ADAPTIVE
@@ -715,14 +715,33 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
 
   // refine if we have cells marked for refinement
   if ((q->level < p4est_params.max_ref_level) &&
-      ((1 == (*flags)[qid] || refine))) {
+      ((1 == flags[qid] || refine))) {
     return 1;
   }
 #endif // LB_ADAPTIVE
   return 0;
 }
 
-int p4est_utils_collect_flags(std::vector<int> *flags) {
+// use around particles
+typedef struct {
+  std::array<double, 3> bbox_min;
+  std::array<double, 3> bbox_max;
+} refinement_area_t;
+
+void create_refinement_patch_from_pos(std::vector<refinement_area_t> &patches,
+                                      Vector3d position, double radius) {
+  refinement_area_t ref_area;
+  std::array<double, 3> img_box = {{0, 0, 0}};
+  ref_area.bbox_min = {{position[0] - radius, position[1] - radius,
+                        position[2] - radius}};
+  fold_position(img_box, ref_area.bbox_min);
+  ref_area.bbox_max = {{position[0] + radius, position[1] + radius,
+                        position[2] + radius}};
+  fold_position(img_box, ref_area.bbox_min);
+  patches.push_back(ref_area);
+}
+
+void p4est_utils_collect_flags(std::vector<int> &flags) {
 #ifdef LB_ADAPTIVE
   // get refinement string for grid change
   // velocity
@@ -787,82 +806,46 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
 
   // refinement in a potentially moving box
   p8est_quadrant_t *q;
-  std::array<double, 3> midpoint, bbox_min, bbox_max;
-  bbox_min = {{std::fmod(coords_for_regional_refinement[0] +
-                         sim_time * vel_reg_ref[0], box_l[0]),
-               std::fmod(coords_for_regional_refinement[2] +
-                         sim_time * vel_reg_ref[1], box_l[1]),
-               std::fmod(coords_for_regional_refinement[4] +
-                         sim_time * vel_reg_ref[2], box_l[2])}};
-  bbox_max = {{std::fmod(coords_for_regional_refinement[1] +
-                         sim_time * vel_reg_ref[0], box_l[0]),
-               std::fmod(coords_for_regional_refinement[3] +
-                         sim_time * vel_reg_ref[1], box_l[1]),
-               std::fmod(coords_for_regional_refinement[5] +
-                         sim_time * vel_reg_ref[2], box_l[2])}};
-  bool overlap[3] = {bbox_max[0] < bbox_min[0],
-                     bbox_max[1] < bbox_min[1],
-                     bbox_max[2] < bbox_min[2]};
+  std::vector<refinement_area_t> refined_patches;
+  refinement_area_t ref_area;
+  std::array<bool, 3> overlap;
+  std::array<double, 3> midpoint;
+  std::array<double, 6> default_box =
+      {{std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+        std::numeric_limits<double>::min(), std::numeric_limits<double>::max()}};
+  if (coords_for_regional_refinement != default_box) {
+    ref_area.bbox_min = {{std::fmod(coords_for_regional_refinement[0] +
+                                    sim_time * vel_reg_ref[0], box_l[0]),
+                          std::fmod(coords_for_regional_refinement[2] +
+                                    sim_time * vel_reg_ref[1], box_l[1]),
+                          std::fmod(coords_for_regional_refinement[4] +
+                                    sim_time * vel_reg_ref[2], box_l[2])}};
+    ref_area.bbox_max = {{std::fmod(coords_for_regional_refinement[1] +
+                                    sim_time * vel_reg_ref[0], box_l[0]),
+                          std::fmod(coords_for_regional_refinement[3] +
+                                    sim_time * vel_reg_ref[1], box_l[1]),
+                          std::fmod(coords_for_regional_refinement[5] +
+                                    sim_time * vel_reg_ref[2], box_l[2])}};
+    refined_patches.push_back(ref_area);
+  }
 
   // particle criterion: Refine cells where we have particles
+  double h_max = (0 == sim_time) ? p4est_params.h[p4est_params.min_ref_level]
+                                 : p4est_params.h[p4est_params.max_ref_level];
+  //double h_max = p4est_params.h[p4est_params.max_ref_level];
+  double radius = 2.5 * h_max;
   if (n_part) {
-    p4est_locidx_t qid, nqid;
-    castable_unique_ptr<sc_array_t> nqids =
-        sc_array_new(sizeof(p4est_locidx_t));
-    std::vector<p4est_locidx_t> ghost_ids;
-    ghost_ids.reserve(adapt_ghost->ghosts.elem_count);
-    std::vector<p4est_locidx_t> quad_indices;
-    for (auto p: ghost_cells.particles()) {
-      quad_indices.clear();
-      uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB,
-                                                  p.r.p.data());
-      p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->ghosts,
-                                           quad_indices);
-      P4EST_ASSERT(p4est_utils_pos_sanity_check(quad_indices[0], p.r.p.data(),
-                                                true));
-      ghost_ids.push_back(quad_indices[0]);
-    }
-    p4est_locidx_t lq = adapt_mesh->local_num_quadrants;
-    p4est_locidx_t gq = adapt_mesh->ghost_num_quadrants;
     for (auto p: local_cells.particles()) {
-      qid = p4est_utils_pos_to_qid(forest_order::adaptive_LB, p.r.p.data());
-      (*flags)[qid] = 1;
-      for (int i = 0; i < 26; ++i) {
-        sc_array_truncate(nqids);
-        p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid, i,
-                                 nullptr, nullptr, nqids);
-        for (int j = 0; j < nqids->elem_count; ++j) {
-          nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
-          P4EST_ASSERT (0 <= nqid && nqid < lq + gq);
-          if (nqid < lq)
-            (*flags)[nqid] = 1;
-        }
-      }
+      create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
     }
-    if (!ghost_ids.empty()) {
-      for (int i = 0; i < adapt_ghost->mirrors.elem_count; ++i) {
-        qid = adapt_mesh->mirror_qid[i];
-        for (int i = 0; i < 26; ++i) {
-          sc_array_truncate(nqids);
-          p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid, i,
-                                   nullptr, nullptr, nqids);
-          for (int j = 0; j < nqids->elem_count; ++j) {
-            nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
-            P4EST_ASSERT (0 <= nqid && nqid < lq + gq);
-            if (lq <= nqid) {
-              auto search_it = std::find(ghost_ids.begin(), ghost_ids.end(),
-                                         nqid - lq);
-              if (search_it != ghost_ids.end()) {
-                (*flags)[qid] = 1;
-              }
-            }
-          }
-        }
-      }
+    for (auto p: ghost_cells.particles()) {
+      create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
     }
   }
 
-  if ((vel_reg_ref[0] != std::numeric_limits<double>::min() &&
+  if (!refined_patches.empty() ||
+      (vel_reg_ref[0] != std::numeric_limits<double>::min() &&
        vel_reg_ref[1] != std::numeric_limits<double>::min() &&
        vel_reg_ref[2] != std::numeric_limits<double>::min()) ||
       (v_min < std::numeric_limits<double>::max()) ||
@@ -883,11 +866,11 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         // boundaries
         if (p4est_params.threshold_velocity[1] * (v_max - v_min) <
             (v - v_min)) {
-          (*flags)[qid] = 1;
-        } else if ((1 != (*flags)[qid]) &&
-                   (v - v_min < p4est_params.threshold_velocity[0] *
-                                (v_max - v_min))) {
-          (*flags)[qid] = 2;
+          flags[qid] = 1;
+        } else if ((p4est_params.threshold_velocity[0] * (v_max - v_min) <
+                    v - v_min) && ((v - v_min) <=
+                    p4est_params.threshold_velocity[1] * (v_max - v_min))) {
+          flags[qid] = 0;
         }
       }
 
@@ -903,53 +886,53 @@ int p4est_utils_collect_flags(std::vector<int> *flags) {
         }
         if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
             (vort - vort_min)) {
-          (*flags)[qid] = 1;
-        } else if ((1 != (*flags)[qid]) &&
-                   (vort - vort_min < p4est_params.threshold_vorticity[0] *
-                                      (vort_max - vort_min))) {
-          (*flags)[qid] = 2;
+          flags[qid] = 1;
+        } else if ((p4est_params.threshold_vorticity[0] * (vort_max - vort_min) <
+                    vort - vort_min) && ((vort - vort_min) <=
+                    p4est_params.threshold_vorticity[1] * (vort_max - vort_min))) {
+          flags[qid] = 0;
         }
       }
 
       // geometry
-      if (vel_reg_ref[0] != std::numeric_limits<double>::min() &&
-          vel_reg_ref[1] != std::numeric_limits<double>::min() &&
-          vel_reg_ref[2] != std::numeric_limits<double>::min()) {
+      for (auto patch: refined_patches) {
         q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
         p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qid], q,
                                  midpoint.data());
+
+        for (int i = 0; i < 3; ++i) {
+          overlap[i] = patch.bbox_min[i] > patch.bbox_max[i];
+        }
+
         // support boundary moving out of domain as well:
         // 3 comparisons:
         // (min - box_l) < c && c < max -> wrap min
         // min < c && c < (max + box_l) -> wrap max
         // min < c && c < max           -> standard
         if (((!overlap[0] &&
-              (bbox_min[0] < midpoint[0] && midpoint[0] < bbox_max[0])) ||
+              (patch.bbox_min[0] < midpoint[0] &&
+               midpoint[0] < patch.bbox_max[0])) ||
              (overlap[0] &&
-              (midpoint[0] < bbox_max[0] || bbox_min[0] < midpoint[0]))) &&
+              (midpoint[0] < patch.bbox_max[0] ||
+               patch.bbox_min[0] < midpoint[0]))) &&
             ((!overlap[1] &&
-              (bbox_min[1] < midpoint[1] && midpoint[1] < bbox_max[1])) ||
+              (patch.bbox_min[1] < midpoint[1] &&
+               midpoint[1] < patch.bbox_max[1])) ||
              (overlap[1] &&
-              (midpoint[1] < bbox_max[1] || bbox_min[1] < midpoint[1]))) &&
+              (midpoint[1] < patch.bbox_max[1] ||
+               patch.bbox_min[1] < midpoint[1]))) &&
             ((!overlap[2] &&
-              (bbox_min[2] < midpoint[2] && midpoint[2] < bbox_max[2])) ||
+              (patch.bbox_min[2] < midpoint[2] &&
+               midpoint[2] < patch.bbox_max[2])) ||
              (overlap[2] &&
-              (midpoint[2] < bbox_max[2] || bbox_min[2] < midpoint[2])))) {
-          (*flags)[qid] = 1;
-        } else if ((*flags)[qid] != 1) {
-          (*flags)[qid] = 2;
+              (midpoint[2] < patch.bbox_max[2] ||
+               patch.bbox_min[2] < midpoint[2])))) {
+          flags[qid] = 1;
         }
-      }
-    }
-  } else {
-    if (n_part) {
-      for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-        (*flags)[qid] = (*flags)[qid] ? 1 : 2;
       }
     }
   }
 #endif // LB_ADAPTIVE
-  return 0;
 }
 
 /** Dummy initialization function for quadrants created in refinement step
@@ -988,7 +971,7 @@ int p4est_utils_perform_adaptivity_step() {
 
   // 1st step: alter copied grid and map data between grids.
   // collect refinement and coarsening flags.
-  flags = new std::vector<int>(adapt_p4est->local_num_quadrants, 0);
+  flags = std::vector<int>(adapt_p4est->local_num_quadrants, 2);
   p4est_utils_collect_flags(flags);
 
   // To guarantee that we can map quadrants probably to their qids write each
@@ -1009,7 +992,7 @@ int p4est_utils_perform_adaptivity_step() {
                    refinement_criteria, p4est_utils_qid_dummy, nullptr);
   // perform coarsening step
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, nullptr, nullptr);
-  delete flags;
+  flags.clear();
   // balance forest after grid change
   p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, nullptr, nullptr);
 

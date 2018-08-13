@@ -157,7 +157,6 @@ void lbadapt_set_force(lbadapt_payload_t *data, int level)
 void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 {
-#ifdef EXTERNAL_FORCES
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
 #ifdef LB_ADAPTIVE_GPU
 // unit conversion: force density
@@ -181,18 +180,6 @@ void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
       p4est_params.prefactors[level] * lbpar.ext_force_density[2] *
       Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #endif // LB_ADAPTIVE_GPU
-#else  // EXTERNAL_FORCES
-#ifdef LB_ADAPTIVE_GPU
-  data->force[0] = 0.0;
-  data->force[1] = 0.0;
-  data->force[2] = 0.0;
-#else  // LB_ADAPTIVE_GPU
-  data->lbfields.force[0] = 0.0;
-  data->lbfields.force[1] = 0.0;
-  data->lbfields.force[2] = 0.0;
-  data->lbfields.has_force_density = 0;
-#endif // LB_ADAPTIVE_GPU
-#endif // EXTERNAL_FORCES
 }
 
 void lbadapt_init() {
@@ -1398,15 +1385,9 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
           lbadapt_thermalize_modes(modes);
         }
 
-/* apply forces */
-#ifdef EXTERNAL_FORCES
+        // apply forces
         lbadapt_apply_forces(modes, data->lbfields.force_density, h);
-#else  // EXTERNAL_FORCES
-        // forces from MD-Coupling
-        if (data->lbfields.has_force_density) {
-          lbadapt_apply_forces(modes, data->lbfields.force, h);
-        }
-#endif // EXTERNAL_FORCES
+
         // perform back transformation
         lbadapt_calc_pop_from_modes(data->lbfluid[0], modes);
       }

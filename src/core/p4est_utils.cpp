@@ -1026,12 +1026,10 @@ int p4est_utils_perform_adaptivity_step() {
 #else
   p4est_utils_repart_preprocess();
   if (p4est_params.partitioning == "n_cells") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_uniform);
+    p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_uniform);
   }
   else if (p4est_params.partitioning == "subcycling") {
-    p8est_partition_ext(p4est_partitioned, 1,
-                        lbadapt_partition_weight_subcycling);
+    p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_subcycling);
   }
   else {
     SC_ABORT_NOT_REACHED();

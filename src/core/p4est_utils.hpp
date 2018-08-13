@@ -548,7 +548,7 @@ bool p4est_utils_pos_enclosing_check(const std::array<double, 3> &pos_mp_q1,
                                      const int level_q1,
                                      const std::array<double, 3> &pos_mp_q2,
                                      const int level_q2,
-                                     const double pos[3],
+                                     const std::array<double, 3> pos,
                                      std::array<double, 6> &interpol_weights);
 
 #if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)

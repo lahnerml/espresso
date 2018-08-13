@@ -376,13 +376,11 @@ void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j);
 void lbadapt_interpolate_pos_adapt(Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
-                                   std::vector<int> &levels,
-                                   bool safe_quads = false);
+                                   std::vector<int> &levels);
 void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
-                                   std::vector<int> &levels,
-                                   bool safe_quads = false);
+                                   std::vector<int> &levels);
 
 void lbadapt_dump2file_synced(std::string &filename);
 

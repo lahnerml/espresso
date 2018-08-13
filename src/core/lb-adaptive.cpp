@@ -34,7 +34,6 @@
 #include "random.hpp"
 #include "thermostat.hpp"
 #include "utils.hpp"
-#include "utils/coupling_helper.hpp"
 #include "utils/Morton.hpp"
 
 #include <algorithm>
@@ -2567,8 +2566,7 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
 void lbadapt_interpolate_pos_adapt(Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
-                                   std::vector<int> &levels,
-                                   bool safe_quads) {
+                                   std::vector<int> &levels) {
   P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
 
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
@@ -2607,8 +2605,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
 
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos.data());
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
-    lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels,
-                                  safe_quads);
+    lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
     if (!payloads.empty()) return;
     fprintf(stderr, "Particle not in local LB domain ");
     fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
@@ -2659,14 +2656,6 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       interpolation_weights[weight_indices[nearest_corner][1]] *
       interpolation_weights[weight_indices[nearest_corner][2]]);
 
-  if (safe_quads) {
-    quad_index =
-        p4est_utils_global_idx(forest, quad, adapt_mesh->quad_to_tree[qidx]);
-    current_coupling_element.cell_positions.push_back(
-        Utils::morton_idx_to_coords(quad_index));
-    current_coupling_element.delta.push_back(interpolation_weights[0]);
-  }
-
   castable_unique_ptr<sc_array_t> nenc = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nqid = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> nvid = sc_array_new(sizeof(int));
@@ -2693,8 +2682,6 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
         lvl = q->level;
         sid = adapt_virtual->quad_qreal_offset[idx];
         payloads.push_back(&lbadapt_local_data[lvl].at(sid));
-        quad_index =
-            p4est_utils_global_idx(forest, q, adapt_mesh->quad_to_tree[idx]);
       } else if (lq <= idx && idx < lq + gq) {
         idx -= lq;
         q = p8est_quadrant_array_index(&adapt_ghost->ghosts, idx);
@@ -2702,9 +2689,6 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
         lvl = q->level;
         sid = adapt_virtual->quad_greal_offset[idx];
         payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
-        quad_index =
-            p4est_utils_global_idx(forest, q,
-                                   adapt_mesh->ghost_to_tree[idx]);
       } else {
         SC_ABORT_NOT_REACHED();
       }
@@ -2733,11 +2717,6 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       last_element /= (double)(nqid->elem_count);
       levels.push_back(lvl);
 
-      if (safe_quads) {
-        current_coupling_element.cell_positions.push_back(
-            Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(last_element);
-      }
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
@@ -2759,8 +2738,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
 void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
-                                   std::vector<int> &levels,
-                                   bool safe_quads) {
+                                   std::vector<int> &levels) {
   P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
   auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
@@ -2846,14 +2824,6 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       interpolation_weights[weight_indices[nearest_corner][2]]);
   zsize = 1 << (p4est_params.max_ref_level - lvl);
 
-  if (safe_quads) {
-    quad_index =
-        p4est_utils_global_idx(forest, quad, tree);
-    current_coupling_element.cell_positions.push_back(
-        Utils::morton_idx_to_coords(quad_index));
-    current_coupling_element.delta.push_back(interpol_weights[0]);
-  }
-
   // determine which neighbor indices need to be found
   std::array<uint64_t, 7> neighbor_indices = {
       {std::numeric_limits<uint64_t>::max(),
@@ -2922,14 +2892,6 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         if (dir == 3 || dir == 5 || dir == 6)
           last_element *= 0.5;
       }
-      if (safe_quads) {
-        quad_index =
-            p4est_utils_global_idx(forest, q,
-                                   adapt_mesh->quad_to_tree[mirror_qid]);
-        current_coupling_element.cell_positions.push_back(
-            Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(last_element);
-      }
 
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
@@ -2973,14 +2935,6 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
           last_element *= 0.25;
         if (dir == 3 || dir == 5 || dir == 6)
           last_element *= 0.5;
-      }
-      if (safe_quads) {
-        quad_index =
-            p4est_utils_global_idx(forest, q,
-                                   adapt_mesh->ghost_to_tree[quad_indices[i]]);
-        current_coupling_element.cell_positions.push_back(
-            Utils::morton_idx_to_coords(quad_index));
-        current_coupling_element.delta.push_back(last_element);
       }
 
       p4est_utils_get_midpoint(adapt_p4est, tree, q,

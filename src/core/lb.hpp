@@ -31,11 +31,6 @@
 
 #include "lattice.hpp"
 #include "utils.hpp"
-#include "utils/coupling_helper.hpp"
-
-extern std::vector <coupling_helper_t> coupling_local;
-extern std::vector <coupling_helper_t> coupling_ghost;
-extern coupling_helper_t current_coupling_element;
 
 #ifdef LB_ADAPTIVE
 #include <p8est.h>

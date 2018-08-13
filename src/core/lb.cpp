@@ -43,7 +43,6 @@
 #include "lbboundaries.hpp"
 #include "p4est_utils.hpp"
 #include "thermostat.hpp"
-#include "utils/coupling_helper.hpp"
 #include "virtual_sites/lb_inertialess_tracers.hpp"
 
 #include <boost/multi_array.hpp>
@@ -55,10 +54,6 @@
 #include <mpi.h>
 
 #include "cuda_interface.hpp"
-
-std::vector <coupling_helper_t> coupling_local;
-std::vector <coupling_helper_t> coupling_ghost;
-coupling_helper_t current_coupling_element;
 
 #ifndef LB_ADAPTIVE_GPU
 #ifdef ADDITIONAL_CHECKS
@@ -3181,15 +3176,9 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 #else  // !LB_ADAPTIVE
   (ghost ? lbadapt_interpolate_pos_ghost
          : lbadapt_interpolate_pos_adapt)(p->r.p, payloads,
-                                          interpolation_weights, quad_levels,
-                                          true);
-  if (payloads.empty()) {
-    // clear coupling helper element
-    current_coupling_element.delta.clear();
-    current_coupling_element.cell_positions.clear();
-    current_coupling_element.fluid_force.clear();
-    return;
-  }
+                                          interpolation_weights, quad_levels);
+  if (payloads.empty()) { return; }
+
   P4EST_ASSERT(payloads.empty() ||
                (8 <= payloads.size() && payloads.size() <= 21));
   double h_max = p4est_params.h[p4est_params.max_ref_level];
@@ -3305,9 +3294,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
     local_f[0] += interpolation_weights[x] * delta_j[0] / level_fact;
     local_f[1] += interpolation_weights[x] * delta_j[1] / level_fact;
     local_f[2] += interpolation_weights[x] * delta_j[2] / level_fact;
-
-    current_coupling_element.fluid_force.push_back(
-        {{local_f[0], local_f[1], local_f[2]}});
   }
 #endif // !LB_ADAPTIVE
 
@@ -3675,61 +3661,27 @@ void calc_particle_lattice_ia() {
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
 #endif
-    for (int foo = 0; foo < n_nodes; ++foo) {
-      MPI_Barrier(comm_cart);
-      if (this_node != foo) continue;
 
-#if 0
-      fprintf(stderr, "[rank %i] local particles (%li particles, %i cells)\n",
-              this_node, local_cells.particles().size(), local_cells.n);
-#endif
-      /* local cells */
-      for (auto &p : local_cells.particles()) {
-        current_coupling_element.reset();
-        current_coupling_element.particle_id = p.identity();
-        current_coupling_element.particle_position = p.r.p;
-        if (!p.p.is_virtual || thermo_virtual) {
-          lb_viscous_coupling(&p, force);
-          current_coupling_element.particle_force =
-              {{force[0], force[1], force[2]}};
-          coupling_local.push_back(current_coupling_element);
+    for (auto &p : local_cells.particles()) {
+      if (!p.p.is_virtual || thermo_virtual) {
+        lb_viscous_coupling(&p, force);
 
         /* add force to the particle */
         p.f.f[0] += force[0];
         p.f.f[1] += force[1];
         p.f.f[2] += force[2];
 
-          ONEPART_TRACE(if (p.p.identity == check_id) {
-            fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
-                    p.f.f[0], p.f.f[1], p.f.f[2]);
-          });
-        }
+        ONEPART_TRACE(if (p.p.identity == check_id) {
+          fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
+                  p.f.f[0], p.f.f[1], p.f.f[2]);
+        });
       }
-#if 0
-      std::string filename = "p4est_" + std::to_string(sim_time) + "_" +
-                             std::to_string(this_node) + ".txt";
-      std::fstream fs(filename, fs.trunc | fs.out);
-      // print coupling info
-      std::sort(coupling_local.begin(), coupling_local.end(),
-                [](const coupling_helper_t &a, const coupling_helper_t &b) -> bool
-                { return a.particle_id < b.particle_id; });
-      for (auto &coupling_element : coupling_local) {
-        std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        fs << coupling_element.print(coupling_order);
-        //fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
-      }
-      fs.close();
-      coupling_local.clear();
-#endif
+    }
 
-#if 0
-      fprintf(stderr, "[rank %i] ghost particles (%li particles, %i cells)\n",
-              this_node, ghost_cells.particles().size(), ghost_cells.n);
-#endif
-      /* ghost cells */
-      for (auto &p : ghost_cells.particles()) {
+    /* ghost cells */
+    for (auto &p : ghost_cells.particles()) {
 #ifndef DD_P4EST
-        /* for ghost particles we have to check if they lie
+      /* for ghost particles we have to check if they lie
          * in the range of the local lattice nodes */
         if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&
             p.r.p[0] < my_right[0] + 0.5 * lblattice.agrid[0] &&
@@ -3738,52 +3690,28 @@ void calc_particle_lattice_ia() {
             p.r.p[2] >= my_left[2] - 0.5 * lblattice.agrid[2] &&
             p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2])
 #endif
+      {
+        ONEPART_TRACE(if (p.p.identity == check_id) {
+          fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
+                  this_node);
+        });
+        if (!p.p.is_virtual || thermo_virtual)
         {
-          current_coupling_element.reset();
-          current_coupling_element.particle_id = p.identity();
-          current_coupling_element.particle_position = p.r.p;
-          ONEPART_TRACE(if (p.p.identity == check_id) {
-            fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
-                    this_node);
-          });
-          if (!p.p.is_virtual || thermo_virtual)
-          {
 #ifndef DD_P4EST
-            lb_viscous_coupling(&p, force);
+          lb_viscous_coupling(&p, force);
 #else
-            lb_viscous_coupling(&p, force, true);
+          lb_viscous_coupling(&p, force, true);
 #endif
-            current_coupling_element.particle_force =
-                {{force[0], force[1], force[2]}};
-            coupling_ghost.push_back(current_coupling_element);
-          }
-
-          /* ghosts must not have the force added! */
-          ONEPART_TRACE(if (p.p.identity == check_id) {
-            fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
-                    p.f.f[0], p.f.f[1], p.f.f[2]);
-          });
         }
+
+        /* ghosts must not have the force added! */
+        ONEPART_TRACE(if (p.p.identity == check_id) {
+          fprintf(stderr, "%d: OPT: LB f = (%.6e,%.3e,%.3e)\n", this_node,
+                  p.f.f[0], p.f.f[1], p.f.f[2]);
+        });
       }
-#if 0
-      // print coupling info
-      filename = "p4est_" + std::to_string(sim_time) + "_" +
-                 std::to_string(this_node) + ".txt";
-      std::fstream fs2(filename, fs.app | fs.out);
-      std::sort(coupling_ghost.begin(), coupling_ghost.end(),
-                [](const coupling_helper_t &a,
-                   const coupling_helper_t &b) -> bool {
-                    return a.particle_id < b.particle_id;
-                });
-      for (auto &coupling_element : coupling_ghost) {
-        std::vector<uint64_t> coupling_order(coupling_element.delta.size());
-        fs2 << coupling_element.print(coupling_order);
-        //fprintf(stderr, "%s", coupling_element.print(coupling_order).c_str());
-      }
-      fs2.close();
-      coupling_ghost.clear();
-#endif
     }
+
 #ifdef DD_P4EST
     // ghost exchange
     std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);

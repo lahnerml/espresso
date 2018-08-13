@@ -1011,24 +1011,20 @@ int p4est_utils_perform_adaptivity_step() {
 
   // cleanup
   p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
+  adapt_p4est.reset(p4est_adapted);
   adapt_virtual.reset();
   adapt_mesh.reset();
 
   // 3rd step: partition grid and transfer data to respective new owner ranks
   //           including all preparations for next time step
-  adapt_p4est.reset(p4est_adapted);
-
 #ifdef DD_P4EST
-  std::vector<std::string> metrics;
-  metrics = {"ncells", p4est_params.partitioning};
-  std::vector<double> alpha = {1., 1.};
-  std::vector<p8est_t *> forests;
-  forests.push_back(dd_p4est_get_p4est());
-  forests.push_back(adapt_p4est);
-  p4est_utils_prepare(forests);
+  p4est_utils_prepare({dd_p4est_get_p4est(), adapt_p4est});
 
+  std::vector<std::string> metrics = {"ncells", p4est_params.partitioning};
+  std::vector<double> alpha = {1., 1.};
   lbmd::repart_all(metrics, alpha);
 #else
+  p4est_utils_repart_preprocess();
   if (p4est_params.partitioning == "n_cells") {
     p8est_partition_ext(p4est_partitioned, 1,
                         lbadapt_partition_weight_uniform);
@@ -1040,8 +1036,8 @@ int p4est_utils_perform_adaptivity_step() {
   else {
     SC_ABORT_NOT_REACHED();
   }
+  p4est_utils_repart_postprocess();
 #endif
-  p4est_utils_prepare(forests);
 #endif // LB_ADAPTIVE
   return 0;
 }
@@ -1236,6 +1232,7 @@ int p4est_utils_repart_postprocess() {
                                              (void**)ghost_pointer.data());
 #endif // COMM_HIDING
   }
+  p4est_utils_prepare({dd_p4est_get_p4est(), adapt_p4est});
 
   return 0;
 }

@@ -440,8 +440,10 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
             (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
              0.5 * (p4est_params.h[level_q1] +
                     p4est_params.h[level_q2]))) ||
-           ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0. ||
-            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0.))));
+           ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             0.5 * p4est_params.h[std::max(level_q1, level_q2)] ||
+            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+             0.5 * p4est_params.h[std::max(level_q1, level_q2)]))));
     }
   }
   return touching;

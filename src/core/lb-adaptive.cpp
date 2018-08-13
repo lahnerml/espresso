@@ -2852,44 +2852,41 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
                                          &adapt_ghost->mirrors,
                                          quad_indices, quad->level);
-    n_neighbors_per_dir += quad_indices.size();
     for (int i = 0; i < quad_indices.size(); ++i) {
       mirror_qid = adapt_mesh->mirror_qid[quad_indices[i]];
       sid = adapt_virtual->quad_qreal_offset[mirror_qid];
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, mirror_qid);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      payloads.push_back(&lbadapt_local_data[q->level].at(sid));
-      levels.push_back(q->level);
-      interpol_weights.push_back(
-          interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
-      auto last_element = interpol_weights.back();
-      if (q->level > lvl) {
-        //auto last_element = interpol_weights.back();
-        if (dir == 1 || dir == 2 || dir == 4)
-          last_element *= 0.25;
-        if (dir == 3 || dir == 5 || dir == 6)
-          last_element *= 0.5;
-      }
-
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
-      std::array<double, 6> check_weights;
-      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
-                                                  neighbor_quad_pos, q->level));
-      P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
-                                                   neighbor_quad_pos, q->level,
-                                                   pos, check_weights));
-      P4EST_ASSERT(dir != 7 ||
-                   ((std::abs(check_weights[0] - interpolation_weights[0]) <
-                     ROUND_ERROR_PREC) &&
-                    (std::abs(check_weights[1] - interpolation_weights[1]) <
-                     ROUND_ERROR_PREC) &&
-                    (std::abs(check_weights[2] - interpolation_weights[2]) <
-                     ROUND_ERROR_PREC)));
+      if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
+                                         neighbor_quad_pos, q->level)) {
+        payloads.push_back(&lbadapt_local_data[q->level].at(sid));
+        levels.push_back(q->level);
+        interpol_weights.push_back(
+            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
+        if (q->level > lvl) {
+          if (dir == 1 || dir == 2 || dir == 4)
+            interpol_weights[interpol_weights.size() - 1] *= 0.25;
+          if (dir == 3 || dir == 5 || dir == 6)
+            interpol_weights[interpol_weights.size() - 1] *= 0.5;
+        }
+        ++n_neighbors_per_dir;
 
-      ++n_neighbors_per_dir;
+        std::array<double, 6> check_weights;
+        P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
+                                                     neighbor_quad_pos, q->level,
+                                                     pos, check_weights));
+        P4EST_ASSERT(dir != 7 ||
+                     ((std::abs(check_weights[0] - interpolation_weights[0]) <
+                       ROUND_ERROR_PREC) &&
+                      (std::abs(check_weights[1] - interpolation_weights[1]) <
+                       ROUND_ERROR_PREC) &&
+                      (std::abs(check_weights[2] - interpolation_weights[2]) <
+                       ROUND_ERROR_PREC)));
+      }
     }
 
     // search for neighbor in ghosts
@@ -2897,43 +2894,41 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
                                          &adapt_ghost->ghosts,
                                          quad_indices, quad->level);
-    n_neighbors_per_dir += quad_indices.size();
     for (int i = 0; i < quad_indices.size(); ++i) {
       sid = adapt_virtual->quad_greal_offset[quad_indices[i]];
       q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[i]);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      payloads.push_back(&lbadapt_ghost_data[q->level].at(sid));
-      levels.push_back(q->level);
-      interpol_weights.push_back(
-          interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
-          interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
-      auto last_element = interpol_weights.back();
-      if (q->level > lvl) {
-        //auto last_element = interpol_weights.back();
-        if (dir == 1 || dir == 2 || dir == 4)
-          last_element *= 0.25;
-        if (dir == 3 || dir == 5 || dir == 6)
-          last_element *= 0.5;
-      }
-
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
-      std::array<double, 6> check_weights;
-      P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
-                                                  neighbor_quad_pos, q->level));
-      P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
-                                                   neighbor_quad_pos, q->level,
-                                                   pos, check_weights));
-      P4EST_ASSERT(dir != 7 ||
-                   ((std::abs(check_weights[0] - interpolation_weights[0]) <
-                     ROUND_ERROR_PREC) &&
-                    (std::abs(check_weights[1] - interpolation_weights[1]) <
-                       ROUND_ERROR_PREC) &&
-                    (std::abs(check_weights[2] - interpolation_weights[2]) <
-                       ROUND_ERROR_PREC)));
+      if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
+                                         neighbor_quad_pos, q->level)) {
+        payloads.push_back(&lbadapt_ghost_data[q->level].at(sid));
+        levels.push_back(q->level);
+        interpol_weights.push_back(
+            interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
+            interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
+        auto last_element = interpol_weights.back();
+        if (q->level > lvl) {
+          if (dir == 1 || dir == 2 || dir == 4)
+            interpol_weights[interpol_weights.size() - 1] *= 0.25;
+          if (dir == 3 || dir == 5 || dir == 6)
+            interpol_weights[interpol_weights.size() - 1] *= 0.5;
+        }
+        ++n_neighbors_per_dir;
 
-      ++n_neighbors_per_dir;
+        std::array<double, 6> check_weights;
+        P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
+                                                     neighbor_quad_pos, q->level,
+                                                     pos, check_weights));
+        P4EST_ASSERT(dir != 7 ||
+                     ((std::abs(check_weights[0] - interpolation_weights[0]) <
+                       ROUND_ERROR_PREC) &&
+                      (std::abs(check_weights[1] - interpolation_weights[1]) <
+                       ROUND_ERROR_PREC) &&
+                      (std::abs(check_weights[2] - interpolation_weights[2]) <
+                       ROUND_ERROR_PREC)));
+      }
     }
     P4EST_ASSERT(payloads.size() <= 20);
     P4EST_ASSERT(n_neighbors_per_dir == 0 || n_neighbors_per_dir == 1 ||

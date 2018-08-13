@@ -1042,9 +1042,6 @@ int p4est_utils_perform_adaptivity_step() {
   }
 #endif
   p4est_utils_prepare(forests);
-
-  // free linear payload (i.e. send buffer)
-  linear_payload_lbm.clear();
 #endif // LB_ADAPTIVE
   return 0;
 }

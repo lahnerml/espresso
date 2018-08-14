@@ -400,7 +400,7 @@ void p4est_utils_set_cellsize_optimal(double mesh_width);
  *
  * @param x    Position that is transformed in place.
  */
-static inline void tree_to_boxlcoords(double x[3]) {
+inline void tree_to_boxlcoords(double x[3]) {
   for (int i = 0; i < P8EST_DIM; ++i) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     if (dd_p4est_get_p4est() != nullptr) {
@@ -426,7 +426,7 @@ static inline void tree_to_boxlcoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in simulation domain
  */
-static inline std::array<double, 3> tree_to_boxlcoords_copy(const double x[3]) {
+inline std::array<double, 3> tree_to_boxlcoords_copy(const double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   tree_to_boxlcoords(res.data());
   return res;
@@ -437,7 +437,7 @@ static inline std::array<double, 3> tree_to_boxlcoords_copy(const double x[3]) {
  *
  * @param x    Position that is transformed in place.
  */
-static inline void boxl_to_treecoords(double x[3]) {
+inline void boxl_to_treecoords(double x[3]) {
   for (int i = 0; i < P8EST_DIM; ++i) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     if (dd_p4est_get_p4est() != nullptr) {
@@ -463,7 +463,7 @@ static inline void boxl_to_treecoords(double x[3]) {
  * @param x    Position to be transformed.
  * @return     Position in p4est tree-coordinates
  */
-static inline std::array<double, 3> boxl_to_treecoords_copy(const double x[3]) {
+inline std::array<double, 3> boxl_to_treecoords_copy(const double x[3]) {
   std::array<double, 3> res = {{x[0], x[1], x[2]}};
   boxl_to_treecoords(res.data());
   return res;

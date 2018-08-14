@@ -668,7 +668,7 @@ template <typename T>
  * @param T           Data-type of numerical payload.
  * @param data        Pointer to payload struct
  */
-static int p4est_utils_deallocate_levelwise_storage(
+int p4est_utils_deallocate_levelwise_storage(
     std::vector<std::vector<T>> &data) {
   if (!data.empty()) {
     for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
@@ -689,7 +689,7 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-static int p4est_utils_allocate_levelwise_storage(
+int p4est_utils_allocate_levelwise_storage(
     std::vector<std::vector<T>> &data, p4est_mesh_t *mesh,
     p4est_virtual_t *virtual_quads, bool local_data) {
   if (!data.empty()) {
@@ -712,14 +712,13 @@ static int p4est_utils_allocate_levelwise_storage(
                   P8EST_CHILDREN * (virtual_quads->virtual_glevels +
                                     level)->elem_count;
     data[level] = std::vector<T>(quads_on_level);
-    P4EST_ASSERT(data[level].size() == (size_t) quads_on_level);
   }
 
   return 0;
 }
 
 template <typename T>
-static int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
+int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
                                   std::vector<T *> &local_pointer,
                                   std::vector<std::vector<T>> &ghost_data,
                                   std::vector<T *> &ghost_pointer) {

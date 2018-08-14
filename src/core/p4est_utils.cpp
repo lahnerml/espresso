@@ -293,6 +293,7 @@ int p4est_utils_determine_grid_level(double mesh_width,
 }
 
 void p4est_utils_set_cellsize_optimal(double mesh_width) {
+#ifdef LB_ADAPTIVE
   std::array<int, 3> ncells = {{1, 1, 1}};
 
   int grid_level = p4est_utils_determine_grid_level(mesh_width, ncells);
@@ -300,6 +301,7 @@ void p4est_utils_set_cellsize_optimal(double mesh_width) {
   lb_conn_brick[0] = ncells[0] >> grid_level;
   lb_conn_brick[1] = ncells[1] >> grid_level;
   lb_conn_brick[2] = ncells[2] >> grid_level;
+#endif
 }
 
 void p4est_utils_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
@@ -662,8 +664,10 @@ p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, const double xyz[3]) 
 }
 
 p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t idx) {
+#ifdef LB_ADAPTIVE
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
+#endif
 }
 
 // Find the process that handles the position

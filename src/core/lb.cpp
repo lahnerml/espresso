@@ -3265,16 +3265,6 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[1];
         local_f[2] +=
             delta[3 * x + 0] * delta[3 * y + 1] * delta[3 * z + 2] * delta_j[2];
-
-        current_coupling_element.delta.push_back(delta[3 * x + 0] *
-                                                 delta[3 * y + 1] *
-                                                 delta[3 * z + 2]);
-        std::array<uint64_t, 3> pos;
-        get_grid_pos(node_index[(z * 2 + y) + 2 + x], &pos[0], &pos[1], &pos[2],
-                     lblattice.halo_grid);
-        current_coupling_element.cell_positions.push_back(pos);
-        current_coupling_element.fluid_force.push_back(
-            {{local_f[0], local_f[1], local_f[2]}});
       }
     }
   }

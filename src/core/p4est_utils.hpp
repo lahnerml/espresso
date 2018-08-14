@@ -697,8 +697,7 @@ int p4est_utils_allocate_levelwise_storage(
   }
 
   // allocate data for each level
-  data = std::vector<std::vector<T>>(P8EST_QMAXLEVEL, std::vector<T>());
-  P4EST_ASSERT(data.size() == P8EST_QMAXLEVEL);
+  data.resize(P8EST_QMAXLEVEL);
 
   size_t quads_on_level;
 
@@ -711,7 +710,7 @@ int p4est_utils_allocate_levelwise_storage(
             : (mesh->ghost_level + level)->elem_count +
                   P8EST_CHILDREN * (virtual_quads->virtual_glevels +
                                     level)->elem_count;
-    data[level] = std::vector<T>(quads_on_level);
+    data[level].resize(quads_on_level);
   }
 
   return 0;

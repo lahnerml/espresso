@@ -662,6 +662,25 @@ const int p4est_to_ci[18] = {  2,  1,  4,  3,  6,  5, 16, 17, 18,
 /*****************************************************************************/
 /*@{*/
 template <typename T>
+/** Deallocate a level-wise data-structure with potentially empty lists of
+ * numerical payload from level 0 .. P8EST_QMAXLEVEL.
+ *
+ * @param T           Data-type of numerical payload.
+ * @param data        Pointer to payload struct
+ */
+static int p4est_utils_deallocate_levelwise_storage(
+    std::vector<std::vector<T>> &data) {
+  if (!data.empty()) {
+    for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
+      data[level].clear();
+    }
+  }
+  data.clear();
+
+  return 0;
+}
+
+template <typename T>
 /** Generic function to allocate level-wise data-structure with potentially
  * empty lists from 0 to P8EST_QMAXLEVEL.
  *
@@ -674,7 +693,7 @@ static int p4est_utils_allocate_levelwise_storage(
     std::vector<std::vector<T>> &data, p4est_mesh_t *mesh,
     p4est_virtual_t *virtual_quads, bool local_data) {
   if (!data.empty()) {
-    p4est_utils_deallocate_levelwise_storage(data);
+    p4est_utils_deallocate_levelwise_storage<T>(data);
   }
 
   // allocate data for each level
@@ -695,25 +714,6 @@ static int p4est_utils_allocate_levelwise_storage(
     data[level] = std::vector<T>(quads_on_level);
     P4EST_ASSERT(data[level].size() == (size_t) quads_on_level);
   }
-
-  return 0;
-}
-
-template <typename T>
-/** Deallocate a level-wise data-structure with potentially empty lists of
- * numerical payload from level 0 .. P8EST_QMAXLEVEL.
- *
- * @param T           Data-type of numerical payload.
- * @param data        Pointer to payload struct
- */
-static int p4est_utils_deallocate_levelwise_storage(
-    std::vector<std::vector<T>> &data) {
-  if (!data.empty()) {
-    for (int level = 0; level < P8EST_QMAXLEVEL; ++level) {
-      data[level].clear();
-    }
-  }
-  data.clear();
 
   return 0;
 }

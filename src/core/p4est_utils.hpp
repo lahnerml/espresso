@@ -237,7 +237,7 @@ inline int p4est_utils_get_max_level(int *lvl) {
 }
 
 /** Set partitioning strategy from p4est actor */
-inline int p4est_utils_set_partitioning(std::string part) {
+inline int p4est_utils_set_partitioning(const std::string &part) {
   if (!strcmp(part.data(), "n_cells") || !strcmp(part.data(), "subcycling")) {
     p4est_params.partitioning.assign(part);
     mpi_call(mpi_set_partitioning, -1, 0);

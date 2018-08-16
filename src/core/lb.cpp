@@ -964,7 +964,7 @@ int lb_lbfluid_print_vtk_velocity(char *filename, const std::vector<int> &bb1,
   castable_unique_ptr<sc_array_t> velocity =
       sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
   castable_unique_ptr<sc_array_t> vel_pts =
-      sc_array_new_size(sizeof(double), P4EST_CHILDREN * P4EST_DIM * num_cells);
+      sc_array_new_size(sizeof(double), P8EST_CHILDREN * P8EST_DIM * num_cells);
   castable_unique_ptr<sc_array_t> vorticity =
       sc_array_new_size(sizeof(double), P8EST_DIM * num_cells);
 
@@ -1747,7 +1747,7 @@ void lb_local_fields_get_boundary_flag(uint64_t index, int *boundary) {
   p4est_locidx_t qid = p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
   P4EST_ASSERT(0 <= qid && qid < adapt_p4est->local_num_quadrants);
 
-  auto quad = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+  auto quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
   auto sid = adapt_virtual->quad_qreal_offset[qid];
   *boundary = lbadapt_local_data[quad->level][sid].lbfields.boundary;
 }
@@ -2598,7 +2598,7 @@ void lb_calc_n_from_rho_j_pi(const Lattice::index_t index, const double rho,
   // get qid
   int qid = p4est_utils_idx_to_qid(forest_order::adaptive_LB, index);
   P4EST_ASSERT(0 <= qid && qid < adapt_p4est->local_num_quadrants);
-  p4est_quadrant_t *q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+  p8est_quadrant_t *q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
   lbadapt_payload_t *data =
       &lbadapt_local_data[q->level].at(adapt_virtual->quad_qreal_offset[qid]);
   lb_float j_cast[3];
@@ -3000,12 +3000,12 @@ inline void lb_collide_stream() {
 
 #ifdef COMM_HIDING
       exc_status_lb[level] =
-          p4est_virtual_ghost_exchange_data_level_begin(
+          p8est_virtual_ghost_exchange_data_level_begin(
               adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
               adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
               (void**)local_pointer.data(), (void**)ghost_pointer.data());
 #else
-      p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
+      p8est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                                adapt_mesh, adapt_virtual,
                                                adapt_virtual_ghost, level,
                                                sizeof(lbadapt_payload_t),
@@ -3705,12 +3705,12 @@ void calc_particle_lattice_ia() {
          level <= p4est_params.max_ref_level; ++level) {
 #ifdef COMM_HIDING
       exc_status_lb[level] =
-          p4est_virtual_ghost_exchange_data_level_begin(
+          p8est_virtual_ghost_exchange_data_level_begin(
               adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
               adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
               (void **) local_pointer.data(), (void **) ghost_pointer.data());
 #else
-      p4est_virtual_ghost_exchange_data_level(
+      p8est_virtual_ghost_exchange_data_level(
           adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
           adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
           (void**)local_pointer.data(), (void**)ghost_pointer.data());

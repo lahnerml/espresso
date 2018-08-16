@@ -117,8 +117,8 @@ struct Randintgen {
                .time_since_epoch()
                .count()),
         d(1, 1000) {}
-  Randintgen(Randintgen &&other)
-      : mt(std::move(other.mt)), d(std::move(other.d)) {}
+  Randintgen(Randintgen &&other) noexcept
+      : mt(other.mt), d(other.d) {}
   int operator()() { return d(mt); }
 
 private:
@@ -207,7 +207,7 @@ std::vector<double> repart::metric::operator()() const {
 
   for (const auto& t: mdesc) {
     double factor = std::get<0>(t);
-    repart::metric::metric_func func = std::get<1>(t);
+    const repart::metric::metric_func &func = std::get<1>(t);
 
     func(tmp);
     // Multiply add to w.

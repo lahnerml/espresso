@@ -2550,7 +2550,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
                                    std::vector<int> &levels) {
   P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
 
-  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;  // This value determines first index of
                            // neighbor_directions and weight_indices.
   uint64_t quad_index;
@@ -2721,7 +2721,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                                    std::vector<double> &interpol_weights,
                                    std::vector<int> &levels) {
   P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
-  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
   uint64_t quad_index;
 

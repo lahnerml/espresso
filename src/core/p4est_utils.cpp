@@ -975,7 +975,8 @@ int p4est_utils_perform_adaptivity_step() {
 
   // 1st step: alter copied grid and map data between grids.
   // collect refinement and coarsening flags.
-  flags = std::vector<int>(adapt_p4est->local_num_quadrants, 2);
+  flags.resize(adapt_p4est->local_num_quadrants);
+  for (int &f : flags) { f = 2; }
   p4est_utils_collect_flags(flags);
 
   // To guarantee that we can map quadrants probably to their qids write each

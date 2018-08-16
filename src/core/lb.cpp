@@ -935,8 +935,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   return 0;
 }
 
-int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
-                                  std::vector<int> bb2) {
+int lb_lbfluid_print_vtk_velocity(char *filename, const std::vector<int> &bb1,
+                                  const std::vector<int> &bb2) {
 #ifdef LB_ADAPTIVE
   /* strip file ending from filename (if given) */
   char *pos_file_ending;
@@ -1294,7 +1294,7 @@ int lb_lbfluid_save_checkpoint(char *filename, int binary) {
     if (!cpfile) {
       return ES_ERROR;
     }
-    double pop[19];
+    std::array<double, 19> pop;
     int ind[3];
 
     int gridsize[3];
@@ -1309,14 +1309,14 @@ int lb_lbfluid_save_checkpoint(char *filename, int binary) {
           ind[0] = i;
           ind[1] = j;
           ind[2] = k;
-          lb_lbnode_get_pop(ind, pop);
+          lb_lbnode_get_pop(ind, pop.data());
           if (!binary) {
             for (int n = 0; n < 19; n++) {
               fprintf(cpfile, "%.16e ", pop[n]);
             }
             fprintf(cpfile, "\n");
           } else {
-            fwrite(pop, sizeof(double), 19, cpfile);
+            fwrite(pop.data(), sizeof(double), 19, cpfile);
           }
         }
       }
@@ -2951,7 +2951,8 @@ inline void lb_collide_stream() {
   int lvl_diff;
 
   // perform 1st half of subcycling here (process coarse before fine)
-  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest_lb =
+      p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = p4est_params.min_ref_level;
        level <= p4est_params.max_ref_level; ++level) {
     // level always relates to level of real cells

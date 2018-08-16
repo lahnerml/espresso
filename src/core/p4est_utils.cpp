@@ -1178,12 +1178,12 @@ int p4est_utils_repart_postprocess() {
   recv_buffer.resize(adapt_p4est->local_num_quadrants);
 
 #ifdef COMM_HIDING
-  auto data_transfer_handle = p4est_transfer_fixed_begin(
+  auto data_transfer_handle = p8est_transfer_fixed_begin(
       adapt_p4est->global_first_quadrant, old_partition_table_adapt.data(), comm_cart,
       3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #else  // COMM_HIDING
-  p4est_transfer_fixed(adapt_p4est->global_first_quadrant,
+  p8est_transfer_fixed(adapt_p4est->global_first_quadrant,
                        old_partition_table_adapt.data(), comm_cart,
                        3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
                        linear_payload_lbm.data(), sizeof(lbadapt_payload_t));

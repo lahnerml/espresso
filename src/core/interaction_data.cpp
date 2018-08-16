@@ -478,8 +478,7 @@ void realloc_ia_params(int nsize) {
   /* if there is an old field, move entries */
   for (int i = 0; i < max_seen_particle_type; i++)
     for (int j = 0; j < max_seen_particle_type; j++) {
-      new_params[i * nsize + j] =
-          std::move(ia_params[i * max_seen_particle_type + j]);
+      new_params[i * nsize + j] = ia_params[i * max_seen_particle_type + j];
     }
 
   max_seen_particle_type = nsize;

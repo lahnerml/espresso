@@ -418,11 +418,11 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
 
   // check boundary status.
-  double new_mp[3];
+  std::array<double, 3> new_mp;
   int new_boundary;
-  p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
-  new_boundary = lbadapt_is_boundary(new_mp);
+  new_boundary = lbadapt_is_boundary(new_mp.data());
 
   if (new_boundary) {
     // if cell is a boundary cell initialize data to 0.
@@ -453,11 +453,11 @@ int data_interpolation<lbadapt_payload_t>(
   P4EST_ASSERT(quad_new->level == 1 + quad_old->level);
 
   // check boundary status.
-  lb_float new_mp[3];
+  std::array<double, 3> new_mp;
   int new_boundary;
-  p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp);
+  p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
-  new_boundary = lbadapt_is_boundary(new_mp);
+  new_boundary = lbadapt_is_boundary(new_mp.data());
 
   if (new_boundary) {
     // if cell is a boundary cell initialize data to 0.
@@ -474,14 +474,15 @@ int data_interpolation<lbadapt_payload_t>(
 }
 
 int lbadapt_is_boundary(double *pos) {
-  double dist, dist_tmp, dist_vec[3];
+  double dist, dist_tmp;
+  std::array<double, 3> dist_vec;
   dist = std::numeric_limits<double>::max();
   int the_boundary = -1;
   int n = 0;
 
   for (auto it = LBBoundaries::lbboundaries.begin();
        it != LBBoundaries::lbboundaries.end(); ++it, ++n) {
-    (**it).calc_dist(pos, &dist_tmp, dist_vec);
+    (**it).calc_dist(pos, &dist_tmp, dist_vec.data());
 
     if (dist_tmp < dist) {
       dist = dist_tmp;
@@ -706,8 +707,8 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
-  lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
+  std::array<double, 3> midpoint;
+  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
       (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -721,10 +722,10 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t **quads) {
-  lb_float midpoint[3];
+  std::array<double, 3> midpoint;
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
-    p4est_utils_get_midpoint(p8est, which_tree, quads[i], (double*) midpoint);
+    p4est_utils_get_midpoint(p8est, which_tree, quads[i], midpoint.data());
     if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
         (midpoint[0] <= coords_for_regional_refinement[1]) &&
         (coords_for_regional_refinement[2] <= midpoint[1]) &&
@@ -744,15 +745,10 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   // 0.6 instead of 0.5 for stability reasons
   lb_float half_length = 0.6 * sqrt(3) * p4est_params.h[q->level];
 
-  lb_float midpoint[3];
-  p4est_utils_get_midpoint(p8est, which_tree, q, (double*) midpoint);
+  std::array<double, 3> midpoint, dist_vec;
+  p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());
 
-  double mp[3];
-  mp[0] = midpoint[0];
-  mp[1] = midpoint[1];
-  mp[2] = midpoint[2];
-
-  double dist, dist_tmp, dist_vec[3];
+  double dist, dist_tmp;
   dist = std::numeric_limits<double>::max();
 
   int n = 0;
@@ -766,7 +762,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
         continue;
       }
     }
-    (**it).calc_dist(mp, &dist_tmp, dist_vec);
+    (**it).calc_dist(midpoint.data(), &dist_tmp, dist_vec.data());
 
 
     if (dist_tmp < dist) {
@@ -1642,15 +1638,15 @@ void lbadapt_update_populations_from_virtuals(int level,
       if (!mesh_iter->current_is_ghost) {
         parent_sid =
             mesh_iter->virtual_quads->quad_qreal_offset[mesh_iter->current_qid];
-        data = &lbadapt_local_data[level + 1].at(
+        data = &lbadapt_local_data.at(level + 1).at(
             p8est_meshiter_get_current_storage_id(mesh_iter));
-        parent_data = &lbadapt_local_data[level].at(parent_sid);
+        parent_data = &lbadapt_local_data.at(level).at(parent_sid);
       } else {
         parent_sid =
             mesh_iter->virtual_quads->quad_greal_offset[mesh_iter->current_qid];
-        data = &lbadapt_ghost_data[level + 1].at(
+        data = &lbadapt_ghost_data.at(level + 1).at(
             p8est_meshiter_get_current_storage_id(mesh_iter));
-        parent_data = &lbadapt_ghost_data[level].at(parent_sid);
+        parent_data = &lbadapt_ghost_data.at(level).at(parent_sid);
       }
       if (!data->lbfields.boundary) {
         if (!mesh_iter->current_vid) {

@@ -3697,8 +3697,8 @@ void calc_particle_lattice_ia() {
                                                         lbadapt_local_data,
                                                         lbadapt_ghost_data);
 #else
-    std::vector<T*> local_pointer(P8EST_QMAXLEVEL);
-    std::vector<T*> ghost_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t*> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t*> ghost_pointer(P8EST_QMAXLEVEL);
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
     for (int level = p4est_params.min_ref_level;

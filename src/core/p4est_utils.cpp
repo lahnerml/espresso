@@ -952,6 +952,7 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
+#ifdef COMM_HIDING
 template<typename T>
 void p4est_utils_start_communication(
   std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level,
@@ -984,8 +985,6 @@ void p4est_utils_start_communication(
 
 int p4est_utils_end_pending_communication(
     std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level) {
-#ifdef LB_ADAPTIVE
-#ifdef COMM_HIDING
   if (-1 == level) {
     for (int lvl = p4est_params.min_ref_level;
          lvl < p4est_params.max_ref_level; ++lvl) {
@@ -1000,10 +999,9 @@ int p4est_utils_end_pending_communication(
       exc_status[level] = nullptr;
     }
   }
-#endif // COMM_HIDING
-#endif // LB_ADAPTIVE
   return 0;
 }
+#endif
 
 int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE

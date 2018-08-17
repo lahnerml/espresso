@@ -739,11 +739,35 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /*@{*/
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
-template<typename T>
+template <typename T>
 void p4est_utils_start_communication(
-    std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level,
-    std::vector< std::vector<T> > &local_data,
-    std::vector< std::vector<T> > &ghost_data);
+    std::vector<p8est_virtual_ghost_exchange_t *> &exc_status, int level,
+    std::vector<std::vector<T>> &local_data,
+    std::vector<std::vector<T>> &ghost_data) {
+  P4EST_ASSERT(-1 <= level && level < P8EST_QMAXLEVEL);
+  std::vector<T *> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<T *> ghost_pointer(P8EST_QMAXLEVEL);
+  prepare_ghost_exchange(local_data, local_pointer, ghost_data, ghost_pointer);
+
+  if (level == -1) {
+    for (int lvl = p4est_params.min_ref_level;
+         lvl < p4est_params.max_ref_level; ++lvl) {
+      P4EST_ASSERT(exc_status[lvl] == nullptr);
+      exc_status_lb[lvl] =
+          p8est_virtual_ghost_exchange_data_level_begin(
+              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+              adapt_virtual_ghost, lvl, sizeof(T),
+              (void **) local_pointer.data(), (void **) ghost_pointer.data());
+    }
+  } else {
+    P4EST_ASSERT(exc_status[level] == nullptr);
+    exc_status_lb[level] =
+        p8est_virtual_ghost_exchange_data_level_begin(
+            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+            adapt_virtual_ghost, level, sizeof(T),
+            (void **) local_pointer.data(), (void **) ghost_pointer.data());
+  }
+}
 
 int p4est_utils_end_pending_communication(
     std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level = -1);

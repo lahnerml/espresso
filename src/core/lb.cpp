@@ -2979,8 +2979,8 @@ inline void lb_collide_stream() {
 #ifdef COMM_HIDING
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
 
-      P4EST_ASSERT(exc_status_lb[level] == nullptr);
-      P4EST_ASSERT(exc_status_lb[level + 1] == nullptr);
+      p4est_utils_end_pending_communication(exc_status_lb, level);
+      p4est_utils_end_pending_communication(exc_status_lb, level + 1);
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_update_populations_from_virtuals(level,
@@ -2993,9 +2993,8 @@ inline void lb_collide_stream() {
       // synchronize ghost data for next collision step
 
 #ifdef COMM_HIDING
-      p4est_utils_start_communication<lbadapt_payload_t> (exc_status_lb, level,
-                                                          lbadapt_local_data,
-                                                          lbadapt_ghost_data);
+      p4est_utils_start_communication(exc_status_lb, level, lbadapt_local_data,
+                                      lbadapt_ghost_data);
 #else
       std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
@@ -3693,9 +3692,8 @@ void calc_particle_lattice_ia() {
 
 #ifdef DD_P4EST
 #ifdef COMM_HIDING
-    p4est_utils_start_communication<lbadapt_payload_t> (exc_status_lb, -1,
-                                                        lbadapt_local_data,
-                                                        lbadapt_ghost_data);
+    p4est_utils_start_communication(exc_status_lb, -1, lbadapt_local_data,
+                                    lbadapt_ghost_data);
 #else
     std::vector<lbadapt_payload_t*> local_pointer(P8EST_QMAXLEVEL);
     std::vector<lbadapt_payload_t*> ghost_pointer(P8EST_QMAXLEVEL);

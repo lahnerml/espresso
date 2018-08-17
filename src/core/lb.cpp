@@ -2979,8 +2979,8 @@ inline void lb_collide_stream() {
 #ifdef COMM_HIDING
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
 
-      P4EST_ASSERT(exc_status_lb[level == nullptr]);
-      P4EST_ASSERT(exc_status_lb[level + 1 == nullptr]);
+      P4EST_ASSERT(exc_status_lb[level] == nullptr);
+      P4EST_ASSERT(exc_status_lb[level + 1] == nullptr);
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_update_populations_from_virtuals(level,

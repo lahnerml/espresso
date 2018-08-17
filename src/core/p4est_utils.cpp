@@ -667,6 +667,10 @@ p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t 
 #ifdef LB_ADAPTIVE
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
+#else
+  fprintf(stderr, "Function only supposed to be called with LB_ADAPTIVE enabled.\n");
+  errexit();
+  return 0;
 #endif
 }
 

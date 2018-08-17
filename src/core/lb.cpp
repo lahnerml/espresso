@@ -2899,7 +2899,7 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
     // populate halos on that level

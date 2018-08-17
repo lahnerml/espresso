@@ -192,6 +192,11 @@ void p4est_utils_init() {
 
 void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                                        bool partition) {
+#ifdef COMM_HIDING
+  // get rid of any pending communication and avoid dangling messages
+  p4est_utils_end_pending_communication(exc_status_lb);
+#endif
+
   std::vector<p4est_t *> forests;
 #ifdef DD_P4EST
   forests.push_back(dd_p4est_get_p4est());
@@ -971,10 +976,16 @@ int p4est_utils_end_pending_communication(
 
 int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE
+#ifdef COMM_HIDING
+  // get rid of any pending communication and avoid dangling messages
+  p4est_utils_end_pending_communication(exc_status_lb);
+#endif
+
   p4est_connect_type_t btype = P4EST_CONNECT_FULL;
 
   // 1st step: alter copied grid and map data between grids.
   // collect refinement and coarsening flags.
+  P4EST_ASSERT(flags.empty());
   flags.resize(adapt_p4est->local_num_quadrants);
   for (int &f : flags) { f = 2; }
   p4est_utils_collect_flags(flags);
@@ -984,11 +995,6 @@ int p4est_utils_perform_adaptivity_step() {
   // mempool by libsc).
   p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
                 nullptr, nullptr, nullptr);
-
-#ifdef COMM_HIDING
-  // get rid of any pending communication and avoid dangling messages
-  p4est_utils_end_pending_communication(exc_status_lb);
-#endif
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
@@ -1008,6 +1014,7 @@ int p4est_utils_perform_adaptivity_step() {
   adapt_ghost.reset();
 
   // locally map data between forests.
+  P4EST_ASSERT(linear_payload_lbm.empty());
   linear_payload_lbm.resize(p4est_adapted->local_num_quadrants);
 
   p4est_utils_post_gridadapt_map_data(adapt_p4est, adapt_mesh, adapt_virtual,
@@ -1161,11 +1168,15 @@ std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
 }
 
 int p4est_utils_repart_preprocess() {
+#ifdef COMM_HIDING
+  p4est_utils_end_pending_communication(exc_status_lb);
+#endif // COMM_HIDING
+
   if (linear_payload_lbm.empty()) {
-    linear_payload_lbm.resize(adapt_p4est->local_num_quadrants);
     p4est_utils_flatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              lbadapt_local_data, linear_payload_lbm);
   }
+
   // Save global_first_quadrants for migration
   old_partition_table_adapt.clear();
   std::copy_n(adapt_p4est->global_first_quadrant, n_nodes + 1,
@@ -1180,8 +1191,8 @@ int p4est_utils_repart_postprocess() {
 
 #ifdef COMM_HIDING
   auto data_transfer_handle = p8est_transfer_fixed_begin(
-      adapt_p4est->global_first_quadrant, old_partition_table_adapt.data(), comm_cart,
-      3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
+      adapt_p4est->global_first_quadrant, old_partition_table_adapt.data(),
+      comm_cart, 3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
 #else  // COMM_HIDING
   p8est_transfer_fixed(adapt_p4est->global_first_quadrant,

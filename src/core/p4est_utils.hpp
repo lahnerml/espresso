@@ -739,6 +739,12 @@ int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
 /*@{*/
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
+template<typename T>
+void p4est_utils_start_communication(
+    std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level,
+    std::vector< std::vector<T> > &local_data,
+    std::vector< std::vector<T> > &ghost_data);
+
 int p4est_utils_end_pending_communication(
     std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level = -1);
 #endif

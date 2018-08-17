@@ -37,7 +37,8 @@ castable_unique_ptr<p4est_mesh_t> adapt_mesh;
 castable_unique_ptr<p4est_virtual_t> adapt_virtual;
 castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 #ifdef COMM_HIDING
-std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (19, nullptr);
+std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (P8EST_QMAXLEVEL,
+                                                            nullptr);
 #endif
 #endif
 
@@ -951,16 +952,46 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
+template<typename T>
+void p4est_utils_start_communication(
+  std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level,
+  std::vector< std::vector<T> > &local_data,
+  std::vector< std::vector<T> > &ghost_data) {
+  P4EST_ASSERT (-1 <= level && level < P8EST_QMAXLEVEL);
+  std::vector<T*> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<T*> ghost_pointer(P8EST_QMAXLEVEL);
+  prepare_ghost_exchange(local_data, local_pointer, ghost_data, ghost_pointer);
+
+  if (level == -1) {
+    for (int lvl = p4est_params.min_ref_level;
+         lvl < p4est_params.max_ref_level; ++lvl) {
+      P4EST_ASSERT(exc_status[lvl] == nullptr);
+      exc_status_lb[lvl] =
+          p8est_virtual_ghost_exchange_data_level_begin(
+              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+              adapt_virtual_ghost, lvl, sizeof(lbadapt_payload_t),
+              (void **) local_pointer.data(), (void **) ghost_pointer.data());
+    }
+  } else {
+    P4EST_ASSERT(exc_status[level] == nullptr);
+    exc_status_lb[level] =
+        p8est_virtual_ghost_exchange_data_level_begin(
+            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+            (void **) local_pointer.data(), (void **) ghost_pointer.data());
+  }
+}
+
 int p4est_utils_end_pending_communication(
     std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level) {
 #ifdef LB_ADAPTIVE
 #ifdef COMM_HIDING
   if (-1 == level) {
-    for (int i = p4est_params.min_ref_level;
-         i < p4est_params.max_ref_level; ++i) {
-      if (nullptr != exc_status[i]) {
-        p4est_virtual_ghost_exchange_data_level_end(exc_status[i]);
-        exc_status[i] = nullptr;
+    for (int lvl = p4est_params.min_ref_level;
+         lvl < p4est_params.max_ref_level; ++lvl) {
+      if (nullptr != exc_status[lvl]) {
+        p4est_virtual_ghost_exchange_data_level_end(exc_status[lvl]);
+        exc_status[lvl] = nullptr;
       }
     }
   } else {
@@ -1225,27 +1256,25 @@ int p4est_utils_repart_postprocess() {
                              recv_buffer, lbadapt_local_data);
 
   // synchronize ghost data for next collision step
+#ifdef COMM_HIDING
+  p4est_utils_start_communication<lbadapt_payload_t>(exc_status_lb, -1,
+                                                     lbadapt_local_data,
+                                                     lbadapt_ghost_data);
+#else // COMM_HIDING
   std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                          lbadapt_ghost_data, ghost_pointer);
   for (int level = p4est_params.min_ref_level;
        level <= p4est_params.max_ref_level; ++level) {
-#ifdef COMM_HIDING
-    exc_status_lb[level] =
-        p4est_virtual_ghost_exchange_data_level_begin(
-            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-            (void**)local_pointer.data(), (void**)ghost_pointer.data());
-#else // COMM_HIDING
     p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                              adapt_mesh, adapt_virtual,
                                              adapt_virtual_ghost, level,
                                              sizeof(lbadapt_payload_t),
                                              (void**)local_pointer.data(),
                                              (void**)ghost_pointer.data());
-#endif // COMM_HIDING
   }
+#endif // COMM_HIDING
   p4est_utils_prepare({dd_p4est_get_p4est(), adapt_p4est});
 
   return 0;

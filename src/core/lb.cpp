@@ -2899,7 +2899,7 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  auto forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
     // populate halos on that level
@@ -2978,12 +2978,10 @@ inline void lb_collide_stream() {
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef COMM_HIDING
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
-      // Stop ghost exchange "early" if there are virtual quadrants on that
-      // level.
-      if (0 < (adapt_virtual->virtual_glevels + level + 1)->elem_count) {
-        p4est_utils_end_pending_communication(exc_status_lb, level + 1);
-        lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
-      }
+
+      P4EST_ASSERT(exc_status_lb[level == nullptr]);
+      P4EST_ASSERT(exc_status_lb[level + 1 == nullptr]);
+      lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_update_populations_from_virtuals(level,
                                                P8EST_TRAVERSE_LOCALGHOST);
@@ -2993,18 +2991,16 @@ inline void lb_collide_stream() {
       lbadapt_swap_pointers(level);
 
       // synchronize ghost data for next collision step
+
+#ifdef COMM_HIDING
+      p4est_utils_start_communication<lbadapt_payload_t> (exc_status_lb, level,
+                                                          lbadapt_local_data,
+                                                          lbadapt_ghost_data);
+#else
       std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
-
-#ifdef COMM_HIDING
-      exc_status_lb[level] =
-          p8est_virtual_ghost_exchange_data_level_begin(
-              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-              adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-              (void**)local_pointer.data(), (void**)ghost_pointer.data());
-#else
       p8est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
                                                adapt_mesh, adapt_virtual,
                                                adapt_virtual_ghost, level,
@@ -3696,26 +3692,23 @@ void calc_particle_lattice_ia() {
     }
 
 #ifdef DD_P4EST
-    // ghost exchange
-    std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
-    std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+#ifdef COMM_HIDING
+    p4est_utils_start_communication<lbadapt_payload_t> (exc_status_lb, -1,
+                                                        lbadapt_local_data,
+                                                        lbadapt_ghost_data);
+#else
+    std::vector<lbadapt_payload_t*> local_pointer(P8EST_QMAXLEVEL);
+    std::vector<lbadapt_payload_t*> ghost_pointer(P8EST_QMAXLEVEL);
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
     for (int level = p4est_params.min_ref_level;
          level <= p4est_params.max_ref_level; ++level) {
-#ifdef COMM_HIDING
-      exc_status_lb[level] =
-          p8est_virtual_ghost_exchange_data_level_begin(
-              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-              adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-              (void **) local_pointer.data(), (void **) ghost_pointer.data());
-#else
       p8est_virtual_ghost_exchange_data_level(
           adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
           adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
           (void**)local_pointer.data(), (void**)ghost_pointer.data());
-#endif
     }
+#endif
 #endif
   }
 }

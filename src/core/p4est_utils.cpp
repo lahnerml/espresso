@@ -191,6 +191,7 @@ void p4est_utils_init() {
   });
 }
 
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                                        bool partition) {
 #ifdef COMM_HIDING
@@ -277,6 +278,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                                                     btype));
 #endif // defined(LB_ADAPTIVE)
 }
+#endif
 
 static inline int count_trailing_zeros(int x)
 {
@@ -956,15 +958,16 @@ void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
   q->p.user_long = -1;
 }
 
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
-template<typename T>
+template <typename T>
 void p4est_utils_start_communication(
-  std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level,
-  std::vector< std::vector<T> > &local_data,
-  std::vector< std::vector<T> > &ghost_data) {
-  P4EST_ASSERT (-1 <= level && level < P8EST_QMAXLEVEL);
-  std::vector<T*> local_pointer(P8EST_QMAXLEVEL);
-  std::vector<T*> ghost_pointer(P8EST_QMAXLEVEL);
+    std::vector<p8est_virtual_ghost_exchange_t *> &exc_status, int level,
+    std::vector<std::vector<T>> &local_data,
+    std::vector<std::vector<T>> &ghost_data) {
+  P4EST_ASSERT(-1 <= level && level < P8EST_QMAXLEVEL);
+  std::vector<T *> local_pointer(P8EST_QMAXLEVEL);
+  std::vector<T *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(local_data, local_pointer, ghost_data, ghost_pointer);
 
   if (level == -1) {
@@ -1005,7 +1008,7 @@ int p4est_utils_end_pending_communication(
   }
   return 0;
 }
-#endif
+#endif // COMM_HIDING
 
 int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE
@@ -1186,8 +1189,6 @@ void get_subc_weights(p8est_iter_volume_info_t *info, void *user_data) {
   w->at(info->quadid) = 1 << (p4est_params.max_ref_level - info->quad->level);
 }
 
-
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
   std::vector<double> weights (adapt_p4est->local_num_quadrants, 1.0);
   if (metric == "subcycling") {

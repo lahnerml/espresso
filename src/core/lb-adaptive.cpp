@@ -2584,9 +2584,11 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
     lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
     if (!payloads.empty()) return;
-    fprintf(stderr, "Particle not in local LB domain ");
-    fprintf(stderr, "%i : %li [%lf %lf %lf]; LB process boundary indices: ",
-            this_node, qidx, pos[0], pos[1], pos[2]);
+    fprintf(stderr, "Particle not in local LB domain of rank ");
+    fprintf(stderr,
+            "%i : %li [%lf %lf %lf], %li; LB process boundary indices: ",
+            this_node, qidx, pos[0], pos[1], pos[2],
+            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()));
     for (int i = 0; i <= n_nodes; ++i) {
       fprintf(stderr, "%li, ",
               p4est_utils_get_forest_info(
@@ -2707,6 +2709,16 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
            (1.0 - dsum));
     for (auto &w : interpol_weights) {
       printf("%lf ", w);
+    }
+    printf("\n");
+    fprintf(stderr,
+            "%i : %li [%lf %lf %lf], %li; LB process boundary indices: ",
+            this_node, qidx, pos[0], pos[1], pos[2],
+            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()));
+    for (int i = 0; i <= n_nodes; ++i) {
+      fprintf(stderr, "%li, ",
+              p4est_utils_get_forest_info(
+                  forest_order::adaptive_LB).p4est_space_idx[i]);
     }
     printf("\n");
   }
@@ -2876,7 +2888,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                      neighbor_quad_pos, q->level,
                                                      pos, check_weights));
-        P4EST_ASSERT(dir != 7 ||
+        P4EST_ASSERT(dir != 7 || quad->level != q->level ||
                      ((std::abs(check_weights[0] - interpolation_weights[0]) <
                        ROUND_ERROR_PREC) &&
                       (std::abs(check_weights[1] - interpolation_weights[1]) <
@@ -2918,7 +2930,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                      neighbor_quad_pos, q->level,
                                                      pos, check_weights));
-        P4EST_ASSERT(dir != 7 ||
+        P4EST_ASSERT(dir != 7 || quad->level != q->level ||
                      ((std::abs(check_weights[0] - interpolation_weights[0]) <
                        ROUND_ERROR_PREC) &&
                       (std::abs(check_weights[1] - interpolation_weights[1]) <
@@ -2948,6 +2960,17 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       printf("%lf ", w);
     }
     printf("\n");
+    fprintf(stderr,
+            "Rank %i: [%lf %lf %lf], %li (found in ghost: %i); LB process "
+            "boundary indices: ",
+            this_node, pos[0], pos[1], pos[2],
+            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()),
+            found_in_ghost);
+    for (int i = 0; i <= n_nodes; ++i) {
+      fprintf(stderr, "%li, ",
+              p4est_utils_get_forest_info(
+                  forest_order::adaptive_LB).p4est_space_idx[i]);
+    }
   }
 }
 

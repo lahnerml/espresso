@@ -2584,23 +2584,29 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
     lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
     if (!payloads.empty()) return;
-    fprintf(stderr, "Particle not in local LB domain of rank ");
-    fprintf(stderr,
-            "%i : %li [%lf %lf %lf], %li; LB process boundary indices: ",
-            this_node, qidx, pos[0], pos[1], pos[2],
-            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()));
+
+    std::stringstream err_msg;
+    err_msg << "At sim time " << sim_time << " (lbsteps: " << n_lbsteps << ")"
+            << std::endl
+            << "Particle not in local LB domain of rank " << this_node
+            << " Found qid " << qidx << " position " << pos[0] << ", " << pos[1]
+            << ", " << pos[2] << " quad idx "
+            << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())
+            << "; LB process boundary indices:" << std::endl;
     for (int i = 0; i <= n_nodes; ++i) {
-      fprintf(stderr, "%li, ",
-              p4est_utils_get_forest_info(
-                  forest_order::adaptive_LB).p4est_space_idx[i]);
+      err_msg << forest.p4est_space_idx[i] << " ";
     }
+    err_msg << std::endl;
 #ifdef DD_P4EST
-    fprintf(stderr, "belongs to MD process %i, (%i in forest info)\n",
-            cell_structure.position_to_node(pos.data()),
-            p4est_utils_pos_to_proc(forest_order::short_range, pos.data()));
-#else
-    fprintf(stderr, "\n");
+    err_msg << "belongs to MD process "
+            << cell_structure.position_to_node(pos.data())
+            << " ("
+            << p4est_utils_pos_to_proc(forest_order::short_range, pos.data())
+            << " in forestinfo)"
+            << std::endl;
 #endif
+    err_msg << std::endl;
+    fprintf(stderr, "%s", err_msg.str().c_str());
     errexit();
   } else {
     P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos.data()));
@@ -2681,7 +2687,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                    neighbor_quad_pos, q->level,
                                                    pos, check_weights));
-      P4EST_ASSERT(i != 7 ||
+      P4EST_ASSERT(i != 7 || quad->level != q->level ||
                    ((std::abs(check_weights[0] - interpolation_weights[0]) <
                      ROUND_ERROR_PREC) &&
                     (std::abs(check_weights[1] - interpolation_weights[1]) <
@@ -2705,22 +2711,26 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   double dsum = std::accumulate(interpol_weights.begin(),
                                 interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("[Local interpol.] Sum of interpol. weights deviates from 1 by %lf\n",
-           (1.0 - dsum));
+    std::stringstream err_msg;
+    err_msg << "[local interpol.] Sum of interpol. weights deviates from 1 by"
+            << (1.0 - dsum) << std::endl;
     for (auto &w : interpol_weights) {
-      printf("%lf ", w);
+      err_msg << w << " ";
     }
-    printf("\n");
-    fprintf(stderr,
-            "%i : %li [%lf %lf %lf], %li; LB process boundary indices: ",
-            this_node, qidx, pos[0], pos[1], pos[2],
-            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()));
+    err_msg << std::endl;
+    err_msg << "Rank " << this_node 
+            << " position " << pos[0] << ", " << pos[1] << ", " << pos[2]
+            << " pos index" 
+            << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())
+            << "LB process boundary indices:"
+            << std::endl;
     for (int i = 0; i <= n_nodes; ++i) {
-      fprintf(stderr, "%li, ",
-              p4est_utils_get_forest_info(
-                  forest_order::adaptive_LB).p4est_space_idx[i]);
+      err_msg << forest.p4est_space_idx[i] << " ";
     }
-    printf("\n");
+    err_msg << std::endl;
+    err_msg << std::endl;
+    fprintf(stderr, "%s", err_msg.str().c_str());
+    errexit();
   }
 }
 
@@ -2954,23 +2964,27 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   double dsum = std::accumulate(interpol_weights.begin(),
                                 interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
-    printf("[Ghost interpol.] Sum of interpol. weights deviates from 1 by %lf\n",
-           (1.0 - dsum));
+    std::stringstream err_msg;
+    err_msg << "[Ghost interpol. on rank " << this_node
+            << "] Sum of interpol. weights deviates from 1 by " << (1.0 - dsum)
+            << std::endl;
     for (auto &w : interpol_weights) {
-      printf("%lf ", w);
+      err_msg << w << " ";
     }
-    printf("\n");
-    fprintf(stderr,
-            "Rank %i: [%lf %lf %lf], %li (found in ghost: %i); LB process "
-            "boundary indices: ",
-            this_node, pos[0], pos[1], pos[2],
-            p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data()),
-            found_in_ghost);
+    err_msg << std::endl;
+    err_msg << "Rank " << this_node 
+            << " position " << pos[0] << ", " << pos[1] << ", " << pos[2]
+            << " pos index " 
+            << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())
+            << " (found in ghost: " << found_in_ghost <<  ") "
+            << "LB process boundary indices:"
+            << std::endl;
     for (int i = 0; i <= n_nodes; ++i) {
-      fprintf(stderr, "%li, ",
-              p4est_utils_get_forest_info(
-                  forest_order::adaptive_LB).p4est_space_idx[i]);
+      err_msg << forest.p4est_space_idx[i] << " ";
     }
+    err_msg << std::endl;
+    err_msg << std::endl;
+    fprintf(stderr, "%s", err_msg.str().c_str());
   }
 }
 

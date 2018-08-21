@@ -59,7 +59,7 @@ static void dd_p4est_init_communication_structure();
 static void dd_p4est_init_cell_interactions();
 
 // Map a position to a cell, returns NULL if not in local (+ ROUND_ERR_PREC*boxl) domain
-static Cell* dd_p4est_save_position_to_cell(double pos[3]);
+Cell* dd_p4est_save_position_to_cell(double pos[3]);
 // Map a position to a cell, returns NULL if not in local domain
 static Cell* dd_p4est_position_to_cell(double pos[3]);
 

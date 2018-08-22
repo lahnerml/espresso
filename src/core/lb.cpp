@@ -3092,6 +3092,11 @@ inline void lb_collide_stream() {
  */
 void lattice_boltzmann_update() {
   int factor = (int)round(lbpar.tau / time_step);
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+  if (n_part && 0 == n_lbsteps && adapt_p4est != nullptr) {
+    p4est_utils_refine_around_particles();
+  }
+#endif
 
   fluidstep += 1;
   if (fluidstep >= factor) {

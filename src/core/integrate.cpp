@@ -863,43 +863,6 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     mpi_bcast_parameter(FIELD_SKIN);
   }
 
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  if (n_part && 0.0 == sim_time && adapt_p4est != nullptr) {
-    fprintf(stderr, "Dynamically refine grid around particles\n");
-    std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
-    std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,
-                2 * sizeof(double));
-    std::memcpy(thresh_vort_temp.data(), p4est_params.threshold_velocity,
-                2 * sizeof(double));
-
-    p4est_params.threshold_velocity[0] = 0.;
-    p4est_params.threshold_velocity[1] = 1.;
-    mpi_call(mpi_bcast_thresh_vel,-1, -1);
-    mpi_bcast_thresh_vel(0, 0);
-
-    p4est_params.threshold_vorticity[0] = 0.;
-    p4est_params.threshold_vorticity[1] = 1.;
-    mpi_call(mpi_bcast_thresh_vort,-1, -1);
-    mpi_bcast_thresh_vort(0, 0);
-
-    for(int i = p4est_params.min_ref_level;
-        i < p4est_params.max_ref_level; ++i) {
-      mpi_call(mpi_adapt_grid, -1, 0);
-      mpi_adapt_grid(0, 0);
-    }
-    std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
-                2 * sizeof(double));
-    mpi_call(mpi_bcast_thresh_vel,-1, -1);
-    mpi_bcast_thresh_vel(0, 0);
-
-    std::memcpy(p4est_params.threshold_vorticity, thresh_vort_temp.data(),
-                2 * sizeof(double));
-    mpi_call(mpi_bcast_thresh_vort,-1, -1);
-    mpi_bcast_thresh_vort(0, 0);
-    fprintf(stderr, "Done refinement around particles\n");
-  }
-#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-
   /* perform integration */
   if (!Accumulators::auto_update_enabled()) {
     if (mpi_integrate(n_steps, reuse_forces))

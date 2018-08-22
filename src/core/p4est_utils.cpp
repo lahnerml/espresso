@@ -847,9 +847,11 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   }
 
   // particle criterion: Refine cells where we have particles
+  // Distinction is needed as we may have statically refined geometric
+  // boundaries, thus finest_level_global from adaptive tree will already be max
+  // level
   double h_max = (0 == sim_time) ? p4est_params.h[p4est_params.min_ref_level]
                                  : p4est_params.h[p4est_params.max_ref_level];
-  //double h_max = p4est_params.h[p4est_params.max_ref_level];
   double radius = 2.5 * h_max;
   if (n_part) {
     for (auto p: local_cells.particles()) {
@@ -979,6 +981,39 @@ int p4est_utils_end_pending_communication(
   return 0;
 }
 #endif // COMM_HIDING
+
+void p4est_utils_refine_around_particles() {
+  if (!this_node) {
+    fprintf(stderr, "Dynamically refine grid around particles\n");
+  }
+  std::array<double, 2> thresh_vel_temp, thresh_vort_temp;
+  std::memcpy(thresh_vel_temp.data(), p4est_params.threshold_velocity,
+              2 * sizeof(double));
+  std::memcpy(thresh_vort_temp.data(), p4est_params.threshold_velocity,
+              2 * sizeof(double));
+
+  p4est_params.threshold_velocity[0] = 0.;
+  p4est_params.threshold_velocity[1] = 1.;
+
+  p4est_params.threshold_vorticity[0] = 0.;
+  p4est_params.threshold_vorticity[1] = 1.;
+
+  for (int i = p4est_params.min_ref_level; i < p4est_params.max_ref_level;
+       ++i) {
+    fprintf(stderr, "[p4est %i] %li ghost particles available\n", this_node,
+            ghost_cells.particles().size());
+    p4est_utils_perform_adaptivity_step();
+    cells_update_ghosts();
+  }
+  std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),
+              2 * sizeof(double));
+
+  std::memcpy(p4est_params.threshold_vorticity, thresh_vort_temp.data(),
+              2 * sizeof(double));
+  if (!this_node) {
+    fprintf(stderr, "Done refinement around particles\n");
+  }
+}
 
 int p4est_utils_perform_adaptivity_step() {
 #ifdef LB_ADAPTIVE

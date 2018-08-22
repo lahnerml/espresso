@@ -773,6 +773,8 @@ int p4est_utils_end_pending_communication(
     std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level = -1);
 #endif
 
+void p4est_utils_refine_around_particles();
+
 /** Function that handles grid alteration. After calling this function the grid
  * has changed and everything is set to perform the next integration step.
  */

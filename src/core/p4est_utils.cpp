@@ -1000,8 +1000,6 @@ void p4est_utils_refine_around_particles() {
 
   for (int i = p4est_params.min_ref_level; i < p4est_params.max_ref_level;
        ++i) {
-    fprintf(stderr, "[p4est %i] %li ghost particles available\n", this_node,
-            ghost_cells.particles().size());
     p4est_utils_perform_adaptivity_step();
     cells_update_ghosts();
   }

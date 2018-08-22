@@ -27,6 +27,7 @@ void write_parallel_particle_vtk(char *filename) {
 
 void write_particle_vtk(char *filename) {
   char fname[1024];
+  char filename_copy[1024];
   // node 0 writes the header file
   if (!this_node) {
     sprintf(fname, "%s.pvtp", filename);
@@ -49,8 +50,14 @@ void write_particle_vtk(char *filename) {
     fprintf(h, "<PDataArray type=\"Float32\" Name=\"velocity\" "
                "NumberOfComponents=\"3\" format=\"ascii\"/>\n\t\t");
     fprintf(h, "</PPointData>\n");
-    for (int p = 0; p < n_nodes; ++p)
-      fprintf(h, "\t\t<Piece Source=\"%s_%04i.vtp\"/>\n", filename, p);
+    for (int p = 0; p < n_nodes; ++p) {
+      /* We want to write the basename of each processes file, since
+       * the basename function could modify its argument, we create a
+       * temporary copy. */
+      sprintf(filename_copy, "%s", filename);
+      char *filename_basename = basename(filename_copy);
+      fprintf(h, "\t\t<Piece Source=\"%s_%04i.vtp\"/>\n", filename_basename, p);
+    }
     fprintf(h, "\t</PPolyData>\n</VTKFile>\n");
     fclose(h);
   }

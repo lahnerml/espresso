@@ -1145,7 +1145,7 @@ p4est_dd_repart_calc_nquads(const std::vector<double>& metric)
   MPI_Allreduce(&localsum, &sum, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / n_nodes;
 
-  if (!isnormal(target))
+  if (!std::isnormal(target))
     throw std::runtime_error("Repart with all-zero weights impossible.");
 
   std::vector<p4est_locidx_t> part_nquads(n_nodes, static_cast<p4est_locidx_t>(0));

@@ -37,7 +37,7 @@
 #include "utils/Morton.hpp"
 
 #include <algorithm>
-#include <assert.h>
+#include <cassert>
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
@@ -122,7 +122,7 @@ void init_to_zero(lbadapt_payload_t *data) {
 #else  // LB_ADAPTIVE_GPU
 void init_to_zero(lbadapt_patch_cell_t *data) {
 #endif // LB_ADAPTIVE_GPU
-  for (int i = 0; i < lbmodel.n_veloc; i++) {
+  for (int i = 0; i < LB_Model<>::n_veloc; i++) {
     data->lbfluid[0][i] = 0.;
     data->lbfluid[1][i] = 0.;
   }
@@ -145,8 +145,8 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
   }
 
   // 6D array
-  for (int i = 0; i < 6; i++) {
-    data->lbfields.pi[i] = 0;
+  for (double & i : data->lbfields.pi) {
+    i = 0;
   }
 #endif // LB_ADAPTIVE_GPU
 }
@@ -418,7 +418,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
 
   // check boundary status.
-  std::array<double, 3> new_mp;
+  std::array<double, 3> new_mp{};
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
@@ -430,7 +430,7 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
     data_new->lbfields.boundary = new_boundary;
   } else {
     // else calculate arithmetic mean of population of smaller quadrants
-    for (int vel = 0; vel < lbmodel.n_veloc; ++vel) {
+    for (int vel = 0; vel < LB_Model<>::n_veloc; ++vel) {
       data_new->lbfluid[0][vel] += 0.125 * data_old->lbfluid[0][vel];
     }
   }
@@ -453,7 +453,7 @@ int data_interpolation<lbadapt_payload_t>(
   P4EST_ASSERT(quad_new->level == 1 + quad_old->level);
 
   // check boundary status.
-  std::array<double, 3> new_mp;
+  std::array<double, 3> new_mp{};
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
@@ -475,7 +475,7 @@ int data_interpolation<lbadapt_payload_t>(
 
 int lbadapt_is_boundary(double *pos) {
   double dist, dist_tmp;
-  std::array<double, 3> dist_vec;
+  std::array<double, 3> dist_vec{};
   dist = std::numeric_limits<double>::max();
   int the_boundary = -1;
   int n = 0;
@@ -490,7 +490,7 @@ int lbadapt_is_boundary(double *pos) {
     }
   }
 
-  if (dist <= 0 && LBBoundaries::lbboundaries.size() > 0) {
+  if (dist <= 0 && !LBBoundaries::lbboundaries.empty()) {
     return the_boundary + 1;
   } else {
     return 0;
@@ -707,7 +707,7 @@ int refine_random(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                     p8est_quadrant_t *q) {
-  std::array<double, 3> midpoint;
+  std::array<double, 3> midpoint{};
   p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());
   if ((coords_for_regional_refinement[0] <= midpoint[0]) &&
       (midpoint[0] <= coords_for_regional_refinement[1]) &&
@@ -722,7 +722,7 @@ int refine_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 
 int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t **quads) {
-  std::array<double, 3> midpoint;
+  std::array<double, 3> midpoint{};
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     p4est_utils_get_midpoint(p8est, which_tree, quads[i], midpoint.data());
@@ -745,7 +745,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   // 0.6 instead of 0.5 for stability reasons
   lb_float half_length = 0.6 * sqrt(3) * p4est_params.h[q->level];
 
-  std::array<double, 3> midpoint, dist_vec;
+  std::array<double, 3> midpoint{}, dist_vec{};
   p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());
 
   double dist, dist_tmp;
@@ -771,7 +771,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   }
 
   if ((std::abs(dist) <= half_length) &&
-      LBBoundaries::lbboundaries.size() > 0) {
+      !LBBoundaries::lbboundaries.empty()) {
     return 1;
   } else {
     return 0;
@@ -1271,7 +1271,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
   currCellData->lbfluid[1][0] = currCellData->lbfluid[0][0];
 
   // stream to surrounding cells
-  for (int dir_ESPR = 1; dir_ESPR < lbmodel.n_veloc; ++dir_ESPR) {
+  for (int dir_ESPR = 1; dir_ESPR < LB_Model<>::n_veloc; ++dir_ESPR) {
     // set neighboring cell information in iterator
     int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
     p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
@@ -1321,12 +1321,12 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
 int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m) {
 #ifdef LB_ADAPTIVE
   /* normalization factors enter in the back transformation */
-  for (int i = 0; i < lbmodel.n_veloc; ++i) {
+  for (int i = 0; i < LB_Model<>::n_veloc; ++i) {
     m[i] *= (1. / d3q19_modebase[19][i]);
   }
 
   /** perform back transformation and add weights */
-  for (int i = 0; i < lbmodel.n_veloc; ++i) {
+  for (int i = 0; i < LB_Model<>::n_veloc; ++i) {
     populations[i] = lbadapt_backTransformation(m, i) * lbmodel.w[i];
   }
 #endif // LB_ADAPTIVE
@@ -1419,9 +1419,9 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
   }
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     std::memcpy(virtual_data->lbfluid[0], source_data->lbfluid[0],
-                lbmodel.n_veloc * sizeof(lb_float));
+                LB_Model<>::n_veloc * sizeof(lb_float));
     std::memcpy(virtual_data->lbfluid[1], virtual_data->lbfluid[0],
-                lbmodel.n_veloc * sizeof(lb_float));
+                LB_Model<>::n_veloc * sizeof(lb_float));
     // make sure that boundary is not occupied by some memory clutter
     virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
@@ -1650,9 +1650,9 @@ void lbadapt_update_populations_from_virtuals(int level,
       }
       if (!data->lbfields.boundary) {
         if (!mesh_iter->current_vid) {
-          std::fill_n(std::begin(parent_data->lbfluid[1]), lbmodel.n_veloc, 0);
+          std::fill_n(std::begin(parent_data->lbfluid[1]), LB_Model<>::n_veloc, 0);
         }
-        for (vel = 0; vel < lbmodel.n_veloc; ++vel) {
+        for (vel = 0; vel < LB_Model<>::n_veloc; ++vel) {
           // child velocities have already been swapped here
           parent_data->lbfluid[1][vel] += 0.125 * data->lbfluid[0][vel];
         }
@@ -2100,7 +2100,7 @@ void check_vel(int qid, double local_h, lbadapt_payload_t *data,
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
                               data->lbfields.boundary,
                               data->lbfields.has_force_density,
-                              local_h, &rho, vel[qid].data(), 0);
+                              local_h, &rho, vel[qid].data(), nullptr);
 
     lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
     vel[qid][0] = vel[qid][0] / rho * h_max / lbpar.tau;
@@ -2130,7 +2130,7 @@ void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
   castable_unique_ptr<sc_array_t> neighbor_qids = sc_array_new(sizeof(int));
   castable_unique_ptr<sc_array_t> neighbor_encs = sc_array_new(sizeof(int));
   std::array<std::vector<int>, 3> n_qids;
-  std::array<double, 3> mesh_width;
+  std::array<double, 3> mesh_width{};
   double c_h, h;
   p8est_quadrant_t *quad;
   lbadapt_payload_t *data, *currCellData;
@@ -2346,7 +2346,7 @@ void lbadapt_calc_local_j(p8est_meshiter_t *mesh_iter, lb_float *j) {
 /*** ITERATOR CALLBACKS ***/
 void lbadapt_calc_local_rho(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  lb_float *rho = (lb_float *)user_data; /* passed lb_float to fill */
+  auto *rho = (lb_float *)user_data; /* passed lb_float to fill */
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data =
@@ -2395,7 +2395,7 @@ void calc_local_j(lb_float populations[2][19], std::array<lb_float, 3> &res) {
 void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
                                  void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  double *momentum= (double*) user_data;
+  auto *momentum= (double*) user_data;
 
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;
@@ -2403,7 +2403,7 @@ void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
   data = &lbadapt_local_data[q->level].at(
       adapt_virtual->quad_qreal_offset[qid]);
 
-  std::array<lb_float, 3> j;
+  std::array<lb_float, 3> j{};
   calc_local_j(data->lbfluid, j);
   for (int i = 0; i < P8EST_DIM; ++i)
     momentum[i] += j[i] + data->lbfields.force_density[i];
@@ -2412,14 +2412,14 @@ void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
 
 void lbadapt_calc_local_temp(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  temp_iter_t *ti = (temp_iter_t*) user_data;
+  auto *ti = (temp_iter_t*) user_data;
 
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data;
   data = &lbadapt_local_data[q->level].at(
       adapt_virtual->quad_qreal_offset[qid]);
-  std::array<lb_float, 3> j;
+  std::array<lb_float, 3> j{};
 
   if (data->lbfields.boundary) {
     j = {{0., 0., 0.}};
@@ -2510,7 +2510,7 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
   lbadapt_payload_t *data = &lbadapt_local_data[q->level].at(
       adapt_virtual->quad_qreal_offset[info->quadid]);
 
-  std::string *filename = (std::string *)user_data;
+  auto *filename = (std::string *)user_data;
   std::ofstream myfile;
   myfile.open(*filename, std::ofstream::out | std::ofstream::app);
   myfile << "id: "
@@ -2567,7 +2567,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       {{1, 3, 17, 5, 13, 9, 25}}, // right, back, top
   }};
 
-  std::array<double, 6> interpolation_weights;  // Stores normed distance from pos to center
+  std::array<double, 6> interpolation_weights{};  // Stores normed distance from pos to center
                                     // of cell containing pos in both directions.
                                     // order: lower x, lower y, lower z,
                                     //        upper x, upper y, upper z
@@ -2621,7 +2621,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   payloads.push_back(&lbadapt_local_data[lvl].at(sid));
   levels.push_back(lvl);
 
-  std::array<double, 3> quad_pos, neighbor_quad_pos;
+  std::array<double, 3> quad_pos{}, neighbor_quad_pos{};
   double dis;
   p4est_topidx_t tree;
   p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qidx], quad,
@@ -2683,7 +2683,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
 
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
-      std::array<double, 6> check_weights;
+      std::array<double, 6> check_weights{};
       P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                                   neighbor_quad_pos, q->level));
       P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
@@ -2744,8 +2744,9 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   int nearest_corner = 0;
   uint64_t quad_index;
+  std::vector<p4est_locidx_t> quads_to_mark = {};
 
-  std::array<double, 6> interpolation_weights;  // Stores normed distance from pos to center
+  std::array<double, 6> interpolation_weights{};  // Stores normed distance from pos to center
   // of cell containing pos in both directions.
   // order: lower x, lower y, lower z,
   //        upper x, upper y, upper z
@@ -2796,7 +2797,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
   } else {
     quad = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad_indices[0]);
-    coupling_quads[quad_indices[0]] = true;
+    quads_to_mark.push_back(quad_indices[0]);
     lvl = quad->level;
     tree = adapt_mesh->quad_to_tree[quad_indices[0]];
     sid =adapt_virtual->quad_qreal_offset[quad_indices[0]];
@@ -2805,7 +2806,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
   levels.push_back(lvl);
 
   // determine which neighbors to find
-  std::array<double, 3> quad_pos, neighbor_quad_pos;
+  std::array<double, 3> quad_pos{}, neighbor_quad_pos{};
   p4est_utils_get_midpoint(adapt_p4est, tree, quad, quad_pos.data());
   double dis;
   for (int d = 0; d < 3; ++d) {
@@ -2835,7 +2836,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
        std::numeric_limits<uint64_t>::max(),
        std::numeric_limits<uint64_t>::max(),
        std::numeric_limits<uint64_t>::max()}};
-  std::array<int, 3> displace;
+  std::array<int, 3> displace{};
   for (int i = 1; i < 8; ++i) {
     // reset displace
     displace = {{0, 0, 0}};
@@ -2874,8 +2875,8 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
                                          &adapt_ghost->mirrors,
                                          quad_indices, quad->level);
-    for (int i = 0; i < quad_indices.size(); ++i) {
-      mirror_qid = adapt_mesh->mirror_qid[quad_indices[i]];
+    for (int quad_indice : quad_indices) {
+      mirror_qid = adapt_mesh->mirror_qid[quad_indice];
       sid = adapt_virtual->quad_qreal_offset[mirror_qid];
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, mirror_qid);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
@@ -2883,13 +2884,13 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                                neighbor_quad_pos.data());
       if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                          neighbor_quad_pos, q->level)) {
-        coupling_quads[mirror_qid] = true;
         payloads.push_back(&lbadapt_local_data[q->level].at(sid));
         levels.push_back(q->level);
         interpol_weights.push_back(
             interpolation_weights[weight_indices[nearest_corner ^ dir][0]] *
             interpolation_weights[weight_indices[nearest_corner ^ dir][1]] *
             interpolation_weights[weight_indices[nearest_corner ^ dir][2]]);
+        quads_to_mark.push_back(mirror_qid);
         if (q->level > lvl) {
           if (dir == 1 || dir == 2 || dir == 4)
             interpol_weights[interpol_weights.size() - 1] *= 0.25;
@@ -2898,7 +2899,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         }
         ++n_neighbors_per_dir;
 
-        std::array<double, 6> check_weights;
+        std::array<double, 6> check_weights{};
         P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                      neighbor_quad_pos, q->level,
                                                      pos, check_weights));
@@ -2917,9 +2918,9 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
                                          &adapt_ghost->ghosts,
                                          quad_indices, quad->level);
-    for (int i = 0; i < quad_indices.size(); ++i) {
-      sid = adapt_virtual->quad_greal_offset[quad_indices[i]];
-      q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indices[i]);
+    for (int quad_indice : quad_indices) {
+      sid = adapt_virtual->quad_greal_offset[quad_indice];
+      q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indice);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
       p4est_utils_get_midpoint(adapt_p4est, tree, q,
                                neighbor_quad_pos.data());
@@ -2940,7 +2941,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         }
         ++n_neighbors_per_dir;
 
-        std::array<double, 6> check_weights;
+        std::array<double, 6> check_weights{};
         P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                      neighbor_quad_pos, q->level,
                                                      pos, check_weights));
@@ -2961,8 +2962,13 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
       payloads.clear();
       interpol_weights.clear();
       levels.clear();
+      quads_to_mark.clear();
       return;
     }
+  }
+
+  for (p4est_locidx_t idx : quads_to_mark) {
+    coupling_quads[idx] = true;
   }
 
   double dsum = std::accumulate(interpol_weights.begin(),

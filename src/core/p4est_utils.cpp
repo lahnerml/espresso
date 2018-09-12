@@ -755,7 +755,7 @@ void create_refinement_patch_from_pos(std::vector<refinement_area_t> &patches,
   fold_position(img_box, ref_area.bbox_min);
   ref_area.bbox_max = {{folded_pos[0] + radius, folded_pos[1] + radius,
                         folded_pos[2] + radius}};
-  fold_position(img_box, ref_area.bbox_min);
+  fold_position(img_box, ref_area.bbox_max);
   patches.push_back(ref_area);
 }
 

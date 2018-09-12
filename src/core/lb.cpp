@@ -3593,6 +3593,7 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
 #ifdef COMM_HIDING
+  if (n_part)
     p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // DD_P4EST
@@ -3700,6 +3701,7 @@ void calc_particle_lattice_ia() {
     }
 
 #ifdef DD_P4EST
+  if (n_part) {
 #ifdef COMM_HIDING
     p4est_utils_start_communication(exc_status_lb, -1, lbadapt_local_data,
                                     lbadapt_ghost_data);
@@ -3716,6 +3718,7 @@ void calc_particle_lattice_ia() {
           (void**)local_pointer.data(), (void**)ghost_pointer.data());
     }
 #endif
+  }
 #endif
   }
 }

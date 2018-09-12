@@ -2609,6 +2609,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
     fprintf(stderr, "%s", err_msg.str().c_str());
     errexit();
   } else {
+    coupling_quads[qidx] = true;
     P4EST_ASSERT(p4est_utils_pos_sanity_check(qidx, pos.data()));
   }
 
@@ -2663,6 +2664,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
       idx = *((int *)sc_array_index_int(nqid, n));
 
       if (0 <= idx && idx < lq) {                 // local quadrant
+        coupling_quads[idx] = true;
         q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
         tree = adapt_mesh->quad_to_tree[idx];
         lvl = q->level;
@@ -2794,6 +2796,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
     payloads.push_back(&lbadapt_ghost_data[lvl].at(sid));
   } else {
     quad = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, quad_indices[0]);
+    coupling_quads[quad_indices[0]] = true;
     lvl = quad->level;
     tree = adapt_mesh->quad_to_tree[quad_indices[0]];
     sid =adapt_virtual->quad_qreal_offset[quad_indices[0]];
@@ -2880,6 +2883,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                                neighbor_quad_pos.data());
       if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                          neighbor_quad_pos, q->level)) {
+        coupling_quads[mirror_qid] = true;
         payloads.push_back(&lbadapt_local_data[q->level].at(sid));
         levels.push_back(q->level);
         interpol_weights.push_back(

@@ -3644,6 +3644,10 @@ void calc_particle_lattice_ia() {
 #ifdef ENGINE
     ghost_communicator(&cell_structure.ghost_swimming_comm);
 #endif
+    #ifdef LB_ADAPTIVE
+    // Clear coupling quads vector
+    coupling_quads = std::vector<bool>(adapt_p4est->local_num_quadrants, false);
+    #endif
 
     for (auto &p : local_cells.particles()) {
       if (!p.p.is_virtual || thermo_virtual) {

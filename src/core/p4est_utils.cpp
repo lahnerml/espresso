@@ -40,6 +40,7 @@ castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (P8EST_QMAXLEVEL,
                                                             nullptr);
 #endif
+std::vector<bool> coupling_quads = {{}};
 #endif
 
 p4est_parameters p4est_params = {
@@ -848,23 +849,26 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
     refined_patches.push_back(ref_area);
   }
 
+  // Start of simulation
   // particle criterion: Refine cells where we have particles
   // Distinction is needed as we may have statically refined geometric
   // boundaries, thus finest_level_global from adaptive tree will already be max
   // level
-  double h_max = (0 == sim_time) ? p4est_params.h[p4est_params.min_ref_level]
-                                 : p4est_params.h[p4est_params.max_ref_level];
-  double radius = 2.5 * h_max;
+  double h_max, radius;
   if (n_part) {
-    for (auto p: local_cells.particles()) {
-      create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
-    }
-    for (auto p: ghost_cells.particles()) {
-      create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
+    if (sim_time == 0.) {
+      h_max = p4est_params.h[p4est_params.min_ref_level];
+      radius = 2.5 * h_max;
+      for (auto p : local_cells.particles()) {
+        create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
+      }
+      for (auto p : ghost_cells.particles()) {
+        create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
+      }
     }
   }
 
-  if (!refined_patches.empty() ||
+  if (!refined_patches.empty() || n_part ||
       (vel_reg_ref[0] != std::numeric_limits<double>::min() &&
        vel_reg_ref[1] != std::numeric_limits<double>::min() &&
        vel_reg_ref[2] != std::numeric_limits<double>::min()) ||
@@ -874,6 +878,8 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
       (vort_max < std::numeric_limits<double>::min())) {
     // traverse forest and decide if the current quadrant is to be refined or
     // coarsened
+    castable_unique_ptr<sc_array_t> nqids = sc_array_new(sizeof(p4est_locidx_t));
+    p4est_locidx_t nqid;
     for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
       // velocity
       if ((v_min < std::numeric_limits<double>::max()) ||
@@ -949,6 +955,24 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
                patch.bbox_min[2] < midpoint[2])))) {
           flags[qid] = 1;
           break;
+        }
+      }
+
+      // particles during simulation
+      if (sim_time > 0.0) {
+        if (coupling_quads[qid]) {
+          flags[qid] = 1;
+          for (int i = 0; i < 26; ++i) {
+            sc_array_truncate(nqids);
+            p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid,
+                                     i, nullptr, nullptr, nqids);
+            for (int j = 0; j < nqids->elem_count; ++j) {
+              nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
+              if (0 <= nqid && nqid < adapt_p4est->local_num_quadrants) {
+                flags[nqid] = 1;
+              }
+            }
+          }
         }
       }
     }

@@ -104,6 +104,7 @@ extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 #ifdef COMM_HIDING
 extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb;
 #endif
+extern std::vector<bool> coupling_quads;
 #endif
 
 /** Struct containing information to adjust p4est behavior */

@@ -746,20 +746,28 @@ typedef struct {
 } refinement_area_t;
 
 void create_refinement_patch_from_pos(std::vector<refinement_area_t> &patches,
-                                      Vector3d position, double radius) {
+                                      Vector3d &position, double radius) {
+  P4EST_ASSERT(0 < radius);
   refinement_area_t ref_area;
   std::array<double, 3> img_box = {{0, 0, 0}};
   Vector3d folded_pos = position;
-  fold_position(img_box, folded_pos);
+  fold_position(folded_pos, img_box);
   ref_area.bbox_min = {{folded_pos[0] - radius, folded_pos[1] - radius,
                         folded_pos[2] - radius}};
-  fold_position(img_box, ref_area.bbox_min);
+  fold_position(ref_area.bbox_min, img_box);
+  P4EST_ASSERT(0. <= ref_area.bbox_min[0] && ref_area.bbox_min[0] < box_l[0]);
+  P4EST_ASSERT(0. <= ref_area.bbox_min[1] && ref_area.bbox_min[1] < box_l[1]);
+  P4EST_ASSERT(0. <= ref_area.bbox_min[2] && ref_area.bbox_min[2] < box_l[2]);
   ref_area.bbox_max = {{folded_pos[0] + radius, folded_pos[1] + radius,
                         folded_pos[2] + radius}};
-  fold_position(img_box, ref_area.bbox_max);
+  fold_position(ref_area.bbox_max, img_box);
+  P4EST_ASSERT(0. <= ref_area.bbox_max[0] && ref_area.bbox_max[0] < box_l[0]);
+  P4EST_ASSERT(0. <= ref_area.bbox_max[1] && ref_area.bbox_max[1] < box_l[1]);
+  P4EST_ASSERT(0. <= ref_area.bbox_max[2] && ref_area.bbox_max[2] < box_l[2]);
   patches.push_back(ref_area);
 }
 
+static int initial_ref_steps;
 void p4est_utils_collect_flags(std::vector<int> &flags) {
 #ifdef LB_ADAPTIVE
   // get refinement string for grid change
@@ -857,7 +865,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   double h_max, radius;
   if (n_part) {
     if (sim_time == 0.) {
-      h_max = p4est_params.h[p4est_params.min_ref_level];
+      h_max = p4est_params.h[p4est_params.min_ref_level + initial_ref_steps];
       radius = 2.5 * h_max;
       for (auto p : local_cells.particles()) {
         create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
@@ -1025,9 +1033,12 @@ void p4est_utils_refine_around_particles() {
   p4est_params.threshold_vorticity[0] = 0.;
   p4est_params.threshold_vorticity[1] = 1.;
 
+  initial_ref_steps = 0;
   for (int i = p4est_params.min_ref_level; i < p4est_params.max_ref_level;
        ++i) {
     p4est_utils_perform_adaptivity_step();
+    ++initial_ref_steps;
+
     cells_update_ghosts();
   }
   std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),

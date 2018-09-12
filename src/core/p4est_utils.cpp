@@ -1383,12 +1383,19 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 #endif // defined(DD_P4EST) && defined(LB_ADAPTIVE)
 }
 
+// use dynamic programming to traverse trees in parallel
+static p4est_tree_t *last_tree;
+static p4est_locidx_t tqid;
 static int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
-                   p4est_quadrant_t *quad[]) {
+                          p4est_quadrant_t *quad[]) {
   p4est_t *cmp = (p4est_t *)p4est->user_pointer;
   p4est_tree_t *tree = p4est_tree_array_index(cmp->trees, tree_idx);
-  for (unsigned int i = 0; i < tree->quadrants.elem_count; ++i) {
-    p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, i);
+  if (last_tree != tree) {
+    tqid = 0;
+    last_tree = tree;
+  }
+  for (; tqid < tree->quadrants.elem_count; ++tqid) {
+    p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, tqid);
     if (p4est_quadrant_overlaps(q, quad[0]))
       return q->level < quad[0]->level;
   }
@@ -1400,7 +1407,8 @@ static int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
 p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   p4est_t *fct = p4est_copy(t2, 0);
   fct->user_pointer = (void *)t1;
-  p4est_coarsen(fct, 1, fct_coarsen_cb, NULL);
+  last_tree = nullptr;
+  p8est_coarsen(fct, 1, fct_coarsen_cb, nullptr);
   return fct;
 }
 

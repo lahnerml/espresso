@@ -748,11 +748,13 @@ void create_refinement_patch_from_pos(std::vector<refinement_area_t> &patches,
                                       Vector3d position, double radius) {
   refinement_area_t ref_area;
   std::array<double, 3> img_box = {{0, 0, 0}};
-  ref_area.bbox_min = {{position[0] - radius, position[1] - radius,
-                        position[2] - radius}};
+  Vector3d folded_pos = position;
+  fold_position(img_box, folded_pos);
+  ref_area.bbox_min = {{folded_pos[0] - radius, folded_pos[1] - radius,
+                        folded_pos[2] - radius}};
   fold_position(img_box, ref_area.bbox_min);
-  ref_area.bbox_max = {{position[0] + radius, position[1] + radius,
-                        position[2] + radius}};
+  ref_area.bbox_max = {{folded_pos[0] + radius, folded_pos[1] + radius,
+                        folded_pos[2] + radius}};
   fold_position(img_box, ref_area.bbox_min);
   patches.push_back(ref_area);
 }

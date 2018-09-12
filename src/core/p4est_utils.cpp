@@ -826,7 +826,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   p8est_quadrant_t *q;
   std::vector<refinement_area_t> refined_patches;
   refinement_area_t ref_area;
-  std::array<bool, 3> overlap;
+  std::array<bool, 3> wrap;
   std::array<double, 3> midpoint;
   std::array<double, 6> default_box =
       {{std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
@@ -921,7 +921,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
                                  midpoint.data());
 
         for (int i = 0; i < 3; ++i) {
-          overlap[i] = patch.bbox_min[i] > patch.bbox_max[i];
+          wrap[i] = patch.bbox_min[i] > patch.bbox_max[i];
         }
 
         // support boundary moving out of domain as well:
@@ -929,25 +929,26 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         // (min - box_l) < c && c < max -> wrap min
         // min < c && c < (max + box_l) -> wrap max
         // min < c && c < max           -> standard
-        if (((!overlap[0] &&
+        if (((!wrap[0] &&
               (patch.bbox_min[0] < midpoint[0] &&
                midpoint[0] < patch.bbox_max[0])) ||
-             (overlap[0] &&
+             (wrap[0] &&
               (midpoint[0] < patch.bbox_max[0] ||
                patch.bbox_min[0] < midpoint[0]))) &&
-            ((!overlap[1] &&
+            ((!wrap[1] &&
               (patch.bbox_min[1] < midpoint[1] &&
                midpoint[1] < patch.bbox_max[1])) ||
-             (overlap[1] &&
+             (wrap[1] &&
               (midpoint[1] < patch.bbox_max[1] ||
                patch.bbox_min[1] < midpoint[1]))) &&
-            ((!overlap[2] &&
+            ((!wrap[2] &&
               (patch.bbox_min[2] < midpoint[2] &&
                midpoint[2] < patch.bbox_max[2])) ||
-             (overlap[2] &&
+             (wrap[2] &&
               (midpoint[2] < patch.bbox_max[2] ||
                patch.bbox_min[2] < midpoint[2])))) {
           flags[qid] = 1;
+          break;
         }
       }
     }

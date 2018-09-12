@@ -1386,6 +1386,7 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
 // use dynamic programming to traverse trees in parallel
 static p4est_tree_t *last_tree;
 static p4est_locidx_t tqid;
+static uint64_t old_morton_idx;
 static int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
                           p4est_quadrant_t *quad[]) {
   p4est_t *cmp = (p4est_t *)p4est->user_pointer;
@@ -1394,6 +1395,23 @@ static int fct_coarsen_cb(p4est_t *p4est, p4est_topidx_t tree_idx,
     tqid = 0;
     last_tree = tree;
   }
+
+  // Recursive coarsening might breaks the rule that we can start searching
+  // from the old "tqid". Therefore, we detect recursive calls by storing the
+  // Morton index of the last seen quadrants and compare them to the current
+  // ones. In recursive coarsenings, the current quadrant has a lower index
+  // than the quadrant in the last call.
+  // In this case, we start the search 7 quadrants before "tqid" in order to
+  // visit all of "tqid"'s sibling quadrants.
+  // Note, that this could also be achieved by checking the overlap with all
+  // 8 quadrants in the array "quad" instead of only "quad[0]".
+  auto midx = Utils::morton_coords_to_idx(quad[0]->x, quad[0]->y, quad[0]->z);
+
+  if (midx < old_morton_idx) {
+    tqid = std::max(0, tqid - (P8EST_CHILDREN - 1));
+  }
+  old_morton_idx = midx;
+
   for (; tqid < tree->quadrants.elem_count; ++tqid) {
     p4est_quadrant_t *q = p4est_quadrant_array_index(&tree->quadrants, tqid);
     if (p4est_quadrant_overlaps(q, quad[0]))
@@ -1408,6 +1426,7 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
   p4est_t *fct = p4est_copy(t2, 0);
   fct->user_pointer = (void *)t1;
   last_tree = nullptr;
+  old_morton_idx = 0;
   p8est_coarsen(fct, 1, fct_coarsen_cb, nullptr);
   return fct;
 }

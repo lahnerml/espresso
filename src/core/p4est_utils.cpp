@@ -584,6 +584,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
   p4est_quadrant_t *q;
   p4est_locidx_t zlvlfill = 0;
   first = 0;
+  auto forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
   count = adapt_p4est->local_num_quadrants;
   while (0 < count) {
     step = 0.5 * count;
@@ -591,7 +592,7 @@ p4est_locidx_t bin_search_loc_quads(p4est_gloidx_t idx) {
     q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, index);
     p4est_topidx_t tid = adapt_mesh->quad_to_tree[index];
     cmp_idx = p4est_utils_global_idx(forest_order::adaptive_LB, q, tid);
-    zlvlfill = 1 << (3*(p4est_params.max_ref_level - q->level));
+    zlvlfill = 1 << (3 * (forest.finest_level_global - q->level));
     if (cmp_idx <= idx && idx < cmp_idx + zlvlfill) {
       return index;
     } else if (cmp_idx < idx) {

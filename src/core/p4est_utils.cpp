@@ -866,7 +866,9 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   if (n_part) {
     if (sim_time == 0.) {
       h_max = p4est_params.h[p4est_params.min_ref_level + initial_ref_steps];
-      radius = 2.5 * h_max;
+      radius = std::min(2.5 * h_max,
+                        *std::min_element(std::begin(half_box_l),
+                                          std::end(half_box_l)));
       for (auto p : local_cells.particles()) {
         create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
       }

@@ -970,18 +970,16 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
       }
 
       // particles during simulation
-      if (sim_time > 0.0) {
-        if (coupling_quads[qid]) {
-          flags[qid] = 1;
-          for (int i = 0; i < 26; ++i) {
-            sc_array_truncate(nqids);
-            p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid,
-                                     i, nullptr, nullptr, nqids);
-            for (int j = 0; j < nqids->elem_count; ++j) {
-              nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
-              if (0 <= nqid && nqid < adapt_p4est->local_num_quadrants) {
-                flags[nqid] = 1;
-              }
+      if (sim_time > 0.0 && coupling_quads[qid]) {
+        flags[qid] = 1;
+        for (int i = 0; i < 26; ++i) {
+          sc_array_truncate(nqids);
+          p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid,
+                                   i, nullptr, nullptr, nqids);
+          for (int j = 0; j < nqids->elem_count; ++j) {
+            nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
+            if (0 <= nqid && nqid < adapt_p4est->local_num_quadrants) {
+              flags[nqid] = 1;
             }
           }
         }
@@ -1078,7 +1076,6 @@ int p4est_utils_perform_adaptivity_step() {
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
-  P4EST_ASSERT(p4est_is_equal(p4est_adapted, adapt_p4est, 0));
   p8est_refine_ext(p4est_adapted, 0, p4est_params.max_ref_level,
                    refinement_criteria, p4est_utils_qid_dummy, nullptr);
   // perform coarsening step

@@ -2537,7 +2537,8 @@ void lbadapt_dump2file(p8est_iter_volume_info_t *info, void *user_data) {
 
 void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   p8est_quadrant_t *q = info->quad;
-  q->p.user_long = info->quadid;
+  p8est_tree_t *t = p4est_tree_array_index(info->p4est->trees, info->treeid);
+  q->p.user_long = info->quadid + t->quadrants_offset;
 }
 
 void lbadapt_interpolate_pos_adapt(Vector3d &opos,

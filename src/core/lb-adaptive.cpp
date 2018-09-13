@@ -2903,6 +2903,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
         P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
                                                      neighbor_quad_pos, q->level,
                                                      pos, check_weights));
+#if 0
         P4EST_ASSERT(dir != 7 || quad->level != q->level ||
                      ((std::abs(check_weights[0] - interpolation_weights[0]) <
                        ROUND_ERROR_PREC) &&
@@ -2910,6 +2911,7 @@ void lbadapt_interpolate_pos_ghost(Vector3d &opos,
                        ROUND_ERROR_PREC) &&
                       (std::abs(check_weights[2] - interpolation_weights[2]) <
                        ROUND_ERROR_PREC)));
+#endif
       }
     }
 

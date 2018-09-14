@@ -3356,12 +3356,12 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 
 void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v) {
 #ifndef LB_ADAPTIVE_GPU
+#ifdef LB_ADAPTIVE
   // FIXME Port to GPU
   bool ghost = (this_node != p4est_utils_pos_to_proc(forest_order::adaptive_LB,
                                                      p.data()));
-  return lb_lbfluid_get_interpolated_velocity(p, v, ghost);
-#else  // !LB_ADAPTIVE_GPU
-  return -1;
+  lb_lbfluid_get_interpolated_velocity(p, v, ghost);
+#endif // !LB_ADAPTIVE
 #endif // !LB_ADAPTIVE_GPU
 }
 
@@ -3700,6 +3700,7 @@ void calc_particle_lattice_ia() {
       }
     }
 
+#ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
   if (n_part) {
 #ifdef COMM_HIDING
@@ -3719,6 +3720,7 @@ void calc_particle_lattice_ia() {
     }
 #endif
   }
+#endif
 #endif
   }
 }

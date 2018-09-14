@@ -29,7 +29,7 @@
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+#if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;
 castable_unique_ptr<p4est_connectivity_t> adapt_conn;
 castable_unique_ptr<p4est_ghost_t> adapt_ghost;
@@ -40,8 +40,9 @@ castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (P8EST_QMAXLEVEL,
                                                             nullptr);
 #endif
-std::vector<bool> coupling_quads = {{}};
 #endif
+std::vector<bool> coupling_quads = {{}};
+
 
 p4est_parameters p4est_params = {
   // min_ref_level

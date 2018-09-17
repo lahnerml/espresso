@@ -181,6 +181,14 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
         ####################################################
 
+        def remove_boundary_from_geometric_refinement(self, index):
+            if (p4est_utils_geometric_refinement_exclude_boundary_index(index)):
+                raise Exception("p4est_utils_geometric_refinement_exclude_boundary_index")
+
+            return 0
+
+        ####################################################
+
         def adapt_grid(self):
             if (p4est_utils_adapt_grid()):
                 raise Exception("p4est_utils_adapt_grid error")

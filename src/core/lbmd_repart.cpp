@@ -6,7 +6,7 @@
 
 
 #include "cells.hpp"
-#include "lb-adaptive.hpp"
+#include "grid_based_algorithms/lb-adaptive.hpp"
 #include "p4est_utils.hpp"
 #include "repart.hpp"
 

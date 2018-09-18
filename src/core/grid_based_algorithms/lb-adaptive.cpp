@@ -25,11 +25,11 @@
  * Implementation file for \ref lb-adaptive.hpp.
  */
 #include "communication.hpp"
-#include "lb-adaptive-gpu.hpp"
-#include "lb-adaptive.hpp"
-#include "lbboundaries.hpp"
-#include "lb-d3q19.hpp"
-#include "lb.hpp"
+#include "grid_based_algorithms/lb-adaptive-gpu.hpp"
+#include "grid_based_algorithms/lb-adaptive.hpp"
+#include "grid_based_algorithms/lbboundaries.hpp"
+#include "grid_based_algorithms/lb-d3q19.hpp"
+#include "grid_based_algorithms/lb.hpp"
 #include "p4est_utils.hpp"
 #include "random.hpp"
 #include "thermostat.hpp"

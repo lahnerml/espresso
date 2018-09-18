@@ -30,8 +30,8 @@
 
 #include "p4est_utils.hpp"
 
-#include "lb-adaptive-gpu.hpp"
-#include "lb.hpp"
+#include "grid_based_algorithms/lb-adaptive-gpu.hpp"
+#include "grid_based_algorithms/lb.hpp"
 #include "utils.hpp"
 
 #ifdef LB_ADAPTIVE

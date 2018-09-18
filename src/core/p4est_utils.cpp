@@ -5,7 +5,7 @@
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
 #include "grid.hpp"
-#include "lb-adaptive.hpp"
+#include "grid_based_algorithms/lb-adaptive.hpp"
 #include "lbmd_repart.hpp"
 #include "p4est_dd.hpp"
 #include "utils/Morton.hpp"

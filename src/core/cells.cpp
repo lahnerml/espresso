@@ -418,24 +418,6 @@ void cells_update_ghosts() {
 }
 
 /*************************************************/
-int cells_full_shell_neigh(int c, int n)
-{
-  switch (cell_structure.type) {
-  case CELL_STRUCTURE_DOMDEC:
-    return dd_full_shell_neigh(c, n);
-    break;
-#ifdef DD_P4EST
-  case CELL_STRUCTURE_P4EST:
-    return dd_p4est_full_shell_neigh(c, n);
-    break;
-#endif
-  default:
-    fprintf(stderr, "Cannot call full_shell_neigh on non-domain-decomposition.\n");
-    errexit();
-  }
-  // Not reached.
-  return 0;
-}
 
 Cell *find_current_cell(const Particle &p) {
   auto c = cell_structure.position_to_cell(p.r.p.data());

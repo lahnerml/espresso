@@ -59,14 +59,14 @@ static void dd_p4est_init_communication_structure();
 static void dd_p4est_init_cell_interactions();
 
 // Map a position to a cell, returns NULL if not in local (+ ROUND_ERR_PREC*boxl) domain
-Cell* dd_p4est_save_position_to_cell(double pos[3]);
+Cell* dd_p4est_save_position_to_cell(const double pos[3]);
 // Map a position to a cell, returns NULL if not in local domain
-static Cell* dd_p4est_position_to_cell(double pos[3]);
+static Cell* dd_p4est_position_to_cell(const double pos[3]);
 
 // Map a position to a global processor index
 static int dd_p4est_pos_to_proc(double pos[3]);
 // Compute a Morton index for a position (this is not equal to the p4est index)
-static uint64_t dd_p4est_pos_morton_idx(double pos[3]);
+static uint64_t dd_p4est_pos_morton_idx(const double pos[3]);
 
 /** Revert the order of a communicator: After calling this the
     communicator is working in reverted order with exchanged
@@ -566,18 +566,23 @@ void dd_p4est_mark_cells () {
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_cell_interactions() {
   for (int i = 0; i < local_cells.n; ++i) {
-    cells[i].m_neighbors.clear();
-    cells[i].m_neighbors.reserve(14);
-    for (int n = 1; n < 14; ++n) {
-      auto neighidx = ds::p4est_cellinfo[i].neighbor[half_neighbor_idx[n]];
+    std::vector<Cell *> red_neighbors;
+    std::vector<Cell *> black_neighbors;
+
+    for (int n = 0; n < 27; ++n) {
+      auto neighidx = ds::p4est_cellinfo[i].neighbor[n];
       // Check for invalid cells
-      if (neighidx >= 0 && neighidx < num_cells)
-        local_cells.cell[i]->m_neighbors.emplace_back(&cells[neighidx]);
+      if (n < 1 || 14 < n) {
+        black_neighbors.emplace_back(&cells[neighidx]);
+      } else {
+        red_neighbors.emplace_back(&cells[neighidx]);
+      }
+      local_cells.cell[i]->m_neighbors = Neighbors<Cell *>(red_neighbors, black_neighbors);
     }
   }
 }
 //--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_save_position_to_cell(double pos[3]) {
+Cell* dd_p4est_save_position_to_cell(const double pos[3]) {
   auto shellidxcomp = [](const CellInfo& s, uint64_t idx) {
     uint64_t sidx = dd_p4est_cell_morton_idx(s.coord[0],
                                              s.coord[1],
@@ -601,7 +606,7 @@ Cell* dd_p4est_save_position_to_cell(double pos[3]) {
     return nullptr;
 }
 //--------------------------------------------------------------------------------------------------
-Cell* dd_p4est_position_to_cell(double pos[3]) {
+Cell* dd_p4est_position_to_cell(const double pos[3]) {
   // Accept OOB particles for the sake of IO.
   // If this is used, you need to manually do a global(!) resort afterwards
   // MPI-IO does so.
@@ -1012,7 +1017,7 @@ static void dd_p4est_repart_exchange_end(CellPList *old) {
 // coordinates.
 // Note: The global Morton index returned here is NOT equal to the local cell
 //       index!!!
-static uint64_t dd_p4est_pos_morton_idx(double pos[3]) {
+static uint64_t dd_p4est_pos_morton_idx(const double pos[3]) {
   double pfold[3] = {pos[0], pos[1], pos[2]};
   int im[3] = {0, 0, 0}; /* dummy */
   fold_position(pfold, im);

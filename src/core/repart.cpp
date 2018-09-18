@@ -7,7 +7,7 @@
 #include "cells.hpp"
 #include <regex>
 #include "domain_decomposition.hpp"
-#include "interaction_data.hpp"
+#include "nonbonded_interactions/nonbonded_interaction_data.hpp"
 #include "short_range_loop.hpp"
 
 // Fills weights with a constant.
@@ -22,10 +22,14 @@ static void metric_npart(std::vector<double> &weights) {
 }
 
 int cell_ndistpairs(Cell *c) {
+#if 0
   int nnp =
       std::accumulate(std::begin(c->m_neighbors), std::end(c->m_neighbors), 0,
                       [](int acc, const Cell *neigh) { return acc + neigh->n; });
   return c->n * nnp;
+#else
+  return 0;
+#endif // 0
 }
 
 // Fills weights with the number of distance pairs per cell.

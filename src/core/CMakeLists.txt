@@ -29,14 +29,18 @@ set(EspressoCore_SRC
     integrate.cpp
     lattice.cpp
     layered.cpp
+    lbmd_repart.cpp
     metadynamics.cpp
     minimize_energy.cpp
     MpiCallbacks.cpp
     nemd.cpp
     npt.cpp
     nsquare.cpp
+    p4est_dd.cpp
+    p4est_utils.cpp
     partCfg_global.cpp
     particle_data.cpp
+    particle_vtk.cpp
     PdbParser.cpp
     polymer.cpp
     polynom.cpp
@@ -44,6 +48,7 @@ set(EspressoCore_SRC
     random.cpp
     rattle.cpp
     reaction_ensemble.cpp
+    repart.cpp
     rotate_system.cpp
     rotation.cpp
     RuntimeErrorCollector.cpp

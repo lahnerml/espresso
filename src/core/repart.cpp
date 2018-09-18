@@ -35,6 +35,7 @@ static void metric_ndistpairs(std::vector<double> &weights) {
 }
 
 static void metric_nforcepairs(std::vector<double> &weights) {
+#ifdef LENNARD_JONES
   // Ugly hack: Use pairkernel to advance the current cell number
   int cellno = 0;
   for(;cellno < (local_cells.n - 1) && local_cells.cell[cellno]->n == 0; cellno++);
@@ -67,6 +68,10 @@ static void metric_nforcepairs(std::vector<double> &weights) {
   };
 
   short_range_loop(particlekernel, pairkernel);
+#else
+  std::fprintf(stderr, "Error: Force pairs metric only available with LENNARD_JONES defined.");
+  errexit();
+#endif
 }
 
 int cell_nbondedia(Cell *cell) {

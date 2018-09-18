@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2011,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -30,14 +30,14 @@
 #ifdef LB
 
 #include "communication.hpp"
-#include "lb.hpp"
-#include "lb-adaptive.hpp"
-#include "lbboundaries.hpp"
+#include "grid_based_algorithms/lb.hpp"
+#include "grid_based_algorithms/lb-adaptive.hpp"
+#include "grid_based_algorithms/lbboundaries.hpp"
 #include "p4est_utils.hpp"
 #include "utils.hpp"
 #include <mpi.h>
 
-/** Caclulate mass of the LB fluid.
+/** Calculate mass of the LB fluid.
  * \param result Fluid mass
  */
 void lb_calc_fluid_mass(double *result) {
@@ -140,8 +140,9 @@ void lb_calc_fluid_temp(double *result) {
 #endif // LB_ADAPTIVE
 
   // @Todo: lblattice.agrid is 3d. What to use here?
-  temp *= 1. / (3. * lbpar.rho * number_of_non_boundary_nodes * lbpar.tau *
-                lbpar.tau * h_max) /
+  temp *= 1. /
+          (3. * lbpar.rho * number_of_non_boundary_nodes * lbpar.tau *
+           lbpar.tau * lbpar.agrid) /
           n_nodes;
 
   MPI_Reduce(&temp, result, 1, MPI_DOUBLE, MPI_SUM, 0, comm_cart);

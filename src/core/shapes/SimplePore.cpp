@@ -34,11 +34,12 @@ std::pair<double, double> SimplePore::dist_half_pore(double r, double z) const {
   assert(z >= 0.0);
   assert(r >= 0.0);
 
-  if (z <= c_z) {
-    /* Cylinder section */
+  if ((r <= (m_smoothing_rad + c_r)) && (z <= c_z)) {
+    /* Cylinder section, inner */
     return {m_rad - r, 0};
-  } else if ((r >= c_r) && (z >= m_half_length)) {
-    /* Wall section */
+  } else if (((r > (m_smoothing_rad + c_r)) && ((z <= c_z) || (z > c_z))) ||
+              z > m_half_length) {
+    /* Wall section and outer cylinder */
     return {0, m_half_length - z};
   } else {
     /* Smoothing area */
@@ -73,13 +74,24 @@ int SimplePore::calculate_dist(const double *ppos, double *dist,
   double dr, dz;
   std::tie(dr, dz) = dist_half_pore(r, std::abs(z));
 
+  double side = -1;
+  if (((dz == 0) && (r <= m_rad)) || // cylinder section
+      ((dr == 0) && (std::abs(z) > m_half_length))) {// ||
+    side = 1;
+  } else {
+    // smoothing area
+    if (std::abs(z) >= c_z) {
+      double angle = std::asin((std::abs(z) - c_z) / m_smoothing_rad);
+      double dist_offset = m_smoothing_rad - (std::cos(angle) * m_smoothing_rad);
+      if (r <= (m_rad + dist_offset)) {
+        side = 1;
+      }
+    }
+  }
+
   if (z <= 0.0) {
     dz *= -1;
   }
-
-  double side = -1;
-  if (std::abs(z) >= m_half_length || r >= m_rad)
-    side = 1;
 
   *dist = std::sqrt(dr * dr + dz * dz) * side;
   for (int i = 0; i < 3; i++) {

@@ -936,8 +936,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   return 0;
 }
 
-int lb_lbfluid_print_vtk_velocity(char *filename, const std::vector<int> &bb1,
-                                  const std::vector<int> &bb2) {
+int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> &bb1,
+                                  std::vector<int> &bb2) {
 #ifdef LB_ADAPTIVE
   /* strip file ending from filename (if given) */
   char *pos_file_ending;
@@ -3178,6 +3178,8 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
 
   P4EST_ASSERT(8 <= payloads.size() && payloads.size() <= 20);
   double h_max = p4est_params.h[p4est_params.max_ref_level];
+#else
+  double h_max = lbpar.agrid;
 #endif // LB_ADAPTIVE
 
 
@@ -3343,7 +3345,8 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v) {
 }
 
 
-void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool ghost) {
+void lb_lbfluid_get_interpolated_velocity(const Vector3d &pos, double *v,
+                                          bool ghost) {
 #ifndef LB_ADAPTIVE_GPU
 // FIXME Port to GPU
 #ifndef LB_ADAPTIVE
@@ -3375,10 +3378,10 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v, bool gho
   double modes[19];
 
   if (ghost) {
-    lbadapt_interpolate_pos_ghost(p, payloads, interpolation_weights,
+    lbadapt_interpolate_pos_ghost(pos, payloads, interpolation_weights,
                                   quad_levels);
   } else {
-    lbadapt_interpolate_pos_adapt(p, payloads, interpolation_weights,
+    lbadapt_interpolate_pos_adapt(pos, payloads, interpolation_weights,
                                   quad_levels);
   }
   double h_local = p4est_params.h[quad_levels[0]];

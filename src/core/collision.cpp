@@ -31,10 +31,6 @@
 #include "utils/mpi/all_compare.hpp"
 #include "virtual_sites/VirtualSitesRelative.hpp"
 
-#ifdef DD_P4EST
-Cell* dd_p4est_save_position_to_cell(double pos[3]);
-#endif
-
 #ifdef COLLISION_DETECTION_DEBUG
 #define TRACE(a) a
 #else
@@ -515,79 +511,6 @@ static void three_particle_binding_do_search(Cell *basecell, Particle &p1,
   for (auto &n : basecell->neighbors().all()) {
     handle_cell(n);
   }
-}
-
-Cell* project_to_boundary(const double pos[3])
-{
-  // In pronciple we could directly map a particle to the subdomain for the domain_decomposition cell system.
-  // However with non-rectangular subdomains this is not so easy anymore.
-  // Also, we could try to find out to which boundary in its cell it is nearest and mirror the particle
-  // over to the other cell (possible over edge, corner?). However, we stick to the most simple approach for now.
-
-  // Test with increasing distance:
-  //  - First face neighbors
-  //  - Then edge neighbors
-  //  - Then corner neighbors
-  static const std::vector<std::array<int, 3>> directions = {
-    {{ 0,  0,  0}},
-    // Faces
-    {{ 0,  0, -1}},
-    {{ 0,  0,  1}},
-    {{ 0, -1,  0}},
-    {{ 0,  1,  0}},
-    {{-1,  0,  0}},
-    {{ 1,  0,  0}},
-    // Edges
-    {{ 0, -1, -1}},
-    {{ 0, -1,  1}},
-    {{ 0,  1, -1}},
-    {{ 0,  1,  1}},
-    
-    {{-1,  0, -1}},
-    {{-1,  0,  1}},
-    {{ 1,  0, -1}},
-    {{ 1,  0,  1}},
-    
-    {{-1, -1,  0}},
-    {{-1,  1,  0}},
-    {{ 1, -1,  0}},
-    {{ 1,  1,  0}},
-    // Corners
-    {{-1, -1, -1}},
-    {{-1, -1,  1}},
-    {{-1,  1, -1}},
-    {{-1,  1,  1}},
-
-    {{ 1, -1, -1}},
-    {{ 1, -1,  1}},
-    {{ 1,  1, -1}},
-    {{ 1,  1,  1}}};
-
-  Cell *c;
-
-  for (const auto& displ: directions) {  
-    double spos[3] = { pos[0] + displ[0] * dd.cell_size[0]
-                     , pos[1] + displ[1] * dd.cell_size[1]
-                     , pos[2] + displ[2] * dd.cell_size[2] };
-#ifdef DD_P4EST
-    if ((c = dd_p4est_save_position_to_cell(spos)))
-      return c;
-#endif
-  }
-
-  return nullptr;
-}
-
-Cell* responsible_collision_cell(Particle& p)
-{
-  if (cell_structure.type != CELL_STRUCTURE_P4EST) {
-    fprintf(stderr, "Coldet currently works only with p4est cell system.");
-    errexit();
-  }
-  if (p.l.ghost)
-    return project_to_boundary(p.r.p.data());
-  else
-    return cell_structure.position_to_cell(p.r.p.data());
 }
 
 // Goes through the collision queue and for each pair in it

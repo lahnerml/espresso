@@ -1,6 +1,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <libgen.h>
 #include <mpi.h>
 #include "particle_vtk.hpp"
 #include "integrate.hpp"

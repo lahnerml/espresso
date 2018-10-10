@@ -600,8 +600,8 @@ int lb_get_lattice_switch(int *py_switch);
 /* IO routines */
 int lb_lbfluid_print_vtk_boundary(char *filename);
 int lb_lbfluid_print_vtk_velocity(char *filename,
-                                  const std::vector<int>& = {-1, -1, -1},
-                                  const std::vector<int>& = {-1, -1, -1});
+                                  std::vector<int> = {-1, -1, -1},
+                                  std::vector<int> = {-1, -1, -1});
 int lb_lbfluid_print_vtk_density(char *filename);
 int lb_lbfluid_print_boundary(char *filename);
 int lb_lbfluid_print_velocity(char *filename);

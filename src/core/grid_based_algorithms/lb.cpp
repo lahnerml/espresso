@@ -936,8 +936,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
   return 0;
 }
 
-int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> &bb1,
-                                  std::vector<int> &bb2) {
+int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
+                                  std::vector<int> bb2) {
 #ifdef LB_ADAPTIVE
   /* strip file ending from filename (if given) */
   char *pos_file_ending;

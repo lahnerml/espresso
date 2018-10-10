@@ -20,11 +20,13 @@ if (CUDA)
 
   cuda_add_library(lbgpu_cuda SHARED
     lbgpu_cuda.cu
+    lb-adaptive-gpu_cuda.cu
   )
   add_dependencies(lbgpu_cuda EspressoConfig)
 
   add_library(lbgpu SHARED
     lbgpu.cpp
+    lb-adaptive.cpp
     lb-adaptive-gpu.cpp
     lb-d3q19.cpp
   )
@@ -54,6 +56,7 @@ add_dependencies(lbboundaries_interface EspressoConfig)
 add_library(lbcpu SHARED
   lb.cpp
   lb-adaptive.cpp
+  lb-adaptive-gpu.cpp
   lb-d3q19.cpp
 )
 target_include_directories(lbcpu PRIVATE

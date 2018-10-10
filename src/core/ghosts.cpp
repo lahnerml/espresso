@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 2010,2012,2013,2014,2015,2016 The ESPResSo project
+  Copyright (C) 2010-2018 The ESPResSo project
   Copyright (C) 2002,2003,2004,2005,2006,2007,2008,2009,2010
     Max-Planck-Institute for Polymer Research, Theory Group
 
@@ -18,19 +18,19 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-/** \file ghosts.cpp   Ghost particles and particle exchange.
+/** \file
+ *  Ghost particles and particle exchange.
  *
  *  For more information on ghosts,
  *  see \ref ghosts.hpp "ghosts.hpp"
-*/
+ */
 #include "ghosts.hpp"
 #include "cells.hpp"
 #include "communication.hpp"
-#include "particle_data.hpp"
-#include "utils.hpp"
 #include "debug.hpp"
 #include "errorhandling.hpp"
-#include "domain_decomposition.hpp"
+#include "particle_data.hpp"
+#include "utils.hpp"
 #include "utils/mpi/waitany.hpp"
 
 #include <algorithm>
@@ -39,7 +39,6 @@
 #include <cstring>
 #include <mpi.h>
 #include <vector>
-#include <boost/serialization/vector.hpp>
 
 /** Tag for communication in ghost_comm. */
 #define REQ_GHOST_SEND 100
@@ -49,32 +48,31 @@
  * buffer but to be able to remove the old global variables.
  */
 struct CommBuf {
-    std::vector<char> buf;
-    std::vector<int> bondbuffer;
+  std::vector<char> buf;
+  std::vector<int> bondbuffer;
 
-    /** Returns the size in bytes set by the last call to ensure_and_set_size.
-     */
-    int size() const { return buf.size(); }
+  /** Returns the size in bytes set by the last call to ensure_and_set_size.
+   */
+  int size() const { return buf.size(); }
 
-    /** Ensures that this buffer can hold at least nb bytes of data.
-     * Also sets the internal state so that subsequent calls to size() return nb.
-     */
-    void ensure_and_set_size(int nb) { buf.resize(nb); }
+  /** Ensures that this buffer can hold at least nb bytes of data.
+   * Also sets the internal state so that subsequent calls to size() return nb.
+   */
+  void ensure_and_set_size(int nb) { buf.resize(nb); }
 
-    /** Returns a char pointer to the underlying data buffer.
-     */
-    operator char *() { return buf.data(); }
+  /** Returns a char pointer to the underlying data buffer.
+   */
+  operator char *() { return buf.data(); }
 
-    /** Access the associated bond buffer.
-     */
-    std::vector<int>& bondbuf() { return bondbuffer; }
+  /** Access the associated bond buffer.
+   */
+  std::vector<int>& bondbuf() { return bondbuffer; }
 
-    /* Returns if size > 0.
-     */
-    bool has_particles() const { return size() > 0; }
+  bool has_particles() const { return size() > 0; }
 };
 
-// Serialization for CommBuf
+#include <boost/serialization/vector.hpp>
+
 namespace boost {
 namespace serialization {
 template <class Archive>
@@ -99,44 +97,52 @@ void serialize(Archive &ar, CommBuf &cb, unsigned int file_version) {
 }
 
 
-
-/** whether the ghosts should also have velocity information, e. g. for DPD or RATTLE.
-    You need this whenever you need the relative velocity of two particles.
-    NO CHANGES OF THIS VALUE OUTSIDE OF \ref on_ghost_flags_change !!!!
+/** whether the ghosts should also have velocity information, e. g. for DPD or
+   RATTLE. You need this whenever you need the relative velocity of two
+   particles. NO CHANGES OF THIS VALUE OUTSIDE OF \ref on_ghost_flags_change
+   !!!!
 */
 int ghosts_have_v = 0;
 
-void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async)
-{
+
+void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async) {
   assert(comm);
   comm->data_parts = data_parts;
   comm->async = async;
 
-  GHOST_TRACE(fprintf(stderr, "%d: prepare_comm, data_parts = %d\n", this_node, comm->data_parts));
+  /* if ghosts should have uptodate velocities, they have to be updated like positions
+     (except for shifting...) */
+  if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
+    comm->data_parts |= GHOSTTRANS_MOMENTUM;
+
+  GHOST_TRACE(fprintf(stderr, "%d: prepare_comm, data_parts = %d\n", this_node,
+                      comm->data_parts));
 
   comm->num = num;
-  comm->comm = (GhostCommunication*)Utils::malloc(num*sizeof(GhostCommunication));
-  for(int i=0; i<num; i++) {
-    comm->comm[i].shift[0]=comm->comm[i].shift[1]=comm->comm[i].shift[2]=0.0;
+  comm->comm =
+      (GhostCommunication *)Utils::malloc(num * sizeof(GhostCommunication));
+  for (int i = 0; i < num; i++) {
+    comm->comm[i].shift[0] = comm->comm[i].shift[1] = comm->comm[i].shift[2] =
+        0.0;
     comm->comm[i].n_part_lists = 0;
     comm->comm[i].part_lists = nullptr;
   }
 }
 
-void free_comm(GhostCommunicator *comm)
-{
+void free_comm(GhostCommunicator *comm) {
   int n;
-  GHOST_TRACE(fprintf(stderr,"%d: free_comm: %p has %d ghost communications\n",this_node,(void*) comm,comm->num));
-  for (n = 0; n < comm->num; n++) free(comm->comm[n].part_lists);
+  GHOST_TRACE(fprintf(stderr, "%d: free_comm: %p has %d ghost communications\n",
+                      this_node, (void *)comm, comm->num));
+  for (n = 0; n < comm->num; n++)
+    free(comm->comm[n].part_lists);
   free(comm->comm);
 }
 
-int calc_transmit_size(GhostCommunication *gc, int data_parts)
-{
+int calc_transmit_size(GhostCommunication *gc, int data_parts) {
   int n_buffer_new;
 
   if (data_parts & GHOSTTRANS_PARTNUM)
-    n_buffer_new = sizeof(int)*gc->n_part_lists;
+    n_buffer_new = sizeof(int) * gc->n_part_lists;
   else {
     int count = 0;
     for (int p = 0; p < gc->n_part_lists; p++)
@@ -177,7 +183,8 @@ int calc_transmit_size(GhostCommunication *gc, int data_parts)
 
 void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_parts)
 {
-  GHOST_TRACE(fprintf(stderr, "%d: prepare sending to/bcast from %d\n", this_node, gc->node));
+  GHOST_TRACE(fprintf(stderr, "%d: prepare sending to/bcast from %d\n",
+                      this_node, gc->node));
 
   /* reallocate send buffer */
   s_buffer.ensure_and_set_size(calc_transmit_size(gc, data_parts));
@@ -205,13 +212,15 @@ void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_par
           *(int *)insert = pt->bl.n;
           insert += sizeof(int);
           if (pt->bl.n) {
-            s_buffer.bondbuf().insert(s_buffer.bondbuf().end(), pt->bl.e, pt->bl.e + pt->bl.n);
+            s_buffer.bondbuf().insert(s_buffer.bondbuf().end(), pt->bl.e,
+                                      pt->bl.e + pt->bl.n);
           }
 #ifdef EXCLUSIONS
           *(int *)insert = pt->el.n;
           insert += sizeof(int);
           if (pt->el.n) {
-            s_buffer.bondbuf().insert(s_buffer.bondbuf().end(), pt->el.e, pt->el.e + pt->el.n);
+            s_buffer.bondbuf().insert(s_buffer.bondbuf().end(), pt->el.e,
+                                      pt->el.e + pt->el.n);
           }
 #endif
 #endif
@@ -259,19 +268,19 @@ void prepare_send_buffer(CommBuf& s_buffer, GhostCommunication *gc, int data_par
   }
 
   if (insert - s_buffer != s_buffer.size()) {
-    fprintf(stderr, "%d: INTERNAL ERROR: send buffer size %d "
-                    "differs from what I put in (%ld)\n",
+    fprintf(stderr,
+            "%d: INTERNAL ERROR: send buffer size %d "
+            "differs from what I put in (%td)\n",
             this_node, s_buffer.size(), insert - s_buffer);
     errexit();
   }
 }
 
-static void prepare_ghost_cell(Cell *cell, int size)
-{
+static void prepare_ghost_cell(Cell *cell, int size) {
 #ifdef GHOSTS_HAVE_BONDS
   // free all allocated information, will be resent
   {
-    int np   = cell->n;
+    int np = cell->n;
     Particle *part = cell->part;
     for (int p = 0; p < np; p++) {
       free_particle(part + p);
@@ -281,27 +290,26 @@ static void prepare_ghost_cell(Cell *cell, int size)
   cell->resize(size);
   // invalidate pointers etc
   {
-    int np   = cell->n;
+    int np = cell->n;
     Particle *part = cell->part;
     for (int p = 0; p < np; p++) {
-      Particle *pt = new(&part[p]) Particle();
+      Particle *pt = new (&part[p]) Particle();
 
-      //init ghost variable
-      pt->l.ghost=1;
+      // init ghost variable
+      pt->l.ghost = 1;
     }
   }
 }
 
-void prepare_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
-{
-  GHOST_TRACE(fprintf(stderr, "%d: prepare receiving from %d\n", this_node, gc->node));
+void prepare_recv_buffer(CommBuf &r_buffer, GhostCommunication *gc, int data_parts) {
+  GHOST_TRACE(
+      fprintf(stderr, "%d: prepare receiving from %d\n", this_node, gc->node));
   /* reallocate recv buffer */
   r_buffer.ensure_and_set_size(calc_transmit_size(gc, data_parts));
   GHOST_TRACE(fprintf(stderr, "%d: will get %d\n", this_node, r_buffer.size()));
 }
 
-void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
-{
+void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts) {
   /* put back data */
   char *retrieve = r_buffer;
 
@@ -310,34 +318,34 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
   for (int pl = 0; pl < gc->n_part_lists; pl++) {
     auto cur_list = gc->part_lists[pl];
     if (data_parts & GHOSTTRANS_PARTNUM) {
-      GHOST_TRACE(fprintf(stderr, "%d: reallocating cell %p to size %d, assigned to node %d\n",
-                          this_node, (void*) cur_list, *(int *)retrieve, gc->node));
+      GHOST_TRACE(fprintf(
+          stderr, "%d: reallocating cell %p to size %d, assigned to node %d\n",
+          this_node, (void *)cur_list, *(int *)retrieve, gc->node));
       prepare_ghost_cell(cur_list, *(int *)retrieve);
       retrieve += sizeof(int);
-    }
-    else {
-      int np   = cur_list->n;
+    } else {
+      int np = cur_list->n;
       Particle *part = cur_list->part;
       for (int p = 0; p < np; p++) {
         Particle *pt = &part[p];
         if (data_parts & GHOSTTRANS_PROPRTS) {
           memmove(&pt->p, retrieve, sizeof(ParticleProperties));
-          retrieve +=  sizeof(ParticleProperties);
+          retrieve += sizeof(ParticleProperties);
 #ifdef GHOSTS_HAVE_BONDS
           int n_bonds;
-	  memmove(&n_bonds, retrieve, sizeof(int));
-	  retrieve +=  sizeof(int);
+          memmove(&n_bonds, retrieve, sizeof(int));
+          retrieve += sizeof(int);
           if (n_bonds) {
-	    pt->bl.resize(n_bonds);
+            pt->bl.resize(n_bonds);
             std::copy_n(bond_retrieve, n_bonds, pt->bl.begin());
             bond_retrieve += n_bonds;
           }
 #ifdef EXCLUSIONS
           int n_exclusions;
-	  memmove(&n_exclusions, retrieve, sizeof(int));
-	  retrieve +=  sizeof(int);
+          memmove(&n_exclusions, retrieve, sizeof(int));
+          retrieve += sizeof(int);
           if (n_exclusions) {
-	    pt->el.resize(n_exclusions);
+            pt->el.resize(n_exclusions);
             std::copy_n(bond_retrieve, n_exclusions, pt->el.begin());
             bond_retrieve += n_exclusions;
           }
@@ -349,26 +357,26 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
         }
         if (data_parts & GHOSTTRANS_POSITION) {
           memmove(&pt->r, retrieve, sizeof(ParticlePosition));
-          retrieve +=  sizeof(ParticlePosition);
+          retrieve += sizeof(ParticlePosition);
         }
         if (data_parts & GHOSTTRANS_MOMENTUM) {
           memmove(&pt->m, retrieve, sizeof(ParticleMomentum));
-          retrieve +=  sizeof(ParticleMomentum);
+          retrieve += sizeof(ParticleMomentum);
         }
         if (data_parts & GHOSTTRANS_FORCE) {
           memmove(&pt->f, retrieve, sizeof(ParticleForce));
-          retrieve +=  sizeof(ParticleForce);
+          retrieve += sizeof(ParticleForce);
         }
 #ifdef LB
         if (data_parts & GHOSTTRANS_COUPLING) {
           memmove(&pt->lc, retrieve, sizeof(ParticleLatticeCoupling));
-          retrieve +=  sizeof(ParticleLatticeCoupling);
+          retrieve += sizeof(ParticleLatticeCoupling);
         }
 #endif
 #ifdef ENGINE
         if (data_parts & GHOSTTRANS_SWIMMING) {
           memmove(&pt->swim, retrieve, sizeof(ParticleParametersSwimming));
-          retrieve +=  sizeof(ParticleParametersSwimming);
+          retrieve += sizeof(ParticleParametersSwimming);
         }
 #endif
       }
@@ -380,15 +388,17 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
     retrieve += sizeof(int);
   }
 
-  if (retrieve - (char *) r_buffer != r_buffer.size()) {
-    fprintf(stderr, "%d: recv buffer size %d differs "
-                    "from what I read out (%ld)\n",
-            this_node, r_buffer.size(), retrieve - r_buffer);
+  if (retrieve - static_cast<char *>(r_buffer) != r_buffer.size()) {
+    fprintf(stderr,
+            "%d: recv buffer size %d differs "
+            "from what I read out (%td)\n",
+            this_node, r_buffer.size(), retrieve - static_cast<char *>(r_buffer));
     errexit();
   }
   if (bond_retrieve != r_buffer.bondbuf().end()) {
-    fprintf(stderr, "%d: recv bond buffer was not used up, %ld elements remain\n",
-            this_node, r_buffer.bondbuf().end() - bond_retrieve );
+    fprintf(stderr,
+            "%d: recv bond buffer was not used up, %td elements remain\n",
+            this_node, r_buffer.bondbuf().end() - bond_retrieve);
     errexit();
   }
   // Note: Asynchronous bond reception relies on resetting the bondbuffers to
@@ -396,8 +406,7 @@ void put_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc, int data_parts)
   r_buffer.bondbuf().resize(0);
 }
 
-void add_forces_from_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc)
-{
+void add_forces_from_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc) {
   int pl, p;
   Particle *part, *pt;
   char *retrieve;
@@ -410,34 +419,34 @@ void add_forces_from_recv_buffer(CommBuf& r_buffer, GhostCommunication *gc)
     for (p = 0; p < np; p++) {
       pt = &part[p];
       pt->f += *(reinterpret_cast<ParticleForce *>(retrieve));
-      retrieve +=  sizeof(ParticleForce);
+      retrieve += sizeof(ParticleForce);
     }
   }
-  if (retrieve - (char *) r_buffer != r_buffer.size()) {
-    fprintf(stderr, "%d: recv buffer size %d differs "
-                    "from what I put in %ld\n",
-            this_node, r_buffer.size(), retrieve - r_buffer);
+  if (retrieve - static_cast<char *>(r_buffer) != r_buffer.size()) {
+    fprintf(stderr,
+            "%d: recv buffer size %d differs "
+            "from what I put in %td\n",
+            this_node, r_buffer.size(), retrieve - static_cast<char *>(r_buffer));
     errexit();
   }
 }
 
-void cell_cell_transfer(GhostCommunication *gc, int data_parts)
-{
+void cell_cell_transfer(GhostCommunication *gc, int data_parts) {
   int pl, p, offset;
   Particle *part1, *part2, *pt1, *pt2;
 
-  GHOST_TRACE(fprintf(stderr, "%d: local_transfer: type %d data_parts %d\n", this_node,gc->type,data_parts));
+  GHOST_TRACE(fprintf(stderr, "%d: local_transfer: type %d data_parts %d\n",
+                      this_node, gc->type, data_parts));
 
   /* transfer data */
-  offset = gc->n_part_lists/2;
+  offset = gc->n_part_lists / 2;
   for (pl = 0; pl < offset; pl++) {
     Cell *src_list = gc->part_lists[pl];
     Cell *dst_list = gc->part_lists[pl + offset];
 
     if (data_parts & GHOSTTRANS_PARTNUM) {
       prepare_ghost_cell(dst_list, src_list->n);
-    }
-    else {
+    } else {
       int np = src_list->n;
       part1 = src_list->part;
       part2 = dst_list->part;
@@ -449,7 +458,7 @@ void cell_cell_transfer(GhostCommunication *gc, int data_parts)
 #ifdef GHOSTS_HAVE_BONDS
           pt2->bl = pt1->bl;
 #ifdef EXCLUSIONS
-	  pt2->el = pt1->el;
+          pt2->el = pt1->el;
 #endif
 #endif
         }
@@ -459,14 +468,13 @@ void cell_cell_transfer(GhostCommunication *gc, int data_parts)
           memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
           for (i = 0; i < 3; i++)
             pt2->r.p[i] += gc->shift[i];
-        }
-        else if (data_parts & GHOSTTRANS_POSITION)
+        } else if (data_parts & GHOSTTRANS_POSITION)
           memmove(&pt2->r, &pt1->r, sizeof(ParticlePosition));
         if (data_parts & GHOSTTRANS_MOMENTUM) {
           memmove(&pt2->m, &pt1->m, sizeof(ParticleMomentum));
-    }
-	if (data_parts & GHOSTTRANS_FORCE)
-      pt2->f += pt1->f;
+        }
+        if (data_parts & GHOSTTRANS_FORCE)
+          pt2->f += pt1->f;
 
 #ifdef LB
         if (data_parts & GHOSTTRANS_COUPLING)
@@ -474,19 +482,17 @@ void cell_cell_transfer(GhostCommunication *gc, int data_parts)
 #endif
 #ifdef ENGINE
         if (data_parts & GHOSTTRANS_SWIMMING)
-	  memmove(&pt2->swim, &pt1->swim, sizeof(ParticleParametersSwimming));
+          memmove(&pt2->swim, &pt1->swim, sizeof(ParticleParametersSwimming));
 #endif
       }
     }
   }
 }
 
-void reduce_forces_sum(void *add, void *to, int *len, MPI_Datatype *type)
-{
-  ParticleForce 
-    *cadd = static_cast<ParticleForce*>(add), 
-    *cto = static_cast<ParticleForce*>(to);
-  int i, clen = *len/sizeof(ParticleForce);
+void reduce_forces_sum(void *add, void *to, int *len, MPI_Datatype *type) {
+  ParticleForce *cadd = static_cast<ParticleForce *>(add),
+                *cto = static_cast<ParticleForce *>(to);
+  int i, clen = *len / sizeof(ParticleForce);
 
   if (*type != MPI_BYTE || (*len % sizeof(ParticleForce)) != 0) {
     fprintf(stderr, "%d: transfer data type wrong\n", this_node);
@@ -497,27 +503,24 @@ void reduce_forces_sum(void *add, void *to, int *len, MPI_Datatype *type)
     cto[i] += cadd[i];
 }
 
-static int is_send_op(int comm_type, int node)
-{
+static int is_send_op(int comm_type, int node) {
   return ((comm_type == GHOST_SEND) || (comm_type == GHOST_RDCE) ||
           (comm_type == GHOST_BCST && node == this_node));
 }
 
-static int is_recv_op(int comm_type, int node)
-{
+static int is_recv_op(int comm_type, int node) {
   return ((comm_type == GHOST_RECV) ||
           (comm_type == GHOST_BCST && node != this_node) ||
           (comm_type == GHOST_RDCE && node == this_node));
 }
 
 /** Asynchronous communication.
- * Only supports sends and receives, not optimizations for local communications
+ * Only supports sends and receives. No optimizations for local communications
  * and no broadcasts or reductions.
  *
  * \param gc Communication specification, see \ref GhostCommunicator
  */
-static void ghost_communicator_async(GhostCommunicator *gc, int data_parts)
-{
+static void ghost_communicator_async(GhostCommunicator *gc, int data_parts) {
   std::vector<CommBuf> commbufs(gc->num);
   // Need the full "gc->num" elements here (although we might omit transfers
   // below) as the wait_any code below needs to be able to associate an index to
@@ -561,28 +564,33 @@ static void ghost_communicator_async(GhostCommunicator *gc, int data_parts)
     else
       put_recv_buffer(commbufs[rno], gcn, data_parts);
   }
+
+  comm_cart.barrier();
 }
 
 /** Synchronous communication.
  * \param gc Communication specification, see \ref GhostCommunicator
  */
-static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts)
-{
+static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts) {
   static CommBuf s_buffer, r_buffer;
   MPI_Status status;
   int n, n2;
 
-  GHOST_TRACE(fprintf(stderr, "%d: ghost_comm %p, data_parts %d\n", this_node, (void*) gc, data_parts));
+  GHOST_TRACE(fprintf(stderr, "%d: ghost_comm %p, data_parts %d\n", this_node,
+                      (void *)gc, data_parts));
 
   for (n = 0; n < gc->num; n++) {
     GhostCommunication *gcn = &gc->comm[n];
     int comm_type = gcn->type & GHOST_JOBMASK;
-    int prefetch  = gcn->type & GHOST_PREFETCH;
+    int prefetch = gcn->type & GHOST_PREFETCH;
     int poststore = gcn->type & GHOST_PSTSTORE;
-    int node      = gcn->node;
+    int node = gcn->node;
 
-    GHOST_TRACE(fprintf(stderr, "%d: ghost_comm round %d, job %x\n", this_node, n, gc->comm[n].type));
-    GHOST_TRACE(fprintf(stderr, "%d: ghost_comm shift %f %f %f\n",this_node, gc->comm[n].shift[0], gc->comm[n].shift[1], gc->comm[n].shift[2]));
+    GHOST_TRACE(fprintf(stderr, "%d: ghost_comm round %d, job %x\n", this_node,
+                        n, gc->comm[n].type));
+    GHOST_TRACE(fprintf(stderr, "%d: ghost_comm shift %f %f %f\n", this_node,
+                        gc->comm[n].shift[0], gc->comm[n].shift[1],
+                        gc->comm[n].shift[2]));
     if (comm_type == GHOST_LOCL)
       cell_cell_transfer(gcn, data_parts);
     else {
@@ -592,26 +600,34 @@ static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts)
         if (!prefetch)
           prepare_send_buffer(s_buffer, gcn, data_parts);
         else {
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm using prefetched data for operation %d, sending to %d\n", this_node, n, node));
+          GHOST_TRACE(fprintf(stderr,
+                              "%d: ghost_comm using prefetched data for "
+                              "operation %d, sending to %d\n",
+                              this_node, n, node));
 #ifdef ADDITIONAL_CHECKS
           if (s_buffer.size() != calc_transmit_size(gcn, data_parts)) {
-	    fprintf(stderr, "%d: ghost_comm transmission size and current size of cells to transmit do not match\n", this_node);
-	    errexit();
-	  }
+            fprintf(stderr,
+                    "%d: ghost_comm transmission size and current size of "
+                    "cells to transmit do not match\n",
+                    this_node);
+            errexit();
+          }
 #endif
         }
-      }
-      else {
+      } else {
         /* we do not send this time, let's look for a prefetch */
         if (prefetch) {
           /* find next action where we send and which has PREFETCH set */
-          for (n2 = n+1; n2 < gc->num; n2++) {
+          for (n2 = n + 1; n2 < gc->num; n2++) {
             GhostCommunication *gcn2 = &gc->comm[n2];
             int comm_type2 = gcn2->type & GHOST_JOBMASK;
-            int prefetch2  = gcn2->type & GHOST_PREFETCH;
-            int node2      = gcn2->node;
+            int prefetch2 = gcn2->type & GHOST_PREFETCH;
+            int node2 = gcn2->node;
             if (is_send_op(comm_type2, node2) && prefetch2) {
-              GHOST_TRACE(fprintf(stderr, "%d: ghost_comm prefetch operation %d, is send/bcast to/from %d\n", this_node, n2, node2));
+              GHOST_TRACE(fprintf(stderr,
+                                  "%d: ghost_comm prefetch operation %d, is "
+                                  "send/bcast to/from %d\n",
+                                  this_node, n2, node2));
               prepare_send_buffer(s_buffer, gcn2, data_parts);
               break;
             }
@@ -625,105 +641,129 @@ static void ghost_communicator_sync(GhostCommunicator *gc, int data_parts)
 
       /* transfer data */
       switch (comm_type) {
-        case GHOST_RECV: {
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm receive from %d (%d bytes)\n", this_node, node, r_buffer.size()));
-          MPI_Recv(r_buffer, r_buffer.size(), MPI_BYTE, node, REQ_GHOST_SEND, comm_cart, &status);
-          if (data_parts & GHOSTTRANS_PROPRTS) {
-            int n_bonds = *(int *)((char *)r_buffer + r_buffer.size() - sizeof(int));
-            GHOST_TRACE(fprintf(stderr, "%d: ghost_comm receive from %d (%d bonds)\n", this_node, node, n_bonds));
-            if (n_bonds) {
-              r_buffer.bondbuf().resize(n_bonds);
-              MPI_Recv(&r_buffer.bondbuf()[0], n_bonds, MPI_INT, node, REQ_GHOST_SEND, comm_cart, &status);
-            }
+      case GHOST_RECV: {
+        GHOST_TRACE(fprintf(stderr,
+                            "%d: ghost_comm receive from %d (%d bytes)\n",
+                            this_node, node, n_r_buffer));
+        MPI_Recv(r_buffer, r_buffer.size(), MPI_BYTE, node, REQ_GHOST_SEND,
+                 comm_cart, &status);
+        if (data_parts & GHOSTTRANS_PROPRTS) {
+          int n_bonds = *(int *)(static_cast<char *>(r_buffer) + r_buffer.size() - sizeof(int));
+          GHOST_TRACE(fprintf(stderr,
+                              "%d: ghost_comm receive from %d (%d bonds)\n",
+                              this_node, node, n_bonds));
+          if (n_bonds) {
+            r_buffer.bondbuf().resize(n_bonds);
+            MPI_Recv(&r_buffer.bondbuf()[0], n_bonds, MPI_INT, node, REQ_GHOST_SEND,
+                     comm_cart, &status);
           }
-          break;
         }
-        case GHOST_SEND: {
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm send to %d (%d bytes)\n", this_node, node, s_buffer.size()));
-          MPI_Send(s_buffer, s_buffer.size(), MPI_BYTE, node, REQ_GHOST_SEND, comm_cart);
+        break;
+      }
+      case GHOST_SEND: {
+        GHOST_TRACE(fprintf(stderr, "%d: ghost_comm send to %d (%d bytes)\n",
+                            this_node, node, s_buffer.size()));
+        MPI_Send(s_buffer, s_buffer.size(), MPI_BYTE, node, REQ_GHOST_SEND,
+                 comm_cart);
+        int n_bonds = s_buffer.bondbuf().size();
+        if (!(data_parts & GHOSTTRANS_PROPRTS) && n_bonds > 0) {
+          fprintf(stderr,
+                  "%d: INTERNAL ERROR: not sending properties, but bond buffer "
+                  "not empty\n",
+                  this_node);
+          errexit();
+        }
+        GHOST_TRACE(fprintf(stderr, "%d: ghost_comm send to %d (%d ints)\n",
+                            this_node, node, n_bonds));
+        if (n_bonds) {
+          MPI_Send(&s_buffer.bondbuf()[0], n_bonds, MPI_INT, node, REQ_GHOST_SEND,
+                   comm_cart);
+        }
+        break;
+      }
+      case GHOST_BCST:
+        GHOST_TRACE(fprintf(stderr, "%d: ghost_comm bcast from %d (%d bytes)\n",
+                            this_node, node,
+                            (node == this_node) ? s_buffer.size() : r_buffer.size()));
+        if (node == this_node) {
+          MPI_Bcast(s_buffer, s_buffer.size(), MPI_BYTE, node, comm_cart);
           int n_bonds = s_buffer.bondbuf().size();
           if (!(data_parts & GHOSTTRANS_PROPRTS) && n_bonds > 0) {
-            fprintf(stderr, "%d: INTERNAL ERROR: not sending properties, but bond buffer not empty\n", this_node);
+            fprintf(stderr,
+                    "%d: INTERNAL ERROR: not sending properties, but bond "
+                    "buffer not empty\n",
+                    this_node);
             errexit();
           }
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm send to %d (%d ints)\n", this_node, node, n_bonds));
           if (n_bonds) {
-            MPI_Send(&s_buffer.bondbuf()[0], n_bonds, MPI_INT, node, REQ_GHOST_SEND, comm_cart);
+            MPI_Bcast(&s_buffer.bondbuf()[0], n_bonds, MPI_INT, node, comm_cart);
           }
-          break;
-        }
-        case GHOST_BCST:
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm bcast from %d (%d bytes)\n", this_node, node,
-                              (node == this_node) ? sbuffer.size() : r_buffer.size()));
-          if (node == this_node) {
-            MPI_Bcast(s_buffer, s_buffer.size(), MPI_BYTE, node, comm_cart);
-            int n_bonds = s_buffer.bondbuf().size();
-            if (!(data_parts & GHOSTTRANS_PROPRTS) && n_bonds > 0) {
-              fprintf(stderr, "%d: INTERNAL ERROR: not sending properties, but bond buffer not empty\n", this_node);
-              errexit();
-            }
+        } else {
+          MPI_Bcast(r_buffer, r_buffer.size(), MPI_BYTE, node, comm_cart);
+          if (data_parts & GHOSTTRANS_PROPRTS) {
+            int n_bonds = *(int *)((char *)r_buffer + r_buffer.size() - sizeof(int));
             if (n_bonds) {
-              MPI_Bcast(&s_buffer.bondbuf()[0], n_bonds, MPI_INT, node, comm_cart);
+              r_buffer.bondbuf().resize(n_bonds);
+              MPI_Bcast(&r_buffer.bondbuf()[0], n_bonds, MPI_INT, node, comm_cart);
             }
           }
-          else {
-            MPI_Bcast(r_buffer, r_buffer.size(), MPI_BYTE, node, comm_cart);
-            if (data_parts & GHOSTTRANS_PROPRTS) {
-              int n_bonds = *(int *)((char *)r_buffer + r_buffer.size() - sizeof(int));
-              if (n_bonds) {
-                r_buffer.bondbuf().resize(n_bonds);
-                MPI_Bcast(&r_buffer.bondbuf()[0], n_bonds, MPI_INT, node, comm_cart);
-              }
-            }
-          }
-          break;
-        case GHOST_RDCE: {
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm reduce to %d (%d bytes)\n",
-                              this_node, node, n_s_buffer));
+        }
+        break;
+      case GHOST_RDCE: {
+        GHOST_TRACE(fprintf(stderr, "%d: ghost_comm reduce to %d (%d bytes)\n",
+                            this_node, node, n_s_buffer));
 
-          if (node == this_node)
-            MPI_Reduce(reinterpret_cast<double *>(static_cast<char *>(s_buffer)),
-                      reinterpret_cast<double *>(static_cast<char *>(r_buffer)),
-                      s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
-                      comm_cart);
-          else
-            MPI_Reduce(reinterpret_cast<double *>(static_cast<char *>(s_buffer)), nullptr,
-                      s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
-                      comm_cart);
-          } break;
+        if (node == this_node)
+          MPI_Reduce(reinterpret_cast<double *>((char *) s_buffer),
+                     reinterpret_cast<double *>((char *) r_buffer),
+                     s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
+                     comm_cart);
+        else
+          MPI_Reduce(reinterpret_cast<double *>((char *) s_buffer), nullptr,
+                     s_buffer.size() / sizeof(double), MPI_DOUBLE, MPI_SUM, node,
+                     comm_cart);
+      } break;
       }
       GHOST_TRACE(fprintf(stderr, "%d: ghost_comm done\n", this_node));
 
-      /* recv op; write back data directly, if no PSTSTORE delay is requested. */
+      /* recv op; write back data directly, if no PSTSTORE delay is requested.
+       */
       if (is_recv_op(comm_type, node)) {
         if (!poststore) {
-          /* forces have to be added, the rest overwritten. Exception is RDCE, where the addition
-             is integrated into the communication. */
+          /* forces have to be added, the rest overwritten. Exception is RDCE,
+             where the addition is integrated into the communication. */
           if (data_parts == GHOSTTRANS_FORCE && comm_type != GHOST_RDCE)
             add_forces_from_recv_buffer(r_buffer, gcn);
           else
             put_recv_buffer(r_buffer, gcn, data_parts);
+        } else {
+          GHOST_TRACE(fprintf(
+              stderr, "%d: ghost_comm delaying operation %d, recv from %d\n",
+              this_node, n, node));
         }
-        else {
-          GHOST_TRACE(fprintf(stderr, "%d: ghost_comm delaying operation %d, recv from %d\n", this_node, n, node));
-        }
-      }
-      else {
-        /* send op; write back delayed data from last recv, when this was a prefetch send. */
+      } else {
+        /* send op; write back delayed data from last recv, when this was a
+         * prefetch send. */
         if (poststore) {
           /* find previous action where we recv and which has PSTSTORE set */
-          for (n2 = n-1; n2 >= 0; n2--) {
+          for (n2 = n - 1; n2 >= 0; n2--) {
             GhostCommunication *gcn2 = &gc->comm[n2];
             int comm_type2 = gcn2->type & GHOST_JOBMASK;
             int poststore2 = gcn2->type & GHOST_PSTSTORE;
-            int node2      = gcn2->node;
+            int node2 = gcn2->node;
             if (is_recv_op(comm_type2, node2) && poststore2) {
-              GHOST_TRACE(fprintf(stderr, "%d: ghost_comm storing delayed recv, operation %d, from %d\n", this_node, n2, node2));
+              GHOST_TRACE(fprintf(stderr,
+                                  "%d: ghost_comm storing delayed recv, "
+                                  "operation %d, from %d\n",
+                                  this_node, n2, node2));
 #ifdef ADDITIONAL_CHECKS
-              if (r_buffer.size() != calc_transmit_size(gcn2, data_parts)) {
-		fprintf(stderr, "%d: ghost_comm transmission size and current size of cells to transmit do not match\n", this_node);
-		errexit();
-	      }
+              if (n_r_buffer != calc_transmit_size(gcn2, data_parts)) {
+                fprintf(stderr,
+                        "%d: ghost_comm transmission size and current size of "
+                        "cells to transmit do not match\n",
+                        this_node);
+                errexit();
+              }
 #endif
               /* as above */
               if (data_parts == GHOSTTRANS_FORCE && comm_type != GHOST_RDCE)
@@ -743,10 +783,9 @@ void ghost_communicator(GhostCommunicator *gc)
 {
   int data_parts = gc->data_parts;
   /* if ghosts should have uptodate velocities, they have to be updated like
-     positions (except for shifting...) */
+   positions (except for shifting...) */
   if (ghosts_have_v && (data_parts & GHOSTTRANS_POSITION))
     data_parts |= GHOSTTRANS_MOMENTUM;
-
   if (gc->async)
     ghost_communicator_async(gc, data_parts);
   else
@@ -755,22 +794,20 @@ void ghost_communicator(GhostCommunicator *gc)
 
 /** Go through \ref ghost_cells and remove the ghost entries from \ref
     local_particles. Part of \ref dd_exchange_and_sort_particles.*/
-void invalidate_ghosts()
-{
+void invalidate_ghosts() {
   int c, p;
   /* remove ghosts, but keep Real Particles */
-  for(c=0; c<ghost_cells.n; c++) {
+  for (c = 0; c < ghost_cells.n; c++) {
     Particle *part = ghost_cells.cell[c]->part;
     int np = ghost_cells.cell[c]->n;
-    for(p=0 ; p<np; p++) {
+    for (p = 0; p < np; p++) {
       /* Particle is stored as ghost in the local_particles array,
-	 if the pointer stored there belongs to a ghost celll
-	 particle array. */
-      if( &(part[p]) == local_particles[part[p].p.identity] )
+         if the pointer stored there belongs to a ghost cell
+         particle array. */
+      if (&(part[p]) == local_particles[part[p].p.identity])
         local_particles[part[p].p.identity] = nullptr;
-      free_particle(part+p);
+      free_particle(part + p);
     }
     ghost_cells.cell[c]->n = 0;
   }
 }
-

@@ -20,7 +20,8 @@
 */
 #ifndef _GHOSTS_H
 #define _GHOSTS_H
-/** \file ghosts.hpp    Ghost particles and particle exchange.
+/** \file
+ *  Ghost particles and particle exchange.
 
 In this file you find everything concerning the exchange of
 particle data (particles, ghosts, positions and forces) for short
@@ -180,7 +181,6 @@ typedef struct {
      this is the shift vector. Normally this a integer multiple of the box
      length. The shift is done on the sender side */
   double shift[3];
-
 } GhostCommunication;
 
 /** Properties for a ghost communication. A ghost communication is defined */
@@ -215,8 +215,16 @@ void prepare_comm(GhostCommunicator *comm, int data_parts, int num, bool async =
 /** Free a communicator. */
 void free_comm(GhostCommunicator *comm);
 
-/** Do a ghost communication, either synchronous or asynchronous depending on the async flag. */
+/**
+ * @brief do a ghost communication with the data parts specified
+ *        in the communicator.
+ */
 void ghost_communicator(GhostCommunicator *gc);
+
+/**
+ * @brief Do a ghost communication with caller specified data parts.
+ */
+void ghost_communicator(GhostCommunicator *gc, int data_parts);
 
 /** Go through \ref ghost_cells and remove the ghost entries from \ref
     local_particles. Part of \ref dd_exchange_and_sort_particles.*/

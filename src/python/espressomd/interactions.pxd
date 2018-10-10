@@ -47,6 +47,10 @@ cdef extern from "nonbonded_interactions/nonbonded_interaction_data.hpp":
         double LJ_offset
         double LJ_min
 
+        double WCA_eps
+        double WCA_sig
+        double WCA_cut
+
         double LJCOS_eps
         double LJCOS_sig
         double LJCOS_cut
@@ -160,6 +164,10 @@ cdef extern from "nonbonded_interactions/lj.hpp":
                                       double eps, double sig, double cut,
                                       double shift, double offset,
                                       double min)
+
+cdef extern from "nonbonded_interactions/wca.hpp":
+    cdef int wca_set_params(int part_type_a, int part_type_b,
+                            double eps, double sig)
 IF LJCOS:
     cdef extern from "nonbonded_interactions/ljcos.hpp":
         cdef int ljcos_set_params(int part_type_a, int part_type_b,
@@ -298,7 +306,7 @@ ELSE:
 
 IF P3M:
     cdef extern from "bonded_interactions/bonded_interaction_data.hpp":
-        #* Parameters for Bonded coulomb p3m sr */
+        #* Parameters for Bonded Coulomb p3m sr */
         cdef struct Bonded_coulomb_p3m_sr_bond_parameters:
             double q1q2
 ELSE:
@@ -348,7 +356,7 @@ cdef extern from "bonded_interactions/bonded_interaction_data.hpp":
         double gamma_distance
         double r_cut
 
-#* Parameters for Bonded coulomb */
+#* Parameters for Bonded Coulomb */
     cdef struct Bonded_coulomb_bond_parameters:
         double prefactor
 

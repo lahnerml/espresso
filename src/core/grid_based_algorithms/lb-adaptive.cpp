@@ -2541,7 +2541,7 @@ void lbadapt_init_qid_payload(p8est_iter_volume_info_t *info, void *user_data) {
   q->p.user_long = info->quadid + t->quadrants_offset;
 }
 
-void lbadapt_interpolate_pos_adapt(Vector3d &opos,
+void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
                                    std::vector<int> &levels) {
@@ -2737,7 +2737,7 @@ void lbadapt_interpolate_pos_adapt(Vector3d &opos,
   }
 }
 
-void lbadapt_interpolate_pos_ghost(Vector3d &opos,
+void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
                                    std::vector<lbadapt_payload_t *> &payloads,
                                    std::vector<double> &interpol_weights,
                                    std::vector<int> &levels) {

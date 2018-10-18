@@ -105,7 +105,9 @@ void on_program_start() {
   // auto verbosity = SC_LP_VERBOSE;
   sc_init (comm_cart, 1, 1, nullptr, verbosity);
   p4est_init(nullptr, verbosity);
+#ifdef DD_P4EST
   topology_init(CELL_STRUCTURE_P4EST, &local_cells);
+#endif
 #else
   /* initially go for domain decomposition */
   topology_init(CELL_STRUCTURE_DOMDEC, &local_cells);

@@ -186,7 +186,9 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 
 void p4est_utils_init() {
   p4est_utils_prepare({
+#ifdef DD_P4EST
     dd_p4est_get_p4est(),
+#endif
 #ifdef LB_ADAPTIVE
     adapt_p4est,
 #endif
@@ -201,14 +203,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
   p4est_utils_end_pending_communication(exc_status_lb);
 #endif
 
-  std::vector<p4est_t *> forests;
-#ifdef DD_P4EST
-  forests.push_back(dd_p4est_get_p4est());
-#endif // DD_P4EST
-#ifdef LB_ADAPTIVE
-  forests.push_back(adapt_p4est);
-#endif // LB_ADAPTIVE
-  p4est_utils_prepare(forests);
+  p4est_utils_init();
 
   if (partition) {
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
@@ -227,7 +222,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
                  forest_order::short_range : forest_order::adaptive_LB;
       p4est_dd_repart_preprocessing();
       p4est_utils_partition_multiple_forests(ref, mod);
-      p4est_utils_prepare(forests);
+      p4est_utils_init();
 
       // copied from lbmd_repart short-range MD postprocess
       cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
@@ -245,14 +240,14 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     p4est_utils_weighted_partition(dd_p4est_get_p4est(), weights_md, 1.0,
                                    adapt_p4est, weights_lb, 1.0);
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
-    p4est_utils_prepare(forests);
+    p4est_utils_init();
 #elif defined(LB_ADAPTIVE)
     if (p4est_params.partitioning == "n_cells") {
-      p8est_partition_ext(p4est_partitioned, 1,
+      p8est_partition_ext(adapt_p4est, 1,
                           lbadapt_partition_weight_uniform);
     }
     else if (p4est_params.partitioning == "subcycling") {
-      p8est_partition_ext(p4est_partitioned, 1,
+      p8est_partition_ext(adapt_p4est, 1,
                           lbadapt_partition_weight_subcycling);
     }
     else {
@@ -263,7 +258,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     p8est_partition(dd_p4est_get_p4est(), 1, nullptr);
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 #endif // DD_P4EST
-    p4est_utils_prepare(forests);
+    p4est_utils_init();
   }
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;
@@ -1108,7 +1103,7 @@ int p4est_utils_perform_adaptivity_step() {
   // 3rd step: partition grid and transfer data to respective new owner ranks
   //           including all preparations for next time step
 #ifdef DD_P4EST
-  p4est_utils_prepare({dd_p4est_get_p4est(), adapt_p4est});
+  p4est_utils_init();
 
   std::vector<std::string> metrics = {"ncells", p4est_params.partitioning};
   std::vector<double> alpha = {1., 1.};
@@ -1319,7 +1314,7 @@ int p4est_utils_repart_postprocess() {
                                              (void**)ghost_pointer.data());
   }
 #endif // COMM_HIDING
-  p4est_utils_prepare({dd_p4est_get_p4est(), adapt_p4est});
+  p4est_utils_init();
 
   return 0;
 }

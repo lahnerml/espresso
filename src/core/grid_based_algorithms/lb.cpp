@@ -3544,7 +3544,7 @@ void calc_particle_lattice_ia() {
 
       /* ghost cells */
       for (auto &p : ghost_cells.particles()) {
-#ifndef DD_P4EST
+#if !defined(DD_P4EST) && !defined(LB_ADAPTIVE)
         /* for ghost particles we have to check if they lie
          * in the range of the local lattice nodes */
         if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&

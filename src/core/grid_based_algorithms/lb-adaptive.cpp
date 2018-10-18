@@ -24,12 +24,12 @@
  * Adaptive Lattice Boltzmann Scheme using CPU.
  * Implementation file for \ref lb-adaptive.hpp.
  */
+#include "grid_based_algorithms/lb-adaptive.hpp"
 #include "communication.hpp"
 #include "grid_based_algorithms/lb-adaptive-gpu.hpp"
-#include "grid_based_algorithms/lb-adaptive.hpp"
-#include "grid_based_algorithms/lbboundaries.hpp"
 #include "grid_based_algorithms/lb-d3q19.hpp"
 #include "grid_based_algorithms/lb.hpp"
+#include "grid_based_algorithms/lbboundaries.hpp"
 #include "p4est_utils.hpp"
 #include "random.hpp"
 #include "thermostat.hpp"
@@ -144,7 +144,7 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
   }
 
   // 6D array
-  for (double & i : data->lbfields.pi) {
+  for (double &i : data->lbfields.pi) {
     i = 0;
   }
 #endif // LB_ADAPTIVE_GPU
@@ -152,32 +152,29 @@ void init_to_zero(lbadapt_patch_cell_t *data) {
 
 #ifndef LB_ADAPTIVE_GPU
 void lbadapt_set_force(lbadapt_payload_t *data, int level)
-#else // LB_ADAPTIVE_GPU
+#else  // LB_ADAPTIVE_GPU
 void lbadapt_set_force(lbadapt_patch_cell_t *data, int level)
 #endif // LB_ADAPTIVE_GPU
 {
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
 #ifdef LB_ADAPTIVE_GPU
-// unit conversion: force density
-  data->force[0] =
-      prefactors[level] * lbpar.ext_force_density[0] * Utils::sqr(h_max) *
-      Utils::sqr(lbpar.tau);
-  data->force[1] =
-      prefactors[level] * lbpar.ext_force_density[1] * Utils::sqr(h_max) *
-      Utils::sqr(lbpar.tau);
-  data->force[2] =
-      prefactors[level] * lbpar.ext_force_density[2] * Utils::sqr(h_max) *
-      Utils::sqr(lbpar.tau);
+  // unit conversion: force density
+  data->force[0] = prefactors[level] * lbpar.ext_force_density[0] *
+                   Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  data->force[1] = prefactors[level] * lbpar.ext_force_density[1] *
+                   Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  data->force[2] = prefactors[level] * lbpar.ext_force_density[2] *
+                   Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #else  // LB_ADAPTIVE_GPU
-  data->lbfields.force_density[0] =
-      p4est_params.prefactors[level] * lbpar.ext_force_density[0] *
-      Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  data->lbfields.force_density[1] =
-      p4est_params.prefactors[level] * lbpar.ext_force_density[1] *
-      Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
-  data->lbfields.force_density[2] =
-      p4est_params.prefactors[level] * lbpar.ext_force_density[2] *
-      Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  data->lbfields.force_density[0] = p4est_params.prefactors[level] *
+                                    lbpar.ext_force_density[0] *
+                                    Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  data->lbfields.force_density[1] = p4est_params.prefactors[level] *
+                                    lbpar.ext_force_density[1] *
+                                    Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
+  data->lbfields.force_density[2] = p4est_params.prefactors[level] *
+                                    lbpar.ext_force_density[2] *
+                                    Utils::sqr(h_max) * Utils::sqr(lbpar.tau);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -207,13 +204,11 @@ void lbadapt_init() {
       status = p8est_meshiter_next(mesh_iter);
       if (status != P8EST_MESHITER_DONE) {
         if (!mesh_iter->current_is_ghost) {
-          data =
-              &lbadapt_local_data[level].at(
-                  p8est_meshiter_get_current_storage_id(mesh_iter));
+          data = &lbadapt_local_data[level].at(
+              p8est_meshiter_get_current_storage_id(mesh_iter));
         } else {
-          data =
-              &lbadapt_ghost_data[level].at(
-                  p8est_meshiter_get_current_storage_id(mesh_iter));
+          data = &lbadapt_ghost_data[level].at(
+              p8est_meshiter_get_current_storage_id(mesh_iter));
         }
 #ifndef LB_ADAPTIVE_GPU
         data->lbfields.boundary = 0;
@@ -234,33 +229,34 @@ void lbadapt_init() {
 } // lbadapt_init();
 
 void lbadapt_reinit_parameters() {
-  for (int i = p4est_params.max_ref_level;
-       p4est_params.min_ref_level <= i; --i) {
+  for (int i = p4est_params.max_ref_level; p4est_params.min_ref_level <= i;
+       --i) {
     p4est_params.prefactors[i] = 1 << (p4est_params.max_ref_level - i);
 
 #ifdef LB_ADAPTIVE_GPU
     p4est_params.h[i] = ((double)P8EST_QUADRANT_LEN(i) * box_l[0]) /
-        ((double)LBADAPT_PATCHSIZE *
-         (double)P8EST_ROOT_LEN * (double)lb_conn_brick[0]);
+                        ((double)LBADAPT_PATCHSIZE * (double)P8EST_ROOT_LEN *
+                         (double)lb_conn_brick[0]);
 #else  // LB_ADAPTIVE_GPU
     p4est_params.h[i] = ((double)P8EST_QUADRANT_LEN(i) * box_l[0]) /
-        ((double)P8EST_ROOT_LEN * (double)lb_conn_brick[0]);
+                        ((double)P8EST_ROOT_LEN * (double)lb_conn_brick[0]);
 #endif // LB_ADAPTIVE_GPU
 #ifndef USE_BGK
-    if (lbpar.viscosity[0] > 0.0) {
-      gamma_shear[i] =
-          1. -
-          2. / (6. * lbpar.viscosity[0] * prefactors[i] * lbpar.tau /
-          (Utils::sqr(h[i])) + 1.);
+    if (lbpar.viscosity > 0.0) {
+      lbpar.gamma_shear[i] =
+          1. - 2. / (6. * lbpar.viscosity * p4est_params.prefactors[i] *
+                         lbpar.tau / (Utils::sqr(p4est_params.h[i])) +
+                     1.);
     }
-    if (lbpar.bulk_viscosity[0] > 0.0) {
-      gamma_bulk[i] = 1. -
-                      2. / (9. * lbpar.bulk_viscosity[0] * lbpar.tau /
-                                (prefactors[i] * Utils::sqr(h[i])) +
-                            1.);
+    if (lbpar.bulk_viscosity > 0.0) {
+      lbpar.gamma_bulk[i] =
+          1. - 2. / (9. * lbpar.bulk_viscosity * lbpar.tau /
+                         (p4est_params.prefactors[i] *
+                          Utils::sqr(p4est_params.h[i])) +
+                     1.);
     }
 #else
-    lbpar.gamma_shear[i] = 0.0; //uncomment for special case of BGK
+    lbpar.gamma_shear[i] = 0.0; // uncomment for special case of BGK
     lbpar.gamma_bulk[i] = 0.0;
 #endif
   }
@@ -382,12 +378,10 @@ void lbadapt_reinit_fluid_per_cell() {
 #endif // LB_ADAPTIVE_GPU
       }
     }
-    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                             adapt_mesh, adapt_virtual,
-                                             adapt_virtual_ghost, level,
-                                             sizeof(lbadapt_payload_t),
-                                             (void**)local_pointer.data(),
-                                             (void**)ghost_pointer.data());
+    p4est_virtual_ghost_exchange_data_level(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+        adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
 }
 
@@ -756,21 +750,19 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
     if (!LBBoundaries::exclude_in_geom_ref.empty()) {
       auto search_it = std::find(LBBoundaries::exclude_in_geom_ref.begin(),
-                            LBBoundaries::exclude_in_geom_ref.end(), n);
+                                 LBBoundaries::exclude_in_geom_ref.end(), n);
       if (search_it != LBBoundaries::exclude_in_geom_ref.end()) {
         continue;
       }
     }
     (**it).calc_dist(midpoint.data(), &dist_tmp, dist_vec.data());
 
-
     if (dist_tmp < dist) {
       dist = dist_tmp;
     }
   }
 
-  if ((std::abs(dist) <= half_length) &&
-      !LBBoundaries::lbboundaries.empty()) {
+  if ((std::abs(dist) <= half_length) && !LBBoundaries::lbboundaries.empty()) {
     return 1;
   } else {
     return 0;
@@ -784,8 +776,7 @@ int refine_inv_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
 
 /*** HELPER FUNCTIONS ***/
 int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
-                                 lb_float *j,
-                                 const std::array<lb_float, 6> &pi,
+                                 lb_float *j, const std::array<lb_float, 6> &pi,
                                  lb_float local_h) {
   int i;
   lb_float local_rho, local_j[3], local_pi[6], trace;
@@ -833,49 +824,37 @@ int lbadapt_calc_n_from_rho_j_pi(lb_float datafield[2][19], lb_float rho,
   tmp1 = local_pi[0] + local_pi[2];
   tmp2 = 2.0 * local_pi[1];
 
-  datafield[0][7] = rho_times_coeff +
-                    1. / 12. * (local_j[0] + local_j[1]) +
+  datafield[0][7] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[1]) +
                     0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][8] = rho_times_coeff -
-                    1. / 12. * (local_j[0] + local_j[1]) +
+  datafield[0][8] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[1]) +
                     0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][9] = rho_times_coeff +
-                    1. / 12. * (local_j[0] - local_j[1]) +
+  datafield[0][9] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[1]) +
                     0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][10] = rho_times_coeff -
-                     1. / 12. * (local_j[0] - local_j[1]) +
+  datafield[0][10] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[1]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[0] + local_pi[5];
   tmp2 = 2.0 * local_pi[3];
 
-  datafield[0][11] = rho_times_coeff +
-                     1. / 12. * (local_j[0] + local_j[2]) +
+  datafield[0][11] = rho_times_coeff + 1. / 12. * (local_j[0] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][12] = rho_times_coeff -
-                     1. / 12. * (local_j[0] + local_j[2]) +
+  datafield[0][12] = rho_times_coeff - 1. / 12. * (local_j[0] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][13] = rho_times_coeff +
-                     1. / 12. * (local_j[0] - local_j[2]) +
+  datafield[0][13] = rho_times_coeff + 1. / 12. * (local_j[0] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][14] = rho_times_coeff -
-                     1. / 12. * (local_j[0] - local_j[2]) +
+  datafield[0][14] = rho_times_coeff - 1. / 12. * (local_j[0] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 
   tmp1 = local_pi[2] + local_pi[5];
   tmp2 = 2.0 * local_pi[4];
 
-  datafield[0][15] = rho_times_coeff +
-                     1. / 12. * (local_j[1] + local_j[2]) +
+  datafield[0][15] = rho_times_coeff + 1. / 12. * (local_j[1] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][16] = rho_times_coeff -
-                     1. / 12. * (local_j[1] + local_j[2]) +
+  datafield[0][16] = rho_times_coeff - 1. / 12. * (local_j[1] + local_j[2]) +
                      0.125 * (tmp1 + tmp2) - 1. / 24. * trace;
-  datafield[0][17] = rho_times_coeff +
-                     1. / 12. * (local_j[1] - local_j[2]) +
+  datafield[0][17] = rho_times_coeff + 1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
-  datafield[0][18] = rho_times_coeff -
-                     1. / 12. * (local_j[1] - local_j[2]) +
+  datafield[0][18] = rho_times_coeff - 1. / 12. * (local_j[1] - local_j[2]) +
                      0.125 * (tmp1 - tmp2) - 1. / 24. * trace;
 
   return 0;
@@ -937,24 +916,18 @@ int lbadapt_calc_local_fields(lb_float populations[2][19], lb_float force[3],
 
   /* Now we must predict the outcome of the next collision */
   /* We immediately average pre- and post-collision. */
-  cpmode[4] =
-      modes_from_pi_eq[0] +
-      (0.5 + 0.5 * lbpar.gamma_bulk[level]) * (cpmode[4] - modes_from_pi_eq[0]);
-  cpmode[5] =
-      modes_from_pi_eq[1] +
-      (0.5 + 0.5 * lbpar.gamma_shear[level]) * (cpmode[5] - modes_from_pi_eq[1]);
-  cpmode[6] =
-      modes_from_pi_eq[2] +
-      (0.5 + 0.5 * lbpar.gamma_shear[level]) * (cpmode[6] - modes_from_pi_eq[2]);
-  cpmode[7] =
-      modes_from_pi_eq[3] +
-      (0.5 + 0.5 * lbpar.gamma_shear[level]) * (cpmode[7] - modes_from_pi_eq[3]);
-  cpmode[8] =
-      modes_from_pi_eq[4] +
-      (0.5 + 0.5 * lbpar.gamma_shear[level]) * (cpmode[8] - modes_from_pi_eq[4]);
-  cpmode[9] =
-      modes_from_pi_eq[5] +
-      (0.5 + 0.5 * lbpar.gamma_shear[level]) * (cpmode[9] - modes_from_pi_eq[5]);
+  cpmode[4] = modes_from_pi_eq[0] + (0.5 + 0.5 * lbpar.gamma_bulk[level]) *
+                                        (cpmode[4] - modes_from_pi_eq[0]);
+  cpmode[5] = modes_from_pi_eq[1] + (0.5 + 0.5 * lbpar.gamma_shear[level]) *
+                                        (cpmode[5] - modes_from_pi_eq[1]);
+  cpmode[6] = modes_from_pi_eq[2] + (0.5 + 0.5 * lbpar.gamma_shear[level]) *
+                                        (cpmode[6] - modes_from_pi_eq[2]);
+  cpmode[7] = modes_from_pi_eq[3] + (0.5 + 0.5 * lbpar.gamma_shear[level]) *
+                                        (cpmode[7] - modes_from_pi_eq[3]);
+  cpmode[8] = modes_from_pi_eq[4] + (0.5 + 0.5 * lbpar.gamma_shear[level]) *
+                                        (cpmode[8] - modes_from_pi_eq[4]);
+  cpmode[9] = modes_from_pi_eq[5] + (0.5 + 0.5 * lbpar.gamma_shear[level]) *
+                                        (cpmode[9] - modes_from_pi_eq[5]);
 
   // Transform the stress tensor components according to the modes that
   // correspond to those used by U. Schiller. In terms of populations this
@@ -1046,16 +1019,9 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
    * equilibrium value */
   rho = mode[0] + lbpar.rho * h_max * h_max * h_max;
 
-  j[0] = mode[1];
-  j[1] = mode[2];
-  j[2] = mode[3];
-
-  /* if forces are present, the momentum density is redefined to
-   * include one half-step of the force action.  See the
-   * Chapman-Enskog expansion in [Ladd & Verberg]. */
-  j[0] += 0.5 * force[0];
-  j[1] += 0.5 * force[1];
-  j[2] += 0.5 * force[2];
+  j[0] = mode[1] + 0.5 * force[0];
+  j[1] = mode[2] + 0.5 * force[1];
+  j[2] = mode[3] + 0.5 * force[2];
 
   /* equilibrium part of the stress modes */
   pi_eq[0] = scalar(j, j) / rho;
@@ -1087,7 +1053,7 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
   mode[16] = lbpar.gamma_even * mode[16];
   mode[17] = lbpar.gamma_even * mode[17];
   mode[18] = lbpar.gamma_even * mode[18];
-// clang-format on
+  // clang-format on
 
 #endif // LB_ADAPTIVE_GPU
 
@@ -1096,8 +1062,8 @@ int lbadapt_relax_modes(lb_float *mode, lb_float *force, lb_float local_h) {
 
 int lbadapt_thermalize_modes(lb_float *mode) {
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
-  const double rootrho = std::sqrt(
-      std::fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
+  const double rootrho =
+      std::sqrt(std::fabs(mode[0] + lbpar.rho * h_max * h_max * h_max));
 
 #ifdef GAUSSRANDOM
   constexpr double variance = 1. / 12.;
@@ -1108,7 +1074,7 @@ int lbadapt_thermalize_modes(lb_float *mode) {
 #elif defined(FLATNOISE)
   constexpr double variance = 1. / 12.0;
   auto rng = []() -> double { return d_random() - 0.5; };
-#else  // GAUSSRANDOM
+#else // GAUSSRANDOM
 #error No noise type defined for the CPU LB
 #endif // GAUSSRANDOM
 
@@ -1156,14 +1122,14 @@ int lbadapt_apply_forces(lb_float *mode, lb_float *f, lb_float local_h) {
   u[2] = (mode[3] + 0.5 * f[2]) / rho;
 
   C[0] = (1. + lbpar.gamma_bulk[level]) * u[0] * f[0] +
-         1. / 3. * (lbpar.gamma_bulk[level] -
-                    lbpar.gamma_shear[level]) * scalar(u, f);
+         1. / 3. * (lbpar.gamma_bulk[level] - lbpar.gamma_shear[level]) *
+             scalar(u, f);
   C[2] = (1. + lbpar.gamma_bulk[level]) * u[1] * f[1] +
-         1. / 3. * (lbpar.gamma_bulk[level] -
-                    lbpar.gamma_shear[level]) * scalar(u, f);
+         1. / 3. * (lbpar.gamma_bulk[level] - lbpar.gamma_shear[level]) *
+             scalar(u, f);
   C[5] = (1. + lbpar.gamma_bulk[level]) * u[2] * f[2] +
-         1. / 3. * (lbpar.gamma_bulk[level] -
-                    lbpar.gamma_shear[level]) * scalar(u, f);
+         1. / 3. * (lbpar.gamma_bulk[level] - lbpar.gamma_shear[level]) *
+             scalar(u, f);
   C[1] = 0.5 * (1. + lbpar.gamma_shear[level]) * (u[0] * f[1] + u[1] * f[0]);
   C[3] = 0.5 * (1. + lbpar.gamma_shear[level]) * (u[0] * f[2] + u[2] * f[0]);
   C[4] = 0.5 * (1. + lbpar.gamma_shear[level]) * (u[1] * f[2] + u[2] * f[1]);
@@ -1279,7 +1245,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
     // stream if we found a neighbor.
     // however, do not stream between two real quadrants that both hold virtual
     // children
-  #if 0
+#if 0
     if (mesh_iter->neighbor_qid != -1
         && ((-1 != mesh_iter->current_vid)
             || (-1 != mesh_iter->neighbor_vid)
@@ -1290,7 +1256,7 @@ void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
             || (mesh_iter->neighbor_is_ghost
                 && -1 ==
                    adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
-#else // 0
+#else  // 0
     if (mesh_iter->neighbor_qid != -1)
 #endif // 0
     {
@@ -1358,12 +1324,14 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide) {
         data = &lbadapt_ghost_data[level].at(
             p8est_meshiter_get_current_storage_id(mesh_iter));
         has_virtuals =
-            (-1 != mesh_iter->virtual_quads->virtual_gflags[mesh_iter->current_qid]);
+            (-1 !=
+             mesh_iter->virtual_quads->virtual_gflags[mesh_iter->current_qid]);
       } else {
         data = &lbadapt_local_data[level].at(
             p8est_meshiter_get_current_storage_id(mesh_iter));
         has_virtuals =
-            (-1 != mesh_iter->virtual_quads->virtual_qflags[mesh_iter->current_qid]);
+            (-1 !=
+             mesh_iter->virtual_quads->virtual_qflags[mesh_iter->current_qid]);
       }
 #ifdef LB_BOUNDARIES
       if (!data->lbfields.boundary)
@@ -1527,7 +1495,7 @@ void lbadapt_bounce_back(int level) {
                 || (mesh_iter->neighbor_is_ghost
                     && -1 ==
                        adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
-#else // 0
+#else  // 0
         if (mesh_iter->neighbor_qid != -1)
 #endif // 0
         {
@@ -1562,20 +1530,22 @@ void lbadapt_bounce_back(int level) {
               // calculate population shift (velocity boundary condition)
               population_shift = 0.;
               for (int l = 0; l < 3; ++l) {
-                population_shift -=
-                    h_max * h_max * h_max * lbpar.rho * 2 *
-                    lbmodel.c[dir_ESPR][l] * lbmodel.w[dir_ESPR] *
-                        (*LBBoundaries::lbboundaries
-                         [currCellData->lbfields.boundary - 1]).velocity()[l] *
-                    (lbpar.tau / h_max) / lbmodel.c_sound_sq;
+                population_shift -= h_max * h_max * h_max * lbpar.rho * 2 *
+                                    lbmodel.c[dir_ESPR][l] *
+                                    lbmodel.w[dir_ESPR] *
+                                    (*LBBoundaries::lbboundaries
+                                         [currCellData->lbfields.boundary - 1])
+                                        .velocity()[l] *
+                                    (lbpar.tau / h_max) / lbmodel.c_sound_sq;
               }
 
               // sum up the force that the fluid applies on the boundary
               for (int l = 0; l < 3; ++l) {
-                (*LBBoundaries::lbboundaries
-                    [currCellData->lbfields.boundary - 1]).force()[l] +=
-                        (2 * currCellData->lbfluid[1][dir_ESPR] +
-                         population_shift) * lbmodel.c[dir_ESPR][l];
+                (*LBBoundaries::lbboundaries[currCellData->lbfields.boundary -
+                                             1])
+                    .force()[l] += (2 * currCellData->lbfluid[1][dir_ESPR] +
+                                    population_shift) *
+                                   lbmodel.c[dir_ESPR][l];
               }
 
               // add if we bounce back from a cell without virtual quadrants
@@ -1597,8 +1567,8 @@ void lbadapt_bounce_back(int level) {
                 population_shift -=
                     h_max * h_max * h_max * lbpar.rho * 2 *
                     lbmodel.c[inv[dir_ESPR]][l] * lbmodel.w[inv[dir_ESPR]] *
-                        (*LBBoundaries::lbboundaries
-                        [data->lbfields.boundary - 1]).velocity()[l] *
+                    (*LBBoundaries::lbboundaries[data->lbfields.boundary - 1])
+                        .velocity()[l] *
                     (lbpar.tau / h_max) / lbmodel.c_sound_sq;
               }
 
@@ -1615,9 +1585,8 @@ void lbadapt_bounce_back(int level) {
 #endif // LB_ADAPTIVE_GPU
 }
 
-void lbadapt_update_populations_from_virtuals(int level,
-                                              p8est_meshiter_localghost_t
-                                              quads_to_update) {
+void lbadapt_update_populations_from_virtuals(
+    int level, p8est_meshiter_localghost_t quads_to_update) {
 #ifndef LB_ADAPTIVE_GPU
   int status = 0;
   int parent_sid;
@@ -1649,7 +1618,8 @@ void lbadapt_update_populations_from_virtuals(int level,
       }
       if (!data->lbfields.boundary) {
         if (!mesh_iter->current_vid) {
-          std::fill_n(std::begin(parent_data->lbfluid[1]), LB_Model<>::n_veloc, 0);
+          std::fill_n(std::begin(parent_data->lbfluid[1]), LB_Model<>::n_veloc,
+                      0);
         }
         for (vel = 0; vel < LB_Model<>::n_veloc; ++vel) {
           // child velocities have already been swapped here
@@ -1864,10 +1834,10 @@ void lbadapt_get_velocity_values(sc_array_t *velocity_values) {
         double j[3];
 
 #ifndef LB_ADAPTIVE_GPU
-        lbadapt_calc_local_fields(
-            data->lbfluid, data->lbfields.force_density,
-            data->lbfields.boundary, data->lbfields.has_force_density,
-            p4est_params.h[level], &rho, j, nullptr);
+        lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
+                                  data->lbfields.boundary,
+                                  data->lbfields.has_force_density,
+                                  p4est_params.h[level], &rho, j, nullptr);
 
         j[0] = j[0] / rho * h_max / lbpar.tau;
         j[1] = j[1] / rho * h_max / lbpar.tau;
@@ -1928,15 +1898,15 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
   bool smaller, larger;
 
   // neighbor search directions
-  static const int n_idx[8][7] =
-      {{0, 2, 14, 4, 10, 6, 18},  // left, front, bottom
-       {1, 2, 15, 4, 11, 6, 19},  // right, front, bottom
-       {0, 3, 16, 4, 10, 7, 20},  // left, back, bottom
-       {1, 3, 17, 4, 11, 7, 21},  // right, back, bottom
-       {0, 2, 14, 5, 12, 8, 22},  // left, front, top
-       {1, 2, 15, 5, 13, 8, 23},  // right, front, top
-       {0, 3, 16, 5, 12, 9, 24},  // left, back, top
-       {1, 3, 17, 5, 13, 9, 25}}; // right, back, top
+  static const int n_idx[8][7] = {
+      {0, 2, 14, 4, 10, 6, 18},  // left, front, bottom
+      {1, 2, 15, 4, 11, 6, 19},  // right, front, bottom
+      {0, 3, 16, 4, 10, 7, 20},  // left, back, bottom
+      {1, 3, 17, 4, 11, 7, 21},  // right, back, bottom
+      {0, 2, 14, 5, 12, 8, 22},  // left, front, top
+      {1, 2, 15, 5, 13, 8, 23},  // right, front, top
+      {0, 3, 16, 5, 12, 9, 24},  // left, back, top
+      {1, 3, 17, 5, 13, 9, 25}}; // right, back, top
 
   lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
 
@@ -1944,7 +1914,7 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
        ++level) {
     // local mesh width
     lb_float h =
-        (lb_float) P8EST_QUADRANT_LEN(level) / ((lb_float) P8EST_ROOT_LEN);
+        (lb_float)P8EST_QUADRANT_LEN(level) / ((lb_float)P8EST_ROOT_LEN);
 
     m.reset(p4est_meshiter_new_ext(adapt_p4est, adapt_ghost, adapt_mesh,
                                    adapt_virtual, level, adapt_ghost->btype,
@@ -1983,16 +1953,15 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
                                          adapt_virtual, m->current_qid, c,
                                          n_idx[c][idx], &m->neighbor_encs,
                                          &m->neighbor_qids, &m->neighbor_vids);
-              P4EST_ASSERT (0 == m->neighbor_qids.elem_count
-                            || 1 == m->neighbor_qids.elem_count);
+              P4EST_ASSERT(0 == m->neighbor_qids.elem_count ||
+                           1 == m->neighbor_qids.elem_count);
               for (size_t i = 0; i < m->neighbor_qids.elem_count; ++i) {
                 smaller = true;
-                m->neighbor_qid = *(int *) sc_array_index(&m->neighbor_qids, i);
+                m->neighbor_qid = *(int *)sc_array_index(&m->neighbor_qids, i);
                 if (adapt_p4est->local_num_quadrants <= m->neighbor_qid) {
                   m->neighbor_qid -= adapt_p4est->local_num_quadrants;
                   m->neighbor_is_ghost = 1;
-                }
-                else {
+                } else {
                   m->neighbor_is_ghost = 0;
                 }
                 m->neighbor_vid = -1;
@@ -2025,10 +1994,10 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
             } else {
               assert(false);
             }
-            lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
-                                      data->lbfields.boundary,
-                                      data->lbfields.has_force_density, h, &rho,
-                                      &vels[P4EST_DIM * (idx + 1)], nullptr);
+            lbadapt_calc_local_fields(
+                data->lbfluid, data->lbfields.force_density,
+                data->lbfields.boundary, data->lbfields.has_force_density, h,
+                &rho, &vels[P4EST_DIM * (idx + 1)], nullptr);
 
             if (!data->lbfields.boundary) {
               vels[P4EST_DIM * (idx + 1) + 0] =
@@ -2038,33 +2007,26 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
               vels[P4EST_DIM * (idx + 1) + 2] =
                   vels[P4EST_DIM * (idx + 1) + 2] / rho * h_max / lbpar.tau;
             }
-
           }
           // perform trilinear interpolation ignoring the interpolation error
           // introduced by non-regular grid
           // x - direction
           for (int i = 0; i < P4EST_HALF; ++i) {
-            vels[i * P4EST_DIM + 0] =
-                0.5 * (vels[2 * i * P4EST_DIM + 0] +
-                       vels[(2 * i + 1) * P4EST_DIM + 0]);
-            vels[i * P4EST_DIM + 1] =
-                0.5 * (vels[2 * i * P4EST_DIM + 1] +
-                       vels[(2 * i + 1) * P4EST_DIM + 1]);
-            vels[i * P4EST_DIM + 2] =
-                0.5 * (vels[2 * i * P4EST_DIM + 2] +
-                       vels[(2 * i + 1) * P4EST_DIM + 2]);
+            vels[i * P4EST_DIM + 0] = 0.5 * (vels[2 * i * P4EST_DIM + 0] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 0]);
+            vels[i * P4EST_DIM + 1] = 0.5 * (vels[2 * i * P4EST_DIM + 1] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 1]);
+            vels[i * P4EST_DIM + 2] = 0.5 * (vels[2 * i * P4EST_DIM + 2] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 2]);
           }
           // y - direction
           for (int i = 0; i < 2; ++i) {
-            vels[i * P4EST_DIM + 0] =
-                0.5 * (vels[2 * i * P4EST_DIM + 0] +
-                       vels[(2 * i + 1) * P4EST_DIM + 0]);
-            vels[i * P4EST_DIM + 1] =
-                0.5 * (vels[2 * i * P4EST_DIM + 1] +
-                       vels[(2 * i + 1) * P4EST_DIM + 1]);
-            vels[i * P4EST_DIM + 2] =
-                0.5 * (vels[2 * i * P4EST_DIM + 2] +
-                       vels[(2 * i + 1) * P4EST_DIM + 2]);
+            vels[i * P4EST_DIM + 0] = 0.5 * (vels[2 * i * P4EST_DIM + 0] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 0]);
+            vels[i * P4EST_DIM + 1] = 0.5 * (vels[2 * i * P4EST_DIM + 1] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 1]);
+            vels[i * P4EST_DIM + 2] = 0.5 * (vels[2 * i * P4EST_DIM + 2] +
+                                             vels[(2 * i + 1) * P4EST_DIM + 2]);
           }
           // z - direction
           vels[0] = 0.5 * (vels[0] + vels[P4EST_DIM + 0]);
@@ -2072,10 +2034,9 @@ void lbadapt_get_velocity_values_nodes(sc_array_t *velocity_values) {
           vels[2] = 0.5 * (vels[2] + vels[P4EST_DIM + 2]);
 
           // write velocity to result array
-          veloc_ptr =
-              (double *) sc_array_index(velocity_values,
-                                        (P4EST_CHILDREN * P4EST_DIM *
-                                         m->current_qid) + (P4EST_DIM * c));
+          veloc_ptr = (double *)sc_array_index(
+              velocity_values,
+              (P4EST_CHILDREN * P4EST_DIM * m->current_qid) + (P4EST_DIM * c));
           std::memcpy(veloc_ptr, vels, P8EST_DIM * sizeof(double));
         }
       }
@@ -2098,22 +2059,22 @@ void check_vel(int qid, double local_h, lbadapt_payload_t *data,
                                          std::numeric_limits<double>::min()}}) {
     lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
                               data->lbfields.boundary,
-                              data->lbfields.has_force_density,
-                              local_h, &rho, vel[qid].data(), nullptr);
+                              data->lbfields.has_force_density, local_h, &rho,
+                              vel[qid].data(), nullptr);
 
     lb_float h_max = p4est_params.h[p4est_params.max_ref_level];
     vel[qid][0] = vel[qid][0] / rho * h_max / lbpar.tau;
     vel[qid][1] = vel[qid][1] / rho * h_max / lbpar.tau;
     vel[qid][2] = vel[qid][2] / rho * h_max / lbpar.tau;
   }
-#endif //!LB_ADAPTIVE_GPU
+#endif //! LB_ADAPTIVE_GPU
 }
 
 void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
 #ifndef LB_ADAPTIVE_GPU
   // FIXME port to GPU
   P4EST_ASSERT(vort_values->elem_count ==
-               (size_t) P4EST_DIM * adapt_p4est->local_num_quadrants);
+               (size_t)P4EST_DIM * adapt_p4est->local_num_quadrants);
 
   // use dynamic programming to calculate fluid velocities
   std::vector<std::array<double, 3>> fluid_vel(
@@ -2137,10 +2098,10 @@ void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
   double vort[3];
 
   for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-      quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
-      c_level = quad->level;
-      currCellData = &lbadapt_local_data[c_level].at(
-          adapt_virtual->quad_qreal_offset[qid]);
+    quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
+    c_level = quad->level;
+    currCellData =
+        &lbadapt_local_data[c_level].at(adapt_virtual->quad_qreal_offset[qid]);
     c_h = (double)P8EST_QUADRANT_LEN(c_level) / (double)P8EST_ROOT_LEN;
     check_vel(qid, c_h, currCellData, fluid_vel);
 
@@ -2183,24 +2144,24 @@ void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
     if (!currCellData->lbfields.boundary) {
       for (size_t i = 0; i < n_qids[0].size(); ++i) {
         vort[0] += ((1. / n_qids[0].size()) *
-                         (((fluid_vel[n_qids[0][i]][2] - fluid_vel[qid][2]) /
-                           mesh_width[1]) -
-                          ((fluid_vel[n_qids[0][i]][1] - fluid_vel[qid][1]) /
-                           mesh_width[2])));
+                    (((fluid_vel[n_qids[0][i]][2] - fluid_vel[qid][2]) /
+                      mesh_width[1]) -
+                     ((fluid_vel[n_qids[0][i]][1] - fluid_vel[qid][1]) /
+                      mesh_width[2])));
       }
       for (size_t i = 0; i < n_qids[1].size(); ++i) {
         vort[1] += ((1. / n_qids[1].size()) *
-                         (((fluid_vel[n_qids[1][i]][0] - fluid_vel[qid][0]) /
-                           mesh_width[2]) -
-                          ((fluid_vel[n_qids[1][i]][2] - fluid_vel[qid][2]) /
-                           mesh_width[0])));
+                    (((fluid_vel[n_qids[1][i]][0] - fluid_vel[qid][0]) /
+                      mesh_width[2]) -
+                     ((fluid_vel[n_qids[1][i]][2] - fluid_vel[qid][2]) /
+                      mesh_width[0])));
       }
       for (size_t i = 0; i < n_qids[2].size(); ++i) {
         vort[2] += ((1. / n_qids[2].size()) *
-                         (((fluid_vel[n_qids[2][i]][1] - fluid_vel[qid][1]) /
-                           mesh_width[0]) -
-                          ((fluid_vel[n_qids[2][i]][0] - fluid_vel[qid][0]) /
-                           mesh_width[1])));
+                    (((fluid_vel[n_qids[2][i]][1] - fluid_vel[qid][1]) /
+                      mesh_width[0]) -
+                     ((fluid_vel[n_qids[2][i]][0] - fluid_vel[qid][0]) /
+                      mesh_width[1])));
       }
     }
     // clear neighbor lists and copy result into array
@@ -2208,7 +2169,7 @@ void lbadapt_get_vorticity_values(sc_array_t *vort_values) {
     n_qids[1].clear();
     n_qids[2].clear();
 
-    ins = (double *) sc_array_index(vort_values, 3 * qid);
+    ins = (double *)sc_array_index(vort_values, 3 * qid);
     std::memcpy(ins, vort, 3 * sizeof(double));
   }
 #endif // LB_ADAPTIVE_GPU
@@ -2259,7 +2220,7 @@ void lbadapt_get_boundary_status() {
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU
-        p4est_utils_get_front_lower_left(mesh_iter, (double*) xyz_quad);
+        p4est_utils_get_front_lower_left(mesh_iter, (double *)xyz_quad);
         for (int i = 0; i < 3; ++i) {
           xyz_quad[i] *= box_l[i] / lb_conn_brick[i];
         }
@@ -2287,12 +2248,10 @@ void lbadapt_get_boundary_status() {
       }
     }
 
-    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                             adapt_mesh, adapt_virtual,
-                                             adapt_virtual_ghost, level,
-                                             sizeof(lbadapt_payload_t),
-                                             (void**)local_pointer.data(),
-                                             (void**)ghost_pointer.data());
+    p4est_virtual_ghost_exchange_data_level(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+        adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
 }
 
@@ -2394,13 +2353,13 @@ void calc_local_j(lb_float populations[2][19], std::array<lb_float, 3> &res) {
 void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
                                  void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  auto *momentum= (double*) user_data;
+  auto *momentum = (double *)user_data;
 
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data;
-  data = &lbadapt_local_data[q->level].at(
-      adapt_virtual->quad_qreal_offset[qid]);
+  data =
+      &lbadapt_local_data[q->level].at(adapt_virtual->quad_qreal_offset[qid]);
 
   std::array<lb_float, 3> j{};
   calc_local_j(data->lbfluid, j);
@@ -2411,27 +2370,25 @@ void lbadapt_calc_fluid_momentum(p8est_iter_volume_info_t *info,
 
 void lbadapt_calc_local_temp(p8est_iter_volume_info_t *info, void *user_data) {
 #ifndef LB_ADAPTIVE_GPU
-  auto *ti = (temp_iter_t*) user_data;
+  auto *ti = (temp_iter_t *)user_data;
 
   p8est_quadrant_t *q = info->quad;
   p4est_locidx_t qid = info->quadid;
   lbadapt_payload_t *data;
-  data = &lbadapt_local_data[q->level].at(
-      adapt_virtual->quad_qreal_offset[qid]);
+  data =
+      &lbadapt_local_data[q->level].at(adapt_virtual->quad_qreal_offset[qid]);
   std::array<lb_float, 3> j{};
 
   if (data->lbfields.boundary) {
     j = {{0., 0., 0.}};
     ++ti->n_non_boundary_nodes;
-  }
-  else {
+  } else {
     calc_local_j(data->lbfluid, j);
   }
   ti->temp += scalar(j.data(), j.data());
 
 #endif // LB_ADAPTIVE_GPU
 }
-
 
 void lbadapt_dump2file_synced(std::string &filename) {
 #ifndef LB_ADAPTIVE_GPU
@@ -2499,7 +2456,7 @@ void lbadapt_dump2file_synced(std::string &filename) {
     }
   }
   // make sure that we have inspected all local quadrants.
-  P4EST_ASSERT (nqid == adapt_p4est->local_num_quadrants);
+  P4EST_ASSERT(nqid == adapt_p4est->local_num_quadrants);
 #endif // LB_ADAPTIVE_GPU
 }
 
@@ -2547,8 +2504,8 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
   P4EST_ASSERT(payloads.empty() && interpol_weights.empty() && levels.empty());
 
   const auto &forest = p4est_utils_get_forest_info(forest_order::adaptive_LB);
-  int nearest_corner = 0;  // This value determines first index of
-                           // neighbor_directions and weight_indices.
+  int nearest_corner = 0; // This value determines first index of
+                          // neighbor_directions and weight_indices.
   uint64_t quad_index;
   // Order neighbor_directions as follows:
   // face neighbor x, face neighbor y, edge neighbor xy plane,
@@ -2556,7 +2513,7 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
   // corner neighbor.
   // The reason why this order is chosen is that we can now XOR the
   // nearest_corner index to determine the weight indices.
-  const std::array< std::array<int, 7>, 8> neighbor_directions = {{
+  const std::array<std::array<int, 7>, 8> neighbor_directions = {{
       {{0, 2, 14, 4, 10, 6, 18}}, // left, front, bottom
       {{1, 2, 15, 4, 11, 6, 19}}, // right, front, bottom
       {{0, 3, 16, 4, 10, 7, 20}}, // left, back, bottom
@@ -2567,13 +2524,21 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
       {{1, 3, 17, 5, 13, 9, 25}}, // right, back, top
   }};
 
-  std::array<double, 6> interpolation_weights{};  // Stores normed distance from pos to center
-                                    // of cell containing pos in both directions.
-                                    // order: lower x, lower y, lower z,
-                                    //        upper x, upper y, upper z
-  const std::array< std::array<int, 3>, 8> weight_indices = {{ // indexes into interpolation_weights
-    {{0, 1, 2}}, {{3, 1, 2}}, {{0, 4, 2}}, {{3, 4, 2}},
-    {{0, 1, 5}}, {{3, 1, 5}}, {{0, 4, 5}}, {{3, 4, 5}},
+  std::array<double, 6>
+      interpolation_weights{}; // Stores normed distance from pos to center
+                               // of cell containing pos in both directions.
+                               // order: lower x, lower y, lower z,
+                               //        upper x, upper y, upper z
+  const std::array<std::array<int, 3>, 8> weight_indices = {{
+      // indexes into interpolation_weights
+      {{0, 1, 2}},
+      {{3, 1, 2}},
+      {{0, 4, 2}},
+      {{3, 4, 2}},
+      {{0, 1, 5}},
+      {{3, 1, 5}},
+      {{0, 4, 5}},
+      {{3, 4, 5}},
   }};
 
   std::array<int, 3> fold = {{0, 0, 0}};
@@ -2583,7 +2548,8 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos.data());
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
     lbadapt_interpolate_pos_ghost(opos, payloads, interpol_weights, levels);
-    if (!payloads.empty()) return;
+    if (!payloads.empty())
+      return;
 
     std::stringstream err_msg;
     err_msg << "At sim time " << sim_time << " (lbsteps: " << n_lbsteps << ")"
@@ -2599,11 +2565,9 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
     err_msg << std::endl;
 #ifdef DD_P4EST
     err_msg << "belongs to MD process "
-            << cell_structure.position_to_node(pos.data())
-            << " ("
+            << cell_structure.position_to_node(pos.data()) << " ("
             << p4est_utils_pos_to_proc(forest_order::short_range, pos.data())
-            << " in forestinfo)"
-            << std::endl;
+            << " in forestinfo)" << std::endl;
 #endif
     err_msg << std::endl;
     fprintf(stderr, "%s", err_msg.str().c_str());
@@ -2628,7 +2592,7 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
                            quad_pos.data());
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
-    P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
+    P4EST_ASSERT(-0.5 <= dis && dis <= 0.5);
     if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
@@ -2656,14 +2620,14 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
     // if neighbor is smaller we will not obtain any neighbors from virtual
     // neighbor query
     if (!nqid->elem_count) {
-      p8est_mesh_get_neighbors(
-          adapt_p4est, adapt_ghost, adapt_mesh, qidx,
-          neighbor_directions[nearest_corner][i], nullptr, nullptr, nqid);
+      p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qidx,
+                               neighbor_directions[nearest_corner][i], nullptr,
+                               nullptr, nqid);
     }
     for (size_t n = 0; n < nqid->elem_count; ++n) {
       idx = *((int *)sc_array_index_int(nqid, n));
 
-      if (0 <= idx && idx < lq) {                 // local quadrant
+      if (0 <= idx && idx < lq) { // local quadrant
         coupling_quads[idx] = true;
         q = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, idx);
         tree = adapt_mesh->quad_to_tree[idx];
@@ -2681,8 +2645,7 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
         SC_ABORT_NOT_REACHED();
       }
 
-      p4est_utils_get_midpoint(adapt_p4est, tree, q,
-                               neighbor_quad_pos.data());
+      p4est_utils_get_midpoint(adapt_p4est, tree, q, neighbor_quad_pos.data());
       std::array<double, 6> check_weights{};
       P4EST_ASSERT(p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                                   neighbor_quad_pos, q->level));
@@ -2701,17 +2664,16 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][0]] *
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][1]] *
           interpolation_weights[weight_indices[nearest_corner ^ (i + 1)][2]] /
-              (double)(nqid->elem_count));
+          (double)(nqid->elem_count));
       levels.push_back(lvl);
-
     }
     sc_array_truncate(nenc);
     sc_array_truncate(nqid);
     sc_array_truncate(nvid);
   }
 
-  double dsum = std::accumulate(interpol_weights.begin(),
-                                interpol_weights.end(), 0.0);
+  double dsum =
+      std::accumulate(interpol_weights.begin(), interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
     std::stringstream err_msg;
     err_msg << "[local interpol.] Sum of interpol. weights deviates from 1 by"
@@ -2720,12 +2682,10 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
       err_msg << w << " ";
     }
     err_msg << std::endl;
-    err_msg << "Rank " << this_node 
-            << " position " << pos[0] << ", " << pos[1] << ", " << pos[2]
-            << " pos index" 
+    err_msg << "Rank " << this_node << " position " << pos[0] << ", " << pos[1]
+            << ", " << pos[2] << " pos index"
             << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())
-            << "LB process boundary indices:"
-            << std::endl;
+            << "LB process boundary indices:" << std::endl;
     for (int i = 0; i <= n_nodes; ++i) {
       err_msg << forest.p4est_space_idx[i] << " ";
     }
@@ -2746,13 +2706,20 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
   uint64_t quad_index;
   std::vector<p4est_locidx_t> quads_to_mark = {};
 
-  std::array<double, 6> interpolation_weights{};  // Stores normed distance from pos to center
+  std::array<double, 6>
+      interpolation_weights{}; // Stores normed distance from pos to center
   // of cell containing pos in both directions.
   // order: lower x, lower y, lower z,
   //        upper x, upper y, upper z
-  const std::array< std::array<int, 3>, 8> weight_indices = {{
-      {{0, 1, 2}}, {{3, 1, 2}}, {{0, 4, 2}}, {{3, 4, 2}},
-      {{0, 1, 5}}, {{3, 1, 5}}, {{0, 4, 5}}, {{3, 4, 5}},
+  const std::array<std::array<int, 3>, 8> weight_indices = {{
+      {{0, 1, 2}},
+      {{3, 1, 2}},
+      {{0, 4, 2}},
+      {{3, 4, 2}},
+      {{0, 1, 5}},
+      {{3, 1, 5}},
+      {{0, 4, 5}},
+      {{3, 4, 5}},
   }};
 
   // Fold position.
@@ -2764,26 +2731,26 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
   // Begin by search in ghost layer.  If there is no quadrant containing the
   // given position search mirror quadrants.
   bool found_in_ghost = true;
-  uint64_t pos_idx = p4est_utils_pos_to_index(forest_order::adaptive_LB,
-                                              pos.data());
+  uint64_t pos_idx =
+      p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data());
   std::vector<p4est_locidx_t> quad_indices;
   p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->ghosts,
                                        quad_indices);
-  if(quad_indices.empty() ||
-     !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
-                                   found_in_ghost)) {
+  if (quad_indices.empty() ||
+      !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
+                                    found_in_ghost)) {
     quad_indices.clear();
     p4est_utils_bin_search_quad_in_array(pos_idx, &adapt_ghost->mirrors,
                                          quad_indices);
-    if(!quad_indices.empty()) {
+    if (!quad_indices.empty()) {
       found_in_ghost = false;
       quad_indices[0] = adapt_mesh->mirror_qid[quad_indices[0]];
     }
   }
 
-  if(quad_indices.empty() ||
-     !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
-                                   found_in_ghost)) {
+  if (quad_indices.empty() ||
+      !p4est_utils_pos_sanity_check(quad_indices[0], pos.data(),
+                                    found_in_ghost)) {
     return;
   }
 
@@ -2800,7 +2767,7 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
     quads_to_mark.push_back(quad_indices[0]);
     lvl = quad->level;
     tree = adapt_mesh->quad_to_tree[quad_indices[0]];
-    sid =adapt_virtual->quad_qreal_offset[quad_indices[0]];
+    sid = adapt_virtual->quad_qreal_offset[quad_indices[0]];
     payloads.push_back(&lbadapt_local_data[lvl].at(sid));
   }
   levels.push_back(lvl);
@@ -2811,7 +2778,7 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
   double dis;
   for (int d = 0; d < 3; ++d) {
     dis = (pos[d] - quad_pos[d]) / p4est_params.h[lvl];
-    P4EST_ASSERT (-0.5 <= dis && dis <= 0.5);
+    P4EST_ASSERT(-0.5 <= dis && dis <= 0.5);
     if (dis > 0.0) { // right neighbor
       nearest_corner |= 1 << d;
       interpolation_weights[d] = dis;
@@ -2860,8 +2827,10 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
       else
         displace[2] = -zsize;
     }
-    P4EST_ASSERT(neighbor_indices[i - 1] == std::numeric_limits<uint64_t>::max());
-    neighbor_indices[i - 1] = p4est_utils_global_idx(forest, quad, tree, displace);
+    P4EST_ASSERT(neighbor_indices[i - 1] ==
+                 std::numeric_limits<uint64_t>::max());
+    neighbor_indices[i - 1] =
+        p4est_utils_global_idx(forest, quad, tree, displace);
   }
 
   // collect over all 7 direction wrt. to corner
@@ -2873,15 +2842,14 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
     // search for neighbor in mirrors
     quad_indices.clear();
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
-                                         &adapt_ghost->mirrors,
-                                         quad_indices, quad->level);
+                                         &adapt_ghost->mirrors, quad_indices,
+                                         quad->level);
     for (int quad_indice : quad_indices) {
       mirror_qid = adapt_mesh->mirror_qid[quad_indice];
       sid = adapt_virtual->quad_qreal_offset[mirror_qid];
       q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, mirror_qid);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      p4est_utils_get_midpoint(adapt_p4est, tree, q,
-                               neighbor_quad_pos.data());
+      p4est_utils_get_midpoint(adapt_p4est, tree, q, neighbor_quad_pos.data());
       if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                          neighbor_quad_pos, q->level)) {
         payloads.push_back(&lbadapt_local_data[q->level].at(sid));
@@ -2900,9 +2868,9 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
         ++n_neighbors_per_dir;
 
         std::array<double, 6> check_weights{};
-        P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
-                                                     neighbor_quad_pos, q->level,
-                                                     pos, check_weights));
+        P4EST_ASSERT(p4est_utils_pos_enclosing_check(
+            quad_pos, quad->level, neighbor_quad_pos, q->level, pos,
+            check_weights));
 #if 0
         P4EST_ASSERT(dir != 7 || quad->level != q->level ||
                      ((std::abs(check_weights[0] - interpolation_weights[0]) <
@@ -2918,14 +2886,13 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
     // search for neighbor in ghosts
     quad_indices.clear();
     p4est_utils_bin_search_quad_in_array(neighbor_indices[dir - 1],
-                                         &adapt_ghost->ghosts,
-                                         quad_indices, quad->level);
+                                         &adapt_ghost->ghosts, quad_indices,
+                                         quad->level);
     for (int quad_indice : quad_indices) {
       sid = adapt_virtual->quad_greal_offset[quad_indice];
       q = p4est_quadrant_array_index(&adapt_ghost->ghosts, quad_indice);
       P4EST_ASSERT((lvl - 1) <= q->level && q->level <= (lvl + 1));
-      p4est_utils_get_midpoint(adapt_p4est, tree, q,
-                               neighbor_quad_pos.data());
+      p4est_utils_get_midpoint(adapt_p4est, tree, q, neighbor_quad_pos.data());
       if (p4est_utils_pos_vicinity_check(quad_pos, quad->level,
                                          neighbor_quad_pos, q->level)) {
         payloads.push_back(&lbadapt_ghost_data[q->level].at(sid));
@@ -2944,9 +2911,9 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
         ++n_neighbors_per_dir;
 
         std::array<double, 6> check_weights{};
-        P4EST_ASSERT(p4est_utils_pos_enclosing_check(quad_pos, quad->level,
-                                                     neighbor_quad_pos, q->level,
-                                                     pos, check_weights));
+        P4EST_ASSERT(p4est_utils_pos_enclosing_check(
+            quad_pos, quad->level, neighbor_quad_pos, q->level, pos,
+            check_weights));
         P4EST_ASSERT(dir != 7 || quad->level != q->level ||
                      ((std::abs(check_weights[0] - interpolation_weights[0]) <
                        ROUND_ERROR_PREC) &&
@@ -2973,8 +2940,8 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
     coupling_quads[idx] = true;
   }
 
-  double dsum = std::accumulate(interpol_weights.begin(),
-                                interpol_weights.end(), 0.0);
+  double dsum =
+      std::accumulate(interpol_weights.begin(), interpol_weights.end(), 0.0);
   if (abs(1.0 - dsum) > ROUND_ERROR_PREC) {
     std::stringstream err_msg;
     err_msg << "[Ghost interpol. on rank " << this_node
@@ -2984,13 +2951,11 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
       err_msg << w << " ";
     }
     err_msg << std::endl;
-    err_msg << "Rank " << this_node 
-            << " position " << pos[0] << ", " << pos[1] << ", " << pos[2]
-            << " pos index " 
+    err_msg << "Rank " << this_node << " position " << pos[0] << ", " << pos[1]
+            << ", " << pos[2] << " pos index "
             << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())
-            << " (found in ghost: " << found_in_ghost <<  ") "
-            << "LB process boundary indices:"
-            << std::endl;
+            << " (found in ghost: " << found_in_ghost << ") "
+            << "LB process boundary indices:" << std::endl;
     for (int i = 0; i <= n_nodes; ++i) {
       err_msg << forest.p4est_space_idx[i] << " ";
     }
@@ -3005,13 +2970,12 @@ int lbadapt_sanity_check_parameters() {
        level <= p4est_params.max_ref_level; ++level) {
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
       fprintf(stderr,
-              "Bad relaxation parameter gamma_shear on level %i (%lf)\n",
-              level, lbpar.gamma_shear[level]);
+              "Bad relaxation parameter gamma_shear on level %i (%lf)\n", level,
+              lbpar.gamma_shear[level]);
       errexit();
     }
     if (abs(lbpar.gamma_shear[level]) > 1.0) {
-      fprintf(stderr,
-              "Bad relaxation parameter gamma_bulk on level %i (%lf)\n",
+      fprintf(stderr, "Bad relaxation parameter gamma_bulk on level %i (%lf)\n",
               level, lbpar.gamma_bulk[level]);
       errexit();
     }

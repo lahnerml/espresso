@@ -29,6 +29,9 @@ SWIMMER_REACTIONS
 ENGINE                          implies ROTATION, EXTERNAL_FORCES
 PARTICLE_ANISOTROPY
 
+/* p4est-based MD domain-decomposition */
+DD_P4EST
+
 /* Rotation */
 ROTATION
 ROTATIONAL_INERTIA              implies ROTATION

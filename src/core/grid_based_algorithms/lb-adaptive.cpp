@@ -46,7 +46,6 @@
 
 #ifdef LB_ADAPTIVE
 
-#define USE_BGK
 #define DUMP_VIRTUALS
 
 /* Code duplication from lb.cpp */

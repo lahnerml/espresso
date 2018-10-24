@@ -2192,7 +2192,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
@@ -2206,7 +2206,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                        "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2216,7 +2216,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context =
@@ -2232,7 +2232,7 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                    "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2264,7 +2264,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
@@ -2277,7 +2277,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                        0, /* no custom cell vector data */
                                        "density", density.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2287,7 +2287,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = lbadapt_vtk_write_cell_dataf(context,
@@ -2301,7 +2301,7 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                          0, /* no custom cell vector data */
                                          "density", density.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2339,7 +2339,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   /* begin writing the output files */
   context = p8est_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = p8est_vtk_write_cell_dataf(context,
@@ -2353,11 +2353,11 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                        "vorticity", vorticity.get(),
                                        "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   context = p8est_vtk_write_point_dataf(context, 0, 1, "velocity node",
                                         vel_pts.get(), context);
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2367,7 +2367,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
 
   /* begin writing the output files */
   context = lbadapt_vtk_write_header(context);
-  SC_CHECK_ABORT(context != NULL,
+  SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
   // clang-format off
   context = lbadapt_vtk_write_cell_dataf(context,
@@ -2381,7 +2381,7 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                                data */
                                          "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != NULL, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2442,8 +2442,8 @@ void mpi_unif_refinement(int node, int ref_iterations) {
                      0,                    // no recursive refinement
                      p4est_params.max_ref_level, // maximum refinement level
                      refine_regional,      // return true to refine cell
-                     NULL,                 // init data
-                     NULL);                // replace data
+                     nullptr,                 // init data
+                     nullptr);                // replace data
     // clang-format on
     // neither re-balancing nor re-partitioning needed here
   }
@@ -2461,7 +2461,7 @@ void mpi_rand_refinement(int node, int ref_iterations) {
   // assert level 0 is refined
   if ((size_t)adapt_p4est->global_num_quadrants ==
       adapt_p4est->trees->elem_count) {
-    p8est_refine(adapt_p4est, 0, refine_uniform, NULL);
+    p8est_refine(adapt_p4est, 0, refine_uniform, nullptr);
     ++start_idx;
   }
 
@@ -2473,13 +2473,13 @@ void mpi_rand_refinement(int node, int ref_iterations) {
                      0,                    // no recursive refinement
                      p4est_params.max_ref_level, // maximum refinement level
                      refine_random,        // return true to refine cell
-                     NULL,                 // init data
-                     NULL);                // replace data
+                     nullptr,                 // init data
+                     nullptr);                // replace data
 
     p8est_balance_ext(adapt_p4est,            // forest
                       P8EST_CONNECT_CORNER,// connection type
-                      NULL,                // init data
-                      NULL);               // replace data
+                      nullptr,                // init data
+                      nullptr);               // replace data
   }
   p4est_utils_rebuild_p4est_structs(btype);
 
@@ -2502,13 +2502,13 @@ void mpi_reg_refinement(int node, int param) {
                    0,                    // no recursive refinement
                    p4est_params.max_ref_level, // maximum refinement level
                    refine_regional,      // return true to refine cell
-                   NULL,                 // init data
-                   NULL);                // replace data
+                   nullptr,                 // init data
+                   nullptr);                // replace data
 
   p8est_balance_ext(adapt_p4est,               // forest
                     P8EST_CONNECT_CORNER, // connection type
-                    NULL,                // init data
-                    NULL);               // replace data
+                    nullptr,                // init data
+                    nullptr);               // replace data
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
@@ -2527,13 +2527,13 @@ void mpi_reg_coarsening(int node, int param) {
                     0,                   // do not callback on orphans
                     coarsen_regional,    // return true to coarsen group of
                                          // eight cells
-                    NULL,                // init data
-                    NULL);               // replace data
+                    nullptr,                // init data
+                    nullptr);               // replace data
 
   p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
-                    NULL,                // init data
-                    NULL);               // replace data
+                    nullptr,                // init data
+                    nullptr);               // replace data
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
@@ -2550,13 +2550,13 @@ void mpi_geometric_refinement(int node, int param) {
                    1,                    // recursive refinement
                    p4est_params.max_ref_level, // maximum refinement level
                    refine_geometric,     // return true to refine cell
-                   NULL,                 // init data
-                   NULL);                // replace data
+                   nullptr,                 // init data
+                   nullptr);                // replace data
 
   p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
-                    NULL,                // init data
-                    NULL);               // replace data
+                    nullptr,                // init data
+                    nullptr);               // replace data
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 
@@ -2573,13 +2573,13 @@ void mpi_inv_geometric_refinement(int node, int param) {
                    1,                    // recursive refinement
                    p4est_params.max_ref_level, // maximum refinement level
                    refine_inv_geometric, // return true to refine cell
-                   NULL,                 // init data
-                   NULL);                // replace data
+                   nullptr,                 // init data
+                   nullptr);                // replace data
 
   p8est_balance_ext(adapt_p4est,            // forest
                     P8EST_CONNECT_CORNER,// connection type
-                    NULL,                // init data
-                    NULL);               // replace data
+                    nullptr,                // init data
+                    nullptr);               // replace data
   // clang-format on
   p4est_utils_rebuild_p4est_structs(btype);
 

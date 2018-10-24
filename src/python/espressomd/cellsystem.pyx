@@ -86,7 +86,12 @@ class P4estDD:
 
 
 cdef class CellSystem(object):
-    def set_domain_decomposition(self, use_verlet_lists=True):
+    def set_domain_decomposition(
+        self,
+        use_verlet_lists=True,
+     fully_connected=[False,
+                      False,
+                      False]):
         """
         Activates domain decomposition cell system.
 
@@ -99,11 +104,11 @@ cdef class CellSystem(object):
         """
 
         cell_structure.use_verlet_list = use_verlet_lists
+        dd.fully_connected = fully_connected
         # grid.h::node_grid
         mpi_bcast_cell_structure(CELL_STRUCTURE_DOMDEC)
 
-        # @TODO: gathering should be interface independent
-        # return mpi_gather_runtime_errors(interp, TCL_OK)
+        handle_errors("Error while initializing the cell system.")
         return True
 
     def set_p4est_dd(self, use_verlet_lists=True):
@@ -217,6 +222,7 @@ cdef class CellSystem(object):
             [dd.cell_size[0], dd.cell_size[1], dd.cell_size[2]])
         s["max_num_cells"] = max_num_cells
         s["min_num_cells"] = min_num_cells
+        s["fully_connected"] = dd.fully_connected
 
         return s
 
@@ -235,6 +241,7 @@ cdef class CellSystem(object):
         s["node_grid"] = np.array([node_grid[0], node_grid[1], node_grid[2]])
         s["max_num_cells"] = max_num_cells
         s["min_num_cells"] = min_num_cells
+        s["fully_connected"] = dd.fully_connected
         return s
 
     def __setstate__(self, d):

@@ -466,7 +466,7 @@ int data_interpolation<lbadapt_payload_t>(
   return 0;
 }
 
-int lbadapt_is_boundary(double *pos) {
+int lbadapt_is_boundary(const Vector3d &pos) {
   double dist, dist_tmp;
   std::array<double, 3> dist_vec{};
   dist = std::numeric_limits<double>::max();
@@ -738,7 +738,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
   // 0.6 instead of 0.5 for stability reasons
   lb_float half_length = 0.6 * sqrt(3) * p4est_params.h[q->level];
 
-  std::array<double, 3> midpoint{}, dist_vec{};
+  Vector3d midpoint{}, dist_vec{};
   p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());
 
   double dist, dist_tmp;
@@ -755,7 +755,7 @@ int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
         continue;
       }
     }
-    (**it).calc_dist(midpoint.data(), &dist_tmp, dist_vec.data());
+    (**it).calc_dist(midpoint, &dist_tmp, dist_vec.data());
 
     if (dist_tmp < dist) {
       dist = dist_tmp;

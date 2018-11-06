@@ -359,8 +359,8 @@ void lbadapt_reinit_fluid_per_cell() {
                                      p4est_params.h[level]);
 #ifdef LB_BOUNDARIES
         if (!mesh_iter->current_is_ghost) {
-          double mp[3];
-          p4est_utils_get_midpoint(mesh_iter, mp);
+          Vector3d mp;
+          p4est_utils_get_midpoint(mesh_iter, mp.data());
           data->lbfields.boundary = lbadapt_is_boundary(mp);
         }
 #endif // LB_BOUNDARIES
@@ -411,11 +411,12 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   P4EST_ASSERT(quad_new->level + 1 == quad_old->level);
 
   // check boundary status.
-  std::array<double, 3> new_mp{};
+  Vector3d new_mp;
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
-  new_boundary = lbadapt_is_boundary(new_mp.data());
+  new_boundary = lbadapt_is_boundary(new_mp);
+
 
   if (new_boundary) {
     // if cell is a boundary cell initialize data to 0.
@@ -446,11 +447,11 @@ int data_interpolation<lbadapt_payload_t>(
   P4EST_ASSERT(quad_new->level == 1 + quad_old->level);
 
   // check boundary status.
-  std::array<double, 3> new_mp{};
+  Vector3d new_mp;
   int new_boundary;
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
-  new_boundary = lbadapt_is_boundary(new_mp.data());
+  new_boundary = lbadapt_is_boundary(new_mp);
 
   if (new_boundary) {
     // if cell is a boundary cell initialize data to 0.
@@ -2215,8 +2216,8 @@ void lbadapt_get_boundary_status() {
             p8est_meshiter_get_current_storage_id(mesh_iter));
 
 #ifndef LB_ADAPTIVE_GPU
-        double midpoint[3];
-        p4est_utils_get_midpoint(mesh_iter, midpoint);
+        Vector3d midpoint;
+        p4est_utils_get_midpoint(mesh_iter, midpoint.data());
 
         data->lbfields.boundary = lbadapt_is_boundary(midpoint);
 #else  // LB_ADAPTIVE_GPU

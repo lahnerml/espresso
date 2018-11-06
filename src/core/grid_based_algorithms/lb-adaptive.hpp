@@ -105,7 +105,7 @@ void lbadapt_reinit_fluid_per_cell();
 #ifdef LB_BOUNDARIES
 /** Check if current midpoint is part of the boundary
  */
-int lbadapt_is_boundary(double pos[3]);
+int lbadapt_is_boundary(const Vector3d &pos);
 #endif // LB_BOUNDARIES
 
 #ifdef LB_ADAPTIVE_GPU

@@ -29,6 +29,10 @@
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
 
+int n_integrate_calls;
+sc_statinfo_t stats[N_STATS];
+sc_flopinfo_t fi, snapshot;
+
 #if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;
 castable_unique_ptr<p4est_connectivity_t> adapt_conn;
@@ -1036,6 +1040,7 @@ void p4est_utils_refine_around_particles() {
     p4est_utils_perform_adaptivity_step();
     ++initial_ref_steps;
 
+    cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
     cells_update_ghosts();
   }
   std::memcpy(p4est_params.threshold_velocity, thresh_vel_temp.data(),

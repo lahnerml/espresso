@@ -205,6 +205,7 @@ static int terminated = 0;
   CB(mpi_get_particles_slave)                                                  \
   CB(mpi_rotate_system_slave)                                                  \
   CB(mpi_adapt_grid)                                                           \
+  CB(mpi_eval_statistics)                                                      \
   CB(mpi_bcast_thresh_vel)                                                     \
   CB(mpi_bcast_thresh_vort)                                                    \
   CB(mpi_lbadapt_grid_init)                                                    \
@@ -2085,8 +2086,17 @@ void mpi_lbadapt_grid_reset(int node, int dummy) {
 void mpi_adapt_grid(int node, int level) {
 // TODO: make this work for DD_P4EST
 #if (defined(LB_ADAPTIVE)) // || defined(DD_P4EST))
+  sc_flops_snap(&fi, &snapshot);
   p4est_utils_perform_adaptivity_step();
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&stats[GRID_CHANGE_00 + n_integrate_calls],
+                      snapshot.iwtime);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
+}
+
+void mpi_eval_statistics(int node, int param) {
+  sc_stats_compute(comm_cart, N_STATS, stats);
+  sc_stats_print (-1, SC_LP_STATISTICS, N_STATS, stats, 1, 1);
 }
 
 void mpi_bcast_thresh_vel(int node, int level) {

@@ -16,6 +16,8 @@
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
 #include <p8est_virtual.h>
+#include <sc_flops.h>
+#include <sc_statistics.h>
 #include <vector>
 
 /*****************************************************************************/
@@ -77,6 +79,35 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator T*() const { return this->get(); }
   operator void *() const { return this->get(); }
 };
+
+enum {
+  LB_STEP_00, LB_STEP_01, LB_STEP_02, LB_STEP_03, LB_STEP_04,
+  LB_STEP_05, LB_STEP_06, LB_STEP_07, LB_STEP_08, LB_STEP_09,
+  MD_STEP_00, MD_STEP_01, MD_STEP_02, MD_STEP_03, MD_STEP_04,
+  MD_STEP_05, MD_STEP_06, MD_STEP_07, MD_STEP_08, MD_STEP_09,
+  GRID_CHANGE_00, GRID_CHANGE_01, GRID_CHANGE_02, GRID_CHANGE_03,
+  GRID_CHANGE_04, GRID_CHANGE_05, GRID_CHANGE_06, GRID_CHANGE_07,
+  GRID_CHANGE_08, GRID_CHANGE_09,
+  NCELLS_LB_LOCAL_00, NCELLS_LB_LOCAL_01, NCELLS_LB_LOCAL_02,
+  NCELLS_LB_LOCAL_03, NCELLS_LB_LOCAL_04, NCELLS_LB_LOCAL_05,
+  NCELLS_LB_LOCAL_06, NCELLS_LB_LOCAL_07, NCELLS_LB_LOCAL_08,
+  NCELLS_LB_LOCAL_09,
+  NCELLS_LB_GHOST_00, NCELLS_LB_GHOST_01, NCELLS_LB_GHOST_02,
+  NCELLS_LB_GHOST_03, NCELLS_LB_GHOST_04, NCELLS_LB_GHOST_05,
+  NCELLS_LB_GHOST_06, NCELLS_LB_GHOST_07, NCELLS_LB_GHOST_08,
+  NCELLS_LB_GHOST_09,
+  NPART_LOCAL_00, NPART_LOCAL_01, NPART_LOCAL_02, NPART_LOCAL_03,
+  NPART_LOCAL_04, NPART_LOCAL_05, NPART_LOCAL_06, NPART_LOCAL_07,
+  NPART_LOCAL_08, NPART_LOCAL_09,
+  NPART_GHOST_00, NPART_GHOST_01, NPART_GHOST_02, NPART_GHOST_03,
+  NPART_GHOST_04, NPART_GHOST_05, NPART_GHOST_06, NPART_GHOST_07,
+  NPART_GHOST_08, NPART_GHOST_09,
+  N_STATS,
+};
+
+extern int n_integrate_calls;
+extern sc_statinfo_t stats[N_STATS];
+extern sc_flopinfo_t fi, snapshot;
 
 /** Allow using std::lower_bound with sc_arrays by stubbing begin and end
  */
@@ -374,6 +405,15 @@ inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
   }
   return 0;
 }
+
+/** Calculate statistics */
+inline int p4est_utils_get_stat_report() {
+  /* calculate and print timings */
+  mpi_call(mpi_eval_statistics, -1, 0);
+  mpi_eval_statistics(0, 0);
+  return 0;
+}
+
 #endif // defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)
 /*@}*/
 

@@ -55,6 +55,7 @@
 #include "npt.hpp"
 #include "nsquare.hpp"
 #include "observables/Observable.hpp"
+#include "p4est_utils.hpp"
 #include "partCfg_global.hpp"
 #include "particle_data.hpp"
 #include "pressure.hpp"
@@ -113,6 +114,80 @@ void on_program_start() {
   /* initially go for domain decomposition */
   topology_init(CELL_STRUCTURE_DOMDEC, &local_cells);
 #endif
+
+  // initialize stats
+  sc_stats_init(&stats[LB_STEP_00], "Coarse LB step 00");
+  sc_stats_init(&stats[LB_STEP_01], "Coarse LB step 01");
+  sc_stats_init(&stats[LB_STEP_02], "Coarse LB step 02");
+  sc_stats_init(&stats[LB_STEP_03], "Coarse LB step 03");
+  sc_stats_init(&stats[LB_STEP_04], "Coarse LB step 04");
+  sc_stats_init(&stats[LB_STEP_05], "Coarse LB step 05");
+  sc_stats_init(&stats[LB_STEP_06], "Coarse LB step 06");
+  sc_stats_init(&stats[LB_STEP_07], "Coarse LB step 07");
+  sc_stats_init(&stats[LB_STEP_08], "Coarse LB step 08");
+  sc_stats_init(&stats[LB_STEP_09], "Coarse LB step 09");
+  sc_stats_init(&stats[MD_STEP_00], "Coarse MD step 00");
+  sc_stats_init(&stats[MD_STEP_01], "Coarse MD step 01");
+  sc_stats_init(&stats[MD_STEP_02], "Coarse MD step 02");
+  sc_stats_init(&stats[MD_STEP_03], "Coarse MD step 03");
+  sc_stats_init(&stats[MD_STEP_04], "Coarse MD step 04");
+  sc_stats_init(&stats[MD_STEP_05], "Coarse MD step 05");
+  sc_stats_init(&stats[MD_STEP_06], "Coarse MD step 06");
+  sc_stats_init(&stats[MD_STEP_07], "Coarse MD step 07");
+  sc_stats_init(&stats[MD_STEP_08], "Coarse MD step 08");
+  sc_stats_init(&stats[MD_STEP_09], "Coarse MD step 09");
+  sc_stats_init(&stats[GRID_CHANGE_00], "Grid change step 00");
+  sc_stats_init(&stats[GRID_CHANGE_01], "Grid change step 01");
+  sc_stats_init(&stats[GRID_CHANGE_02], "Grid change step 02");
+  sc_stats_init(&stats[GRID_CHANGE_03], "Grid change step 03");
+  sc_stats_init(&stats[GRID_CHANGE_04], "Grid change step 04");
+  sc_stats_init(&stats[GRID_CHANGE_05], "Grid change step 05");
+  sc_stats_init(&stats[GRID_CHANGE_06], "Grid change step 06");
+  sc_stats_init(&stats[GRID_CHANGE_07], "Grid change step 07");
+  sc_stats_init(&stats[GRID_CHANGE_08], "Grid change step 08");
+  sc_stats_init(&stats[GRID_CHANGE_09], "Grid change step 09");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_00], "Number of local cells step 00");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_01], "Number of local cells step 01");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_02], "Number of local cells step 02");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_03], "Number of local cells step 03");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_04], "Number of local cells step 04");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_05], "Number of local cells step 05");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_06], "Number of local cells step 06");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_07], "Number of local cells step 07");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_08], "Number of local cells step 08");
+  sc_stats_init(&stats[NCELLS_LB_LOCAL_09], "Number of local cells step 09");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_00], "Number of ghost cells step 00");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_01], "Number of ghost cells step 01");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_02], "Number of ghost cells step 02");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_03], "Number of ghost cells step 03");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_04], "Number of ghost cells step 04");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_05], "Number of ghost cells step 05");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_06], "Number of ghost cells step 06");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_07], "Number of ghost cells step 07");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_08], "Number of ghost cells step 08");
+  sc_stats_init(&stats[NCELLS_LB_GHOST_09], "Number of ghost cells step 09");
+  sc_stats_init(&stats[NPART_LOCAL_00], "Number of local particles step 00");
+  sc_stats_init(&stats[NPART_LOCAL_01], "Number of local particles step 01");
+  sc_stats_init(&stats[NPART_LOCAL_02], "Number of local particles step 02");
+  sc_stats_init(&stats[NPART_LOCAL_03], "Number of local particles step 03");
+  sc_stats_init(&stats[NPART_LOCAL_04], "Number of local particles step 04");
+  sc_stats_init(&stats[NPART_LOCAL_05], "Number of local particles step 05");
+  sc_stats_init(&stats[NPART_LOCAL_06], "Number of local particles step 06");
+  sc_stats_init(&stats[NPART_LOCAL_07], "Number of local particles step 07");
+  sc_stats_init(&stats[NPART_LOCAL_08], "Number of local particles step 08");
+  sc_stats_init(&stats[NPART_LOCAL_09], "Number of local particles step 09");
+  sc_stats_init(&stats[NPART_GHOST_00], "Number of ghost particles step 00");
+  sc_stats_init(&stats[NPART_GHOST_01], "Number of ghost particles step 01");
+  sc_stats_init(&stats[NPART_GHOST_02], "Number of ghost particles step 02");
+  sc_stats_init(&stats[NPART_GHOST_03], "Number of ghost particles step 03");
+  sc_stats_init(&stats[NPART_GHOST_04], "Number of ghost particles step 04");
+  sc_stats_init(&stats[NPART_GHOST_05], "Number of ghost particles step 05");
+  sc_stats_init(&stats[NPART_GHOST_06], "Number of ghost particles step 06");
+  sc_stats_init(&stats[NPART_GHOST_07], "Number of ghost particles step 07");
+  sc_stats_init(&stats[NPART_GHOST_08], "Number of ghost particles step 08");
+  sc_stats_init(&stats[NPART_GHOST_09], "Number of ghost particles step 09");
+
+  n_integrate_calls = 0;
 
 #ifdef P3M
   p3m_pre_init();

@@ -506,6 +506,10 @@ void mpi_bcast_lbboundary(int del_num);
  */
 void mpi_adapt_grid (int node, int param);
 
+/** Callback to evaluate gathered statistics
+ */
+void mpi_eval_statistics (int node, int param);
+
 /** Callback to broadcast velocity threshold values for coarsening and
  * refinement.
  */

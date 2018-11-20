@@ -356,14 +356,17 @@ int lbboundary_get_force(void *lbb, double *f) {
   } else {
 #if defined(LB_BOUNDARIES) && defined(LB)
     if(0 == this_node) {
-      mpi_gather_stats(8, forces.data(), nullptr, nullptr, nullptr);
+        mpi_gather_stats(8, forces.data(), nullptr, nullptr, nullptr);
 
-      f[0] = forces[3 * no + 0] * lbpar.agrid /
-             lbpar.tau; // lbpar.tau; TODO this makes the units wrong and
-      f[1] = forces[3 * no + 1] * lbpar.agrid /
-             lbpar.tau; // lbpar.tau; the result correct. But it's 3.13AM
-      f[2] = forces[3 * no + 2] * lbpar.agrid /
-             lbpar.tau; // lbpar.tau; on a Saturday at the ICP. Someone fix.
+        f[0] = forces[3 * no + 0] * lbpar.agrid /
+               (lbpar.tau * lbpar.tau *
+                lbpar.rho); // lbpar.tau; TODO this makes the units wrong and
+        f[1] = forces[3 * no + 1] * lbpar.agrid /
+               (lbpar.tau * lbpar.tau *
+                lbpar.rho); // lbpar.tau; the result correct. But it's 3.13AM
+        f[2] = forces[3 * no + 2] * lbpar.agrid /
+               (lbpar.tau * lbpar.tau *
+                lbpar.rho); // lbpar.tau; on a Saturday at the ICP. Someone fix.
     }
 #else
     return ES_ERROR;

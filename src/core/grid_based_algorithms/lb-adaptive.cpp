@@ -2542,9 +2542,9 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
       {{3, 4, 5}},
   }};
 
-  std::array<int, 3> fold = {{0, 0, 0}};
-  std::array<double, 3> pos = {{opos[0], opos[1], opos[2]}};
-  fold_position(pos, fold);
+  Vector3d pos = {{opos[0], opos[1], opos[2]}};
+  int corner[3] = {0, 0, 0};
+  fold_position(pos, corner);
 
   int64_t qidx = p4est_utils_pos_to_qid(forest_order::adaptive_LB, pos.data());
   if (!(0 <= qidx && qidx < adapt_p4est->local_num_quadrants)) {
@@ -2724,9 +2724,9 @@ void lbadapt_interpolate_pos_ghost(const Vector3d &opos,
   }};
 
   // Fold position.
-  std::array<int, 3> fold = {{0, 0, 0}};
-  std::array<double, 3> pos = {{opos[0], opos[1], opos[2]}};
-  fold_position(pos, fold);
+  Vector3d pos = {{opos[0], opos[1], opos[2]}};
+  int corner[3] = {0, 0, 0};
+  fold_position(pos, corner);
 
   // Find quadrant containing position and store its payload.
   // Begin by search in ghost layer.  If there is no quadrant containing the

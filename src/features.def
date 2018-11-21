@@ -27,7 +27,7 @@ NPT
 GHMC
 SWIMMER_REACTIONS
 ENGINE                          implies ROTATION, EXTERNAL_FORCES
-PARTICLE_ANISOTROPY
+PARTICLE_ANISOTROPY             implies ROTATION
 
 /* p4est-based MD domain-decomposition */
 DD_P4EST

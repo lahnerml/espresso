@@ -572,11 +572,12 @@ void dd_p4est_mark_cells() {
 void dd_p4est_init_cell_interactions() {
   const std::vector<int> black_indices = {
       {0, 2, 4, 6, 7, 10, 11, 14, 15, 18, 19, 20, 21}};
+  const int n_neighbors = 26;
   for (int i = 0; i < local_cells.n; ++i) {
     std::vector<Cell *> red_neighbors;
     std::vector<Cell *> black_neighbors;
 
-    for (int n = 0; n < 26; ++n) {
+    for (int n = 0; n < n_neighbors; ++n) {
       auto neighidx = ds::p4est_cellinfo[i].neighbor[n];
       // Check for invalid cells
       if (std::find(black_indices.begin(), black_indices.end(), n) !=

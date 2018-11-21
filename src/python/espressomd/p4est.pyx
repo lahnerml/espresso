@@ -197,6 +197,15 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
 
         ####################################################
 
+
+        def get_statistics(self):
+            if (p4est_utils_get_stat_report()):
+                raise Exception("p4est_utils_get_stat_report error")
+
+            return 0
+
+        ####################################################
+
         def set_refinement_area(self, p_bb_coords, p_vel):
             cdef double c_bb_coords[6]
             c_bb_coords = p_bb_coords

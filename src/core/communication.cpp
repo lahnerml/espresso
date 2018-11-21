@@ -1207,8 +1207,6 @@ void gather_stats() {
                       static_cast<double>(local_cells.particles().size()));
   sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
                       static_cast<double>(ghost_cells.particles().size()));
-  std::cout << "[p4est " << this_node << "] local num quadrants: "
-            << adapt_p4est->local_num_quadrants << std::endl;
 }
 
 void end_p4est_integration() {

@@ -589,6 +589,11 @@ void dd_p4est_init_cell_interactions() {
       local_cells.cell[i]->m_neighbors =
           Neighbors<Cell *>(red_neighbors, black_neighbors);
     }
+    if (red_neighbors.size() != black_neighbors.size()) {
+      fprintf(stderr, "Error in red black; n_red %li, n_black %li\n",
+              red_neighbors.size(), black_neighbors.size());
+      errexit();
+    }
   }
 }
 //--------------------------------------------------------------------------------------------------

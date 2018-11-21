@@ -272,11 +272,11 @@ void integrate_vv(int n_steps, int reuse_forces) {
       ghost_communicator(&cell_structure.update_ghost_pos_comm);
     }
 #endif
-    sc_flops_snap(&fi, &snapshot);
+    //sc_flops_snap(&fi, &snapshot);
     force_calc();
-    sc_flops_shot(&fi, &snapshot);
-    sc_stats_accumulate(&stats[MD_STEP_00 + n_integrate_calls],
-                        snapshot.iwtime);
+    //sc_flops_shot(&fi, &snapshot);
+    //sc_stats_accumulate(&stats[MD_STEP_00 + n_integrate_calls],
+    //                    snapshot.iwtime);
 
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
 #ifdef ROTATION

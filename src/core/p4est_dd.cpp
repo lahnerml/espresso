@@ -743,11 +743,17 @@ static void dd_p4est_insert_particles(ParticleList *recvbuf, int global_flag, in
     Cell* target = dd_p4est_save_position_to_cell(recvbuf->part[p].r.p.data());
     if (!target && !oob) {
       fprintf(stderr, "proc %i received remote particle p %i out of domain, global %i from proc %i\n\t%lfx%lfx%lf, glob morton idx %li, pos2proc %i\n\told pos %lfx%lfx%lf\n",
-        this_node, recvbuf->part[p].p.identity, global_flag, from,
-        recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2],
-        dd_p4est_pos_morton_idx(recvbuf->part[p].r.p.data()),
-               dd_p4est_pos_to_proc(recvbuf->part[p].r.p.data()),
-               op[0], op[1], op[2]);
+              this_node, recvbuf->part[p].p.identity, global_flag, from,
+              recvbuf->part[p].r.p[0], recvbuf->part[p].r.p[1], recvbuf->part[p].r.p[2],
+              dd_p4est_pos_morton_idx(recvbuf->part[p].r.p.data()),
+              dd_p4est_pos_to_proc(recvbuf->part[p].r.p.data()),
+              op[0], op[1], op[2]);
+
+      fprintf(stderr, "pos2proc separators:\n");
+      for (auto &i : first_morton_idx_of_rank) {
+        fprintf(stderr, "%i, ", i);
+      }
+      fprintf(stderr, "\n");
       errexit();
     } else if (!target && oob) {
       target = oob;

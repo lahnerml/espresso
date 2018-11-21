@@ -899,23 +899,6 @@ int python_integrate(int n_steps, bool recalc_forces, bool reuse_forces_par) {
     }
   }
 
-  // collect data about number of cells and particles
-  sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(adapt_p4est->local_num_quadrants));
-  sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
-                      static_cast<double>(adapt_mesh->ghost_num_quadrants));
-  sc_stats_accumulate(&stats[NPART_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(local_cells.particles().size()));
-  sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
-                      static_cast<double>(ghost_cells.particles().size()));
-
-#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-#ifdef COMM_HIDING
-  p4est_utils_end_pending_communication(exc_status_lb);
-#endif // COMM_HIDING
-#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  ++n_integrate_calls;
-
   return ES_OK;
 }
 

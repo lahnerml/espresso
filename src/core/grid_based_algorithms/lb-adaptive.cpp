@@ -2556,6 +2556,7 @@ void lbadapt_interpolate_pos_adapt(const Vector3d &opos,
     err_msg << "At sim time " << sim_time << " (lbsteps: " << n_lbsteps << ")"
             << std::endl
             << "Particle not in local LB domain of rank " << this_node
+            << std::endl
             << " Found qid " << qidx << " position " << pos[0] << ", " << pos[1]
             << ", " << pos[2] << " quad idx "
             << p4est_utils_pos_to_index(forest_order::adaptive_LB, pos.data())

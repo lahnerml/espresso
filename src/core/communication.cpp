@@ -1197,11 +1197,36 @@ int mpi_minimize_energy(void) {
 void mpi_minimize_energy_slave(int a, int b) { minimize_energy(); }
 
 /********************* REQ_INTEGRATE ********/
+void gather_stats() {
+  // collect data about number of cells and particles
+  sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
+                      static_cast<double>(adapt_p4est->local_num_quadrants));
+  sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
+                      static_cast<double>(adapt_mesh->ghost_num_quadrants));
+  sc_stats_accumulate(&stats[NPART_LOCAL_00 + n_integrate_calls],
+                      static_cast<double>(local_cells.particles().size()));
+  sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
+                      static_cast<double>(ghost_cells.particles().size()));
+  std::cout << "[p4est " << this_node << "] local num quadrants: "
+            << adapt_p4est->local_num_quadrants << std::endl;
+}
+
+void end_p4est_integration() {
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+#ifdef COMM_HIDING
+  p4est_utils_end_pending_communication(exc_status_lb);
+#endif // COMM_HIDING
+#endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+  ++n_integrate_calls;
+}
+
 int mpi_integrate(int n_steps, int reuse_forces) {
   mpi_call(mpi_integrate_slave, n_steps, reuse_forces);
   integrate_vv(n_steps, reuse_forces);
   COMM_TRACE(
       fprintf(stderr, "%d: integration task %d done.\n", this_node, n_steps));
+  gather_stats();
+  end_p4est_integration();
   return mpi_check_runtime_errors();
 }
 
@@ -1210,6 +1235,8 @@ void mpi_integrate_slave(int n_steps, int reuse_forces) {
   COMM_TRACE(fprintf(
       stderr, "%d: integration for %d n_steps with %d reuse_forces done.\n",
       this_node, n_steps, reuse_forces));
+  gather_stats();
+  end_p4est_integration();
 }
 
 /*************** REQ_BCAST_IA ************/

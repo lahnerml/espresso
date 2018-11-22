@@ -106,10 +106,6 @@ static const int neighbor_lut[3][3][3] =
         {{14, 2, 15}, {0, -1, 1}, {16, 3, 17}}, //[1][1][1] is the cell itself
         {{22, 8, 23}, {12, 5, 13}, {24, 9, 25}}};
 //--------------------------------------------------------------------------------------------------
-static const int half_neighbor_idx[14] =
-    { // p4est neighbor index of halfshell [0] is cell itself
-        -1, 1, 16, 3, 17, 22, 8, 23, 12, 5, 13, 24, 9, 25};
-//--------------------------------------------------------------------------------------------------
 
 enum class Direction { Left, Right };
 
@@ -570,32 +566,27 @@ void dd_p4est_mark_cells() {
 }
 //--------------------------------------------------------------------------------------------------
 void dd_p4est_init_cell_interactions() {
-  const std::vector<int> black_indices = {
-      {0, 2, 4, 6, 7, 10, 11, 14, 15, 18, 19, 20, 21}};
-  const int n_neighbors = 26;
+  // Half-shell neighbor indices to access CellInfo::neighbors.
+  // Yields the same neighborhood as domain_decomposition.cpp.
+  static const int half_neighbor_idx[] = {1,  16, 3,  17, 22, 8, 23,
+                                          12, 5,  13, 24, 9,  25};
+  static const int complement_half_neighbor_idx[] = {0,  2,  4,  6,  7,  10, 11,
+                                                     14, 15, 18, 19, 20, 21};
+
   for (int i = 0; i < local_cells.n; ++i) {
     std::vector<Cell *> red_neighbors;
     std::vector<Cell *> black_neighbors;
 
-    for (int n = 0; n < n_neighbors; ++n) {
-      auto neighidx = ds::p4est_cellinfo[i].neighbor[n];
-      // Check for invalid cells
-      if (std::find(black_indices.begin(), black_indices.end(), n) !=
-          black_indices.end()) {
-        black_neighbors.emplace_back(&cells[neighidx]);
-      } else {
-        red_neighbors.emplace_back(&cells[neighidx]);
-      }
-      local_cells.cell[i]->m_neighbors =
-          Neighbors<Cell *>(red_neighbors, black_neighbors);
-    }
-#ifdef DEBUG
-    if (red_neighbors.size() != black_neighbors.size()) {
-      fprintf(stderr, "Error in red black; n_red %li, n_black %li\n",
-              red_neighbors.size(), black_neighbors.size());
-      errexit();
-    }
-#endif
+    for (auto n : half_neighbor_idx)
+      red_neighbors.emplace_back(&cells[ds::p4est_cellinfo[i].neighbor[n]]);
+
+    for (auto n : complement_half_neighbor_idx)
+      black_neighbors.emplace_back(&cells[ds::p4est_cellinfo[i].neighbor[n]]);
+
+    black_neighbors.emplace_back(local_cells.cell[i]);
+
+    local_cells.cell[i]->m_neighbors =
+        Neighbors<Cell *>(red_neighbors, black_neighbors);
   }
 }
 //--------------------------------------------------------------------------------------------------

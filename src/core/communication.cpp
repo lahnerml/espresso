@@ -1224,7 +1224,7 @@ void end_p4est_integration() {
   p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  ++n_integrate_calls;
+  //++n_integrate_calls;
 }
 
 int mpi_integrate(int n_steps, int reuse_forces) {

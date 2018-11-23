@@ -249,11 +249,10 @@ void lbadapt_reinit_parameters() {
                      1.);
     }
     if (lbpar.bulk_viscosity > 0.0) {
-      lbpar.gamma_bulk[i] =
-          1. - 2. / (9. * lbpar.bulk_viscosity * lbpar.tau /
-                         (p4est_params.prefactors[i] *
-                          Utils::sqr(p4est_params.h[i])) +
-                     1.);
+      lbpar.gamma_bulk[i] = 1. - 2. / (9. * lbpar.bulk_viscosity * lbpar.tau /
+                                           (p4est_params.prefactors[i] *
+                                            Utils::sqr(p4est_params.h[i])) +
+                                       1.);
     }
 #else
     lbpar.gamma_shear[i] = 0.0; // uncomment for special case of BGK
@@ -416,7 +415,6 @@ int data_restriction<lbadapt_payload_t>(p8est_t *p4est_old, p8est_t *p4est_new,
   p4est_utils_get_midpoint(p4est_new, which_tree, quad_new, new_mp.data());
 
   new_boundary = lbadapt_is_boundary(new_mp);
-
 
   if (new_boundary) {
     // if cell is a boundary cell initialize data to 0.
@@ -1223,67 +1221,6 @@ lb_float lbadapt_backTransformation(lb_float *m, int dir) {
   }
 }
 
-void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
-                              lbadapt_payload_t *currCellData) {
-#ifndef LB_ADAPTIVE_GPU
-  // clang-format off
-  int inv[] = { 0,
-                2,  1,  4,  3,  6,  5,
-                8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
-  // clang-format on
-  lbadapt_payload_t *data;
-
-  // copy resting population
-  currCellData->lbfluid[1][0] = currCellData->lbfluid[0][0];
-
-  // stream to surrounding cells
-  for (int dir_ESPR = 1; dir_ESPR < LB_Model<>::n_veloc; ++dir_ESPR) {
-    // set neighboring cell information in iterator
-    int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
-    p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
-
-    int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
-    // stream if we found a neighbor.
-    // however, do not stream between two real quadrants that both hold virtual
-    // children
-#if 0
-    if (mesh_iter->neighbor_qid != -1
-        && ((-1 != mesh_iter->current_vid)
-            || (-1 != mesh_iter->neighbor_vid)
-            || (-1 == adapt_virtual->virtual_qflags[mesh_iter->current_qid])
-            || (!mesh_iter->neighbor_is_ghost
-                && -1 ==
-                   adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
-            || (mesh_iter->neighbor_is_ghost
-                && -1 ==
-                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
-#else  // 0
-    if (mesh_iter->neighbor_qid != -1)
-#endif // 0
-    {
-      int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
-      assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
-      assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
-
-      if (mesh_iter->neighbor_is_ghost) {
-        data = &lbadapt_ghost_data[mesh_iter->current_level].at(
-            p8est_meshiter_get_neighbor_storage_id(mesh_iter));
-        if (!data->lbfields.boundary) {
-          // invert streaming step only if ghost neighbor is no boundary cell
-          currCellData->lbfluid[1][inv[dir_ESPR]] =
-              data->lbfluid[0][inv_neigh_dir_ESPR];
-        }
-      } else {
-        data = &lbadapt_local_data[mesh_iter->current_level].at(
-            p8est_meshiter_get_neighbor_storage_id(mesh_iter));
-        data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
-            currCellData->lbfluid[0][dir_ESPR];
-      }
-    }
-  }
-#endif // LB_ADAPTIVE_GPU
-}
-
 int lbadapt_calc_pop_from_modes(lb_float *populations, lb_float *m) {
 #ifdef LB_ADAPTIVE
   /* normalization factors enter in the back transformation */
@@ -1393,6 +1330,159 @@ void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter) {
     // make sure that boundary is not occupied by some memory clutter
     virtual_data->lbfields.boundary = source_data->lbfields.boundary;
     ++virtual_data;
+  }
+#endif // LB_ADAPTIVE_GPU
+}
+
+void streaming_kernel(lbadapt_payload_t *data, lbadapt_payload_t *neighbor_data,
+                      int dir) {
+  neighbor_data->lbfluid[1][dir] = data->lbfluid[0][dir];
+}
+
+void bounce_back_kernel(lbadapt_payload_t *data,
+                        lbadapt_payload_t *neighbor_data, int dir,
+                        int inv_dir) {
+  // calculate population shift (velocity boundary condition)
+  double population_shift = 0.;
+  double h_max = p4est_params.h[p4est_params.max_ref_level];
+  for (int l = 0; l < 3; ++l) {
+    population_shift -=
+        h_max * h_max * h_max * lbpar.rho * 2 * lbmodel.c[dir][l] *
+        lbmodel.w[dir] *
+        (*LBBoundaries::lbboundaries[data->lbfields.boundary - 1])
+            .velocity()[l] *
+        (lbpar.tau / h_max) / lbmodel.c_sound_sq;
+  }
+
+  // sum up the force that the fluid applies on the boundary
+  for (int l = 0; l < 3; ++l) {
+    (*LBBoundaries::lbboundaries[data->lbfields.boundary - 1]).force()[l] +=
+        (2 * data->lbfluid[1][dir] + population_shift) * lbmodel.c[dir][l];
+  }
+
+  // add if we bounce back from a cell without virtual quadrants
+  // into a coarse cell hosting virtual quadrants
+  neighbor_data->lbfluid[1][inv_dir] = data->lbfluid[1][dir] + population_shift;
+}
+
+void lbadapt_stream_bounce_back(int level) {
+#ifndef LB_ADAPTIVE_GPU
+  int status = 0;
+  lbadapt_payload_t *data, *neighbor_data;
+  castable_unique_ptr<p4est_meshiter_t> mesh_iter = p4est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, level,
+      P8EST_CONNECT_EDGE, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REALVIRTUAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+
+  static const int inv[] = {0, 2,  1,  4,  3,  6,  5,  8,  7, 10,
+                            9, 12, 11, 14, 13, 16, 15, 18, 17};
+
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      data = &lbadapt_local_data[level].at(
+          p8est_meshiter_get_current_storage_id(mesh_iter));
+      streaming_kernel(data, data, 0);
+      for (int dir_ESPR = 1; dir_ESPR < LB_Model<>::n_veloc; ++dir_ESPR) {
+        int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
+        p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
+        if (mesh_iter->neighbor_qid != -1) {
+          int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+          int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+
+          // streaming
+          if (mesh_iter->neighbor_is_ghost) {
+            // inverse stremaing for ghost
+            neighbor_data = &lbadapt_ghost_data[mesh_iter->current_level].at(
+                p8est_meshiter_get_neighbor_storage_id(mesh_iter));
+            if (!neighbor_data->lbfields.boundary) {
+              streaming_kernel(neighbor_data, data, inv[dir_ESPR]);
+            }
+          } else {
+            // only stream from non-boundary quadrants
+            if (data->lbfields.boundary) {
+              neighbor_data = &lbadapt_local_data[mesh_iter->current_level].at(
+                  p8est_meshiter_get_neighbor_storage_id(mesh_iter));
+              streaming_kernel(data, neighbor_data, dir_ESPR);
+            }
+          }
+
+          // bounce back
+          if (!mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
+            if (!neighbor_data->lbfields.boundary) {
+              bounce_back_kernel(data, neighbor_data, dir_ESPR, inv[dir_ESPR]);
+            } else {
+              data->lbfluid[1][inv[dir_ESPR]] =
+                  neighbor_data->lbfluid[1][dir_ESPR] = 0.0;
+            }
+          } else if (mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
+            bounce_back_kernel(neighbor_data, data, inv[dir_ESPR], dir_ESPR);
+          }
+        }
+      }
+    }
+  }
+#endif
+}
+
+void lbadapt_pass_populations(p8est_meshiter_t *mesh_iter,
+                              lbadapt_payload_t *currCellData) {
+#ifndef LB_ADAPTIVE_GPU
+  // clang-format off
+  static const int inv[] =
+      { 0,
+        2,  1,  4,  3,  6,  5,
+        8,  7, 10,  9, 12, 11, 14, 13, 16, 15, 18, 17 };
+  // clang-format on
+  lbadapt_payload_t *data;
+
+  // copy resting population
+  currCellData->lbfluid[1][0] = currCellData->lbfluid[0][0];
+
+  // stream to surrounding cells
+  for (int dir_ESPR = 1; dir_ESPR < LB_Model<>::n_veloc; ++dir_ESPR) {
+    // set neighboring cell information in iterator
+    int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
+    p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
+
+    int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
+    // stream if we found a neighbor.
+    // however, do not stream between two real quadrants that both hold virtual
+    // children
+#if 0
+    if (mesh_iter->neighbor_qid != -1
+        && ((-1 != mesh_iter->current_vid)
+            || (-1 != mesh_iter->neighbor_vid)
+            || (-1 == adapt_virtual->virtual_qflags[mesh_iter->current_qid])
+            || (!mesh_iter->neighbor_is_ghost
+                && -1 ==
+                   adapt_virtual->virtual_qflags[mesh_iter->neighbor_qid])
+            || (mesh_iter->neighbor_is_ghost
+                && -1 ==
+                   adapt_virtual->virtual_gflags[mesh_iter->neighbor_qid])))
+#else  // 0
+    if (mesh_iter->neighbor_qid != -1)
+#endif // 0
+    {
+      int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
+      assert(inv[dir_ESPR] == inv_neigh_dir_ESPR);
+      assert(dir_ESPR == inv[inv_neigh_dir_ESPR]);
+
+      if (mesh_iter->neighbor_is_ghost) {
+        data = &lbadapt_ghost_data[mesh_iter->current_level].at(
+            p8est_meshiter_get_neighbor_storage_id(mesh_iter));
+        if (!data->lbfields.boundary) {
+          // invert streaming step only if ghost neighbor is no boundary cell
+          currCellData->lbfluid[1][inv[dir_ESPR]] =
+              data->lbfluid[0][inv_neigh_dir_ESPR];
+        }
+      } else {
+        data = &lbadapt_local_data[mesh_iter->current_level].at(
+            p8est_meshiter_get_neighbor_storage_id(mesh_iter));
+        data->lbfluid[1][inv[inv_neigh_dir_ESPR]] =
+            currCellData->lbfluid[0][dir_ESPR];
+      }
+    }
   }
 #endif // LB_ADAPTIVE_GPU
 }

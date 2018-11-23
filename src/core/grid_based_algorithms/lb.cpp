@@ -3039,8 +3039,12 @@ inline void lb_collide_stream() {
       lbadapt_update_populations_from_virtuals(level,
                                                P8EST_TRAVERSE_LOCALGHOST);
 #endif
+#if 0
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
+#else
+      lbadapt_stream_bounce_back(level);
+#endif
       lbadapt_swap_pointers(level);
 
       // synchronize ghost data for next collision step

@@ -280,6 +280,12 @@ void lbadapt_collide(int level, p8est_meshiter_localghost_t quads_to_collide);
  */
 void lbadapt_populate_virtuals(p8est_meshiter_t *mesh_iter);
 
+/** combined streaming and bounce back to avoid searching neighbors once
+ *
+ * \param [in] level   The level on which to stream and bounce-back
+ */
+void lbadapt_stream_bounce_back(int level);
+
 /** streaming
  * CAUTION: sync ghost data before streaming
  *

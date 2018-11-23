@@ -1443,6 +1443,50 @@ int lb_lbfluid_load_checkpoint(char *filename, int binary) {
   return ES_OK;
 }
 
+#ifdef LB_ADAPTIVE
+void lb_is_boundary(p8est_iter_volume_info_t *info, void *user_data) {
+  Vector3i &n = *(Vector3i*) user_data;
+  auto level = info->quad->level;
+  auto offset = adapt_virtual->quad_qreal_offset[info->quadid];
+  auto &data = lbadapt_local_data[level][offset];
+  if (data.lbfields.boundary) {
+    ++n[0];
+  } else {
+    ++n[1];
+  }
+  ++n[2];
+}
+#endif
+
+void lb_lbfluid_get_node_state(Vector3i &nodes) {
+  nodes = {{0, 0, 0}};
+#ifdef LB_ADAPTIVE
+  p8est_iterate(adapt_p4est, nullptr, &nodes, lb_is_boundary, nullptr, nullptr,
+                nullptr);
+#else
+  Lattice::index_t index = lblattice.halo_offset;
+  for (int z = 1; z <= lblattice.grid[2]; z++) {
+    for (int y = 1; y <= lblattice.grid[1]; y++) {
+      for (int x = 1; x <= lblattice.grid[0]; x++) {
+// as we only want to apply this to non-boundary nodes we can throw out
+// the if-clause if we have a non-bounded domain
+#ifdef LB_BOUNDARIES
+        if (lbfields[index].boundary)
+          ++n[0];
+        else
+#endif
+          ++n[1];
+        ++n[2];
+        ++index; /* next node */
+      }
+      index += 2; /* skip halo region */
+    }
+    index += 2 * lblattice.halo_grid[0]; /* skip halo region */
+  }
+#endif
+  MPI_Reduce(MPI_IN_PLACE, nodes.data(), 3, MPI_INT, MPI_SUM, 0, comm_cart);
+}
+
 bool lb_lbnode_is_index_valid(const Vector3i &ind) {
   auto within_bounds = [](const Vector3i &ind, const Vector3i &limits) {
     return ind < limits && ind >= Vector3i{};

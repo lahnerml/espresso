@@ -611,6 +611,14 @@ void lb_dump2file(std::string filename, int id, double *preStreaming,
 int lb_lbfluid_save_checkpoint(char *filename, int binary);
 int lb_lbfluid_load_checkpoint(char *filename, int binary);
 
+/** iterate through grid and report if nodes are fluid or boundary.
+ * nodes[0] boundary
+ * nodes[1] fluid
+ * nodes[2] number of fluid nodes
+ * @param nodes
+ */
+void lb_lbfluid_get_node_state(Vector3i &nodes);
+
 bool lb_lbnode_is_index_valid(const Vector3i &ind);
 int lb_lbnode_get_rho(const Vector3i &ind, double *p_rho);
 int lb_lbnode_get_u(const Vector3i &ind, double *u);

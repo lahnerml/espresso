@@ -247,6 +247,15 @@ IF LB_GPU or LB:
         def load_checkpoint(self, path, binary):
             lb_lbfluid_load_checkpoint(utils.to_char_pointer(path), binary)
 
+        def get_nodes(self):
+            cdef Vector3i nodes
+            lb_lbfluid_get_node_state(nodes)
+            cdef int[3] res
+            for i in range(3):
+                res[i] = nodes[i]
+            return res
+
+
         # Activate Actor
         ####################################################
         def _activate_method(self):

@@ -90,13 +90,13 @@ LB_Parameters lbpar = {
     0.,
     // gamma_even
     0.,
-    // gamma_shear
+// gamma_shear
 #ifdef LB_ADAPTIVE
     {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
 #else
     0.,
 #endif
-    // gamma_bulk
+// gamma_bulk
 #ifdef LB_ADAPTIVE
     {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
 #else
@@ -109,8 +109,8 @@ LB_Parameters lbpar = {
     // fluct
     0,
     // phi
-    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.}
-};
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+     0.}};
 
 /** The DnQm model to be used. */
 LB_Model<> lbmodel = {d3q19_lattice, d3q19_coefficients, d3q19_w,
@@ -716,7 +716,8 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
                                        "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -728,24 +729,24 @@ int lb_lbfluid_print_vtk_boundary(char *filename) {
   context = lbadapt_vtk_write_header(context);
   SC_CHECK_ABORT(context != nullptr,
                  P8EST_STRING "_vtk: Error writing vtk header");
-  context =
-      lbadapt_vtk_write_cell_dataf(context, 1,
-                                   /* write tree indices */
-                                   1, /* write the refinement level */
-                                   1, /* write the mpi process id */
-                                   0, /* do not wrap the mpi rank */
-                                   1, /* write qid */
-                                   1, /* write boundary index as scalar cell
-                                         data */
-                                   0, /* no custom cell vector data */
-                                   "boundary", boundary.get(), context);
+  context = lbadapt_vtk_write_cell_dataf(context, 1,
+                                         /* write tree indices */
+                                         1, /* write the refinement level */
+                                         1, /* write the mpi process id */
+                                         0, /* do not wrap the mpi rank */
+                                         1, /* write qid */
+                                         1, /* write boundary index as scalar
+                                               cell data */
+                                         0, /* no custom cell vector data */
+                                         "boundary", boundary.get(), context);
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
   if (fp == nullptr) {
@@ -862,7 +863,8 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                        "density", density.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -884,12 +886,13 @@ int lb_lbfluid_print_vtk_density(char **filename) {
                                          0, /* no custom cell vector data */
                                          "density", density.get(), context);
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
 #endif // LB_ADAPTIVE_GPU
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   int ii;
 
   for (ii = 0; ii < LB_COMPONENTS; ++ii) {
@@ -997,11 +1000,13 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                        "vorticity", vorticity.get(),
                                        "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   context = p8est_vtk_write_point_dataf(context, 0, 1, "velocity node",
                                         vel_pts.get(), context);
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -1024,11 +1029,12 @@ int lb_lbfluid_print_vtk_velocity(char *filename, std::vector<int> bb1,
                                                data */
                                          "velocity", velocity.get(), context);
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
 #endif // LB_ADAPTIVE_GPU
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   FILE *fp = fopen(filename, "w");
 
   if (fp == nullptr) {
@@ -1492,7 +1498,7 @@ int lb_lbnode_get_rho(const Vector3i &ind, double *p_rho) {
     // unit conversion
     rho *= 1 / lbpar.agrid / lbpar.agrid / lbpar.agrid;
     *p_rho = rho;
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
     double rho;
     double j[3];
     double pi[6];
@@ -1546,7 +1552,7 @@ int lb_lbnode_get_u(const Vector3i &ind, double *p_u) {
     p_u[0] = j[0] / rho * lbpar.agrid / lbpar.tau;
     p_u[1] = j[1] / rho * lbpar.agrid / lbpar.tau;
     p_u[2] = j[2] / rho * lbpar.agrid / lbpar.tau;
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
     double rho;
     double j[3];
     double pi[6];
@@ -1709,7 +1715,7 @@ int lb_lbnode_get_pi_neq(const Vector3i &ind, double *p_pi) {
     p_pi[3] = pi[3] / lbpar.tau / lbpar.tau / lbpar.agrid;
     p_pi[4] = pi[4] / lbpar.tau / lbpar.tau / lbpar.agrid;
     p_pi[5] = pi[5] / lbpar.tau / lbpar.tau / lbpar.agrid;
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
     double rho;
     double j[3];
     double pi[6];
@@ -2415,10 +2421,11 @@ void lb_reinit_parameters() {
     lb_coupl_pref = sqrt(12. * 2. * lbpar.friction * temperature / time_step);
     lb_coupl_pref2 = sqrt(2. * lbpar.friction * temperature / time_step);
     LB_TRACE(fprintf(
-      stderr, "%d: lbpar.gamma_shear=%lf lbpar.gamma_bulk=%lf shear_fluct=%lf "
-              "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
-      this_node, lbpar.gamma_shear, lbpar.gamma_bulk, lbpar.phi[9],
-      lbpar.phi[4], mu, lbpar.bulk_viscosity, lbpar.viscosity));
+        stderr,
+        "%d: lbpar.gamma_shear=%lf lbpar.gamma_bulk=%lf shear_fluct=%lf "
+        "bulk_fluct=%lf mu=%lf, bulkvisc=%lf, visc=%lf\n",
+        this_node, lbpar.gamma_shear, lbpar.gamma_bulk, lbpar.phi[9],
+        lbpar.phi[4], mu, lbpar.bulk_viscosity, lbpar.viscosity));
   } else {
     /* no fluctuations at zero temperature */
     lbpar.fluct = 0;
@@ -2666,7 +2673,7 @@ void lb_calc_modes(Lattice::index_t index, double *mode) {
   mode[16] = n0 + n4p + n5p + n6p + n7p + n8p + n9p - 2. * (n1p + n2p + n3p);
   mode[17] = -n1p + n2p + n6p + n7p - n8p - n9p;
   mode[18] = -n1p - n2p - n6p - n7p - n8p - n9p + 2. * (n3p + n4p + n5p);
-#else // !LB_ADAPTIVE
+#else  // !LB_ADAPTIVE
   runtimeErrorMsg() << __FUNCTION__ << " not implemented with LB_ADAPTIVE flag";
 #endif // !LB_ADAPTIVE
 }
@@ -2902,7 +2909,8 @@ inline void lb_collide_stream() {
   int level;
 #ifdef LB_ADAPTIVE_GPU
   // first part of subcycling; coarse to fine
-  const auto &forest_lb = p4est_utils_get_forest_info(forest_order::adaptive_LB);
+  const auto &forest_lb =
+      p4est_utils_get_forest_info(forest_order::adaptive_LB);
   for (level = forest_lb.coarsest_level_global;
        level <= forest_lb.finest_level_global; ++level) {
     // populate halos on that level
@@ -2943,21 +2951,19 @@ inline void lb_collide_stream() {
     prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                            lbadapt_ghost_data, ghost_pointer);
 
-    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                             adapt_mesh, adapt_virtual,
-                                             adapt_virtual_ghost, level,
-                                             sizeof(lbadapt_payload_t),
-                                             (void**)local_pointer.data(),
-                                             (void**)ghost_pointer.data());
+    p4est_virtual_ghost_exchange_data_level(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+        adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
-#else  // LB_ADAPTIVE_GPU
+#else // LB_ADAPTIVE_GPU
   int lvl_diff;
 
   // perform 1st half of subcycling here (process coarse before fine)
   const auto &forest_lb =
       p4est_utils_get_forest_info(forest_order::adaptive_LB);
-  for (level = p4est_params.min_ref_level;
-       level <= p4est_params.max_ref_level; ++level) {
+  for (level = p4est_params.min_ref_level; level <= p4est_params.max_ref_level;
+       ++level) {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
@@ -2974,8 +2980,8 @@ inline void lb_collide_stream() {
   ++n_lbsteps;
 
   // perform second half of subcycling here (process fine before coarse)
-  for (level = p4est_params.max_ref_level;
-       p4est_params.min_ref_level <= level; --level) {
+  for (level = p4est_params.max_ref_level; p4est_params.min_ref_level <= level;
+       --level) {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
@@ -3003,12 +3009,10 @@ inline void lb_collide_stream() {
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
-      p8est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                               adapt_mesh, adapt_virtual,
-                                               adapt_virtual_ghost, level,
-                                               sizeof(lbadapt_payload_t),
-                                               (void**)local_pointer.data(),
-                                               (void**)ghost_pointer.data());
+      p8est_virtual_ghost_exchange_data_level(
+          adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+          adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+          (void **)local_pointer.data(), (void **)ghost_pointer.data());
 #endif
     }
   }
@@ -3184,17 +3188,17 @@ inline void lb_viscous_coupling(Particle *p, double force[3],
   /* determine elementary lattice cell surrounding the particle
      and the relative position of the particle in this cell */
 #ifdef LB_ADAPTIVE
-  (ghost ? lbadapt_interpolate_pos_ghost
-         : lbadapt_interpolate_pos_adapt)(p->r.p, payloads,
-                                          interpolation_weights, quad_levels);
-  if (payloads.empty()) { return; }
+  (ghost ? lbadapt_interpolate_pos_ghost : lbadapt_interpolate_pos_adapt)(
+      p->r.p, payloads, interpolation_weights, quad_levels);
+  if (payloads.empty()) {
+    return;
+  }
 
   P4EST_ASSERT(8 <= payloads.size() && payloads.size() <= 20);
   double h_max = p4est_params.h[p4est_params.max_ref_level];
 #else
   double h_max = lbpar.agrid;
 #endif // LB_ADAPTIVE
-
 
   /* calculate fluid velocity at particle's position
      this is done by linear interpolation
@@ -3350,13 +3354,12 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &p, double *v) {
 #ifndef LB_ADAPTIVE_GPU
 #ifdef LB_ADAPTIVE
   // FIXME Port to GPU
-  bool ghost = (this_node != p4est_utils_pos_to_proc(forest_order::adaptive_LB,
-                                                     p.data()));
+  bool ghost = (this_node !=
+                p4est_utils_pos_to_proc(forest_order::adaptive_LB, p.data()));
   lb_lbfluid_get_interpolated_velocity(p, v, ghost);
 #endif // !LB_ADAPTIVE
 #endif // !LB_ADAPTIVE_GPU
 }
-
 
 void lb_lbfluid_get_interpolated_velocity(const Vector3d &pos, double *v,
                                           bool ghost) {
@@ -3381,7 +3384,7 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &pos, double *v,
   v[0] *= lbpar.agrid / lbpar.tau;
   v[1] *= lbpar.agrid / lbpar.tau;
   v[2] *= lbpar.agrid / lbpar.tau;
-#else  // !LB_ADAPTIVE
+#else // !LB_ADAPTIVE
   lbadapt_payload_t *data;
   std::vector<lbadapt_payload_t *> payloads;
   std::vector<double> interpolation_weights;
@@ -3406,15 +3409,13 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &pos, double *v,
     int bnd = data->lbfields.boundary;
     if (bnd) {
       local_rho = lbpar.rho * h_max * h_max * h_max;
-      local_j[0] =
-          lbpar.rho * h_max * h_max * h_max *
-          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[0]; // TODO
-      local_j[1] =
-          lbpar.rho * h_max * h_max * h_max *
-          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[1]; // TODO This might not work properly
-      local_j[2] =
-          lbpar.rho * h_max * h_max * h_max *
-          (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[2]; // TODO
+      local_j[0] = lbpar.rho * h_max * h_max * h_max *
+                   (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[0]; // TODO
+      local_j[1] = lbpar.rho * h_max * h_max * h_max *
+                   (*LBBoundaries::lbboundaries[bnd - 1])
+                       .velocity()[1]; // TODO This might not work properly
+      local_j[2] = lbpar.rho * h_max * h_max * h_max *
+                   (*LBBoundaries::lbboundaries[bnd - 1]).velocity()[2]; // TODO
     } else {
       lbadapt_calc_modes(data->lbfluid, modes);
       local_rho = lbpar.rho * h_max * h_max * h_max + modes[0];
@@ -3433,8 +3434,8 @@ void lb_lbfluid_get_interpolated_velocity(const Vector3d &pos, double *v,
     interpolated_u[1] += interpolation_weights[x] * local_j[1] / (local_rho);
     interpolated_u[2] += interpolation_weights[x] * local_j[2] / (local_rho);
   }
-#endif //LB_ADAPTIVE
-#endif //!LB_ADAPTIVE_GPU
+#endif // LB_ADAPTIVE
+#endif //! LB_ADAPTIVE_GPU
 }
 
 /** Calculate particle lattice interactions.
@@ -3478,8 +3479,8 @@ void calc_particle_lattice_ia() {
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
 #ifdef COMM_HIDING
-  if (n_part)
-    p4est_utils_end_pending_communication(exc_status_lb);
+    if (n_part)
+      p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // DD_P4EST
 #else  // LB_ADAPTIVE
@@ -3530,10 +3531,10 @@ void calc_particle_lattice_ia() {
 #else
     const int data_parts = GHOSTTRANS_COUPLING;
 #endif
-    #ifdef LB_ADAPTIVE
+#ifdef LB_ADAPTIVE
     // Clear coupling quads vector
     coupling_quads = std::vector<bool>(adapt_p4est->local_num_quadrants, false);
-    #endif
+#endif
 
     /* communicate the random numbers */
     ghost_communicator(&cell_structure.exchange_ghosts_comm, data_parts);
@@ -3556,24 +3557,23 @@ void calc_particle_lattice_ia() {
     }
 
     /* ghost cells */
-      for (auto &p : ghost_cells.particles()) {
+    for (auto &p : ghost_cells.particles()) {
 #if !defined(DD_P4EST) && !defined(LB_ADAPTIVE)
-        /* for ghost particles we have to check if they lie
-         * in the range of the local lattice nodes */
-        if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&
-            p.r.p[0] < my_right[0] + 0.5 * lblattice.agrid[0] &&
-            p.r.p[1] >= my_left[1] - 0.5 * lblattice.agrid[1] &&
-            p.r.p[1] < my_right[1] + 0.5 * lblattice.agrid[1] &&
-            p.r.p[2] >= my_left[2] - 0.5 * lblattice.agrid[2] &&
-            p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2])
+      /* for ghost particles we have to check if they lie
+       * in the range of the local lattice nodes */
+      if (p.r.p[0] >= my_left[0] - 0.5 * lblattice.agrid[0] &&
+          p.r.p[0] < my_right[0] + 0.5 * lblattice.agrid[0] &&
+          p.r.p[1] >= my_left[1] - 0.5 * lblattice.agrid[1] &&
+          p.r.p[1] < my_right[1] + 0.5 * lblattice.agrid[1] &&
+          p.r.p[2] >= my_left[2] - 0.5 * lblattice.agrid[2] &&
+          p.r.p[2] < my_right[2] + 0.5 * lblattice.agrid[2])
 #endif
       {
         ONEPART_TRACE(if (p.p.identity == check_id) {
           fprintf(stderr, "%d: OPT: LB coupling of ghost particle:\n",
                   this_node);
         });
-        if (!p.p.is_virtual || thermo_virtual)
-        {
+        if (!p.p.is_virtual || thermo_virtual) {
 #ifndef DD_P4EST
           lb_viscous_coupling(&p, force);
 #else
@@ -3591,24 +3591,24 @@ void calc_particle_lattice_ia() {
 
 #ifdef LB_ADAPTIVE
 #ifdef DD_P4EST
-  if (n_part) {
+    if (n_part) {
 #ifdef COMM_HIDING
-    p4est_utils_start_communication(exc_status_lb, -1, lbadapt_local_data,
-                                    lbadapt_ghost_data);
+      p4est_utils_start_communication(exc_status_lb, -1, lbadapt_local_data,
+                                      lbadapt_ghost_data);
 #else
-    std::vector<lbadapt_payload_t*> local_pointer(P8EST_QMAXLEVEL);
-    std::vector<lbadapt_payload_t*> ghost_pointer(P8EST_QMAXLEVEL);
-    prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                           lbadapt_ghost_data, ghost_pointer);
-    for (int level = p4est_params.min_ref_level;
-         level <= p4est_params.max_ref_level; ++level) {
-      p8est_virtual_ghost_exchange_data_level(
-          adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-          adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
-          (void**)local_pointer.data(), (void**)ghost_pointer.data());
-    }
+      std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
+      std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
+      prepare_ghost_exchange(lbadapt_local_data, local_pointer,
+                             lbadapt_ghost_data, ghost_pointer);
+      for (int level = p4est_params.min_ref_level;
+           level <= p4est_params.max_ref_level; ++level) {
+        p8est_virtual_ghost_exchange_data_level(
+            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+            adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+            (void **)local_pointer.data(), (void **)ghost_pointer.data());
+      }
 #endif
-  }
+    }
 #endif
 #endif
   }
@@ -3623,9 +3623,9 @@ void lb_calc_average_rho() {
   double rho, sum_rho;
 #ifdef LB_ADAPTIVE
   rho = 0.0;
-  p8est_iterate(adapt_p4est, nullptr, (void *)&rho,
-                lbadapt_calc_local_rho, nullptr, nullptr, nullptr);
-#else  // LB_ADAPTIVE
+  p8est_iterate(adapt_p4est, nullptr, (void *)&rho, lbadapt_calc_local_rho,
+                nullptr, nullptr, nullptr);
+#else // LB_ADAPTIVE
   double local_rho;
   Lattice::index_t index;
   int x, y, z;

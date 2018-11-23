@@ -1,6 +1,5 @@
 #include "p4est_utils.hpp"
 
-#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
@@ -22,16 +21,17 @@
 
 #include <mpi.h>
 
+int n_integrate_calls;
+sc_statinfo_t stats[N_STATS];
+sc_flopinfo_t fi, snapshot;
+
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 #include <p8est_algorithms.h>
 #include <p8est_bits.h>
 #include <p8est_communication.h>
 #include <p8est_search.h>
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
-
-int n_integrate_calls;
-sc_statinfo_t stats[N_STATS];
-sc_flopinfo_t fi, snapshot;
 
 #if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;

@@ -5,8 +5,6 @@
 #include "p4est_dd.hpp"
 #include "utils.hpp"
 
-#if (defined(LB_ADAPTIVE) || defined (ES_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(DD_P4EST))
-
 #include <cstdint>
 #include <memory>
 #include <p4est_to_p8est.h>
@@ -109,6 +107,8 @@ extern int n_integrate_calls;
 extern sc_statinfo_t stats[N_STATS];
 extern sc_flopinfo_t fi, snapshot;
 
+#if (defined(LB_ADAPTIVE) || defined (ES_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(DD_P4EST))
+
 /** Allow using std::lower_bound with sc_arrays by stubbing begin and end
  */
 template <typename T>
@@ -121,7 +121,6 @@ template <typename T>
 T* sc_wrap_end(const sc_array_t *a) {
   return sc_wrap_begin<T>(a) + a->elem_count;
 }
-
 
 
 /* "global variables" */

@@ -1199,10 +1199,19 @@ void mpi_minimize_energy_slave(int a, int b) { minimize_energy(); }
 /********************* REQ_INTEGRATE ********/
 void gather_stats() {
   // collect data about number of cells and particles
+#ifdef LB_ADAPTIVE
   sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
                       static_cast<double>(adapt_p4est->local_num_quadrants));
   sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
                       static_cast<double>(adapt_mesh->ghost_num_quadrants));
+#else
+  auto total_grid_volume = lblattice.halo_grid_volume;
+  auto halo_volume = total_grid_volume - 2 * (lblattice.halo_grid[0] + lblattice.halo_grid[1] + lblattice.halo_grid[2]);
+  sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
+                      static_cast<double>(total_grid_volume - halo_volume));
+  sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
+                      static_cast<double>(halo_volume));
+#endif
   sc_stats_accumulate(&stats[NPART_LOCAL_00 + n_integrate_calls],
                       static_cast<double>(local_cells.particles().size()));
   sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
@@ -1224,7 +1233,9 @@ int mpi_integrate(int n_steps, int reuse_forces) {
   COMM_TRACE(
       fprintf(stderr, "%d: integration task %d done.\n", this_node, n_steps));
   gather_stats();
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   end_p4est_integration();
+#endif // defined(LB_ADAPTIVE || defined(DD_P4EST)
   return mpi_check_runtime_errors();
 }
 
@@ -1234,7 +1245,9 @@ void mpi_integrate_slave(int n_steps, int reuse_forces) {
       stderr, "%d: integration for %d n_steps with %d reuse_forces done.\n",
       this_node, n_steps, reuse_forces));
   gather_stats();
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   end_p4est_integration();
+#endif // defined(LB_ADAPTIVE || defined(DD_P4EST)
 }
 
 /*************** REQ_BCAST_IA ************/
@@ -2120,8 +2133,10 @@ void mpi_adapt_grid(int node, int level) {
 }
 
 void mpi_eval_statistics(int node, int param) {
+#if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
   sc_stats_compute(comm_cart, N_STATS, stats);
   sc_stats_print (-1, SC_LP_STATISTICS, N_STATS, stats, 1, 1);
+#endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }
 
 void mpi_bcast_thresh_vel(int node, int level) {

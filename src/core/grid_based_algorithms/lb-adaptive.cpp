@@ -1387,36 +1387,26 @@ void lbadapt_stream_bounce_back(int level) {
         int dir_p4est = ci_to_p4est[(dir_ESPR - 1)];
         p8est_meshiter_set_neighbor_quad_info(mesh_iter, dir_p4est);
         if (mesh_iter->neighbor_qid != -1) {
-          int inv_neigh_dir_p4est = mesh_iter->neighbor_entity_index;
-          int inv_neigh_dir_ESPR = p4est_to_ci[inv_neigh_dir_p4est];
-
-          // streaming
           if (mesh_iter->neighbor_is_ghost) {
-            // inverse stremaing for ghost
+            // inverse streaming for ghost
             neighbor_data = &lbadapt_ghost_data[mesh_iter->current_level].at(
                 p8est_meshiter_get_neighbor_storage_id(mesh_iter));
             if (!neighbor_data->lbfields.boundary) {
               streaming_kernel(neighbor_data, data, inv[dir_ESPR]);
+            } else {
+              bounce_back_kernel(neighbor_data, data, inv[dir_ESPR], dir_ESPR);
             }
           } else {
             // only stream from non-boundary quadrants
-            if (data->lbfields.boundary) {
+            if (!data->lbfields.boundary) {
               neighbor_data = &lbadapt_local_data[mesh_iter->current_level].at(
                   p8est_meshiter_get_neighbor_storage_id(mesh_iter));
-              streaming_kernel(data, neighbor_data, dir_ESPR);
+              if (neighbor_data->lbfields.boundary) {
+                bounce_back_kernel(data, neighbor_data, dir_ESPR, inv[dir_ESPR]);
+              } else {
+                streaming_kernel(data, neighbor_data, dir_ESPR);
+              }
             }
-          }
-
-          // bounce back
-          if (!mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
-            if (!neighbor_data->lbfields.boundary) {
-              bounce_back_kernel(data, neighbor_data, dir_ESPR, inv[dir_ESPR]);
-            } else {
-              data->lbfluid[1][inv[dir_ESPR]] =
-                  neighbor_data->lbfluid[1][dir_ESPR] = 0.0;
-            }
-          } else if (mesh_iter->neighbor_is_ghost && data->lbfields.boundary) {
-            bounce_back_kernel(neighbor_data, data, inv[dir_ESPR], dir_ESPR);
           }
         }
       }

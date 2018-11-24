@@ -1349,20 +1349,20 @@ void bounce_back_kernel(lbadapt_payload_t *data,
     population_shift -=
         h_max * h_max * h_max * lbpar.rho * 2 * lbmodel.c[dir][l] *
         lbmodel.w[dir] *
-        (*LBBoundaries::lbboundaries[data->lbfields.boundary - 1])
+        (*LBBoundaries::lbboundaries[neighbor_data->lbfields.boundary - 1])
             .velocity()[l] *
         (lbpar.tau / h_max) / lbmodel.c_sound_sq;
   }
 
   // sum up the force that the fluid applies on the boundary
   for (int l = 0; l < 3; ++l) {
-    (*LBBoundaries::lbboundaries[data->lbfields.boundary - 1]).force()[l] +=
-        (2 * data->lbfluid[1][dir] + population_shift) * lbmodel.c[dir][l];
+    (*LBBoundaries::lbboundaries[neighbor_data->lbfields.boundary - 1]).force()[l] +=
+        (2 * data->lbfluid[0][dir] + population_shift) * lbmodel.c[dir][l];
   }
 
   // add if we bounce back from a cell without virtual quadrants
   // into a coarse cell hosting virtual quadrants
-  neighbor_data->lbfluid[1][inv_dir] = data->lbfluid[1][dir] + population_shift;
+  data->lbfluid[1][inv_dir] = data->lbfluid[0][dir] + population_shift;
 }
 
 void lbadapt_stream_bounce_back(int level) {

@@ -539,3 +539,10 @@ cdef class System(object):
         self.check_valid_type(type)
         pid = get_random_p_id(type)
         return int(pid)
+
+    def get_statistics(self):
+        if (p4est_utils_get_stat_report()):
+            raise Exception("p4est_utils_get_stat_report error")
+
+        return 0
+

@@ -55,3 +55,6 @@ cdef extern from "particle_data.hpp":
     int init_type_map(int type) except +
     int get_random_p_id(int type) except +
     int number_of_particles_with_type(int type) except +
+
+cdef extern from "p4est_utils.hpp":
+    int p4est_utils_get_stat_report()

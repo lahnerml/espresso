@@ -227,6 +227,7 @@ static int terminated = 0;
   CB(mpi_set_refinement_area)                                                  \
   CB(mpi_write_particle_vtk)                                                   \
   CB(mpi_lbadapt_grid_reset)                                                   \
+  CB(mpi_get_node_state_slave)                                                 \
   CB(mpi_recv_interpolated_velocity_slave)
 
 // create the forward declarations
@@ -1217,6 +1218,82 @@ void gather_stats() {
   sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
                       static_cast<double>(ghost_cells.particles().size()));
 }
+
+#ifdef LB_ADAPTIVE
+void lb_is_boundary(p8est_iter_volume_info_t *info, void *user_data) {
+  Vector3i &n = *(Vector3i*) user_data;
+  int level = static_cast<int>(info->quad->level);
+  auto offset = adapt_virtual->quad_qreal_offset[info->quadid];
+  auto &data = lbadapt_local_data[level].at(offset);
+  if (data.lbfields.boundary) {
+    ++n[0];
+  } else {
+    ++n[1];
+  }
+  ++n[2];
+}
+#endif
+
+void mpi_get_node_state_slave(int node, int param) {
+  Vector3i nodes = {{0, 0, 0}};
+#ifdef LB_ADAPTIVE
+  p8est_iterate(adapt_p4est, nullptr, &nodes, lb_is_boundary, nullptr, nullptr,
+                nullptr);
+#else
+  Lattice::index_t index = lblattice.halo_offset;
+  for (int z = 1; z <= lblattice.grid[2]; z++) {
+    for (int y = 1; y <= lblattice.grid[1]; y++) {
+      for (int x = 1; x <= lblattice.grid[0]; x++) {
+// as we only want to apply this to non-boundary nodes we can throw out
+// the if-clause if we have a non-bounded domain
+#ifdef LB_BOUNDARIES
+        if (lbfields[index].boundary)
+          ++n[0];
+        else
+#endif
+          ++n[1];
+        ++n[2];
+        ++index; /* next node */
+      }
+      index += 2; /* skip halo region */
+    }
+    index += 2 * lblattice.halo_grid[0]; /* skip halo region */
+  }
+#endif
+  MPI_Reduce(MPI_IN_PLACE, nodes.data(), 3, MPI_INT, MPI_SUM, 0, comm_cart);
+}
+
+Vector3i mpi_get_node_state() {
+  Vector3i nodes = {{0, 0, 0}};
+#ifdef LB_ADAPTIVE
+  p8est_iterate(adapt_p4est, nullptr, &nodes, lb_is_boundary, nullptr, nullptr,
+                nullptr);
+#else
+  Lattice::index_t index = lblattice.halo_offset;
+  for (int z = 1; z <= lblattice.grid[2]; z++) {
+    for (int y = 1; y <= lblattice.grid[1]; y++) {
+      for (int x = 1; x <= lblattice.grid[0]; x++) {
+// as we only want to apply this to non-boundary nodes we can throw out
+// the if-clause if we have a non-bounded domain
+#ifdef LB_BOUNDARIES
+        if (lbfields[index].boundary)
+          ++n[0];
+        else
+#endif
+          ++n[1];
+        ++n[2];
+        ++index; /* next node */
+      }
+      index += 2; /* skip halo region */
+    }
+    index += 2 * lblattice.halo_grid[0]; /* skip halo region */
+  }
+#endif
+  MPI_Reduce(MPI_IN_PLACE, nodes.data(), 3, MPI_INT, MPI_SUM, 0, comm_cart);
+
+  return nodes;
+}
+
 
 void end_p4est_integration() {
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)

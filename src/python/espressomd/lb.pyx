@@ -249,7 +249,7 @@ IF LB_GPU or LB:
 
         def get_nodes(self):
             cdef Vector3i nodes
-            lb_lbfluid_get_node_state(nodes)
+            nodes = lb_lbfluid_get_node_state()
             cdef int[3] res
             for i in range(3):
                 res[i] = nodes[i]

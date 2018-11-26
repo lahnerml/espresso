@@ -81,7 +81,6 @@ IF LB_ADAPTIVE or EK_ADAPTIVE or ES_ADAPTIVE:
         int p4est_utils_geometric_refinement()
         int p4est_utils_inverse_geometric_refinement()
         int p4est_utils_adapt_grid()
-        int p4est_utils_get_stat_report()
         int p4est_utils_set_refinement_area(double *c_bbcoords, double *c_vel)
 
     ###############################################

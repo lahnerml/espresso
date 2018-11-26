@@ -2204,7 +2204,8 @@ void mpi_adapt_grid(int node, int level) {
   sc_flops_snap(&fi, &snapshot);
   p4est_utils_perform_adaptivity_step();
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&stats[GRID_CHANGE_00 + n_integrate_calls],
+  // integration is done, therefore the integration counter is one step too far
+  sc_stats_accumulate(&stats[GRID_CHANGE_00 - 1 + n_integrate_calls],
                       snapshot.iwtime);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }

@@ -1224,7 +1224,23 @@ void lb_is_boundary(p8est_iter_volume_info_t *info, void *user_data) {
   Vector3i &n = *(Vector3i*) user_data;
   int level = static_cast<int>(info->quad->level);
   auto offset = adapt_virtual->quad_qreal_offset[info->quadid];
-  auto &data = lbadapt_local_data[level].at(offset);
+  if (lbadapt_local_data[level].size() < offset) {
+    std::cout << "[p4est " << this_node
+              << "] Wrong data access: size: "
+              << lbadapt_local_data[level].size()
+              << "; offset: " << offset
+              << "; quadid: " << info->quadid
+              << "; level: " << level
+              << std::endl
+              << "number of real cells on this level: "
+              << (adapt_mesh->quad_level + level)->elem_count
+              << "; virtual cells on this level: "
+              << (adapt_virtual->virtual_qlevels + level)->elem_count
+              << "; virtual cells up to now: "
+              << adapt_virtual->virtual_qflags[info->quadid]
+              << std::endl;
+  }
+  lbadapt_payload_t &data = lbadapt_local_data[level].at(offset);
   if (data.lbfields.boundary) {
     ++n[0];
   } else {

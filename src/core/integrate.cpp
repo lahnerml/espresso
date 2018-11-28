@@ -392,6 +392,10 @@ void integrate_vv(int n_steps, int reuse_forces) {
     sc_flops_shot(&fi, &snapshot);
     sc_stats_accumulate(&stats[MD_STEP_00 + n_integrate_calls],
                         snapshot.iwtime);
+    int n_local_parts = local_cells.particles().size();
+    if (n_local_parts)
+      sc_stats_accumulate(&stats[PUPS_MD_00 + n_integrate_calls],
+                          n_local_parts / snapshot.iwtime);
 
 #ifdef VIRTUAL_SITES
     virtual_sites()->after_force_calc();
@@ -427,6 +431,9 @@ void integrate_vv(int n_steps, int reuse_forces) {
         sc_flops_shot(&fi, &snapshot);
         sc_stats_accumulate(&stats[LB_STEP_00 + n_integrate_calls],
                             snapshot.iwtime);
+        double n = lb_lbfluid_get_fluid_nodes_next_time_step();
+        sc_stats_accumulate(&stats[FLUPS_LB_00 + n_integrate_calls],
+                            n / snapshot.iwtime);
       }
 
       if (check_runtime_errors())

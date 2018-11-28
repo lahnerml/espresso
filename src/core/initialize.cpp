@@ -148,6 +148,26 @@ void on_program_start() {
   sc_stats_init(&stats[GRID_CHANGE_08], "Grid change step 08");
   sc_stats_init(&stats[GRID_CHANGE_09], "Grid change step 09");
 #endif
+  sc_stats_init(&stats[FLUPS_LB_00], "Fluid lattice updates per second 00");
+  sc_stats_init(&stats[FLUPS_LB_01], "Fluid lattice updates per second 01");
+  sc_stats_init(&stats[FLUPS_LB_02], "Fluid lattice updates per second 02");
+  sc_stats_init(&stats[FLUPS_LB_03], "Fluid lattice updates per second 03");
+  sc_stats_init(&stats[FLUPS_LB_04], "Fluid lattice updates per second 04");
+  sc_stats_init(&stats[FLUPS_LB_05], "Fluid lattice updates per second 05");
+  sc_stats_init(&stats[FLUPS_LB_06], "Fluid lattice updates per second 06");
+  sc_stats_init(&stats[FLUPS_LB_07], "Fluid lattice updates per second 07");
+  sc_stats_init(&stats[FLUPS_LB_08], "Fluid lattice updates per second 08");
+  sc_stats_init(&stats[FLUPS_LB_09], "Fluid lattice updates per second 09");
+  sc_stats_init(&stats[PUPS_MD_00], "Particle updates per second 00");
+  sc_stats_init(&stats[PUPS_MD_01], "Particle updates per second 01");
+  sc_stats_init(&stats[PUPS_MD_02], "Particle updates per second 02");
+  sc_stats_init(&stats[PUPS_MD_03], "Particle updates per second 03");
+  sc_stats_init(&stats[PUPS_MD_04], "Particle updates per second 04");
+  sc_stats_init(&stats[PUPS_MD_05], "Particle updates per second 05");
+  sc_stats_init(&stats[PUPS_MD_06], "Particle updates per second 06");
+  sc_stats_init(&stats[PUPS_MD_07], "Particle updates per second 07");
+  sc_stats_init(&stats[PUPS_MD_08], "Particle updates per second 08");
+  sc_stats_init(&stats[PUPS_MD_09], "Particle updates per second 09");
   sc_stats_init(&stats[NCELLS_LB_LOCAL_00], "Number of local cells step 00");
   sc_stats_init(&stats[NCELLS_LB_LOCAL_01], "Number of local cells step 01");
   sc_stats_init(&stats[NCELLS_LB_LOCAL_02], "Number of local cells step 02");

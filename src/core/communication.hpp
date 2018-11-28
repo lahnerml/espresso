@@ -504,14 +504,20 @@ void mpi_eval_statistics (int node, int param);
  */
 Vector3i get_local_nodes();
 
+#ifdef LB_ADAPTIVE
+/** Get local number of fluid and boundary cells of a specific level
+ */
+Vector3i get_local_nodes_level(int l);
+#endif
+
 /** Collect node status locally and send to master
  */
-void mpi_get_node_state_slave(int node, int param);
+void mpi_get_node_state_slave(int node, int level = -1);
 
 /** aggretage nodes over all nodes
  * @return Vector [boundary nodes, fluid nodes, total nodes]
  */
-Vector3i mpi_get_node_state();
+Vector3i mpi_get_node_state(int level = -1);
 
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */

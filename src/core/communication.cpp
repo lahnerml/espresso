@@ -1220,30 +1220,34 @@ void gather_stats() {
 }
 
 #ifdef LB_ADAPTIVE
+Vector3i get_local_nodes_level(int l) {
+  Vector3i nodes = {{0, 0, 0}};
+  lbadapt_payload_t *data;
+  int status = 0;
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, l,
+      P8EST_CONNECT_FULL, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      data = &lbadapt_local_data[l].at(
+          p8est_meshiter_get_current_storage_id(mesh_iter));
+      if (data->lbfields.boundary)
+        ++nodes[0];
+      else
+        ++nodes[1];
+      ++nodes[2];
+    }
+  }
+  return nodes;
+}
+
 Vector3i get_nodes_adaptive() {
   Vector3i nodes = {{0, 0, 0}};
-  castable_unique_ptr<p8est_meshiter_t> mesh_iter;
-  int status;
-  lbadapt_payload_t *data;
   for (int lvl = p4est_params.min_ref_level; lvl <= p4est_params.max_ref_level;
        ++lvl) {
-    status = 0;
-    mesh_iter.reset(p8est_meshiter_new_ext(
-        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, lvl,
-        P8EST_CONNECT_FULL, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
-        P8EST_TRAVERSE_PARBOUNDINNER));
-    while (status != P8EST_MESHITER_DONE) {
-      status = p8est_meshiter_next(mesh_iter);
-      if (status != P8EST_MESHITER_DONE) {
-        data = &lbadapt_local_data[lvl].at(
-            p8est_meshiter_get_current_storage_id(mesh_iter));
-        if (data->lbfields.boundary)
-          ++nodes[0];
-        else
-          ++nodes[1];
-        ++nodes[2];
-      }
-    }
+    nodes += get_local_nodes_level(lvl);
   }
   return nodes;
 }
@@ -1283,14 +1287,31 @@ Vector3i get_local_nodes() {
   return nodes;
 }
 
-void mpi_get_node_state_slave(int node, int param) {
-  Vector3i nodes = get_local_nodes();
+void mpi_get_node_state_slave(int node, int level) {
+  Vector3i nodes;
+#ifdef LB_ADAPTIVE
+  if (level == -1) {
+    nodes = get_local_nodes();
+  } else {
+    nodes = get_local_nodes_level(level);
+  }
+#else
+  nodes = get_local_nodes();
+#endif
   boost::mpi::reduce(comm_cart, nodes, std::plus<Vector3i>(), 0);
 }
 
-Vector3i mpi_get_node_state() {
-  Vector3i nodes = get_local_nodes();
-  Vector3i total_nodes;
+Vector3i mpi_get_node_state(int level) {
+  Vector3i nodes, total_nodes;
+#ifdef LB_ADAPTIVE
+  if (level == -1) {
+    nodes = get_local_nodes();
+  } else {
+    nodes = get_local_nodes_level(level);
+  }
+#else
+  nodes = get_local_nodes();
+#endif
   boost::mpi::reduce(comm_cart, nodes, total_nodes, std::plus<Vector3i>(), 0);
 
   return total_nodes;

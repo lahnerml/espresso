@@ -278,6 +278,12 @@ void integrate_vv(int n_steps, int reuse_forces) {
     //sc_stats_accumulate(&stats[MD_STEP_00 + n_integrate_calls],
     //                    snapshot.iwtime);
 
+#if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+    if (n_part && 0 == n_lbsteps && adapt_p4est != nullptr) {
+      p4est_utils_refine_around_particles();
+    }
+#endif
+
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
 #ifdef ROTATION
       convert_initial_torques();

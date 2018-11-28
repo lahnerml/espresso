@@ -619,6 +619,8 @@ int lb_lbfluid_load_checkpoint(char *filename, int binary);
  */
 Vector3i lb_lbfluid_get_node_state();
 
+int lb_lbfluid_get_fluid_nodes_next_time_step();
+
 bool lb_lbnode_is_index_valid(const Vector3i &ind);
 int lb_lbnode_get_rho(const Vector3i &ind, double *p_rho);
 int lb_lbnode_get_u(const Vector3i &ind, double *u);

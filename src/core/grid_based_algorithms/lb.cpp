@@ -1448,6 +1448,23 @@ Vector3i lb_lbfluid_get_node_state() {
   return mpi_get_node_state();
 }
 
+int lb_lbfluid_get_fluid_nodes_next_time_step() {
+  Vector3i nodes = {{0, 0, 0}};
+#ifdef LB_ADAPTIVE
+  const int lmin = p4est_params.min_ref_level;
+  int lvl = p4est_params.max_ref_level;
+  int lvl_diff = 0;
+  while(n_lbsteps % (1 << lvl_diff) == 0 && lmin <= lvl) {
+    nodes += get_local_nodes_level(lvl);
+    ++lvl_diff;
+    --lvl;
+  }
+#else
+  nodes = get_local_nodes();
+#endif
+  return nodes[1];
+}
+
 bool lb_lbnode_is_index_valid(const Vector3i &ind) {
   auto within_bounds = [](const Vector3i &ind, const Vector3i &limits) {
     return ind < limits && ind >= Vector3i{};
@@ -2981,6 +2998,7 @@ inline void lb_collide_stream() {
 #endif
     }
   }
+
   // increment counter half way to keep coarse quadrants from streaming early
   ++n_lbsteps;
 

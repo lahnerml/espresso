@@ -496,6 +496,23 @@ void mpi_set_particle_gamma_rot(int pnode, int part, Vector3d gamma_rot);
 #endif
 #endif // LANGEVIN_PER_PARTICLE
 
+/** Callback to evaluate gathered statistics
+ */
+void mpi_eval_statistics (int node, int param);
+
+/** Get local number of fluid and boundary cells
+ */
+Vector3i get_local_nodes();
+
+/** Collect node status locally and send to master
+ */
+void mpi_get_node_state_slave(int node, int param);
+
+/** aggretage nodes over all nodes
+ * @return Vector [boundary nodes, fluid nodes, total nodes]
+ */
+Vector3i mpi_get_node_state();
+
 #if defined(LB_BOUNDARIES) || defined(LB_BOUNDARIES_GPU)
 /** Issue REQ_LB_BOUNDARY: set up walls for lb fluid */
 void mpi_bcast_lbboundary(int del_num);
@@ -505,13 +522,6 @@ void mpi_bcast_lbboundary(int del_num);
 /** Callback to adapt p4est grid
  */
 void mpi_adapt_grid (int node, int param);
-
-/** Callback to evaluate gathered statistics
- */
-void mpi_eval_statistics (int node, int param);
-
-void mpi_get_node_state_slave(int node, int param);
-Vector3i mpi_get_node_state();
 
 /** Callback to broadcast velocity threshold values for coarsening and
  * refinement.

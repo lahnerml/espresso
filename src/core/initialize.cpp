@@ -136,6 +136,7 @@ void on_program_start() {
   sc_stats_init(&stats[MD_STEP_07], "Coarse MD step 07");
   sc_stats_init(&stats[MD_STEP_08], "Coarse MD step 08");
   sc_stats_init(&stats[MD_STEP_09], "Coarse MD step 09");
+#ifdef LB_ADAPTIVE
   sc_stats_init(&stats[GRID_CHANGE_00], "Grid change step 00");
   sc_stats_init(&stats[GRID_CHANGE_01], "Grid change step 01");
   sc_stats_init(&stats[GRID_CHANGE_02], "Grid change step 02");
@@ -146,6 +147,7 @@ void on_program_start() {
   sc_stats_init(&stats[GRID_CHANGE_07], "Grid change step 07");
   sc_stats_init(&stats[GRID_CHANGE_08], "Grid change step 08");
   sc_stats_init(&stats[GRID_CHANGE_09], "Grid change step 09");
+#endif
   sc_stats_init(&stats[NCELLS_LB_LOCAL_00], "Number of local cells step 00");
   sc_stats_init(&stats[NCELLS_LB_LOCAL_01], "Number of local cells step 01");
   sc_stats_init(&stats[NCELLS_LB_LOCAL_02], "Number of local cells step 02");

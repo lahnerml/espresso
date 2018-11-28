@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <memory>
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
 #include <p4est_to_p8est.h>
 #include <p8est.h>
 #include <p8est_connectivity.h>
@@ -14,6 +15,7 @@
 #include <p8est_mesh.h>
 #include <p8est_meshiter.h>
 #include <p8est_virtual.h>
+#endif
 #include <sc_flops.h>
 #include <sc_statistics.h>
 #include <vector>
@@ -22,6 +24,7 @@
 /** \name Generic helper functions                                           */
 /*****************************************************************************/
 
+#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
 namespace std
 {
   template<>
@@ -77,15 +80,18 @@ struct castable_unique_ptr: public std::unique_ptr<T> {
   operator T*() const { return this->get(); }
   operator void *() const { return this->get(); }
 };
+#endif
 
 enum {
   LB_STEP_00, LB_STEP_01, LB_STEP_02, LB_STEP_03, LB_STEP_04,
   LB_STEP_05, LB_STEP_06, LB_STEP_07, LB_STEP_08, LB_STEP_09,
   MD_STEP_00, MD_STEP_01, MD_STEP_02, MD_STEP_03, MD_STEP_04,
   MD_STEP_05, MD_STEP_06, MD_STEP_07, MD_STEP_08, MD_STEP_09,
+#ifdef LB_ADAPTIVE
   GRID_CHANGE_00, GRID_CHANGE_01, GRID_CHANGE_02, GRID_CHANGE_03,
   GRID_CHANGE_04, GRID_CHANGE_05, GRID_CHANGE_06, GRID_CHANGE_07,
   GRID_CHANGE_08, GRID_CHANGE_09,
+#endif
   NCELLS_LB_LOCAL_00, NCELLS_LB_LOCAL_01, NCELLS_LB_LOCAL_02,
   NCELLS_LB_LOCAL_03, NCELLS_LB_LOCAL_04, NCELLS_LB_LOCAL_05,
   NCELLS_LB_LOCAL_06, NCELLS_LB_LOCAL_07, NCELLS_LB_LOCAL_08,
@@ -106,6 +112,14 @@ enum {
 extern int n_integrate_calls;
 extern sc_statinfo_t stats[N_STATS];
 extern sc_flopinfo_t fi, snapshot;
+
+/** Calculate statistics */
+inline int p4est_utils_get_stat_report() {
+  /* calculate and print timings */
+  mpi_call(mpi_eval_statistics, -1, 0);
+  mpi_eval_statistics(0, 0);
+  return 0;
+}
 
 #if (defined(LB_ADAPTIVE) || defined (ES_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(DD_P4EST))
 
@@ -402,14 +416,6 @@ inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
     mpi_call(mpi_reg_refinement, -1, 0);
     mpi_reg_refinement(0, 0);
   }
-  return 0;
-}
-
-/** Calculate statistics */
-inline int p4est_utils_get_stat_report() {
-  /* calculate and print timings */
-  mpi_call(mpi_eval_statistics, -1, 0);
-  mpi_eval_statistics(0, 0);
   return 0;
 }
 

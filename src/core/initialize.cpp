@@ -101,11 +101,11 @@ void on_program_start() {
 
   init_node_grid();
 
-#if (defined(DD_P4EST) || defined(LB_ADAPTIVE))
   // auto verbosity = SC_LP_ESSENTIAL;
   auto verbosity = SC_LP_PRODUCTION;
   // auto verbosity = SC_LP_VERBOSE;
   sc_init (comm_cart, 1, 1, nullptr, verbosity);
+#if (defined(DD_P4EST) || defined(LB_ADAPTIVE))
   p4est_init(nullptr, verbosity);
 #ifdef DD_P4EST
   topology_init(CELL_STRUCTURE_P4EST, &local_cells);

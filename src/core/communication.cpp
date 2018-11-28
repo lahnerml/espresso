@@ -52,9 +52,9 @@
 #include "galilei.hpp"
 #include "global.hpp"
 #include "grid.hpp"
-#include "grid_based_algorithms/lb.hpp"
 #include "grid_based_algorithms/lb-adaptive-gpu.hpp"
 #include "grid_based_algorithms/lb-adaptive.hpp"
+#include "grid_based_algorithms/lb.hpp"
 #include "grid_based_algorithms/lbboundaries.hpp"
 #include "initialize.hpp"
 #include "integrate.hpp"
@@ -71,10 +71,10 @@
 #include "nonbonded_interactions/nonbonded_tab.hpp"
 #include "nonbonded_interactions/reaction_field.hpp"
 #include "npt.hpp"
-#include "particle_vtk.hpp"
 #include "p4est_utils.hpp"
 #include "partCfg_global.hpp"
 #include "particle_data.hpp"
+#include "particle_vtk.hpp"
 #include "pressure.hpp"
 #include "rotation.hpp"
 #include "statistics.hpp"
@@ -95,7 +95,6 @@
 #include <boost/serialization/string.hpp>
 
 using namespace std;
-
 
 using namespace std;
 
@@ -1206,10 +1205,11 @@ void gather_stats() {
   sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
                       static_cast<double>(adapt_mesh->ghost_num_quadrants));
 #else
-  auto total_grid_volume = lblattice.halo_grid_volume;
-  auto halo_volume = total_grid_volume - 2 * (lblattice.halo_grid[0] + lblattice.halo_grid[1] + lblattice.halo_grid[2]);
+  auto local_grid_volume = std::accumulate(
+      lblattice.grid.begin(), lblattice.grid.end(), 1, std::multiplies<int>());
+  auto halo_volume = lblattice.halo_grid_volume - local_grid_volume;
   sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(total_grid_volume - halo_volume));
+                      static_cast<double>(local_grid_volume));
   sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
                       static_cast<double>(halo_volume));
 #endif
@@ -1296,14 +1296,13 @@ Vector3i mpi_get_node_state() {
   return total_nodes;
 }
 
-
 void end_p4est_integration() {
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
   p4est_utils_end_pending_communication(exc_status_lb);
 #endif // COMM_HIDING
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-  //++n_integrate_calls;
+  ++n_integrate_calls;
 }
 
 int mpi_integrate(int n_steps, int reuse_forces) {
@@ -1312,9 +1311,7 @@ int mpi_integrate(int n_steps, int reuse_forces) {
   COMM_TRACE(
       fprintf(stderr, "%d: integration task %d done.\n", this_node, n_steps));
   gather_stats();
-#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   end_p4est_integration();
-#endif // defined(LB_ADAPTIVE || defined(DD_P4EST)
   return mpi_check_runtime_errors();
 }
 
@@ -1324,9 +1321,7 @@ void mpi_integrate_slave(int n_steps, int reuse_forces) {
       stderr, "%d: integration for %d n_steps with %d reuse_forces done.\n",
       this_node, n_steps, reuse_forces));
   gather_stats();
-#if defined(LB_ADAPTIVE) || defined(DD_P4EST)
   end_p4est_integration();
-#endif // defined(LB_ADAPTIVE || defined(DD_P4EST)
 }
 
 /*************** REQ_BCAST_IA ************/
@@ -2080,9 +2075,9 @@ void mpi_recv_fluid(int node, int index, double *rho, double *j, double *pi) {
 
     lbadapt_payload_t *data =
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
-    lbadapt_calc_local_fields(data->lbfluid, data->lbfields.force_density,
-                              data->lbfields.boundary, data->lbfields.has_force_density,
-                              p4est_params.h[lvl], rho, j, pi);
+    lbadapt_calc_local_fields(
+        data->lbfluid, data->lbfields.force_density, data->lbfields.boundary,
+        data->lbfields.has_force_density, p4est_params.h[lvl], rho, j, pi);
 #endif // !LB_ADAPTIVE
   } else {
     double data[10];
@@ -2120,10 +2115,10 @@ void mpi_recv_fluid_slave(int node, int index) {
 
     lbadapt_payload_t *dat =
         &lbadapt_local_data[lvl][adapt_virtual->quad_qreal_offset[quad]];
-    lbadapt_calc_local_fields(dat->lbfluid, dat->lbfields.force_density,
-                              dat->lbfields.boundary, dat->lbfields.has_force_density,
-                              p4est_params.h[lvl], &data[0], &data[1],
-                              &data[4]);
+    lbadapt_calc_local_fields(
+        dat->lbfluid, dat->lbfields.force_density, dat->lbfields.boundary,
+        dat->lbfields.has_force_density, p4est_params.h[lvl], &data[0],
+        &data[1], &data[4]);
 #endif // !LB_ADAPTIVE
     MPI_Send(data, 10, MPI_DOUBLE, 0, SOME_TAG, comm_cart);
   }
@@ -2214,7 +2209,7 @@ void mpi_adapt_grid(int node, int level) {
 
 void mpi_eval_statistics(int node, int param) {
   sc_stats_compute(comm_cart, N_STATS, stats);
-  sc_stats_print (-1, SC_LP_STATISTICS, N_STATS, stats, 1, 1);
+  sc_stats_print(-1, SC_LP_STATISTICS, N_STATS, stats, 1, 1);
 }
 
 void mpi_bcast_thresh_vel(int node, int level) {
@@ -2334,7 +2329,8 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                        "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2360,7 +2356,8 @@ void mpi_lbadapt_vtk_print_boundary(int node, int len) {
                                    "boundary", boundary.get(), context);
   // clang-format on
 
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2405,7 +2402,8 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                        0, /* no custom cell vector data */
                                        "density", density.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2429,7 +2427,8 @@ void mpi_lbadapt_vtk_print_density(int node, int len) {
                                          0, /* no custom cell vector data */
                                          "density", density.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2481,11 +2480,13 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                        "vorticity", vorticity.get(),
                                        "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   context = p8est_vtk_write_point_dataf(context, 0, 1, "velocity node",
                                         vel_pts.get(), context);
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = p8est_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2509,7 +2510,8 @@ void mpi_lbadapt_vtk_print_velocity(int node, int len) {
                                                data */
                                          "velocity", velocity.get(), context);
   // clang-format on
-  SC_CHECK_ABORT(context != nullptr, P8EST_STRING "_vtk: Error writing cell data");
+  SC_CHECK_ABORT(context != nullptr,
+                 P8EST_STRING "_vtk: Error writing cell data");
 
   const int retval = lbadapt_vtk_write_footer(context);
   SC_CHECK_ABORT(!retval, P8EST_STRING "_vtk: Error writing footer");
@@ -2719,7 +2721,8 @@ void mpi_inv_geometric_refinement(int node, int param) {
 void mpi_exclude_boundary(int node, int param) {
 #ifdef LB_ADAPTIVE
   if (LBBoundaries::exclude_in_geom_ref.size() == 0) {
-    LBBoundaries::exclude_in_geom_ref.reserve(LBBoundaries::lbboundaries.size());
+    LBBoundaries::exclude_in_geom_ref.reserve(
+        LBBoundaries::lbboundaries.size());
   }
 
   // ensure to only push each boundary index once

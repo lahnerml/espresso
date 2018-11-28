@@ -1253,8 +1253,34 @@ void lb_is_boundary(p8est_iter_volume_info_t *info, void *user_data) {
 void mpi_get_node_state_slave(int node, int param) {
   Vector3i nodes = {{0, 0, 0}};
 #ifdef LB_ADAPTIVE
+#if 0
   p8est_iterate(adapt_p4est, nullptr, &nodes, lb_is_boundary, nullptr, nullptr,
                 nullptr);
+#else
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter;
+  int status;
+  lbadapt_payload_t *data;
+  for (int lvl = p4est_params.min_ref_level; lvl <= p4est_params.max_ref_level;
+       ++lvl) {
+    status = 0;
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, lvl,
+        P8EST_CONNECT_FULL, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        data = &lbadapt_local_data[lvl].at(
+            p8est_meshiter_get_current_storage_id(mesh_iter));
+        if (data->lbfields.boundary)
+          ++nodes[0];
+        else
+          ++nodes[1];
+        ++nodes[2];
+      }
+    }
+  }
+#endif
 #else
   Lattice::index_t index = lblattice.halo_offset;
   for (int z = 1; z <= lblattice.grid[2]; z++) {
@@ -1264,11 +1290,11 @@ void mpi_get_node_state_slave(int node, int param) {
 // the if-clause if we have a non-bounded domain
 #ifdef LB_BOUNDARIES
         if (lbfields[index].boundary)
-          ++n[0];
+          ++nodes[0];
         else
 #endif
-          ++n[1];
-        ++n[2];
+          ++nodes[1];
+        ++nodes[2];
         ++index; /* next node */
       }
       index += 2; /* skip halo region */
@@ -1282,8 +1308,34 @@ void mpi_get_node_state_slave(int node, int param) {
 Vector3i mpi_get_node_state() {
   Vector3i nodes = {{0, 0, 0}};
 #ifdef LB_ADAPTIVE
+#if 0
   p8est_iterate(adapt_p4est, nullptr, &nodes, lb_is_boundary, nullptr, nullptr,
                 nullptr);
+#else
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter;
+  int status;
+  lbadapt_payload_t *data;
+  for (int lvl = p4est_params.min_ref_level; lvl <= p4est_params.max_ref_level;
+       ++lvl) {
+    status = 0;
+    mesh_iter.reset(p8est_meshiter_new_ext(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, lvl,
+        P8EST_CONNECT_FULL, P8EST_TRAVERSE_LOCAL, P8EST_TRAVERSE_REAL,
+        P8EST_TRAVERSE_PARBOUNDINNER));
+    while (status != P8EST_MESHITER_DONE) {
+      status = p8est_meshiter_next(mesh_iter);
+      if (status != P8EST_MESHITER_DONE) {
+        data = &lbadapt_local_data[lvl].at(
+            p8est_meshiter_get_current_storage_id(mesh_iter));
+        if (data->lbfields.boundary)
+          ++nodes[0];
+        else
+          ++nodes[1];
+        ++nodes[2];
+      }
+    }
+  }
+#endif
 #else
   Lattice::index_t index = lblattice.halo_offset;
   for (int z = 1; z <= lblattice.grid[2]; z++) {
@@ -1293,11 +1345,11 @@ Vector3i mpi_get_node_state() {
 // the if-clause if we have a non-bounded domain
 #ifdef LB_BOUNDARIES
         if (lbfields[index].boundary)
-          ++n[0];
+          ++nodes[0];
         else
 #endif
-          ++n[1];
-        ++n[2];
+          ++nodes[1];
+        ++nodes[2];
         ++index; /* next node */
       }
       index += 2; /* skip halo region */

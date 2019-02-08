@@ -2274,6 +2274,9 @@ void mpi_adapt_grid(int node, int level) {
 
 void mpi_eval_statistics(int node, int param) {
 #ifdef LB_ADAPTIVE
+  // HACK:  Simplify parsing by dropping last empty element.
+  //        Obviously, we can only call evaluation of statistics once.
+  statistics.pop_back();
   for (auto s : statistics) {
     sc_stats_compute(comm_cart, N_STATS, s.stats);
     sc_stats_print(-1, SC_LP_STATISTICS, N_STATS, s.stats, 1, 1);

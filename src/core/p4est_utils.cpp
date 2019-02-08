@@ -1,6 +1,5 @@
 #include "p4est_utils.hpp"
 
-
 #include "debug.hpp"
 #include "domain_decomposition.hpp"
 #include "grid.hpp"
@@ -31,7 +30,8 @@ static std::vector<p4est_utils_forest_info_t> forest_info;
 std::vector<stat_container_t> statistics;
 sc_flopinfo_t fi, snapshot;
 
-#if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
+#if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) ||                \
+    defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;
 castable_unique_ptr<p4est_connectivity_t> adapt_conn;
 castable_unique_ptr<p4est_ghost_t> adapt_ghost;
@@ -39,29 +39,30 @@ castable_unique_ptr<p4est_mesh_t> adapt_mesh;
 castable_unique_ptr<p4est_virtual_t> adapt_virtual;
 castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 #ifdef COMM_HIDING
-std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb (P8EST_QMAXLEVEL,
+std::vector<p8est_virtual_ghost_exchange_t *> exc_status_lb(P8EST_QMAXLEVEL,
                                                             nullptr);
 #endif
 #endif
 std::vector<bool> coupling_quads = {{}};
 
-
 p4est_parameters p4est_params = {
-  // min_ref_level
-  -1,
-  // max_ref_level
-  -1,
- // h
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
-  // prefactors
-  {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.},
-  // partitioning
-  "n_cells",
+    // min_ref_level
+    -1,
+    // max_ref_level
+    -1,
+    // h
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+     0.},
+    // prefactors
+    {0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0., 0.,
+     0.},
+    // partitioning
+    "n_cells",
 #ifdef LB_ADAPTIVE
-  // threshold_velocity
-  {0.0, 1.0},
-  // threshold_vorticity
-  {0.0, 1.0},
+    // threshold_velocity
+    {0.0, 1.0},
+    // threshold_vorticity
+    {0.0, 1.0},
 #endif
 };
 
@@ -69,13 +70,13 @@ p4est_parameters p4est_params = {
 int lb_conn_brick[3] = {0, 0, 0};
 #endif // LB_ADAPTIVE
 
-std::array<double, 6> coords_for_regional_refinement =
-    {{std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-      std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-      std::numeric_limits<double>::min(), std::numeric_limits<double>::max()}};
-double vel_reg_ref[3] = { std::numeric_limits<double>::min(),
-                          std::numeric_limits<double>::min(),
-                          std::numeric_limits<double>::min() };
+std::array<double, 6> coords_for_regional_refinement = {
+    {std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+     std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+     std::numeric_limits<double>::min(), std::numeric_limits<double>::max()}};
+double vel_reg_ref[3] = {std::numeric_limits<double>::min(),
+                         std::numeric_limits<double>::min(),
+                         std::numeric_limits<double>::min()};
 
 // CAUTION: Do ONLY use this pointer in p4est_utils_perform_adaptivity_step
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
@@ -118,8 +119,8 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
     }
     // synchronize level and insert into forest_info vector
     MPI_Allreduce(&insert_elem.finest_level_local,
-                  &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX, MPI_MAX,
-                  p4est->mpicomm);
+                  &insert_elem.finest_level_global, 1, P4EST_MPI_LOCIDX,
+                  MPI_MAX, p4est->mpicomm);
     MPI_Allreduce(&insert_elem.coarsest_level_local,
                   &insert_elem.coarsest_level_global, 1, P4EST_MPI_LOCIDX,
                   MPI_MIN, p4est->mpicomm);
@@ -145,7 +146,7 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
                        ((n_trees[i] < n_trees_alt[i]) && n_trees[i] == 0) ||
                        ((n_trees_alt[i] < n_trees[i]) && n_trees_alt[i] == 0));
           if (n_trees[i] < n_trees_alt[i]) {
-            P4EST_ASSERT (n_trees[i] == 0);
+            P4EST_ASSERT(n_trees[i] == 0);
             n_trees[i] = n_trees_alt[i];
           }
         }
@@ -158,18 +159,20 @@ static p4est_utils_forest_info_t p4est_to_forest_info(p4est_t *p4est) {
           n_trees[i] = dd_p4est_get_n_trees(i);
 #endif
         int64_t tmp = 1 << insert_elem.finest_level_global;
-        while (tmp < ((box_l[0] / n_trees[0]) * (1 << insert_elem.finest_level_global)))
+        while (tmp < ((box_l[0] / n_trees[0]) *
+                      (1 << insert_elem.finest_level_global)))
           tmp <<= 1;
-        while (tmp < ((box_l[1] / n_trees[1]) * (1 << insert_elem.finest_level_global)))
+        while (tmp < ((box_l[1] / n_trees[1]) *
+                      (1 << insert_elem.finest_level_global)))
           tmp <<= 1;
-        while (tmp < ((box_l[2] / n_trees[2]) * (1 << insert_elem.finest_level_global)))
+        while (tmp < ((box_l[2] / n_trees[2]) *
+                      (1 << insert_elem.finest_level_global)))
           tmp <<= 1;
         insert_elem.p4est_space_idx[i] = tmp * tmp * tmp;
       }
     }
     return insert_elem;
-  }
-  else {
+  } else {
     return p4est_utils_forest_info_t(nullptr);
   }
 }
@@ -189,10 +192,10 @@ void p4est_utils_prepare(std::vector<p8est_t *> p4ests) {
 void p4est_utils_init() {
   p4est_utils_prepare({
 #ifdef DD_P4EST
-    dd_p4est_get_p4est(),
+      dd_p4est_get_p4est(),
 #endif
 #ifdef LB_ADAPTIVE
-    adapt_p4est,
+      adapt_p4est,
 #endif
   });
 }
@@ -215,14 +218,16 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
         forest_info.at(static_cast<size_t>(forest_order::adaptive_LB));
     if (adapt_forest_info.coarsest_level_global ==
         adapt_forest_info.finest_level_global) {
-      auto short_range_forest_info = forest_info.at(
-          static_cast<size_t>(forest_order::short_range));
+      auto short_range_forest_info =
+          forest_info.at(static_cast<size_t>(forest_order::short_range));
       auto mod = (short_range_forest_info.coarsest_level_global <=
-                  adapt_forest_info.coarsest_level_global) ?
-                 forest_order::adaptive_LB : forest_order::short_range;
+                  adapt_forest_info.coarsest_level_global)
+                     ? forest_order::adaptive_LB
+                     : forest_order::short_range;
       auto ref = (short_range_forest_info.coarsest_level_global <=
-                  adapt_forest_info.coarsest_level_global) ?
-                 forest_order::short_range : forest_order::adaptive_LB;
+                  adapt_forest_info.coarsest_level_global)
+                     ? forest_order::short_range
+                     : forest_order::adaptive_LB;
       p4est_dd_repart_preprocessing();
       p4est_utils_partition_multiple_forests(ref, mod);
       p4est_utils_init();
@@ -246,14 +251,10 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     p4est_utils_init();
 #elif defined(LB_ADAPTIVE)
     if (p4est_params.partitioning == "n_cells") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_uniform);
-    }
-    else if (p4est_params.partitioning == "subcycling") {
-      p8est_partition_ext(adapt_p4est, 1,
-                          lbadapt_partition_weight_subcycling);
-    }
-    else {
+      p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_uniform);
+    } else if (p4est_params.partitioning == "subcycling") {
+      p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_subcycling);
+    } else {
       SC_ABORT_NOT_REACHED();
     }
 #elif defined(DD_P4EST)
@@ -264,7 +265,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     p4est_utils_init();
     sc_flops_shot(&fi, &snapshot);
     sc_stats_accumulate(&statistics.back().stats[TIMING_PARTITION_INIT],
-        snapshot.iwtime);
+                        snapshot.iwtime);
   }
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;
@@ -274,27 +275,24 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
   sc_flops_snap(&fi, &snapshot);
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_GHOST],
-                      snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_GHOST], snapshot.iwtime);
 
   sc_flops_snap(&fi, &snapshot);
-  adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
-                                      btype));
+  adapt_mesh.reset(
+      p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1, btype));
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_MESH],
-                      snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_MESH], snapshot.iwtime);
 
   sc_flops_snap(&fi, &snapshot);
-  adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
-                                            adapt_mesh, btype, 1));
+  adapt_virtual.reset(
+      p4est_virtual_new_ext(adapt_p4est, adapt_ghost, adapt_mesh, btype, 1));
   sc_flops_shot(&fi, &snapshot);
   sc_stats_accumulate(&statistics.back().stats[TIMING_VIRTUAL],
                       snapshot.iwtime);
 
   sc_flops_snap(&fi, &snapshot);
-  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
-                                                    adapt_mesh, adapt_virtual,
-                                                    btype));
+  adapt_virtual_ghost.reset(p4est_virtual_ghost_new(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, btype));
   sc_flops_shot(&fi, &snapshot);
   sc_stats_accumulate(&statistics.back().stats[TIMING_VIRTUAL_GHOST],
                       snapshot.iwtime);
@@ -302,10 +300,10 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
 }
 #endif
 
-static inline int count_trailing_zeros(int x)
-{
+static inline int count_trailing_zeros(int x) {
   int z = 0;
-  for (; (x & 1) == 0; x >>= 1) z++;
+  for (; (x & 1) == 0; x >>= 1)
+    z++;
   return z;
 }
 
@@ -381,11 +379,10 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz) {
   tree_to_boxlcoords(xyz);
 }
 
-
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
-bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
-                                    p4est_quadrant_t* q2, p4est_topidx_t tree2)
-{
+bool p4est_utils_quadrants_touching(p4est_quadrant_t *q1, p4est_topidx_t tree1,
+                                    p4est_quadrant_t *q2,
+                                    p4est_topidx_t tree2) {
   std::array<double, 3> pos1, pos2, p1, p2;
   double h1 = p4est_params.h[q1->level];
   double h2 = p4est_params.h[q2->level];
@@ -420,34 +417,33 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
       }
       fold_position(p2, fold);
       touching = (p1 == p2);
-      if (touching) break;
+      if (touching)
+        break;
     }
   }
 
   return touching;
 }
 
-bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3], bool ghost) {
+bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3],
+                                  bool ghost) {
   std::array<double, 3> qpos;
   p8est_quadrant_t *quad;
   if (ghost) {
     quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, qid);
-    p4est_utils_get_front_lower_left(adapt_p4est,
-                                     adapt_mesh->ghost_to_tree[qid], quad,
-                                     qpos.data());
-  }
-  else {
+    p4est_utils_get_front_lower_left(
+        adapt_p4est, adapt_mesh->ghost_to_tree[qid], quad, qpos.data());
+  } else {
     quad = p8est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
     p4est_utils_get_front_lower_left(adapt_p4est, adapt_mesh->quad_to_tree[qid],
                                      quad, qpos.data());
   }
-  return (
-      qpos[0] <= pos[0] + ROUND_ERROR_PREC &&
-      pos[0] < qpos[0] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
-      qpos[1] <= pos[1] + ROUND_ERROR_PREC &&
-      pos[1] < qpos[1] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
-      qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
-      pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC);
+  return (qpos[0] <= pos[0] + ROUND_ERROR_PREC &&
+          pos[0] < qpos[0] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
+          qpos[1] <= pos[1] + ROUND_ERROR_PREC &&
+          pos[1] < qpos[1] + p4est_params.h[quad->level] + ROUND_ERROR_PREC &&
+          qpos[2] <= pos[2] + ROUND_ERROR_PREC &&
+          pos[2] < qpos[2] + p4est_params.h[quad->level] + ROUND_ERROR_PREC);
 }
 
 bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
@@ -457,25 +453,22 @@ bool p4est_utils_pos_vicinity_check(std::array<double, 3> pos_mp_q1,
   bool touching = true;
   for (int i = 0; i < 3; ++i) {
     if (level_q1 == level_q2) {
-      touching &=
-          (((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             p4est_params.h[level_q1]) ||
-            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             p4est_params.h[level_q1])) ||
-           ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0 ||
-            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0))));
+      touching &= (((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+                     p4est_params.h[level_q1]) ||
+                    (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+                     p4est_params.h[level_q1])) ||
+                   ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0 ||
+                     (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) == 0))));
     } else {
       touching &=
           (((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             0.5 * (p4est_params.h[level_q1] +
-                    p4est_params.h[level_q2])) ||
+             0.5 * (p4est_params.h[level_q1] + p4est_params.h[level_q2])) ||
             (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             0.5 * (p4est_params.h[level_q1] +
-                    p4est_params.h[level_q2]))) ||
+             0.5 * (p4est_params.h[level_q1] + p4est_params.h[level_q2]))) ||
            ((std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             0.5 * p4est_params.h[std::max(level_q1, level_q2)] ||
-            (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
-             0.5 * p4est_params.h[std::max(level_q1, level_q2)]))));
+                 0.5 * p4est_params.h[std::max(level_q1, level_q2)] ||
+             (box_l[i] - std::abs(pos_mp_q1[i] - pos_mp_q2[i]) ==
+              0.5 * p4est_params.h[std::max(level_q1, level_q2)]))));
     }
   }
   return touching;
@@ -509,7 +502,6 @@ bool p4est_utils_pos_enclosing_check(const std::array<double, 3> &pos_mp_q1,
       interpol_weights[i + 3] = 1.0 - interpol_weights[i];
     }
   } else {
-
   }
   return inbetween;
 }
@@ -520,7 +512,8 @@ std::array<uint64_t, 3> p4est_utils_idx_to_pos(uint64_t idx) {
 }
 
 // Returns the morton index for given cartesian coordinates.
-// Note: This is not the index of the p4est quadrants. But the ordering is the same.
+// Note: This is not the index of the p4est quadrants. But the ordering is the
+// same.
 int64_t p4est_utils_cell_morton_idx(uint64_t x, uint64_t y, uint64_t z) {
   return Utils::morton_coords_to_idx(x, y, z);
 }
@@ -531,7 +524,8 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
                                const std::array<int, 3> displace) {
   int x, y, z;
   double xyz[3];
-  p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z, xyz);
+  p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z,
+                         xyz);
   x = xyz[0] * (1 << fi.finest_level_global) + displace[0];
   y = xyz[1] * (1 << fi.finest_level_global) + displace[1];
   z = xyz[2] * (1 << fi.finest_level_global) + displace[2];
@@ -546,33 +540,38 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
                  ((n_trees[i] < n_trees_alt[i]) && n_trees[i] == 0) ||
                  ((n_trees_alt[i] < n_trees[i]) && n_trees_alt[i] == 0));
     if (n_trees[i] < n_trees_alt[i]) {
-      P4EST_ASSERT (n_trees[i] == 0);
+      P4EST_ASSERT(n_trees[i] == 0);
       n_trees[i] = n_trees_alt[i];
     }
   }
 #elif defined(LB_ADAPTIVE)
   for (int i = 0; i < P8EST_DIM; ++i) {
-          n_trees[i] = lb_conn_brick[i];
-        }
+    n_trees[i] = lb_conn_brick[i];
+  }
 #elif defined(DD_P4EST)
-        for (int i = 0; i < P8EST_DIM; ++i)
-          n_trees[i] = dd_p4est_get_n_trees(i);
+  for (int i = 0; i < P8EST_DIM; ++i)
+    n_trees[i] = dd_p4est_get_n_trees(i);
 #endif
 
   // fold
   int ub = n_trees[0] * (1 << fi.finest_level_global);
-  if (x >= ub) x -= ub;
-  if (x < 0) x += ub;
+  if (x >= ub)
+    x -= ub;
+  if (x < 0)
+    x += ub;
   ub = n_trees[1] * (1 << fi.finest_level_global);
-  if (y >= ub) y -= ub;
-  if (y < 0) y += ub;
+  if (y >= ub)
+    y -= ub;
+  if (y < 0)
+    y += ub;
   ub = n_trees[2] * (1 << fi.finest_level_global);
-  if (z >= ub) z -= ub;
-  if (z < 0) z += ub;
+  if (z >= ub)
+    z -= ub;
+  if (z < 0)
+    z += ub;
 
   return p4est_utils_cell_morton_idx(x, y, z);
 }
-
 
 int64_t p4est_utils_global_idx(forest_order forest, const p8est_quadrant_t *q,
                                p4est_topidx_t tree) {
@@ -589,7 +588,7 @@ int64_t p4est_utils_pos_to_index(forest_order forest, const double xyz[3]) {
   return p4est_utils_cell_morton_idx(xyz_mod[0], xyz_mod[1], xyz_mod[2]);
 }
 
-#if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
+#if defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)
 /** Perform a binary search for a given quadrant.
  * CAUTION: This only makes sense for adaptive grids and therefore we implicitly
  *          assume that we are operating on the potentially adaptive p4est of
@@ -637,7 +636,7 @@ p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index) {
 }
 
 void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
-                                          sc_array_t * search_space,
+                                          sc_array_t *search_space,
                                           std::vector<p4est_locidx_t> &result,
                                           int level) {
   const auto fo = forest_order::adaptive_LB;
@@ -661,10 +660,10 @@ void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
       // here we search for neighboring quadrants that fall within the region
       // spanned by the shifted anchor point and the quadrant size.
       // From 2:1 balancing there are three different cases.
-      // 2 of which are trivial: A same size quadrant and a double sized quadrant
-      // will always be the quadrant before p.
-      // smaller quadrants will need to be copied from p - 1 to the upper bound q
-      // which is the first quadrant larger than search_index + zarea
+      // 2 of which are trivial: A same size quadrant and a double sized
+      // quadrant will always be the quadrant before p. smaller quadrants will
+      // need to be copied from p - 1 to the upper bound q which is the first
+      // quadrant larger than search_index + zarea
       int zsize = 1 << (p4est_params.max_ref_level - level);
       int zarea = zsize * zsize * zsize;
       p8est_quadrant_t *quad = p;
@@ -674,8 +673,7 @@ void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
           auto q = std::upper_bound(
               begin, end, search_index + zarea,
               [&](const uint64_t index, const p8est_quadrant_t a) {
-                  return (index <
-                          p4est_utils_global_idx(fo, &a, a.p.which_tree));
+                return (index < p4est_utils_global_idx(fo, &a, a.p.which_tree));
               });
           if (q != end) {
             Utils::iota_n(std::back_inserter(result), std::distance(p, q - 1),
@@ -690,16 +688,19 @@ void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
 }
 #endif // defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
 
-p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, const double xyz[3]) {
+p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest,
+                                      const double xyz[3]) {
   return p4est_utils_idx_to_qid(forest, p4est_utils_pos_to_index(forest, xyz));
 }
 
-p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t idx) {
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest,
+                                      const p4est_gloidx_t idx) {
 #ifdef LB_ADAPTIVE
   P4EST_ASSERT(forest == forest_order::adaptive_LB);
   return bin_search_loc_quads(idx);
 #else
-  fprintf(stderr, "Function only supposed to be called with LB_ADAPTIVE enabled.\n");
+  fprintf(stderr,
+          "Function only supposed to be called with LB_ADAPTIVE enabled.\n");
   errexit();
   return 0;
 #endif
@@ -712,9 +713,9 @@ int p4est_utils_pos_to_proc(forest_order forest, const double xyz[3]) {
 
 int p4est_utils_idx_to_proc(forest_order forest, const p4est_gloidx_t idx) {
   const auto &fi = forest_info.at(static_cast<int>(forest));
-  auto it = std::upper_bound(
-      std::begin(fi.p4est_space_idx), std::end(fi.p4est_space_idx) - 1, idx,
-      [](int i, int64_t index) { return i < index; });
+  auto it = std::upper_bound(std::begin(fi.p4est_space_idx),
+                             std::end(fi.p4est_space_idx) - 1, idx,
+                             [](int i, int64_t index) { return i < index; });
 
   return std::distance(std::begin(fi.p4est_space_idx), it) - 1;
 }
@@ -726,22 +727,23 @@ int coarsening_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
   // get quad id
   int qid = quads[0]->p.user_long;
   // do not coarsen newly generated quadrants
-  if (qid == -1) return 0;
+  if (qid == -1)
+    return 0;
   // avoid coarser cells than min_refinement_level
-  if (quads[0]->level == p4est_params.min_ref_level) return 0;
+  if (quads[0]->level == p4est_params.min_ref_level)
+    return 0;
 
   int coarsen = 1;
   for (int i = 0; i < P8EST_CHILDREN; ++i) {
     // do not coarsen quadrants at the boundary
-    coarsen &= !refine_geometric(p8est, which_tree, quads[i]) &&
-               (flags[qid + i] == 2);
+    coarsen &=
+        !refine_geometric(p8est, which_tree, quads[i]) && (flags[qid + i] == 2);
   }
   return coarsen;
-#else // LB_ADAPTIVE
+#else  // LB_ADAPTIVE
   return 0;
 #endif // LB_ADAPTIVE
 }
-
 
 int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
@@ -774,14 +776,14 @@ void create_refinement_patch_from_pos(std::vector<refinement_area_t> &patches,
   std::array<double, 3> img_box = {{0, 0, 0}};
   Vector3d folded_pos = position;
   fold_position(folded_pos, img_box);
-  ref_area.bbox_min = {{folded_pos[0] - radius, folded_pos[1] - radius,
-                        folded_pos[2] - radius}};
+  ref_area.bbox_min = {
+      {folded_pos[0] - radius, folded_pos[1] - radius, folded_pos[2] - radius}};
   fold_position(ref_area.bbox_min, img_box);
   P4EST_ASSERT(0. <= ref_area.bbox_min[0] && ref_area.bbox_min[0] < box_l[0]);
   P4EST_ASSERT(0. <= ref_area.bbox_min[1] && ref_area.bbox_min[1] < box_l[1]);
   P4EST_ASSERT(0. <= ref_area.bbox_min[2] && ref_area.bbox_min[2] < box_l[2]);
-  ref_area.bbox_max = {{folded_pos[0] + radius, folded_pos[1] + radius,
-                        folded_pos[2] + radius}};
+  ref_area.bbox_max = {
+      {folded_pos[0] + radius, folded_pos[1] + radius, folded_pos[2] + radius}};
   fold_position(ref_area.bbox_max, img_box);
   P4EST_ASSERT(0. <= ref_area.bbox_max[0] && ref_area.bbox_max[0] < box_l[0]);
   P4EST_ASSERT(0. <= ref_area.bbox_max[1] && ref_area.bbox_max[1] < box_l[1]);
@@ -805,9 +807,9 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         sc_array_new_size(sizeof(double), 3 * adapt_p4est->local_num_quadrants);
     lbadapt_get_velocity_values(vel_values);
     for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
-      v = sqrt(Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
-               Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
-               Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
+      v = sqrt(Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid)) +
+               Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 1)) +
+               Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 2)));
       if (v < v_min) {
         v_min = v;
       }
@@ -835,7 +837,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
     lbadapt_get_vorticity_values(vort_values);
     for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
       for (int d = 0; d < P4EST_DIM; ++d) {
-        vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
+        vort_temp = abs(*(double *)sc_array_index(vort_values, 3 * qid + d));
         if (vort_temp < vort_min) {
           vort_min = vort_temp;
         }
@@ -859,23 +861,29 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   refinement_area_t ref_area;
   std::array<bool, 3> wrap;
   std::array<double, 3> midpoint;
-  std::array<double, 6> default_box =
-      {{std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
-        std::numeric_limits<double>::min(), std::numeric_limits<double>::max()}};
+  std::array<double, 6> default_box = {
+      {std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+       std::numeric_limits<double>::min(), std::numeric_limits<double>::max(),
+       std::numeric_limits<double>::min(), std::numeric_limits<double>::max()}};
   if (coords_for_regional_refinement != default_box) {
     ref_area.bbox_min = {{std::fmod(coords_for_regional_refinement[0] +
-                                    sim_time * vel_reg_ref[0], box_l[0]),
+                                        sim_time * vel_reg_ref[0],
+                                    box_l[0]),
                           std::fmod(coords_for_regional_refinement[2] +
-                                    sim_time * vel_reg_ref[1], box_l[1]),
+                                        sim_time * vel_reg_ref[1],
+                                    box_l[1]),
                           std::fmod(coords_for_regional_refinement[4] +
-                                    sim_time * vel_reg_ref[2], box_l[2])}};
+                                        sim_time * vel_reg_ref[2],
+                                    box_l[2])}};
     ref_area.bbox_max = {{std::fmod(coords_for_regional_refinement[1] +
-                                    sim_time * vel_reg_ref[0], box_l[0]),
+                                        sim_time * vel_reg_ref[0],
+                                    box_l[0]),
                           std::fmod(coords_for_regional_refinement[3] +
-                                    sim_time * vel_reg_ref[1], box_l[1]),
+                                        sim_time * vel_reg_ref[1],
+                                    box_l[1]),
                           std::fmod(coords_for_regional_refinement[5] +
-                                    sim_time * vel_reg_ref[2], box_l[2])}};
+                                        sim_time * vel_reg_ref[2],
+                                    box_l[2])}};
     refined_patches.push_back(ref_area);
   }
 
@@ -888,9 +896,8 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
   if (n_part) {
     if (sim_time == 0.) {
       h_max = p4est_params.h[p4est_params.min_ref_level + initial_ref_steps];
-      radius = std::min(2.5 * h_max,
-                        *std::min_element(std::begin(half_box_l),
-                                          std::end(half_box_l)));
+      radius = std::min(2.5 * h_max, *std::min_element(std::begin(half_box_l),
+                                                       std::end(half_box_l)));
       for (auto p : local_cells.particles()) {
         create_refinement_patch_from_pos(refined_patches, p.r.p, radius);
       }
@@ -910,23 +917,25 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
       (vort_max < std::numeric_limits<double>::min())) {
     // traverse forest and decide if the current quadrant is to be refined or
     // coarsened
-    castable_unique_ptr<sc_array_t> nqids = sc_array_new(sizeof(p4est_locidx_t));
+    castable_unique_ptr<sc_array_t> nqids =
+        sc_array_new(sizeof(p4est_locidx_t));
     p4est_locidx_t nqid;
     for (int qid = 0; qid < adapt_p4est->local_num_quadrants; ++qid) {
       // velocity
       if ((v_min < std::numeric_limits<double>::max()) ||
           (std::numeric_limits<double>::min() < v_max)) {
         double v = sqrt(
-            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid)) +
-            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 1)) +
-            Utils::sqr(*(double *) sc_array_index(vel_values, 3 * qid + 2)));
+            Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid)) +
+            Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 1)) +
+            Utils::sqr(*(double *)sc_array_index(vel_values, 3 * qid + 2)));
         // Note, that this formulation stems from the fact that velocity is 0 at
         // boundaries
         if (p4est_params.threshold_velocity[1] * (v_max - v_min) <
             (v - v_min)) {
           flags[qid] = 1;
         } else if ((p4est_params.threshold_velocity[0] * (v_max - v_min) <
-                    v - v_min) && ((v - v_min) <=
+                    v - v_min) &&
+                   ((v - v_min) <=
                     p4est_params.threshold_velocity[1] * (v_max - v_min))) {
           flags[qid] = 0;
         }
@@ -937,7 +946,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
           (std::numeric_limits<double>::min() < vort_max)) {
         double vort = std::numeric_limits<double>::min();
         for (int d = 0; d < P4EST_DIM; ++d) {
-          vort_temp = abs(*(double *) sc_array_index(vort_values, 3 * qid + d));
+          vort_temp = abs(*(double *)sc_array_index(vort_values, 3 * qid + d));
           if (vort < vort_temp) {
             vort = vort_temp;
           }
@@ -945,15 +954,17 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         if (p4est_params.threshold_vorticity[1] * (vort_max - vort_min) <
             (vort - vort_min)) {
           flags[qid] = 1;
-        } else if ((p4est_params.threshold_vorticity[0] * (vort_max - vort_min) <
-                    vort - vort_min) && ((vort - vort_min) <=
-                    p4est_params.threshold_vorticity[1] * (vort_max - vort_min))) {
+        } else if ((p4est_params.threshold_vorticity[0] *
+                        (vort_max - vort_min) <
+                    vort - vort_min) &&
+                   ((vort - vort_min) <= p4est_params.threshold_vorticity[1] *
+                                             (vort_max - vort_min))) {
           flags[qid] = 0;
         }
       }
 
       // geometry
-      for (auto patch: refined_patches) {
+      for (auto patch : refined_patches) {
         q = p4est_mesh_get_quadrant(adapt_p4est, adapt_mesh, qid);
         p4est_utils_get_midpoint(adapt_p4est, adapt_mesh->quad_to_tree[qid], q,
                                  midpoint.data());
@@ -967,24 +978,18 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         // (min - box_l) < c && c < max -> wrap min
         // min < c && c < (max + box_l) -> wrap max
         // min < c && c < max           -> standard
-        if (((!wrap[0] &&
-              (patch.bbox_min[0] < midpoint[0] &&
-               midpoint[0] < patch.bbox_max[0])) ||
-             (wrap[0] &&
-              (midpoint[0] < patch.bbox_max[0] ||
-               patch.bbox_min[0] < midpoint[0]))) &&
-            ((!wrap[1] &&
-              (patch.bbox_min[1] < midpoint[1] &&
-               midpoint[1] < patch.bbox_max[1])) ||
-             (wrap[1] &&
-              (midpoint[1] < patch.bbox_max[1] ||
-               patch.bbox_min[1] < midpoint[1]))) &&
-            ((!wrap[2] &&
-              (patch.bbox_min[2] < midpoint[2] &&
-               midpoint[2] < patch.bbox_max[2])) ||
-             (wrap[2] &&
-              (midpoint[2] < patch.bbox_max[2] ||
-               patch.bbox_min[2] < midpoint[2])))) {
+        if (((!wrap[0] && (patch.bbox_min[0] < midpoint[0] &&
+                           midpoint[0] < patch.bbox_max[0])) ||
+             (wrap[0] && (midpoint[0] < patch.bbox_max[0] ||
+                          patch.bbox_min[0] < midpoint[0]))) &&
+            ((!wrap[1] && (patch.bbox_min[1] < midpoint[1] &&
+                           midpoint[1] < patch.bbox_max[1])) ||
+             (wrap[1] && (midpoint[1] < patch.bbox_max[1] ||
+                          patch.bbox_min[1] < midpoint[1]))) &&
+            ((!wrap[2] && (patch.bbox_min[2] < midpoint[2] &&
+                           midpoint[2] < patch.bbox_max[2])) ||
+             (wrap[2] && (midpoint[2] < patch.bbox_max[2] ||
+                          patch.bbox_min[2] < midpoint[2])))) {
           flags[qid] = 1;
           break;
         }
@@ -995,10 +1000,10 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         flags[qid] = 1;
         for (int i = 0; i < 26; ++i) {
           sc_array_truncate(nqids);
-          p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid,
-                                   i, nullptr, nullptr, nqids);
+          p8est_mesh_get_neighbors(adapt_p4est, adapt_ghost, adapt_mesh, qid, i,
+                                   nullptr, nullptr, nqids);
           for (int j = 0; j < nqids->elem_count; ++j) {
-            nqid = *(p4est_locidx_t *) sc_array_index(nqids, j);
+            nqid = *(p4est_locidx_t *)sc_array_index(nqids, j);
             if (0 <= nqid && nqid < adapt_p4est->local_num_quadrants) {
               flags[nqid] = 1;
             }
@@ -1012,18 +1017,18 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
 
 /** Dummy initialization function for quadrants created in refinement step
  */
-void p4est_utils_qid_dummy (p8est_t *p8est, p4est_topidx_t which_tree,
-                            p8est_quadrant_t *q) {
+void p4est_utils_qid_dummy(p8est_t *p8est, p4est_topidx_t which_tree,
+                           p8est_quadrant_t *q) {
   q->p.user_long = -1;
 }
 
 #if defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 #ifdef COMM_HIDING
 int p4est_utils_end_pending_communication(
-    std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level) {
+    std::vector<p8est_virtual_ghost_exchange_t *> &exc_status, int level) {
   if (-1 == level) {
-    for (int lvl = p4est_params.min_ref_level;
-         lvl < p4est_params.max_ref_level; ++lvl) {
+    for (int lvl = p4est_params.min_ref_level; lvl < p4est_params.max_ref_level;
+         ++lvl) {
       if (nullptr != exc_status[lvl]) {
         sc_flops_snap(&fi, &snapshot);
         p4est_virtual_ghost_exchange_data_level_end(exc_status[lvl]);
@@ -1096,7 +1101,9 @@ int p4est_utils_perform_adaptivity_step() {
   // collect refinement and coarsening flags.
   P4EST_ASSERT(flags.empty());
   flags.resize(adapt_p4est->local_num_quadrants);
-  for (int &f : flags) { f = 2; }
+  for (int &f : flags) {
+    f = 2;
+  }
   sc_flops_snap(&fi, &snapshot);
   p4est_utils_collect_flags(flags);
 
@@ -1106,7 +1113,8 @@ int p4est_utils_perform_adaptivity_step() {
   p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
                 nullptr, nullptr, nullptr);
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_COLLECT_FLAGS], snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_COLLECT_FLAGS],
+                      snapshot.iwtime);
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
@@ -1127,7 +1135,8 @@ int p4est_utils_perform_adaptivity_step() {
   sc_flops_snap(&fi, &snapshot);
   p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, nullptr, nullptr);
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_BALANCE], snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_BALANCE],
+                      snapshot.iwtime);
 
   // 2nd step: locally map data between forests.
   // de-allocate invalid storage and data-structures
@@ -1144,7 +1153,8 @@ int p4est_utils_perform_adaptivity_step() {
                                       p4est_adapted, lbadapt_local_data,
                                       linear_payload_lbm.data());
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_MAP_DATA], snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_MAP_DATA],
+                      snapshot.iwtime);
 
   // cleanup
   p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
@@ -1165,11 +1175,9 @@ int p4est_utils_perform_adaptivity_step() {
   p4est_utils_repart_preprocess();
   if (p4est_params.partitioning == "n_cells") {
     p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_uniform);
-  }
-  else if (p4est_params.partitioning == "subcycling") {
+  } else if (p4est_params.partitioning == "subcycling") {
     p8est_partition_ext(adapt_p4est, 1, lbadapt_partition_weight_subcycling);
-  }
-  else {
+  } else {
     SC_ABORT_NOT_REACHED();
   }
   sc_flops_shot(&fi, &snapshot);
@@ -1203,8 +1211,8 @@ int p4est_utils_post_gridadapt_map_data(
   int level_old, sid_old;
   int level_new;
 
-  while (qid_old < (size_t) p4est_old->local_num_quadrants &&
-         qid_new < (size_t) p4est_new->local_num_quadrants) {
+  while (qid_old < (size_t)p4est_old->local_num_quadrants &&
+         qid_new < (size_t)p4est_new->local_num_quadrants) {
     // wrap multiple trees
     if (tqid_old == curr_tree_old->quadrants.elem_count) {
       ++tid_old;
@@ -1271,19 +1279,19 @@ int p4est_utils_post_gridadapt_map_data(
     P4EST_ASSERT(tqid_new + curr_tree_new->quadrants_offset == qid_new);
     P4EST_ASSERT(tid_old == tid_new);
   }
-  P4EST_ASSERT(qid_old == (size_t) p4est_old->local_num_quadrants);
-  P4EST_ASSERT(qid_new == (size_t) p4est_new->local_num_quadrants);
+  P4EST_ASSERT(qid_old == (size_t)p4est_old->local_num_quadrants);
+  P4EST_ASSERT(qid_new == (size_t)p4est_new->local_num_quadrants);
 
   return 0;
 }
 
 void get_subc_weights(p8est_iter_volume_info_t *info, void *user_data) {
-  std::vector<double> *w = reinterpret_cast<std::vector<double>* >(user_data);
+  std::vector<double> *w = reinterpret_cast<std::vector<double> *>(user_data);
   w->at(info->quadid) = 1 << (p4est_params.max_ref_level - info->quad->level);
 }
 
-std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric) {
-  std::vector<double> weights (adapt_p4est->local_num_quadrants, 1.0);
+std::vector<double> p4est_utils_get_adapt_weights(const std::string &metric) {
+  std::vector<double> weights(adapt_p4est->local_num_quadrants, 1.0);
   if (metric == "subcycling") {
     p4est_iterate(adapt_p4est, nullptr, &weights, get_subc_weights, nullptr,
                   nullptr, nullptr);
@@ -1323,9 +1331,8 @@ int p4est_utils_repart_postprocess() {
       comm_cart, 3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(
-      &statistics.back().stats[TIMING_DATA_TRANSFER_BEGIN],
-      snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_DATA_TRANSFER_BEGIN],
+                      snapshot.iwtime);
 #else  // COMM_HIDING
   sc_flops_snap(&fi, &snapshot);
   p8est_transfer_fixed(adapt_p4est->global_first_quadrant,
@@ -1345,9 +1352,8 @@ int p4est_utils_repart_postprocess() {
   sc_flops_snap(&fi, &snapshot);
   p4est_transfer_fixed_end(data_transfer_handle);
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(
-      &statistics.back().stats[TIMING_DATA_TRANSFER_END],
-      snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_DATA_TRANSFER_END],
+                      snapshot.iwtime);
 #endif // COMM_HIDING
 
   // clear linear data-structure
@@ -1367,25 +1373,24 @@ int p4est_utils_repart_postprocess() {
   p4est_utils_unflatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              recv_buffer, lbadapt_local_data);
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(&statistics.back().stats[TIMING_INSERT_DATA], snapshot.iwtime);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_INSERT_DATA],
+                      snapshot.iwtime);
 
   // synchronize ghost data for next collision step
 #ifdef COMM_HIDING
   p4est_utils_start_communication(exc_status_lb, -1, lbadapt_local_data,
                                   lbadapt_ghost_data);
-#else // COMM_HIDING
+#else  // COMM_HIDING
   std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
   prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                          lbadapt_ghost_data, ghost_pointer);
   for (int level = p4est_params.min_ref_level;
        level <= p4est_params.max_ref_level; ++level) {
-    p4est_virtual_ghost_exchange_data_level (adapt_p4est, adapt_ghost,
-                                             adapt_mesh, adapt_virtual,
-                                             adapt_virtual_ghost, level,
-                                             sizeof(lbadapt_payload_t),
-                                             (void**)local_pointer.data(),
-                                             (void**)ghost_pointer.data());
+    p4est_virtual_ghost_exchange_data_level(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+        adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
+        (void **)local_pointer.data(), (void **)ghost_pointer.data());
   }
 #endif // COMM_HIDING
   p4est_utils_init();
@@ -1396,7 +1401,7 @@ int p4est_utils_repart_postprocess() {
 
 void p4est_utils_partition_multiple_forests(forest_order reference,
                                             forest_order modify) {
-#if defined(DD_P4EST) && defined (LB_ADAPTIVE)
+#if defined(DD_P4EST) && defined(LB_ADAPTIVE)
   p8est_t *p4est_ref = forest_info.at(static_cast<int>(reference)).p4est;
   p8est_t *p4est_mod = forest_info.at(static_cast<int>(modify)).p4est;
   if (p4est_ref && p4est_mod) {
@@ -1448,8 +1453,8 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
                                          std::end(num_quad_per_proc_global), 0);
 
     if (sum < p4est_mod->global_num_quadrants) {
-      fprintf(stderr, "%i : %li quadrants lost while partitioning\n",
-              this_node, p4est_mod->global_num_quadrants - sum);
+      fprintf(stderr, "%i : %li quadrants lost while partitioning\n", this_node,
+              p4est_mod->global_num_quadrants - sum);
       errexit();
     }
 
@@ -1461,24 +1466,20 @@ void p4est_utils_partition_multiple_forests(forest_order reference,
         p8est_partition_given(p4est_mod, num_quad_per_proc_global.data());
     P4EST_GLOBAL_PRODUCTIONF(
         "Done " P8EST_STRING "_partition shipped %lld quadrants %.3g%%\n",
-        (long long) shipped, shipped * 100. / p4est_mod->global_num_quadrants);
+        (long long)shipped, shipped * 100. / p4est_mod->global_num_quadrants);
   } else {
-    p4est_t * existing_forest;
+    p4est_t *existing_forest;
     if (p4est_mod) {
       existing_forest = p4est_mod;
-    }
-    else {
+    } else {
       existing_forest = p4est_ref;
     }
     if (p4est_params.partitioning == "n_cells") {
-      p8est_partition_ext(existing_forest, 1,
-                          lbadapt_partition_weight_uniform);
-    }
-    else if (p4est_params.partitioning == "subcycling") {
+      p8est_partition_ext(existing_forest, 1, lbadapt_partition_weight_uniform);
+    } else if (p4est_params.partitioning == "subcycling") {
       p8est_partition_ext(existing_forest, 1,
                           lbadapt_partition_weight_subcycling);
-    }
-    else {
+    } else {
       SC_ABORT_NOT_REACHED();
     }
 
@@ -1542,14 +1543,18 @@ p4est_t *p4est_utils_create_fct(p4est_t *t1, p4est_t *t2) {
 bool p4est_utils_check_alignment(const p4est_t *t1, const p4est_t *t2) {
   if (!p4est_connectivity_is_equivalent(t1->connectivity, t2->connectivity))
     return false;
-  if (t1->first_local_tree != t2->first_local_tree) return false;
-  if (t1->last_local_tree != t2->last_local_tree) return false;
+  if (t1->first_local_tree != t2->first_local_tree)
+    return false;
+  if (t1->last_local_tree != t2->last_local_tree)
+    return false;
   p4est_quadrant_t *q1 = &t1->global_first_position[t1->mpirank];
   p4est_quadrant_t *q2 = &t2->global_first_position[t2->mpirank];
-  if (!p4est_quadrant_is_equal(q1, q2)) return false;
-  q1 = &t1->global_first_position[t1->mpirank+1];
-  q2 = &t2->global_first_position[t2->mpirank+1];
-  if (!p4est_quadrant_is_equal(q1, q2)) return false;
+  if (!p4est_quadrant_is_equal(q1, q2))
+    return false;
+  q1 = &t1->global_first_position[t1->mpirank + 1];
+  q2 = &t2->global_first_position[t2->mpirank + 1];
+  if (!p4est_quadrant_is_equal(q1, q2))
+    return false;
   return true;
 }
 
@@ -1576,8 +1581,8 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   for (p4est_topidx_t t_idx = fct->first_local_tree;
        t_idx <= fct->last_local_tree; ++t_idx) {
     p4est_tree_t *t_fct = p4est_tree_array_index(fct->trees, t_idx);
-    p4est_tree_t *t_t1  = p4est_tree_array_index(t1->trees, t_idx);
-    p4est_tree_t *t_t2  = p4est_tree_array_index(t2->trees, t_idx);
+    p4est_tree_t *t_t1 = p4est_tree_array_index(t1->trees, t_idx);
+    p4est_tree_t *t_t2 = p4est_tree_array_index(t2->trees, t_idx);
     size_t q_id1, q_id2;
     q_id1 = q_id2 = 0;
     p4est_quadrant_t *q1 = p4est_quadrant_array_index(&t_t1->quadrants, q_id1);
@@ -1610,9 +1615,9 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   }
 
   // complain if counters haven't reached the end
-  P4EST_ASSERT(w_idx == (size_t) fct->local_num_quadrants);
-  P4EST_ASSERT(w_id1 == (size_t) t1->local_num_quadrants);
-  P4EST_ASSERT(w_id2 == (size_t) t2->local_num_quadrants);
+  P4EST_ASSERT(w_idx == (size_t)fct->local_num_quadrants);
+  P4EST_ASSERT(w_id1 == (size_t)t1->local_num_quadrants);
+  P4EST_ASSERT(w_id2 == (size_t)t2->local_num_quadrants);
 
   double localsum = std::accumulate(w_fct.begin(), w_fct.end(), 0.0);
   double sum, prefix = 0; // Initialization is necessary on rank 0!
@@ -1620,10 +1625,11 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   MPI_Exscan(&localsum, &prefix, 1, MPI_DOUBLE, MPI_SUM, comm_cart);
   double target = sum / fct->mpisize;
 
-  for (size_t idx = 0; idx < (size_t) fct->local_num_quadrants; ++idx) {
+  for (size_t idx = 0; idx < (size_t)fct->local_num_quadrants; ++idx) {
     double old_prefix = prefix;
     prefix += w_fct[idx];
-    int proc = std::min<int>(0.5 * (prefix + old_prefix) / target, fct->mpisize - 1);
+    int proc =
+        std::min<int>(0.5 * (prefix + old_prefix) / target, fct->mpisize - 1);
     t1_quads_per_proc[proc] += t1_quads_per_fct_quad[idx];
     t2_quads_per_proc[proc] += t2_quads_per_fct_quad[idx];
   }
@@ -1637,8 +1643,7 @@ void p4est_utils_weighted_partition(p4est_t *t1, const std::vector<double> &w1,
   p8est_partition_given(t2, t2_quads_per_proc.data());
 }
 
-bool adaptive_lb_is_active()
-{
+bool adaptive_lb_is_active() {
 #ifdef LB_ADAPTIVE
   return adapt_p4est != nullptr;
 #else

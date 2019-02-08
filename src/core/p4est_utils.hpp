@@ -86,7 +86,6 @@ template <typename T> struct castable_unique_ptr : public std::unique_ptr<T> {
   operator T *() const { return this->get(); }
   operator void *() const { return this->get(); }
 };
-#endif
 
 enum {
   N_FQUADS_L00,
@@ -413,6 +412,7 @@ static stat_container_t init_new_stat_container(int timestep) {
 
 extern std::vector<stat_container_t> statistics;
 extern sc_flopinfo_t fi, snapshot;
+#endif
 
 /** Calculate statistics */
 inline int p4est_utils_get_stat_report() {

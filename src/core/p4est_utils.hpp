@@ -315,6 +315,51 @@ static stat_container_t init_new_stat_container(int timestep) {
   stat_container_t new_entry;
   new_entry.timestep = timestep;
 
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("Fluid quads", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("Boundary quads", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("Total quads", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(
+        gen_name("collision/populate virtuals", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("collision per quadrant", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("update virtuals", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("stream/bounce back", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("swap", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("ghost exchange begin", timestep, l));
+  }
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("ghost exchange end", timestep, l));
+  }
+  new_entry.names.push_back(gen_name("collect flags", timestep));
+  new_entry.names.push_back(gen_name("refinement", timestep));
+  new_entry.names.push_back(gen_name("coarsening", timestep));
+  new_entry.names.push_back(gen_name("balancing", timestep));
+  new_entry.names.push_back(gen_name("data mapping", timestep));
+  new_entry.names.push_back(gen_name("partitioning (init)", timestep));
+  new_entry.names.push_back(gen_name("partitioning (runtime)", timestep));
+  new_entry.names.push_back(gen_name("data transfer", timestep));
+  new_entry.names.push_back(gen_name("ghost creation", timestep));
+  new_entry.names.push_back(gen_name("mesh creation", timestep));
+  new_entry.names.push_back(gen_name("virtual cells creation", timestep));
+  new_entry.names.push_back(gen_name("virtual ghost creation", timestep));
+  new_entry.names.push_back(gen_name("insert data", timestep));
+
   for (int i = 0; i < N_STATS; ++i) {
     sc_stats_init(&new_entry.stats[i], new_entry.names[i].c_str());
   }

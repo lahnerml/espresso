@@ -417,15 +417,19 @@ void integrate_vv(int n_steps, int reuse_forces) {
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
 #ifdef LB
       if (lattice_switch & LATTICE_LB) {
+#ifdef LB_ADAPTIVE
         sc_flopinfo_t fi_lb, snapshot_lb;
         sc_flops_snap(&fi_lb, &snapshot_lb);
+#endif
         lattice_boltzmann_update();
+#ifdef LB_ADAPTIVE
         sc_flops_shot(&fi_lb, &snapshot_lb);
         sc_stats_accumulate(&statistics.back().stats[LBM_TOTAL],
                             snapshot_lb.iwtime);
         double n = lb_lbfluid_get_fluid_nodes_next_time_step();
         sc_stats_accumulate(&statistics.back().stats[FLUPS],
                             n / snapshot_lb.iwtime);
+#endif
       }
 
       if (check_runtime_errors())

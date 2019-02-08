@@ -1294,28 +1294,44 @@ int p4est_utils_repart_postprocess() {
   recv_buffer.resize(adapt_p4est->local_num_quadrants);
 
 #ifdef COMM_HIDING
+  sc_flops_snap(&fi, &snapshot);
   auto data_transfer_handle = p8est_transfer_fixed_begin(
       adapt_p4est->global_first_quadrant, old_partition_table_adapt.data(),
       comm_cart, 3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
       linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(
+      &statistics.back().stats[TIMING_DATA_TRANSFER_BEGIN],
+      snapshot.iwtime);
 #else  // COMM_HIDING
+  sc_flops_snap(&fi, &snapshot);
   p8est_transfer_fixed(adapt_p4est->global_first_quadrant,
                        old_partition_table_adapt.data(), comm_cart,
                        3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
                        linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(
+      &statistics.back().stats[TIMING_DATA_TRANSFER],
+      snapshot.iwtime
 #endif // COMM_HIDING
 
   // recreate p4est structs after partitioning
   p4est_utils_rebuild_p4est_structs(P8EST_CONNECT_FULL, false);
 
 #ifdef COMM_HIDING
+  sc_flops_snap(&fi, &snapshot);
   p4est_transfer_fixed_end(data_transfer_handle);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(
+      &statistics.back().stats[TIMING_DATA_TRANSFER_END],
+      snapshot.iwtime);
 #endif // COMM_HIDING
 
   // clear linear data-structure
   linear_payload_lbm.clear();
 
   // allocate data
+  sc_flops_snap(&fi, &snapshot);
   p4est_utils_allocate_levelwise_storage(lbadapt_local_data, adapt_mesh,
                                          adapt_virtual, true);
 
@@ -1327,6 +1343,8 @@ int p4est_utils_repart_postprocess() {
   // insert data in per-level data-structure
   p4est_utils_unflatten_data(adapt_p4est, adapt_mesh, adapt_virtual,
                              recv_buffer, lbadapt_local_data);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_INSERT_DATA], snapshot.iwtime);
 
   // synchronize ghost data for next collision step
 #ifdef COMM_HIDING

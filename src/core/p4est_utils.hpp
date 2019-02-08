@@ -308,7 +308,12 @@ enum {
   TIMING_MAP_DATA,
   TIMING_PARTITION_INIT,
   TIMING_PARTITION_SIM,
-  TIMING_DATA_TRNSFR,
+#ifdef COMM_HIDING
+  TIMING_DATA_TRANSFER_BEGIN,
+  TIMING_DATA_TRANSFER_END,
+#else
+  TIMING_DATA_TRANSFER,
+#endif
   TIMING_GHOST,
   TIMING_MESH,
   TIMING_VIRTUAL,
@@ -381,7 +386,12 @@ static stat_container_t init_new_stat_container(int timestep) {
   new_entry.names.push_back(gen_name("data mapping", timestep));
   new_entry.names.push_back(gen_name("partitioning (init)", timestep));
   new_entry.names.push_back(gen_name("partitioning (runtime)", timestep));
+#ifdef COMM_HIDING
+  new_entry.names.push_back(gen_name("data transfer begin", timestep));
+  new_entry.names.push_back(gen_name("data transfer end", timestep));
+#else
   new_entry.names.push_back(gen_name("data transfer", timestep));
+#endif
   new_entry.names.push_back(gen_name("ghost creation", timestep));
   new_entry.names.push_back(gen_name("mesh creation", timestep));
   new_entry.names.push_back(gen_name("virtual cells creation", timestep));

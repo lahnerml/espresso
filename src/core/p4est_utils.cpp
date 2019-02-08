@@ -271,14 +271,33 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
 #endif // LB_ADAPTIVE_GPU
 
 #if defined(LB_ADAPTIVE)
+  sc_flops_snap(&fi, &snapshot);
   adapt_ghost.reset(p4est_ghost_new(adapt_p4est, btype));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_GHOST],
+                      snapshot.iwtime);
+
+  sc_flops_snap(&fi, &snapshot);
   adapt_mesh.reset(p4est_mesh_new_ext(adapt_p4est, adapt_ghost, 1, 1, 1,
                                       btype));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_MESH],
+                      snapshot.iwtime);
+
+  sc_flops_snap(&fi, &snapshot);
   adapt_virtual.reset(p4est_virtual_new_ext(adapt_p4est, adapt_ghost,
                                             adapt_mesh, btype, 1));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_VIRTUAL],
+                      snapshot.iwtime);
+
+  sc_flops_snap(&fi, &snapshot);
   adapt_virtual_ghost.reset(p4est_virtual_ghost_new(adapt_p4est, adapt_ghost,
                                                     adapt_mesh, adapt_virtual,
                                                     btype));
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_VIRTUAL_GHOST],
+                      snapshot.iwtime);
 #endif // defined(LB_ADAPTIVE)
 }
 #endif

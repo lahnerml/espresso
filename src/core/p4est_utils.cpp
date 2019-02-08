@@ -21,8 +21,7 @@
 
 #include <mpi.h>
 
-int n_integrate_calls;
-sc_statinfo_t stats[N_STATS];
+std::vector<stat_container_t> statistics;
 sc_flopinfo_t fi, snapshot;
 
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))

@@ -1207,10 +1207,12 @@ void gather_stats() {
     sc_stats_accumulate(&statistics.back().stats[N_QUADS_L00 + l], nnodes[2]);
   }
 #else
+#if 0
   Vector3i nnodes = get_local_nodes();
   sc_stats_accumulate(&statistics.back().stats[N_BQUADS_L00], nnodes[0]);
   sc_stats_accumulate(&statistics.back().stats[N_FQUADS_L00], nnodes[1]);
   sc_stats_accumulate(&statistics.back().stats[N_QUADS_L00], nnodes[2]);
+#endif
 #endif
 }
 

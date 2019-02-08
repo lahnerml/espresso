@@ -21,9 +21,6 @@
 
 #include <mpi.h>
 
-std::vector<stat_container_t> statistics;
-sc_flopinfo_t fi, snapshot;
-
 #if (defined(LB_ADAPTIVE) || defined(DD_P4EST))
 #include <p8est_algorithms.h>
 #include <p8est_bits.h>
@@ -31,6 +28,9 @@ sc_flopinfo_t fi, snapshot;
 #include <p8est_search.h>
 
 static std::vector<p4est_utils_forest_info_t> forest_info;
+std::vector<stat_container_t> statistics;
+sc_flopinfo_t fi, snapshot;
+
 
 #if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;

@@ -379,6 +379,8 @@ Particle mpi_recv_part(int node, int part);
 */
 int mpi_integrate(int n_steps, int reuse_forces);
 
+void end_p4est_integration();
+
 /** Issue REQ_MIN_ENERGY: start energy minimization.
     @return nonzero on error
  */

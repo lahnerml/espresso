@@ -2990,12 +2990,31 @@ inline void lb_collide_stream() {
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
 #ifdef COMM_HIDING
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_collide(level, P8EST_TRAVERSE_LOCAL);
+      sc_flops_shot(&fi, &snapshot);
+      double local_coll = snapshot.iwtime;
+
       p4est_utils_end_pending_communication(exc_status_lb, level);
+
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_collide(level, P8EST_TRAVERSE_GHOST);
+      sc_flops_shot(&fi, &snapshot);
 #else
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_collide(level, P8EST_TRAVERSE_LOCALGHOST);
+      sc_flops_shot(&fi, &snapshot);
+      double local_coll = 0;
 #endif
+      sc_stats_accumulate(&statistics.back().stats[TIMING_COLL_POP_VIRTUALS_L00 + level],
+                          local_coll + snapshot.iwtime);
+      auto lnodes = get_local_nodes_level(level);
+      auto gnodes = get_ghost_nodes_level(level);
+      if (lnodes[1] + gnodes[1]) {
+        sc_stats_accumulate(&statistics.back().stats[TIMING_COLL_PER_QUAD_L00 + level],
+                            (local_coll + snapshot.iwtime) /
+                            (lnodes[1] + gnodes[1]));
+      }
     }
   }
 

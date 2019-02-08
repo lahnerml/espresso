@@ -208,6 +208,7 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
   p4est_utils_init();
 
   if (partition) {
+    sc_flops_snap(&fi, &snapshot);
 #if defined(DD_P4EST) && defined(LB_ADAPTIVE)
     // create aligned trees
     auto adapt_forest_info =
@@ -261,6 +262,9 @@ void p4est_utils_rebuild_p4est_structs(p4est_connect_type_t btype,
     cells_re_init(CELL_STRUCTURE_CURRENT, true, true);
 #endif // DD_P4EST
     p4est_utils_init();
+    sc_flops_shot(&fi, &snapshot);
+    sc_stats_accumulate(&statistics.back().stats[TIMING_PARTITION_INIT],
+        snapshot.iwtime);
   }
 #ifdef LB_ADAPTIVE_GPU
   local_num_quadrants = adapt_p4est->local_num_quadrants;

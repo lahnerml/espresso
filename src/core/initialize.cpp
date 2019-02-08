@@ -110,11 +110,11 @@ void on_program_start() {
 #ifdef DD_P4EST
   topology_init(CELL_STRUCTURE_P4EST, &local_cells);
 #endif
+  end_p4est_integration();
 #else
   /* initially go for domain decomposition */
   topology_init(CELL_STRUCTURE_DOMDEC, &local_cells);
 #endif
-  end_p4est_integration();
 
 #ifdef P3M
   p3m_pre_init();

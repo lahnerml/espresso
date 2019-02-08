@@ -1074,6 +1074,7 @@ int p4est_utils_perform_adaptivity_step() {
   P4EST_ASSERT(flags.empty());
   flags.resize(adapt_p4est->local_num_quadrants);
   for (int &f : flags) { f = 2; }
+  sc_flops_snap(&fi, &snapshot);
   p4est_utils_collect_flags(flags);
 
   // To guarantee that we can map quadrants probably to their qids write each
@@ -1081,16 +1082,29 @@ int p4est_utils_perform_adaptivity_step() {
   // mempool by libsc).
   p4est_iterate(adapt_p4est, adapt_ghost, nullptr, lbadapt_init_qid_payload,
                 nullptr, nullptr, nullptr);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_COLLECT_FLAGS], snapshot.iwtime);
 
   // copy forest and perform refinement step.
   p8est_t *p4est_adapted = p8est_copy(adapt_p4est, 0);
+  sc_flops_snap(&fi, &snapshot);
   p8est_refine_ext(p4est_adapted, 0, p4est_params.max_ref_level,
                    refinement_criteria, p4est_utils_qid_dummy, nullptr);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_REFINE], snapshot.iwtime);
+
   // perform coarsening step
+  sc_flops_snap(&fi, &snapshot);
   p8est_coarsen_ext(p4est_adapted, 0, 0, coarsening_criteria, nullptr, nullptr);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_COARSE], snapshot.iwtime);
+
   flags.clear();
   // balance forest after grid change
+  sc_flops_snap(&fi, &snapshot);
   p8est_balance_ext(p4est_adapted, P8EST_CONNECT_FULL, nullptr, nullptr);
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_BALANCE], snapshot.iwtime);
 
   // 2nd step: locally map data between forests.
   // de-allocate invalid storage and data-structures
@@ -1102,9 +1116,12 @@ int p4est_utils_perform_adaptivity_step() {
   P4EST_ASSERT(linear_payload_lbm.empty());
   linear_payload_lbm.resize(p4est_adapted->local_num_quadrants);
 
+  sc_flops_snap(&fi, &snapshot);
   p4est_utils_post_gridadapt_map_data(adapt_p4est, adapt_mesh, adapt_virtual,
                                       p4est_adapted, lbadapt_local_data,
                                       linear_payload_lbm.data());
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_MAP_DATA], snapshot.iwtime);
 
   // cleanup
   p4est_utils_deallocate_levelwise_storage(lbadapt_local_data);
@@ -1114,6 +1131,7 @@ int p4est_utils_perform_adaptivity_step() {
 
   // 3rd step: partition grid and transfer data to respective new owner ranks
   //           including all preparations for next time step
+  sc_flops_snap(&fi, &snapshot);
 #ifdef DD_P4EST
   p4est_utils_init();
 
@@ -1131,6 +1149,9 @@ int p4est_utils_perform_adaptivity_step() {
   else {
     SC_ABORT_NOT_REACHED();
   }
+  sc_flops_shot(&fi, &snapshot);
+  sc_stats_accumulate(&statistics.back().stats[TIMING_PARTITION_SIM],
+                      snapshot.iwtime);
   p4est_utils_repart_postprocess();
 #endif
 #endif // LB_ADAPTIVE

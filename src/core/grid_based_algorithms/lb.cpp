@@ -3058,10 +3058,13 @@ inline void lb_collide_stream() {
           &statistics.back().stats[TIMING_STREAM_BOUNCE_BACK_L00 + level],
           snapshot.iwtime);
 #endif
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_swap_pointers(level);
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_SWAP_L00 + level], snapshot.iwtime);
 
       // synchronize ghost data for next collision step
-
 #ifdef COMM_HIDING
       p4est_utils_start_communication(exc_status_lb, level, lbadapt_local_data,
                                       lbadapt_ghost_data);

@@ -1200,23 +1200,18 @@ void mpi_minimize_energy_slave(int a, int b) { minimize_energy(); }
 void gather_stats() {
   // collect data about number of cells and particles
 #ifdef LB_ADAPTIVE
-  sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(adapt_p4est->local_num_quadrants));
-  sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
-                      static_cast<double>(adapt_mesh->ghost_num_quadrants));
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    Vector3i nnodes = get_local_nodes_level(l);
+    sc_stats_accumulate(&statistics.back().stats[N_BQUADS_L00 + l], nnodes[0]);
+    sc_stats_accumulate(&statistics.back().stats[N_FQUADS_L00 + l], nnodes[1]);
+    sc_stats_accumulate(&statistics.back().stats[N_QUADS_L00 + l], nnodes[2]);
+  }
 #else
-  auto local_grid_volume = std::accumulate(
-      lblattice.grid.begin(), lblattice.grid.end(), 1, std::multiplies<int>());
-  auto halo_volume = lblattice.halo_grid_volume - local_grid_volume;
-  sc_stats_accumulate(&stats[NCELLS_LB_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(local_grid_volume));
-  sc_stats_accumulate(&stats[NCELLS_LB_GHOST_00 + n_integrate_calls],
-                      static_cast<double>(halo_volume));
+  Vector3i nnodes = get_local_nodes();
+  sc_stats_accumulate(&statistics.back().stats[N_BQUADS_L00], nnodes[0]);
+  sc_stats_accumulate(&statistics.back().stats[N_FQUADS_L00], nnodes[1]);
+  sc_stats_accumulate(&statistics.back().stats[N_QUADS_L00], nnodes[2]);
 #endif
-  sc_stats_accumulate(&stats[NPART_LOCAL_00 + n_integrate_calls],
-                      static_cast<double>(local_cells.particles().size()));
-  sc_stats_accumulate(&stats[NPART_GHOST_00 + n_integrate_calls],
-                      static_cast<double>(ghost_cells.particles().size()));
 }
 
 #ifdef LB_ADAPTIVE
@@ -2223,14 +2218,14 @@ void mpi_adapt_grid(int node, int level) {
   p4est_utils_perform_adaptivity_step();
   sc_flops_shot(&fi, &snapshot);
   // integration is done, therefore the integration counter is one step too far
-  sc_stats_accumulate(&stats[GRID_CHANGE_00 - 1 + n_integrate_calls],
-                      snapshot.iwtime);
 #endif // (defined(LB_ADAPTIVE) || defined(DD_P4EST)
 }
 
 void mpi_eval_statistics(int node, int param) {
-  sc_stats_compute(comm_cart, N_STATS, stats);
-  sc_stats_print(-1, SC_LP_STATISTICS, N_STATS, stats, 1, 1);
+  for (auto s : statistics) {
+    sc_stats_compute(comm_cart, N_STATS, s.stats);
+    sc_stats_print(-1, SC_LP_STATISTICS, N_STATS, s.stats, 1, 1);
+  }
 }
 
 void mpi_bcast_thresh_vel(int node, int level) {

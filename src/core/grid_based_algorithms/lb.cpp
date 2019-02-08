@@ -3055,7 +3055,8 @@ inline void lb_collide_stream() {
       lbadapt_stream_bounce_back(level);
       sc_flops_shot(&fi, &snapshot);
       sc_stats_accumulate(
-          &statistics.back().stats[TIMING_])
+          &statistics.back().stats[TIMING_STREAM_BOUNCE_BACK_L00 + level],
+          snapshot.iwtime);
 #endif
       lbadapt_swap_pointers(level);
 

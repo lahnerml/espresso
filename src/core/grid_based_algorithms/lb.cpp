@@ -3073,10 +3073,15 @@ inline void lb_collide_stream() {
       std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
       prepare_ghost_exchange(lbadapt_local_data, local_pointer,
                              lbadapt_ghost_data, ghost_pointer);
+      sc_flops_snap(&fi, &snapshot);
       p8est_virtual_ghost_exchange_data_level(
           adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
           adapt_virtual_ghost, level, sizeof(lbadapt_payload_t),
           (void **)local_pointer.data(), (void **)ghost_pointer.data());
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_GHOST_EXC_L00 + level],
+          snapshot.iwtime);
 #endif
     }
   }

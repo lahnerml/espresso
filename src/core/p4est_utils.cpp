@@ -31,7 +31,6 @@ static std::vector<p4est_utils_forest_info_t> forest_info;
 std::vector<stat_container_t> statistics;
 sc_flopinfo_t fi, snapshot;
 
-
 #if defined(LB_ADAPTIVE) || defined(ELECTROSTATICS_ADAPTIVE) || defined(ELECTROKINETICS_ADAPTIVE)
 castable_unique_ptr<p4est_t> adapt_p4est;
 castable_unique_ptr<p4est_connectivity_t> adapt_conn;
@@ -1003,13 +1002,23 @@ int p4est_utils_end_pending_communication(
     for (int lvl = p4est_params.min_ref_level;
          lvl < p4est_params.max_ref_level; ++lvl) {
       if (nullptr != exc_status[lvl]) {
+        sc_flops_snap(&fi, &snapshot);
         p4est_virtual_ghost_exchange_data_level_end(exc_status[lvl]);
+        sc_flops_shot(&fi, &snapshot);
+        sc_stats_accumulate(
+            &statistics.back().stats[TIMING_GHOST_EXC_END_L00 + lvl],
+            snapshot.iwtime);
         exc_status[lvl] = nullptr;
       }
     }
   } else {
     if (nullptr != exc_status[level]) {
+      sc_flops_snap(&fi, &snapshot);
       p4est_virtual_ghost_exchange_data_level_end(exc_status[level]);
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_GHOST_EXC_END_L00 + level],
+          snapshot.iwtime);
       exc_status[level] = nullptr;
     }
   }

@@ -241,6 +241,7 @@ enum {
   TIMING_SWAP_L16,
   TIMING_SWAP_L17,
   TIMING_SWAP_L18,
+#ifdef COMM_HIDING
   TIMING_GHOST_EXC_BEGIN_L00,
   TIMING_GHOST_EXC_BEGIN_L01,
   TIMING_GHOST_EXC_BEGIN_L02,
@@ -279,6 +280,27 @@ enum {
   TIMING_GHOST_EXC_END_L16,
   TIMING_GHOST_EXC_END_L17,
   TIMING_GHOST_EXC_END_L18,
+#else
+  TIMING_GHOST_EXC_L00,
+  TIMING_GHOST_EXC_L01,
+  TIMING_GHOST_EXC_L02,
+  TIMING_GHOST_EXC_L03,
+  TIMING_GHOST_EXC_L04,
+  TIMING_GHOST_EXC_L05,
+  TIMING_GHOST_EXC_L06,
+  TIMING_GHOST_EXC_L07,
+  TIMING_GHOST_EXC_L08,
+  TIMING_GHOST_EXC_L09,
+  TIMING_GHOST_EXC_L10,
+  TIMING_GHOST_EXC_L11,
+  TIMING_GHOST_EXC_L12,
+  TIMING_GHOST_EXC_L13,
+  TIMING_GHOST_EXC_L14,
+  TIMING_GHOST_EXC_L15,
+  TIMING_GHOST_EXC_L16,
+  TIMING_GHOST_EXC_L17,
+  TIMING_GHOST_EXC_L18,
+#endif
   TIMING_COLLECT_FLAGS,
   TIMING_REFINE,
   TIMING_COARSE,
@@ -340,12 +362,18 @@ static stat_container_t init_new_stat_container(int timestep) {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     new_entry.names.push_back(gen_name("swap", timestep, l));
   }
+#ifdef COMM_HIDING
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     new_entry.names.push_back(gen_name("ghost exchange begin", timestep, l));
   }
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     new_entry.names.push_back(gen_name("ghost exchange end", timestep, l));
   }
+#else
+  for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
+    new_entry.names.push_back(gen_name("ghost exchange", timestep, l));
+  }
+#endif
   new_entry.names.push_back(gen_name("collect flags", timestep));
   new_entry.names.push_back(gen_name("refinement", timestep));
   new_entry.names.push_back(gen_name("coarsening", timestep));
@@ -1053,17 +1081,27 @@ void p4est_utils_start_communication(
     for (int lvl = p4est_params.min_ref_level; lvl < p4est_params.max_ref_level;
          ++lvl) {
       P4EST_ASSERT(exc_status[lvl] == nullptr);
+      sc_flops_snap(&fi, &snapshot);
       exc_status_lb[lvl] = p8est_virtual_ghost_exchange_data_level_begin(
           adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
           adapt_virtual_ghost, lvl, sizeof(T), (void **)local_pointer.data(),
           (void **)ghost_pointer.data());
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_GHOST_EXC_BEGIN_L00 + lvl],
+          snapshot.iwtime);
     }
   } else {
     P4EST_ASSERT(exc_status[level] == nullptr);
+    sc_flops_snap(&fi, &snapshot);
     exc_status_lb[level] = p8est_virtual_ghost_exchange_data_level_begin(
         adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
         adapt_virtual_ghost, level, sizeof(T), (void **)local_pointer.data(),
         (void **)ghost_pointer.data());
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_GHOST_EXC_BEGIN_L00 + level],
+          snapshot.iwtime);
+    sc_flops_shot(&fi, &snapshot);
   }
 }
 

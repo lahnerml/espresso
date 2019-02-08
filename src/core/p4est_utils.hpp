@@ -146,6 +146,8 @@ enum {
   N_QUADS_L16,
   N_QUADS_L17,
   N_QUADS_L18,
+  LBM_TOTAL,
+  FLUPS,
   TIMING_COLL_POP_VIRTUALS_L00,
   TIMING_COLL_POP_VIRTUALS_L01,
   TIMING_COLL_POP_VIRTUALS_L02,
@@ -351,6 +353,10 @@ static stat_container_t init_new_stat_container(int timestep) {
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     new_entry.names.push_back(gen_name("Total quads", timestep, l));
   }
+
+  new_entry.names.push_back(gen_name("FLUPSC", timestep));
+  new_entry.names.push_back(gen_name("Total time LBM", timestep));
+
   for (int l = 0; l < P8EST_MAXLEVEL; ++l) {
     new_entry.names.push_back(
         gen_name("collision/populate virtuals", timestep, l));

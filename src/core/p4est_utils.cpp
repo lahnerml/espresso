@@ -1340,9 +1340,8 @@ int p4est_utils_repart_postprocess() {
                        3172 + sizeof(lbadapt_payload_t), recv_buffer.data(),
                        linear_payload_lbm.data(), sizeof(lbadapt_payload_t));
   sc_flops_shot(&fi, &snapshot);
-  sc_stats_accumulate(
-      &statistics.back().stats[TIMING_DATA_TRANSFER],
-      snapshot.iwtime
+  sc_stats_accumulate(&statistics.back().stats[TIMING_DATA_TRANSFER],
+                      snapshot.iwtime);
 #endif // COMM_HIDING
 
   // recreate p4est structs after partitioning

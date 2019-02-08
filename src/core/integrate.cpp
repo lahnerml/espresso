@@ -387,16 +387,7 @@ void integrate_vv(int n_steps, int reuse_forces) {
       ghost_communicator(&cell_structure.update_ghost_pos_comm);
     }
 #endif
-    sc_flops_snap(&fi, &snapshot);
     force_calc();
-    sc_flops_shot(&fi, &snapshot);
-    sc_stats_accumulate(&stats[MD_STEP_00 + n_integrate_calls],
-                        snapshot.iwtime);
-    int n_local_parts = local_cells.particles().size();
-    if (n_local_parts)
-      sc_stats_accumulate(&stats[PUPS_MD_00 + n_integrate_calls],
-                          n_local_parts / snapshot.iwtime);
-
 #ifdef VIRTUAL_SITES
     virtual_sites()->after_force_calc();
 #endif
@@ -426,14 +417,15 @@ void integrate_vv(int n_steps, int reuse_forces) {
     if (integ_switch != INTEG_METHOD_STEEPEST_DESCENT) {
 #ifdef LB
       if (lattice_switch & LATTICE_LB) {
-        sc_flops_snap(&fi, &snapshot);
+        sc_flopinfo_t fi_lb, snapshot_lb;
+        sc_flops_snap(&fi_lb, &snapshot_lb);
         lattice_boltzmann_update();
-        sc_flops_shot(&fi, &snapshot);
-        sc_stats_accumulate(&stats[LB_STEP_00 + n_integrate_calls],
-                            snapshot.iwtime);
+        sc_flops_shot(&fi_lb, &snapshot_lb);
+        sc_stats_accumulate(&statistics.back().stats[LBM_TOTAL],
+                            snapshot_lb.iwtime);
         double n = lb_lbfluid_get_fluid_nodes_next_time_step();
-        sc_stats_accumulate(&stats[FLUPS_LB_00 + n_integrate_calls],
-                            n / snapshot.iwtime);
+        sc_stats_accumulate(&statistics.back().stats[FLUPS],
+                            n / snapshot_lb.iwtime);
       }
 
       if (check_runtime_errors())

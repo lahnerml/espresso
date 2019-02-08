@@ -1382,8 +1382,8 @@ int p4est_utils_repart_postprocess() {
 #else  // COMM_HIDING
   std::vector<lbadapt_payload_t *> local_pointer(P8EST_QMAXLEVEL);
   std::vector<lbadapt_payload_t *> ghost_pointer(P8EST_QMAXLEVEL);
-  prepare_ghost_exchange(lbadapt_local_data, local_pointer,
-                         lbadapt_ghost_data, ghost_pointer);
+  prepare_ghost_exchange(lbadapt_local_data, local_pointer, lbadapt_ghost_data,
+                         ghost_pointer);
   for (int level = p4est_params.min_ref_level;
        level <= p4est_params.max_ref_level; ++level) {
     p4est_virtual_ghost_exchange_data_level(

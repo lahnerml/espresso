@@ -1454,7 +1454,7 @@ int lb_lbfluid_get_fluid_nodes_next_time_step() {
   const int lmin = p4est_params.min_ref_level;
   int lvl = p4est_params.max_ref_level;
   int lvl_diff = 0;
-  while(n_lbsteps % (1 << lvl_diff) == 0 && lmin <= lvl) {
+  while (n_lbsteps % (1 << lvl_diff) == 0 && lmin <= lvl) {
     nodes += get_local_nodes_level(lvl);
     ++lvl_diff;
     --lvl;
@@ -3006,14 +3006,15 @@ inline void lb_collide_stream() {
       sc_flops_shot(&fi, &snapshot);
       double local_coll = 0;
 #endif
-      sc_stats_accumulate(&statistics.back().stats[TIMING_COLL_POP_VIRTUALS_L00 + level],
-                          local_coll + snapshot.iwtime);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_COLL_POP_VIRTUALS_L00 + level],
+          local_coll + snapshot.iwtime);
       auto lnodes = get_local_nodes_level(level);
       auto gnodes = get_ghost_nodes_level(level);
       if (lnodes[1] + gnodes[1]) {
-        sc_stats_accumulate(&statistics.back().stats[TIMING_COLL_PER_QUAD_L00 + level],
-                            (local_coll + snapshot.iwtime) /
-                            (lnodes[1] + gnodes[1]));
+        sc_stats_accumulate(
+            &statistics.back().stats[TIMING_COLL_PER_QUAD_L00 + level],
+            (local_coll + snapshot.iwtime) / (lnodes[1] + gnodes[1]));
       }
     }
   }
@@ -3027,21 +3028,34 @@ inline void lb_collide_stream() {
     // level always relates to level of real cells
     lvl_diff = p4est_params.max_ref_level - level;
     if (n_lbsteps % (1 << lvl_diff) == 0) {
+      double local_update = 0.;
+      sc_flops_snap(&fi, &snapshot);
 #ifdef COMM_HIDING
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_LOCAL);
+      sc_flops_shot(&fi, &snapshot);
+      local_update = snapshot.iwtime;
 
       p4est_utils_end_pending_communication(exc_status_lb, level);
       p4est_utils_end_pending_communication(exc_status_lb, level + 1);
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_update_populations_from_virtuals(level, P8EST_TRAVERSE_GHOST);
 #else
       lbadapt_update_populations_from_virtuals(level,
                                                P8EST_TRAVERSE_LOCALGHOST);
 #endif
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_UPDATE_FROM_VIRTUALS_L00 + level],
+          snapshot.iwtime + local_update);
 #if 0
       lbadapt_stream(level);
       lbadapt_bounce_back(level);
 #else
+      sc_flops_snap(&fi, &snapshot);
       lbadapt_stream_bounce_back(level);
+      sc_flops_shot(&fi, &snapshot);
+      sc_stats_accumulate(
+          &statistics.back().stats[TIMING_])
 #endif
       lbadapt_swap_pointers(level);
 

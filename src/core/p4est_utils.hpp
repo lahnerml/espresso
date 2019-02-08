@@ -25,139 +25,259 @@
 /*****************************************************************************/
 
 #if defined(LB_ADAPTIVE) || defined(DD_P4EST)
-namespace std
-{
-  template<>
-  struct default_delete<p4est_t>
-  {
-    void operator()(p4est_t *p) const { if (p != nullptr) p4est_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_ghost_t>
-  {
-    void operator()(p4est_ghost_t *p) const { if (p != nullptr) p4est_ghost_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_mesh_t>
-  {
-    void operator()(p4est_mesh_t *p) const { if (p != nullptr) p4est_mesh_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_virtual_t>
-  {
-    void operator()(p4est_virtual_t *p) const { if (p != nullptr) p4est_virtual_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_virtual_ghost_t>
-  {
-    void operator()(p4est_virtual_ghost_t *p) const { if (p != nullptr) p4est_virtual_ghost_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_connectivity_t>
-  {
-    void operator()(p4est_connectivity_t *p) const { if (p != nullptr) p4est_connectivity_destroy(p); }
-  };
-  template<>
-  struct default_delete<p4est_meshiter_t>
-  {
-      void operator()(p4est_meshiter_t *p) const { if (p != nullptr) p4est_meshiter_destroy(p); }
-  };
-  template<>
-  struct default_delete<sc_array_t>
-  {
-      void operator()(sc_array_t *p) const { if (p != nullptr) sc_array_destroy(p); }
-  };
-}
+namespace std {
+template <> struct default_delete<p4est_t> {
+  void operator()(p4est_t *p) const {
+    if (p != nullptr)
+      p4est_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_ghost_t> {
+  void operator()(p4est_ghost_t *p) const {
+    if (p != nullptr)
+      p4est_ghost_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_mesh_t> {
+  void operator()(p4est_mesh_t *p) const {
+    if (p != nullptr)
+      p4est_mesh_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_virtual_t> {
+  void operator()(p4est_virtual_t *p) const {
+    if (p != nullptr)
+      p4est_virtual_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_virtual_ghost_t> {
+  void operator()(p4est_virtual_ghost_t *p) const {
+    if (p != nullptr)
+      p4est_virtual_ghost_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_connectivity_t> {
+  void operator()(p4est_connectivity_t *p) const {
+    if (p != nullptr)
+      p4est_connectivity_destroy(p);
+  }
+};
+template <> struct default_delete<p4est_meshiter_t> {
+  void operator()(p4est_meshiter_t *p) const {
+    if (p != nullptr)
+      p4est_meshiter_destroy(p);
+  }
+};
+template <> struct default_delete<sc_array_t> {
+  void operator()(sc_array_t *p) const {
+    if (p != nullptr)
+      sc_array_destroy(p);
+  }
+};
+} // namespace std
 
 // Don't use it. Can lead to nasty bugs.
-template <typename T>
-struct castable_unique_ptr: public std::unique_ptr<T> {
+template <typename T> struct castable_unique_ptr : public std::unique_ptr<T> {
   using Base = std::unique_ptr<T>;
-  constexpr castable_unique_ptr(): Base() {}
-  constexpr castable_unique_ptr(std::nullptr_t n): Base(n) {}
-  castable_unique_ptr(T* p): Base(p) {}
-  castable_unique_ptr(Base&& other): Base(std::move(other)) {}
-  operator T*() const { return this->get(); }
+  constexpr castable_unique_ptr() : Base() {}
+  constexpr castable_unique_ptr(std::nullptr_t n) : Base(n) {}
+  castable_unique_ptr(T *p) : Base(p) {}
+  castable_unique_ptr(Base &&other) : Base(std::move(other)) {}
+  operator T *() const { return this->get(); }
   operator void *() const { return this->get(); }
 };
 #endif
 
 enum {
-  N_FQUADS_L00, N_FQUADS_L01, N_FQUADS_L02, N_FQUADS_L03, N_FQUADS_L04,
-  N_FQUADS_L05, N_FQUADS_L06, N_FQUADS_L07, N_FQUADS_L08, N_FQUADS_L09,
-  N_FQUADS_L10, N_FQUADS_L11, N_FQUADS_L12, N_FQUADS_L13, N_FQUADS_L14,
-  N_FQUADS_L15, N_FQUADS_L16, N_FQUADS_L17, N_FQUADS_L18,
-  N_BQUADS_L00, N_BQUADS_L01, N_BQUADS_L02, N_BQUADS_L03, N_BQUADS_L04,
-  N_BQUADS_L05, N_BQUADS_L06, N_BQUADS_L07, N_BQUADS_L08, N_BQUADS_L09,
-  N_BQUADS_L10, N_BQUADS_L11, N_BQUADS_L12, N_BQUADS_L13, N_BQUADS_L14,
-  N_BQUADS_L15, N_BQUADS_L16, N_BQUADS_L17, N_BQUADS_L18,
-  N_QUADS_L00, N_QUADS_L01, N_QUADS_L02, N_QUADS_L03, N_QUADS_L04,
-  N_QUADS_L05, N_QUADS_L06, N_QUADS_L07, N_QUADS_L08, N_QUADS_L09,
-  N_QUADS_L10, N_QUADS_L11, N_QUADS_L12, N_QUADS_L13, N_QUADS_L14,
-  N_QUADS_L15, N_QUADS_L16, N_QUADS_L17, N_QUADS_L18,
-  TIMING_COLL_POP_VIRTUALS_L00, TIMING_COLL_POP_VIRTUALS_L01,
-  TIMING_COLL_POP_VIRTUALS_L02, TIMING_COLL_POP_VIRTUALS_L03,
-  TIMING_COLL_POP_VIRTUALS_L04, TIMING_COLL_POP_VIRTUALS_L05,
-  TIMING_COLL_POP_VIRTUALS_L06, TIMING_COLL_POP_VIRTUALS_L07,
-  TIMING_COLL_POP_VIRTUALS_L08, TIMING_COLL_POP_VIRTUALS_L09,
-  TIMING_COLL_POP_VIRTUALS_L10, TIMING_COLL_POP_VIRTUALS_L11,
-  TIMING_COLL_POP_VIRTUALS_L12, TIMING_COLL_POP_VIRTUALS_L13,
-  TIMING_COLL_POP_VIRTUALS_L14, TIMING_COLL_POP_VIRTUALS_L15,
-  TIMING_COLL_POP_VIRTUALS_L16, TIMING_COLL_POP_VIRTUALS_L17,
+  N_FQUADS_L00,
+  N_FQUADS_L01,
+  N_FQUADS_L02,
+  N_FQUADS_L03,
+  N_FQUADS_L04,
+  N_FQUADS_L05,
+  N_FQUADS_L06,
+  N_FQUADS_L07,
+  N_FQUADS_L08,
+  N_FQUADS_L09,
+  N_FQUADS_L10,
+  N_FQUADS_L11,
+  N_FQUADS_L12,
+  N_FQUADS_L13,
+  N_FQUADS_L14,
+  N_FQUADS_L15,
+  N_FQUADS_L16,
+  N_FQUADS_L17,
+  N_FQUADS_L18,
+  N_BQUADS_L00,
+  N_BQUADS_L01,
+  N_BQUADS_L02,
+  N_BQUADS_L03,
+  N_BQUADS_L04,
+  N_BQUADS_L05,
+  N_BQUADS_L06,
+  N_BQUADS_L07,
+  N_BQUADS_L08,
+  N_BQUADS_L09,
+  N_BQUADS_L10,
+  N_BQUADS_L11,
+  N_BQUADS_L12,
+  N_BQUADS_L13,
+  N_BQUADS_L14,
+  N_BQUADS_L15,
+  N_BQUADS_L16,
+  N_BQUADS_L17,
+  N_BQUADS_L18,
+  N_QUADS_L00,
+  N_QUADS_L01,
+  N_QUADS_L02,
+  N_QUADS_L03,
+  N_QUADS_L04,
+  N_QUADS_L05,
+  N_QUADS_L06,
+  N_QUADS_L07,
+  N_QUADS_L08,
+  N_QUADS_L09,
+  N_QUADS_L10,
+  N_QUADS_L11,
+  N_QUADS_L12,
+  N_QUADS_L13,
+  N_QUADS_L14,
+  N_QUADS_L15,
+  N_QUADS_L16,
+  N_QUADS_L17,
+  N_QUADS_L18,
+  TIMING_COLL_POP_VIRTUALS_L00,
+  TIMING_COLL_POP_VIRTUALS_L01,
+  TIMING_COLL_POP_VIRTUALS_L02,
+  TIMING_COLL_POP_VIRTUALS_L03,
+  TIMING_COLL_POP_VIRTUALS_L04,
+  TIMING_COLL_POP_VIRTUALS_L05,
+  TIMING_COLL_POP_VIRTUALS_L06,
+  TIMING_COLL_POP_VIRTUALS_L07,
+  TIMING_COLL_POP_VIRTUALS_L08,
+  TIMING_COLL_POP_VIRTUALS_L09,
+  TIMING_COLL_POP_VIRTUALS_L10,
+  TIMING_COLL_POP_VIRTUALS_L11,
+  TIMING_COLL_POP_VIRTUALS_L12,
+  TIMING_COLL_POP_VIRTUALS_L13,
+  TIMING_COLL_POP_VIRTUALS_L14,
+  TIMING_COLL_POP_VIRTUALS_L15,
+  TIMING_COLL_POP_VIRTUALS_L16,
+  TIMING_COLL_POP_VIRTUALS_L17,
   TIMING_COLL_POP_VIRTUALS_L18,
-  TIMING_COLL_PER_QUAD_L00, TIMING_COLL_PER_QUAD_L01,
-  TIMING_COLL_PER_QUAD_L02, TIMING_COLL_PER_QUAD_L03,
-  TIMING_COLL_PER_QUAD_L04, TIMING_COLL_PER_QUAD_L05,
-  TIMING_COLL_PER_QUAD_L06, TIMING_COLL_PER_QUAD_L07,
-  TIMING_COLL_PER_QUAD_L08, TIMING_COLL_PER_QUAD_L09,
-  TIMING_COLL_PER_QUAD_L10, TIMING_COLL_PER_QUAD_L11,
-  TIMING_COLL_PER_QUAD_L12, TIMING_COLL_PER_QUAD_L13,
-  TIMING_COLL_PER_QUAD_L14, TIMING_COLL_PER_QUAD_L15,
-  TIMING_COLL_PER_QUAD_L16, TIMING_COLL_PER_QUAD_L17,
+  TIMING_COLL_PER_QUAD_L00,
+  TIMING_COLL_PER_QUAD_L01,
+  TIMING_COLL_PER_QUAD_L02,
+  TIMING_COLL_PER_QUAD_L03,
+  TIMING_COLL_PER_QUAD_L04,
+  TIMING_COLL_PER_QUAD_L05,
+  TIMING_COLL_PER_QUAD_L06,
+  TIMING_COLL_PER_QUAD_L07,
+  TIMING_COLL_PER_QUAD_L08,
+  TIMING_COLL_PER_QUAD_L09,
+  TIMING_COLL_PER_QUAD_L10,
+  TIMING_COLL_PER_QUAD_L11,
+  TIMING_COLL_PER_QUAD_L12,
+  TIMING_COLL_PER_QUAD_L13,
+  TIMING_COLL_PER_QUAD_L14,
+  TIMING_COLL_PER_QUAD_L15,
+  TIMING_COLL_PER_QUAD_L16,
+  TIMING_COLL_PER_QUAD_L17,
   TIMING_COLL_PER_QUAD_L18,
-  TIMING_UPDATE_FROM_VIRTUALS_L00, TIMING_UPDATE_FROM_VIRTUALS_L01,
-  TIMING_UPDATE_FROM_VIRTUALS_L02, TIMING_UPDATE_FROM_VIRTUALS_L03,
-  TIMING_UPDATE_FROM_VIRTUALS_L04, TIMING_UPDATE_FROM_VIRTUALS_L05,
-  TIMING_UPDATE_FROM_VIRTUALS_L06, TIMING_UPDATE_FROM_VIRTUALS_L07,
-  TIMING_UPDATE_FROM_VIRTUALS_L08, TIMING_UPDATE_FROM_VIRTUALS_L09,
-  TIMING_UPDATE_FROM_VIRTUALS_L10, TIMING_UPDATE_FROM_VIRTUALS_L11,
-  TIMING_UPDATE_FROM_VIRTUALS_L12, TIMING_UPDATE_FROM_VIRTUALS_L13,
-  TIMING_UPDATE_FROM_VIRTUALS_L14, TIMING_UPDATE_FROM_VIRTUALS_L15,
-  TIMING_UPDATE_FROM_VIRTUALS_L16, TIMING_UPDATE_FROM_VIRTUALS_L17,
+  TIMING_UPDATE_FROM_VIRTUALS_L00,
+  TIMING_UPDATE_FROM_VIRTUALS_L01,
+  TIMING_UPDATE_FROM_VIRTUALS_L02,
+  TIMING_UPDATE_FROM_VIRTUALS_L03,
+  TIMING_UPDATE_FROM_VIRTUALS_L04,
+  TIMING_UPDATE_FROM_VIRTUALS_L05,
+  TIMING_UPDATE_FROM_VIRTUALS_L06,
+  TIMING_UPDATE_FROM_VIRTUALS_L07,
+  TIMING_UPDATE_FROM_VIRTUALS_L08,
+  TIMING_UPDATE_FROM_VIRTUALS_L09,
+  TIMING_UPDATE_FROM_VIRTUALS_L10,
+  TIMING_UPDATE_FROM_VIRTUALS_L11,
+  TIMING_UPDATE_FROM_VIRTUALS_L12,
+  TIMING_UPDATE_FROM_VIRTUALS_L13,
+  TIMING_UPDATE_FROM_VIRTUALS_L14,
+  TIMING_UPDATE_FROM_VIRTUALS_L15,
+  TIMING_UPDATE_FROM_VIRTUALS_L16,
+  TIMING_UPDATE_FROM_VIRTUALS_L17,
   TIMING_UPDATE_FROM_VIRTUALS_L18,
-  TIMING_STREAM_L00, TIMING_STREAM_L01, TIMING_STREAM_L02, TIMING_STREAM_L03,
-  TIMING_STREAM_L04, TIMING_STREAM_L05, TIMING_STREAM_L06, TIMING_STREAM_L07,
-  TIMING_STREAM_L08, TIMING_STREAM_L09, TIMING_STREAM_L10, TIMING_STREAM_L11,
-  TIMING_STREAM_L12, TIMING_STREAM_L13, TIMING_STREAM_L14, TIMING_STREAM_L15,
-  TIMING_STREAM_L16, TIMING_STREAM_L17, TIMING_STREAM_L18,
-  TIMING_BOUNCE_BACK_L00, TIMING_BOUNCE_BACK_L01, TIMING_BOUNCE_BACK_L02,
-  TIMING_BOUNCE_BACK_L03, TIMING_BOUNCE_BACK_L04, TIMING_BOUNCE_BACK_L05,
-  TIMING_BOUNCE_BACK_L06, TIMING_BOUNCE_BACK_L07, TIMING_BOUNCE_BACK_L08,
-  TIMING_BOUNCE_BACK_L09, TIMING_BOUNCE_BACK_L10, TIMING_BOUNCE_BACK_L11,
-  TIMING_BOUNCE_BACK_L12, TIMING_BOUNCE_BACK_L13, TIMING_BOUNCE_BACK_L14,
-  TIMING_BOUNCE_BACK_L15, TIMING_BOUNCE_BACK_L16, TIMING_BOUNCE_BACK_L17,
-  TIMING_BOUNCE_BACK_L18,
-  TIMING_SWAP_L00, TIMING_SWAP_L01, TIMING_SWAP_L02, TIMING_SWAP_L03,
-  TIMING_SWAP_L04, TIMING_SWAP_L05, TIMING_SWAP_L06, TIMING_SWAP_L07,
-  TIMING_SWAP_L08, TIMING_SWAP_L09, TIMING_SWAP_L10, TIMING_SWAP_L11,
-  TIMING_SWAP_L12, TIMING_SWAP_L13, TIMING_SWAP_L14, TIMING_SWAP_L15,
-  TIMING_SWAP_L16, TIMING_SWAP_L17, TIMING_SWAP_L18,
-  TIMING_GHOST_EXC_BEGIN_L00, TIMING_GHOST_EXC_BEGIN_L01,
-  TIMING_GHOST_EXC_BEGIN_L02, TIMING_GHOST_EXC_BEGIN_L03,
-  TIMING_GHOST_EXC_BEGIN_L04, TIMING_GHOST_EXC_BEGIN_L05,
-  TIMING_GHOST_EXC_BEGIN_L06, TIMING_GHOST_EXC_BEGIN_L07,
-  TIMING_GHOST_EXC_BEGIN_L08, TIMING_GHOST_EXC_BEGIN_L09,
-  TIMING_GHOST_EXC_BEGIN_L10, TIMING_GHOST_EXC_BEGIN_L11,
-  TIMING_GHOST_EXC_BEGIN_L12, TIMING_GHOST_EXC_BEGIN_L13,
-  TIMING_GHOST_EXC_BEGIN_L14, TIMING_GHOST_EXC_BEGIN_L15,
-  TIMING_GHOST_EXC_BEGIN_L16, TIMING_GHOST_EXC_BEGIN_L17,
+  TIMING_STREAM_BOUNCE_BACK_L00,
+  TIMING_STREAM_BOUNCE_BACK_L01,
+  TIMING_STREAM_BOUNCE_BACK_L02,
+  TIMING_STREAM_BOUNCE_BACK_L03,
+  TIMING_STREAM_BOUNCE_BACK_L04,
+  TIMING_STREAM_BOUNCE_BACK_L05,
+  TIMING_STREAM_BOUNCE_BACK_L06,
+  TIMING_STREAM_BOUNCE_BACK_L07,
+  TIMING_STREAM_BOUNCE_BACK_L08,
+  TIMING_STREAM_BOUNCE_BACK_L09,
+  TIMING_STREAM_BOUNCE_BACK_L10,
+  TIMING_STREAM_BOUNCE_BACK_L11,
+  TIMING_STREAM_BOUNCE_BACK_L12,
+  TIMING_STREAM_BOUNCE_BACK_L13,
+  TIMING_STREAM_BOUNCE_BACK_L14,
+  TIMING_STREAM_BOUNCE_BACK_L15,
+  TIMING_STREAM_BOUNCE_BACK_L16,
+  TIMING_STREAM_BOUNCE_BACK_L17,
+  TIMING_STREAM_BOUNCE_BACK_L18,
+  TIMING_SWAP_L00,
+  TIMING_SWAP_L01,
+  TIMING_SWAP_L02,
+  TIMING_SWAP_L03,
+  TIMING_SWAP_L04,
+  TIMING_SWAP_L05,
+  TIMING_SWAP_L06,
+  TIMING_SWAP_L07,
+  TIMING_SWAP_L08,
+  TIMING_SWAP_L09,
+  TIMING_SWAP_L10,
+  TIMING_SWAP_L11,
+  TIMING_SWAP_L12,
+  TIMING_SWAP_L13,
+  TIMING_SWAP_L14,
+  TIMING_SWAP_L15,
+  TIMING_SWAP_L16,
+  TIMING_SWAP_L17,
+  TIMING_SWAP_L18,
+  TIMING_GHOST_EXC_BEGIN_L00,
+  TIMING_GHOST_EXC_BEGIN_L01,
+  TIMING_GHOST_EXC_BEGIN_L02,
+  TIMING_GHOST_EXC_BEGIN_L03,
+  TIMING_GHOST_EXC_BEGIN_L04,
+  TIMING_GHOST_EXC_BEGIN_L05,
+  TIMING_GHOST_EXC_BEGIN_L06,
+  TIMING_GHOST_EXC_BEGIN_L07,
+  TIMING_GHOST_EXC_BEGIN_L08,
+  TIMING_GHOST_EXC_BEGIN_L09,
+  TIMING_GHOST_EXC_BEGIN_L10,
+  TIMING_GHOST_EXC_BEGIN_L11,
+  TIMING_GHOST_EXC_BEGIN_L12,
+  TIMING_GHOST_EXC_BEGIN_L13,
+  TIMING_GHOST_EXC_BEGIN_L14,
+  TIMING_GHOST_EXC_BEGIN_L15,
+  TIMING_GHOST_EXC_BEGIN_L16,
+  TIMING_GHOST_EXC_BEGIN_L17,
   TIMING_GHOST_EXC_BEGIN_L18,
-  TIMING_GHOST_EXC_END_L00, TIMING_GHOST_EXC_END_L01, TIMING_GHOST_EXC_END_L02,
-  TIMING_GHOST_EXC_END_L03, TIMING_GHOST_EXC_END_L04, TIMING_GHOST_EXC_END_L05,
-  TIMING_GHOST_EXC_END_L06, TIMING_GHOST_EXC_END_L07, TIMING_GHOST_EXC_END_L08,
-  TIMING_GHOST_EXC_END_L09, TIMING_GHOST_EXC_END_L10, TIMING_GHOST_EXC_END_L11,
-  TIMING_GHOST_EXC_END_L12, TIMING_GHOST_EXC_END_L13, TIMING_GHOST_EXC_END_L14,
-  TIMING_GHOST_EXC_END_L15, TIMING_GHOST_EXC_END_L16, TIMING_GHOST_EXC_END_L17,
+  TIMING_GHOST_EXC_END_L00,
+  TIMING_GHOST_EXC_END_L01,
+  TIMING_GHOST_EXC_END_L02,
+  TIMING_GHOST_EXC_END_L03,
+  TIMING_GHOST_EXC_END_L04,
+  TIMING_GHOST_EXC_END_L05,
+  TIMING_GHOST_EXC_END_L06,
+  TIMING_GHOST_EXC_END_L07,
+  TIMING_GHOST_EXC_END_L08,
+  TIMING_GHOST_EXC_END_L09,
+  TIMING_GHOST_EXC_END_L10,
+  TIMING_GHOST_EXC_END_L11,
+  TIMING_GHOST_EXC_END_L12,
+  TIMING_GHOST_EXC_END_L13,
+  TIMING_GHOST_EXC_END_L14,
+  TIMING_GHOST_EXC_END_L15,
+  TIMING_GHOST_EXC_END_L16,
+  TIMING_GHOST_EXC_END_L17,
   TIMING_GHOST_EXC_END_L18,
   TIMING_COLLECT_FLAGS,
   TIMING_REFINE,
@@ -181,13 +301,23 @@ typedef struct {
   int timestep;
 } stat_container_t;
 
-static inline std::string gen_name(std::string name, int timestep) {
-  return name + " " + std::to_string(timestep);
+static inline std::string gen_name(std::string name, int timestep,
+                                   int level = -1) {
+  if (-1 == level) {
+    return name + " " + std::to_string(timestep);
+  } else {
+    return name + " level " + std::to_string(level) + " t " +
+           std::to_string(timestep);
+  }
 }
 
 static stat_container_t init_new_stat_container(int timestep) {
   stat_container_t new_entry;
   new_entry.timestep = timestep;
+
+  for (int i = 0; i < N_STATS; ++i) {
+    sc_stats_init(&new_entry.stats[i], new_entry.names[i].c_str());
+  }
 
   return new_entry;
 }
@@ -203,18 +333,17 @@ inline int p4est_utils_get_stat_report() {
   return 0;
 }
 
-#if (defined(LB_ADAPTIVE) || defined (ES_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(DD_P4EST))
+#if (defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE) ||   \
+     defined(DD_P4EST))
 
 /** Allow using std::lower_bound with sc_arrays by stubbing begin and end
  */
-template <typename T>
-T* sc_wrap_begin(const sc_array_t *a) {
+template <typename T> T *sc_wrap_begin(const sc_array_t *a) {
   assert(sizeof(T) == a->elem_size);
-  return reinterpret_cast<T*>(a->array);
+  return reinterpret_cast<T *>(a->array);
 }
 
-template <typename T>
-T* sc_wrap_end(const sc_array_t *a) {
+template <typename T> T *sc_wrap_end(const sc_array_t *a) {
   return sc_wrap_begin<T>(a) + a->elem_count;
 }
 
@@ -227,7 +356,7 @@ extern castable_unique_ptr<p4est_mesh_t> adapt_mesh;
 extern castable_unique_ptr<p4est_virtual_t> adapt_virtual;
 extern castable_unique_ptr<p4est_virtual_ghost_t> adapt_virtual_ghost;
 #ifdef COMM_HIDING
-extern std::vector<p8est_virtual_ghost_exchange_t*> exc_status_lb;
+extern std::vector<p8est_virtual_ghost_exchange_t *> exc_status_lb;
 #endif
 extern std::vector<bool> coupling_quads;
 #endif
@@ -295,8 +424,7 @@ struct p4est_utils_forest_info_t {
   int finest_level_ghost;
 
   p4est_utils_forest_info_t(p4est_t *p4est)
-      : p4est(p4est), p4est_space_idx(),
-        coarsest_level_local(P8EST_QMAXLEVEL),
+      : p4est(p4est), p4est_space_idx(), coarsest_level_local(P8EST_QMAXLEVEL),
         coarsest_level_ghost(P8EST_QMAXLEVEL),
         coarsest_level_global(P8EST_QMAXLEVEL), finest_level_local(-1),
         finest_level_global(-1), finest_level_ghost(-1) {}
@@ -369,8 +497,7 @@ inline int p4est_utils_set_partitioning(const std::string &part) {
     mpi_call(mpi_set_partitioning, -1, 0);
     mpi_set_partitioning(0, 0);
     return 0;
-  }
-  else {
+  } else {
     return -1;
   }
 }
@@ -385,7 +512,7 @@ inline int p4est_utils_get_partitioning(std::string *part) {
 inline int p4est_utils_set_threshold_velocity(double *thresh) {
 #ifdef LB_ADAPTIVE
   memcpy(p4est_params.threshold_velocity, thresh, 2 * sizeof(double));
-  mpi_call(mpi_bcast_thresh_vel,-1, -1);
+  mpi_call(mpi_bcast_thresh_vel, -1, -1);
   mpi_bcast_thresh_vel(0, 0);
 #endif // LB_ADAPTIVE
   return 0;
@@ -404,7 +531,7 @@ inline int p4est_utils_get_threshold_velocity(double *thresh) {
 inline int p4est_utils_set_threshold_vorticity(double *thresh) {
 #ifdef LB_ADAPTIVE
   memcpy(p4est_params.threshold_vorticity, thresh, 2 * sizeof(double));
-  mpi_call(mpi_bcast_thresh_vort,-1, -1);
+  mpi_call(mpi_bcast_thresh_vort, -1, -1);
   mpi_bcast_thresh_vort(0, 0);
 #endif // LB_ADAPTIVE
   return 0;
@@ -488,7 +615,8 @@ inline int p4est_utils_adapt_grid() {
 
 /** Set an area of refinement and prepare initial grid */
 inline int p4est_utils_set_refinement_area(double *bb_coords, double *vel) {
-  std::memcpy(coords_for_regional_refinement.data(), bb_coords, 6 * sizeof(double));
+  std::memcpy(coords_for_regional_refinement.data(), bb_coords,
+              6 * sizeof(double));
   std::memcpy(vel_reg_ref, vel, 3 * sizeof(double));
   mpi_call(mpi_set_refinement_area, -1, 0);
   mpi_set_refinement_area(0, 0);
@@ -573,9 +701,9 @@ inline void boxl_to_treecoords(double x[3]) {
       x[i] /= (box_l[i] / lb_conn_brick[i]);
     }
 #elif defined(DD_P4EST)
-  x[i] /= (box_l[i] / dd_p4est_get_n_trees(i));
+    x[i] /= (box_l[i] / dd_p4est_get_n_trees(i));
 #elif defined(LB_ADAPTIVE)
-  x[i] /= (box_l[i] / lb_conn_brick[i]);
+    x[i] /= (box_l[i] / lb_conn_brick[i]);
 #endif
   }
 #if !defined(DD_P4EST) && !defined(LB_ADAPTIVE)
@@ -603,8 +731,7 @@ inline std::array<double, 3> boxl_to_treecoords_copy(const double x[3]) {
  * \param [in]  q      the quadrant
  * \param [out] xyz    the coordinates of the midpoint of \a q
  */
-void p4est_utils_get_front_lower_left(p8est_t *p8est,
-                                      p4est_topidx_t which_tree,
+void p4est_utils_get_front_lower_left(p8est_t *p8est, p4est_topidx_t which_tree,
                                       p8est_quadrant_t *q, double *xyz);
 
 /** Get the coordinates of the front lower left corner of a quadrant
@@ -614,8 +741,7 @@ void p4est_utils_get_front_lower_left(p8est_t *p8est,
  *                         of the current quadrant that mesh_iter is pointing
  *                         to.
  */
-void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter,
-                                      double *xyz);
+void p4est_utils_get_front_lower_left(p8est_meshiter_t *mesh_iter, double *xyz);
 
 /** Get the coordinates of the midpoint of a quadrant.
  *
@@ -641,8 +767,8 @@ void p4est_utils_get_midpoint(p8est_meshiter_t *mesh_iter, double *xyz);
  * \param [in] tree1, tree2  Tree id of respective quadrants
  * \return                 True if the quadrants touch via face, edge, or corner
  */
-bool p4est_utils_quadrants_touching(p4est_quadrant_t* q1, p4est_topidx_t tree1,
-                                    p4est_quadrant_t* q2, p4est_topidx_t tree2);
+bool p4est_utils_quadrants_touching(p4est_quadrant_t *q1, p4est_topidx_t tree1,
+                                    p4est_quadrant_t *q2, p4est_topidx_t tree2);
 
 /** Verify that a quadrant contains the given position
  *
@@ -677,7 +803,7 @@ bool p4est_utils_pos_enclosing_check(const std::array<double, 3> &pos_mp_q1,
                                      const std::array<double, 3> pos,
                                      std::array<double, 6> &interpol_weights);
 
-#if defined(LB_ADAPTIVE) || defined (EK_ADAPTIVE) || defined (ES_ADAPTIVE)
+#if defined(LB_ADAPTIVE) || defined(EK_ADAPTIVE) || defined(ES_ADAPTIVE)
 /** Binary search for a local quadrant within the adaptive p4est */
 p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index);
 
@@ -689,14 +815,14 @@ p4est_locidx_t p4est_utils_bin_search_quad(p4est_gloidx_t index);
  * @param result        Initially empty array containing all matching quadrants
  */
 void p4est_utils_bin_search_quad_in_array(uint64_t search_index,
-                                          sc_array_t * search_space,
+                                          sc_array_t *search_space,
                                           std::vector<p4est_locidx_t> &result,
                                           int level = -1);
 #endif
 
 /** Split a Morton-index into 3 integers, i.e. the position on a virtual regular
  * grid on the finest level */
-std::array<uint64_t, 3> p4est_utils_idx_to_pos (uint64_t idx);
+std::array<uint64_t, 3> p4est_utils_idx_to_pos(uint64_t idx);
 
 /** Obtain a Morton-index by interleaving 3 integer coordinates.
  *
@@ -746,7 +872,8 @@ p4est_locidx_t p4est_utils_pos_to_qid(forest_order forest, const double xyz[3]);
  *                 \ref p4est_utils_cell_morton_idx
  * @return         The quadrant index at the given index.
  */
-p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest, const p4est_gloidx_t idx);
+p4est_locidx_t p4est_utils_idx_to_qid(forest_order forest,
+                                      const p4est_gloidx_t idx);
 
 /** Map a geometric position to the respective processor.
  *
@@ -816,9 +943,10 @@ template <typename T>
  * @param mesh        Mesh of current p4est.
  * @param local_data  Bool indicating if local or ghost information is relevant.
  */
-int p4est_utils_allocate_levelwise_storage(
-    std::vector<std::vector<T>> &data, p4est_mesh_t *mesh,
-    p4est_virtual_t *virtual_quads, bool local_data) {
+int p4est_utils_allocate_levelwise_storage(std::vector<std::vector<T>> &data,
+                                           p4est_mesh_t *mesh,
+                                           p4est_virtual_t *virtual_quads,
+                                           bool local_data) {
   if (!data.empty()) {
     p4est_utils_deallocate_levelwise_storage<T>(data);
   }
@@ -832,11 +960,11 @@ int p4est_utils_allocate_levelwise_storage(
     quads_on_level =
         local_data
             ? (mesh->quad_level + level)->elem_count +
-                  P8EST_CHILDREN * (virtual_quads->virtual_qlevels +
-                                    level)->elem_count
+                  P8EST_CHILDREN *
+                      (virtual_quads->virtual_qlevels + level)->elem_count
             : (mesh->ghost_level + level)->elem_count +
-                  P8EST_CHILDREN * (virtual_quads->virtual_glevels +
-                                    level)->elem_count;
+                  P8EST_CHILDREN *
+                      (virtual_quads->virtual_glevels + level)->elem_count;
     data[level].resize(quads_on_level);
   }
 
@@ -845,9 +973,9 @@ int p4est_utils_allocate_levelwise_storage(
 
 template <typename T>
 int prepare_ghost_exchange(std::vector<std::vector<T>> &local_data,
-                                  std::vector<T *> &local_pointer,
-                                  std::vector<std::vector<T>> &ghost_data,
-                                  std::vector<T *> &ghost_pointer) {
+                           std::vector<T *> &local_pointer,
+                           std::vector<std::vector<T>> &ghost_data,
+                           std::vector<T *> &ghost_pointer) {
   P4EST_ASSERT(ghost_data.size() == 0 ||
                ghost_data.size() == local_data.size());
   for (unsigned int i = 0; i < local_data.size(); ++i) {
@@ -877,27 +1005,25 @@ void p4est_utils_start_communication(
   prepare_ghost_exchange(local_data, local_pointer, ghost_data, ghost_pointer);
 
   if (level == -1) {
-    for (int lvl = p4est_params.min_ref_level;
-         lvl < p4est_params.max_ref_level; ++lvl) {
+    for (int lvl = p4est_params.min_ref_level; lvl < p4est_params.max_ref_level;
+         ++lvl) {
       P4EST_ASSERT(exc_status[lvl] == nullptr);
-      exc_status_lb[lvl] =
-          p8est_virtual_ghost_exchange_data_level_begin(
-              adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-              adapt_virtual_ghost, lvl, sizeof(T),
-              (void **) local_pointer.data(), (void **) ghost_pointer.data());
+      exc_status_lb[lvl] = p8est_virtual_ghost_exchange_data_level_begin(
+          adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+          adapt_virtual_ghost, lvl, sizeof(T), (void **)local_pointer.data(),
+          (void **)ghost_pointer.data());
     }
   } else {
     P4EST_ASSERT(exc_status[level] == nullptr);
-    exc_status_lb[level] =
-        p8est_virtual_ghost_exchange_data_level_begin(
-            adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
-            adapt_virtual_ghost, level, sizeof(T),
-            (void **) local_pointer.data(), (void **) ghost_pointer.data());
+    exc_status_lb[level] = p8est_virtual_ghost_exchange_data_level_begin(
+        adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual,
+        adapt_virtual_ghost, level, sizeof(T), (void **)local_pointer.data(),
+        (void **)ghost_pointer.data());
   }
 }
 
 int p4est_utils_end_pending_communication(
-    std::vector<p8est_virtual_ghost_exchange_t*> &exc_status, int level = -1);
+    std::vector<p8est_virtual_ghost_exchange_t *> &exc_status, int level = -1);
 #endif
 
 void p4est_utils_refine_around_particles();
@@ -908,7 +1034,8 @@ void p4est_utils_refine_around_particles();
 int p4est_utils_perform_adaptivity_step();
 #endif
 
-#if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
+#if defined(DD_P4EST) || defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) ||       \
+    defined(EK_ADAPTIVE)
 template <typename T>
 /** Flatten level-wise data, i.e. inverse operation of
  * \ref p4est_utils_unflatten_data
@@ -924,7 +1051,7 @@ template <typename T>
  */
 int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
                              p8est_virtual_t *virtual_quads,
-                             std::vector< std::vector<T> > &data_levelwise,
+                             std::vector<std::vector<T>> &data_levelwise,
                              std::vector<T> &data_flat) {
   p8est_quadrant_t *q;
   data_flat.resize(p4est->local_num_quadrants);
@@ -932,7 +1059,7 @@ int p4est_utils_flatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
     q = p4est_mesh_get_quadrant(p4est, mesh, qid);
     std::memcpy(data_flat.data() + qid,
                 data_levelwise[q->level].data() +
-                virtual_quads->quad_qreal_offset[qid],
+                    virtual_quads->quad_qreal_offset[qid],
                 sizeof(T));
   }
   return 0;
@@ -954,14 +1081,13 @@ template <typename T>
 int p4est_utils_unflatten_data(p8est_t *p4est, p8est_mesh_t *mesh,
                                p8est_virtual_t *virtual_quads,
                                std::vector<T> &data_flat,
-                               std::vector< std::vector<T> > &data_levelwise) {
+                               std::vector<std::vector<T>> &data_levelwise) {
   p8est_quadrant_t *q;
   for (p4est_locidx_t qid = 0; qid < p4est->local_num_quadrants; ++qid) {
     q = p4est_mesh_get_quadrant(p4est, mesh, qid);
     std::memcpy(data_levelwise[q->level].data() +
-                virtual_quads->quad_qreal_offset[qid],
-                data_flat.data() + qid,
-                sizeof(T));
+                    virtual_quads->quad_qreal_offset[qid],
+                data_flat.data() + qid, sizeof(T));
   }
   return 0;
 }
@@ -1040,9 +1166,9 @@ template <typename T>
  *                                   payload is supposed to be filled with 0.
  */
 int p4est_utils_post_gridadapt_map_data(
-    p4est_t *p4est_old, p4est_mesh_t *mesh_old,
-    p4est_virtual_t *virtual_quads, p4est_t *p4est_new,
-    std::vector<std::vector<T>> &local_data_levelwise, T *mapped_data_flat);
+    p4est_t *p4est_old, p4est_mesh_t *mesh_old, p4est_virtual_t *virtual_quads,
+    p4est_t *p4est_new, std::vector<std::vector<T>> &local_data_levelwise,
+    T *mapped_data_flat);
 #endif // defined(LB_ADAPTIVE) || defined(ES_ADAPTIVE) || defined(EK_ADAPTIVE)
 /*@}*/
 
@@ -1058,7 +1184,7 @@ int p4est_utils_post_gridadapt_map_data(
  *                 subcycling   Each cell is weighted with 2**(l_max - l_curr)
  * @return
  */
-std::vector<double> p4est_utils_get_adapt_weights(const std::string& metric);
+std::vector<double> p4est_utils_get_adapt_weights(const std::string &metric);
 
 /** Preprocess repartitioning, i.e. store former partitioning table.
  */
@@ -1075,8 +1201,8 @@ int p4est_utils_repart_postprocess();
 /*****************************************************************************/
 /*@{*/
 /** Partition two different p4ests such that their partition boundaries match.
- *  In case the reference is coarser or equal, the process boundaries are identical.
- *  Otherwise, only finer cells match the process for the reference.
+ *  In case the reference is coarser or equal, the process boundaries are
+ * identical. Otherwise, only finer cells match the process for the reference.
  *
  * @param[in]  p4est_ref   p4est with reference partition boundaries.
  * @param[out] p4est_mod   p4est to be modified such that its boundaries match

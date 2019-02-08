@@ -506,10 +506,16 @@ void mpi_eval_statistics (int node, int param);
  */
 Vector3i get_local_nodes();
 
+/** Get ghost number of fluid and boundary cells
+ */
+Vector3i get_ghost_nodes();
+
 #ifdef LB_ADAPTIVE
 /** Get local number of fluid and boundary cells of a specific level
  */
 Vector3i get_local_nodes_level(int l);
+
+Vector3i get_ghost_nodes_level(int l);
 #endif
 
 /** Collect node status locally and send to master

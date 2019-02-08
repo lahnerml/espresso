@@ -1282,6 +1282,55 @@ Vector3i get_local_nodes() {
   return nodes;
 }
 
+#ifdef LB_ADAPTIVE
+Vector3i get_ghost_nodes_level(int l) {
+  Vector3i nodes = {{0, 0, 0}};
+  lbadapt_payload_t *data;
+  int status = 0;
+  castable_unique_ptr<p8est_meshiter_t> mesh_iter = p8est_meshiter_new_ext(
+      adapt_p4est, adapt_ghost, adapt_mesh, adapt_virtual, l,
+      P8EST_CONNECT_FULL, P8EST_TRAVERSE_GHOST, P8EST_TRAVERSE_REAL,
+      P8EST_TRAVERSE_PARBOUNDINNER);
+  while (status != P8EST_MESHITER_DONE) {
+    status = p8est_meshiter_next(mesh_iter);
+    if (status != P8EST_MESHITER_DONE) {
+      data = &lbadapt_ghost_data[l].at(
+          p8est_meshiter_get_current_storage_id(mesh_iter));
+      if (data->lbfields.boundary)
+        ++nodes[0];
+      else
+        ++nodes[1];
+      ++nodes[2];
+    }
+  }
+  return nodes;
+}
+
+Vector3i get_ghost_nodes_adaptive() {
+  Vector3i nodes = {{0, 0, 0}};
+  for (int lvl = p4est_params.min_ref_level; lvl <= p4est_params.max_ref_level;
+       ++lvl) {
+    nodes += get_ghost_nodes_level(lvl);
+  }
+  return nodes;
+}
+#else
+Vector3i get_ghost_nodes_regular() {
+  return {0, 0, 0};
+}
+#endif
+
+Vector3i get_ghost_nodes() {
+  Vector3i nodes;
+#ifdef LB_ADAPTIVE
+  nodes = get_ghost_nodes_adaptive();
+#else
+  nodes = get_ghost_nodes_regular();
+#endif
+  return nodes;
+}
+
+
 void mpi_get_node_state_slave(int node, int level) {
   Vector3i nodes;
 #ifdef LB_ADAPTIVE

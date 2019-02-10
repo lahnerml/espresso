@@ -735,7 +735,7 @@ int coarsen_regional(p8est_t *p8est, p4est_topidx_t which_tree,
 int refine_geometric(p8est_t *p8est, p4est_topidx_t which_tree,
                      p8est_quadrant_t *q) {
   // 0.6 instead of 0.5 for stability reasons
-  lb_float half_length = 0.6 * sqrt(3) * p4est_params.h[q->level];
+  lb_float half_length = 0.5 * sqrt(3) * p4est_params.h[q->level];
 
   Vector3d midpoint{}, dist_vec{};
   p4est_utils_get_midpoint(p8est, which_tree, q, midpoint.data());

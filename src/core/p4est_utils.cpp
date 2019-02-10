@@ -995,6 +995,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
         }
       }
 
+#ifdef DD_P4EST
       // particles during simulation
       if (sim_time > 0.0 && coupling_quads[qid]) {
         flags[qid] = 1;
@@ -1010,6 +1011,7 @@ void p4est_utils_collect_flags(std::vector<int> &flags) {
           }
         }
       }
+#endif
     }
   }
 #endif // LB_ADAPTIVE

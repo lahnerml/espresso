@@ -427,7 +427,7 @@ bool p4est_utils_quadrants_touching(p4est_quadrant_t *q1, p4est_topidx_t tree1,
 
 bool p4est_utils_pos_sanity_check(p4est_locidx_t qid, double pos[3],
                                   bool ghost) {
-  std::array<double, 3> qpos;
+  std::array<double, 3> qpos = {};
   p8est_quadrant_t *quad;
   if (ghost) {
     quad = p4est_quadrant_array_index(&adapt_ghost->ghosts, qid);
@@ -526,9 +526,9 @@ int64_t p4est_utils_global_idx(p4est_utils_forest_info_t fi,
   double xyz[3];
   p8est_qcoord_to_vertex(fi.p4est->connectivity, which_tree, q->x, q->y, q->z,
                          xyz);
-  x = xyz[0] * (1 << fi.finest_level_global) + displace[0];
-  y = xyz[1] * (1 << fi.finest_level_global) + displace[1];
-  z = xyz[2] * (1 << fi.finest_level_global) + displace[2];
+  x = static_cast<int>(xyz[0] * (1 << fi.finest_level_global) + displace[0]);
+  y = static_cast<int>(xyz[1] * (1 << fi.finest_level_global) + displace[1]);
+  z = static_cast<int>(xyz[2] * (1 << fi.finest_level_global) + displace[2]);
 
   double n_trees[3];
   double n_trees_alt[3];
@@ -749,7 +749,7 @@ int refinement_criteria(p8est_t *p8est, p4est_topidx_t which_tree,
                         p8est_quadrant_t *q) {
 #ifdef LB_ADAPTIVE
   // get quad id
-  int qid = q->p.user_long;
+  auto qid = q->p.user_long;
 
   // perform geometric refinement
   int refine = refine_geometric(p8est, which_tree, q);
